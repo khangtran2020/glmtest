@@ -8,15 +8,13 @@ from rich.console import Console
 def check_docker_image(image_name: str, logger: Console) -> int:
     try:
         result = subprocess.run(
-            ["docker", "images", "inspect", image_name],
+            ["docker", "inspect", image_name],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         )
 
-        if result.returncode == 0:
-            logger.log(f"Pynguin docker image is found no ned to build the image")
-        else:
+        if "No such object" in result.stdout:
             logger.log("Pynguin docker image is not found. Need to build the image")
             with logger.status("Building Pynguin docker image"):
                 try:
@@ -48,6 +46,8 @@ def check_docker_image(image_name: str, logger: Console) -> int:
                 except Exception as e:  # pragma: no cover
                     logger.log(f"Error: {e}")
                     return -1
+        else:
+            logger.log(f"Pynguin docker image is found no ned to build the image")
         logger.log("Pynguin docker image is ready")
         return 0
     except Exception as e:
