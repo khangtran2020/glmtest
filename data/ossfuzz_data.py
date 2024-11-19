@@ -10,15 +10,18 @@ from rich.progress import Progress
 
 class Ossfuzz(Data):
 
-    def __init__(self, logger: Console) -> None:
+    def __init__(self, logger: Console, data_path: str) -> None:
         name = "OssFuzz"
-        super().__init__(name=name, logger=logger)
+        self.data_path = data_path
+        super().__init__(name=name, logger=logger, data_path=data_path)
 
     def crawl(self) -> None:
 
         # check if dataset path exist
         if os.path.exists(self.dataset_path):
-            self.logger.log("dataset path existed, please double-check")
+            self.logger.log(
+                f"dataset path: {self.dataset_path} existed, please double-check"
+            )
             sys.exit("PATH EXISTED")
         os.makedirs(self.dataset_path)
 
@@ -30,18 +33,24 @@ class Ossfuzz(Data):
 
         # clone ossfuzz to dataset_path
         with self.logger.status("Cloning ossfuzz to dataset_path") as status:
-            subprocess.run(
+            result = subprocess.run(
                 [
                     "git",
                     "clone",
                     "https://github.com/google/oss-fuzz.git",
-                    self.dataset_path,
+                    os.path.join(self.data_path, "oss-fuzz"),
                 ]
             )
+            if result.returncode != 0:
+                self.logger.log("Error: OSSFuzz is not cloned")
+                self.logger.log(result.stderr)
+                sys.exit("CLONE ERROR")
             self.logger.log("Cloned ossfuzz to dataset_path")
 
         # get github links of all projects
-        project_paths = os.path.join(self.dataset_path, "projects")
+        project_paths = os.path.join(
+            os.path.join(self.data_path, "oss-fuzz"), "projects"
+        )
         projects = os.listdir(project_paths)
 
         with Progress(console=self.logger) as progress:
@@ -56,6 +65,14 @@ class Ossfuzz(Data):
                     project_yaml = yaml.safe_load(file)
 
                 # check project language is python or not
+                if (
+                    "language" not in project_yaml.keys()
+                    or "main_repo" not in project_yaml.keys()
+                ):
+                    self.logger.log(f"Project {project} is not python project")
+                    progress.advance(task)
+                    continue
+
                 if project_yaml["language"] != "python":
                     self.logger.log(f"Project {project} is not python project")
                     progress.advance(task)
@@ -77,3 +94,4 @@ class Ossfuzz(Data):
                 progress.advance(task)
 
         self.logger.log("Crawling completed")
+        self.process_raw()

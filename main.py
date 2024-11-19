@@ -11,7 +11,7 @@ from rich.console import Console
 def main(args: Namespace, logger: Console) -> None:
 
     # init data
-    dataset = get_dataset(data_name=args.data, logger=console)
+    dataset = get_dataset(data_name=args.data, data_path=args.data_path, logger=console)
     if dataset is None:
         logger.log("Dataset not found, exiting...")
         return
@@ -25,3 +25,4 @@ if __name__ == "__main__":
     args = parse_args()
     print_args(args=args)
     seed_everything(args.seed)
+    main(args=args, logger=console)

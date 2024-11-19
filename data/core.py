@@ -57,11 +57,14 @@ def check_docker_image(image_name: str, logger: Console) -> int:
 
 class Data(object):
 
-    def __init__(self, name: str, logger: Console):
+    def __init__(self, name: str, data_path: str, logger: Console):
         self.name = name
+        self.data_path = data_path
         self.logger = logger
-        self.dataset_path = os.path.abspath(os.path.join("../", self.name))
+        self.dataset_path = os.path.abspath(os.path.join(self.data_path, self.name))
         self.project_path = os.path.join(self.dataset_path, "projects")
+        self.logger.log(f"Dataset path: {self.dataset_path}")
+        self.logger.log(f"Project path: {self.project_path}")
 
     def crawl(self):
         pass
@@ -83,6 +86,7 @@ class Data(object):
 
         # Get all modules from project path
         modules = []
+        projects = []
         path = []
         for project in os.listdir(self.project_path):
             project_path = os.path.join(self.project_path, project)
@@ -90,13 +94,21 @@ class Data(object):
                 for file in files:
                     if file.endswith(".py"):
                         modules.append(file)
+                        projects.append(project)
                         path.append(os.path.join(root, file))
 
         # Create a dataframe to store all modules and their corresponding project with paths
-        df = pd.DataFrame({"module": modules, "path": path})
+        df = pd.DataFrame({"module": modules, "path": path, "project": projects})
         df["uuid"] = list(range(1, len(df) + 1))
-        self.df = df
+        self.df = (
+            df[["uuid", "project", "module", "path"]]
+            .copy()
+            .sample(frac=1)
+            .reset_index(drop=True)
+        )
         self.df.to_csv(os.path.join(self.dataset_path, "raw_data.csv"), index=False)
+        self.logger.log(f"# of projects: {len(self.df['project'].unique())}")
+        self.logger.log(f"# of modules: {len(self.df['module'].unique())}")
         self.logger.log("Processed raw data")
         return
 
