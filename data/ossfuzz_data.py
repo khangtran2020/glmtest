@@ -39,6 +39,10 @@ class Ossfuzz(Data):
                     "clone",
                     "https://github.com/google/oss-fuzz.git",
                     os.path.join(self.data_path, "oss-fuzz"),
+                    "&&",
+                    "rm",
+                    "-rf",
+                    "oss-fuzz/*.git",
                 ]
             )
             if result.returncode != 0:
@@ -88,6 +92,10 @@ class Ossfuzz(Data):
                         "clone",
                         github_link,
                         os.path.join(self.project_path, project),
+                        "&&",
+                        "rm",
+                        "-rf",
+                        f"{os.path.join(self.project_path, project)}/*.git",
                     ]
                 )
                 self.logger.log(f"Cloned {project} to project_path")
