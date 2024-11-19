@@ -39,16 +39,20 @@ class Ossfuzz(Data):
                     "clone",
                     "https://github.com/google/oss-fuzz.git",
                     os.path.join(self.data_path, "oss-fuzz"),
-                    "&&",
-                    "rm",
-                    "-rf",
-                    "oss-fuzz/*.git",
                 ]
             )
             if result.returncode != 0:
                 self.logger.log("Error: OSSFuzz is not cloned")
                 self.logger.log(result.stderr)
                 sys.exit("CLONE ERROR")
+
+            result = subprocess.run(
+                [
+                    "rm",
+                    "-rf",
+                    "oss-fuzz/*.git",
+                ]
+            )
             self.logger.log("Cloned ossfuzz to dataset_path")
 
         # get github links of all projects
@@ -92,13 +96,17 @@ class Ossfuzz(Data):
                         "clone",
                         github_link,
                         os.path.join(self.project_path, project),
-                        "&&",
+                    ]
+                )
+                self.logger.log(f"Cloned {project} to project_path")
+
+                subprocess.run(
+                    [
                         "rm",
                         "-rf",
                         f"{os.path.join(self.project_path, project)}/*.git",
                     ]
                 )
-                self.logger.log(f"Cloned {project} to project_path")
                 progress.advance(task)
 
         self.logger.log("Crawling completed")
