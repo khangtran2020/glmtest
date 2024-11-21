@@ -12,6 +12,7 @@ class Ossfuzz(Data):
 
     def __init__(self, logger: Console, data_path: str) -> None:
         name = "OssFuzz"
+        original_name = "oss-fuzz"
         self.data_path = data_path
         super().__init__(name=name, logger=logger, data_path=data_path)
 

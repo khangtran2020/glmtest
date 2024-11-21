@@ -1,6 +1,6 @@
 import os
+import json
 import subprocess
-import pandas as pd
 from branch.extract import process_module
 from rich.console import Console
 
@@ -57,8 +57,9 @@ def check_docker_image(image_name: str, logger: Console) -> int:
 
 class Data(object):
 
-    def __init__(self, name: str, data_path: str, logger: Console):
+    def __init__(self, name: str, original_name: str, data_path: str, logger: Console):
         self.name = name
+        self.original_name = original_name
         self.data_path = data_path
         self.logger = logger
         self.dataset_path = os.path.abspath(os.path.join(self.data_path, self.name))
@@ -79,36 +80,40 @@ class Data(object):
         """
 
         # Check df exists
-        if os.path.exists(os.path.join(self.dataset_path, "raw_data.csv")):
-            self.df = pd.read_csv(os.path.join(self.dataset_path, "raw_data.csv"))
-            self.logger.log("Found csv file, do not need to process raw data")
+        if os.path.exists(os.path.join(self.dataset_path, "raw_data.json")):
+            self.data = json.load(
+                open(os.path.join(self.dataset_path, "raw_data.json"), "r")
+            )
+            self.logger.log("Found data json file, do not need to process raw data")
             return
 
         # Get all modules from project path
-        modules = []
-        projects = []
-        path = []
-        for project in os.listdir(self.project_path):
+        data = []
+
+        for i, project in enumerate(os.listdir(self.project_path)):
+
+            dat = {}
+            dat["uuid"] = i + 1
+            dat["project"] = project
+            dat["project_path"] = os.path.join(self.project_path, project)
+            dat["project_path_in_orignal"] = os.path.join(
+                self.data_path, self.original_name, "projects", project
+            )
+            dat["build_path"] = os.path.join(dat["project_path_in_orignal"], "build.sh")
+            modules = []
             project_path = os.path.join(self.project_path, project)
             for root, dirs, files in os.walk(project_path):
                 for file in files:
-                    if file.endswith(".py"):
+                    if file.endswith(".py") and "__" not in file:
                         modules.append(file)
-                        projects.append(project)
-                        path.append(os.path.join(root, file))
+            dat["modules"] = modules
+            data.append(dat)
 
-        # Create a dataframe to store all modules and their corresponding project with paths
-        df = pd.DataFrame({"module": modules, "path": path, "project": projects})
-        df["uuid"] = list(range(1, len(df) + 1))
-        self.df = (
-            df[["uuid", "project", "module", "path"]]
-            .copy()
-            .sample(frac=1)
-            .reset_index(drop=True)
-        )
-        self.df.to_csv(os.path.join(self.dataset_path, "raw_data.csv"), index=False)
-        self.logger.log(f"# of projects: {len(self.df['project'].unique())}")
-        self.logger.log(f"# of modules: {len(self.df['module'].unique())}")
+        # Create a json object and stor the data
+        with open(os.path.join(self.dataset_path, "raw_data.json"), "w") as f:
+            json.dump(data, f)
+
+        self.data = data
         self.logger.log("Processed raw data")
         return
 
