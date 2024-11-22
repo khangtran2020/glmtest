@@ -14,7 +14,9 @@ class Ossfuzz(Data):
         name = "OssFuzz"
         original_name = "oss-fuzz"
         self.data_path = data_path
-        super().__init__(name=name, logger=logger, data_path=data_path)
+        super().__init__(
+            name=name, original_name=original_name, logger=logger, data_path=data_path
+        )
 
     def crawl(self) -> None:
 
@@ -51,9 +53,20 @@ class Ossfuzz(Data):
                 [
                     "rm",
                     "-rf",
+                    "oss-fuzz/.git",
+                ]
+            )
+            result = subprocess.run(
+                [
+                    "rm",
+                    "-rf",
                     "oss-fuzz/*.git",
                 ]
             )
+            if result.returncode != 0:
+                self.logger.log("Error: .git is not deleted")
+                self.logger.log(result.stderr)
+                sys.exit("DELETE ERROR")
             self.logger.log("Cloned ossfuzz to dataset_path")
 
         # get github links of all projects
@@ -89,6 +102,13 @@ class Ossfuzz(Data):
 
                 # get github link
                 github_link = project_yaml["main_repo"]
+                if "github.com" not in github_link:
+                    self.logger.log(f"Project {project} is not github project")
+                    progress.advance(task)
+                    continue
+
+                # create directory
+                os.makedirs(os.path.join(self.project_path, project))
 
                 # clone project to project_path
                 subprocess.run(
@@ -96,18 +116,23 @@ class Ossfuzz(Data):
                         "git",
                         "clone",
                         github_link,
-                        os.path.join(self.project_path, project),
+                        os.path.join(self.project_path, project, project),
                     ]
                 )
                 self.logger.log(f"Cloned {project} to project_path")
 
-                subprocess.run(
+                res_del_git = subprocess.run(
                     [
                         "rm",
                         "-rf",
-                        f"{os.path.join(self.project_path, project)}/*.git",
+                        f"{os.path.join(self.project_path, project, project)}/*.git",
                     ]
                 )
+                if res_del_git.returncode != 0:
+                    self.logger.log("Error: .git is not deleted")
+                    self.logger.log(res_del_git.stderr)
+                    sys.exit("DELETE ERROR")
+
                 progress.advance(task)
 
         self.logger.log("Crawling completed")
