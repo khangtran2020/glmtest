@@ -31,7 +31,7 @@ RUN wget --quiet https://repo.anaconda.com/archive/Anaconda3-2024.10-1-Linux-x86
 ENV PATH /opt/conda/bin:$PATH
 
 RUN conda update conda \
-    && conda env create --name work
+    && conda create --n work python=3.9 -y
 
 COPY ./ ./
 RUN conda init bash
