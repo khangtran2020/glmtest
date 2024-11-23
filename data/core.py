@@ -172,8 +172,6 @@ class Data(object):
         if data["build_path"] == "N/A":
             if check_package_exists(data["project"]):
                 new_build_sh = f"pip install {data['project']}"
-            else:
-                new_build_sh = f"pip install -r requirements.txt"
         else:
             with open(data["build_path"], "r") as file:
                 build_sh = file.read()
@@ -181,9 +179,10 @@ class Data(object):
             lines = build_sh.split("\n")
             new_lines = []
             for line in lines:
-                if "# Build fuzzers into $OUT." in line:
+                if "fuzzer" in line.lower():
                     break
                 new_lines.append(line)
+            new_lines.append(f"pip install pynguin")
             new_build_sh = "\n".join(new_lines)
             with open(
                 os.path.join(
@@ -215,7 +214,7 @@ class Data(object):
         # Add command to install dependencies by running build_for_glmf.sh
         dockerfile = (
             dockerfile_template
-            + f"\nRUN cd {data['project']} && bash build_for_glmf.sh"
+            + f"\nRUN cd {data['project']} && conda activate work && bash build_for_glmf.sh"
             + f"\nRUN bash run_pynguin.sh"
         )
         # write Dockerfile
