@@ -1,41 +1,90 @@
 import os
 import sys
 import yaml
+import json
+import shutil
 import subprocess
-import pandas as pd
-from data.core import Data
 from rich.console import Console
 from rich.progress import Progress
+from data.core import Data
+from utils.utils import check_package_exists_in_pypi
+
+DOCKERFILE_TEMPLATE = """# Use nvidia/cuda image
+FROM nvidia/cuda:11.1.1-cudnn8-devel-ubuntu18.04
+WORKDIR /pynguin_gen
+
+# set bash as current shell
+RUN chsh -s /bin/bash
+SHELL ["/bin/bash", "-c"]
+
+# install anaconda
+RUN apt-get update
+RUN apt-get install -y wget bzip2 ca-certificates libglib2.0-0 libxext6 libsm6 libxrender1 git mercurial subversion vim && \
+        apt-get clean
+RUN wget --quiet https://repo.anaconda.com/archive/Anaconda3-2024.10-1-Linux-x86_64.sh -O ~/anaconda.sh && \
+        /bin/bash ~/anaconda.sh -b -p /opt/conda && \
+        rm ~/anaconda.sh && \
+        ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+        echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
+        find /opt/conda/ -follow -type f -name '*.a' -delete && \
+        find /opt/conda/ -follow -type f -name '*.js.map' -delete && \
+        /opt/conda/bin/conda clean -afy
+
+# set path to conda
+ENV PATH /opt/conda/bin:$PATH
+
+RUN conda update conda \
+    && conda create -n work python=3.10 -y
+
+COPY ./ ./
+RUN conda init bash
+RUN echo "conda activate work" >> ~/.bashrc
+RUN export PYTHONHASHSEED=0
+ENV PATH /opt/conda/envs/pet/bin:$PATH
+ENV CONDA_DEFAULT_ENV $work
+
+# Create a new user and group
+RUN groupadd -r pynguin && useradd -r -m -g pynguin pynguin_user
+
+# Change ownership of the working directory to the new user
+RUN chown -R pynguin_user:pynguin /pynguin_gen
+
+# Switch to the new user
+USER pynguin_user
+"""
+
+PYNGUIN_TEMPLATE = """pynguin \
+    --project-path {} \
+    --output-path {} \
+    --module-name {} --maximum-search-time 10 &"""
 
 
-class Ossfuzz(Data):
+class OSSFuzz(Data):
 
-    def __init__(self, logger: Console, data_path: str) -> None:
-        name = "OssFuzz"
-        original_name = "oss-fuzz"
-        self.data_path = data_path
-        super().__init__(
-            name=name, original_name=original_name, logger=logger, data_path=data_path
-        )
+    def __init__(self, logger: Console, path: str) -> None:
+        self.name = "OSSFuzz"
+        self.data_path = os.path.join(path, self.name)
+        super().__init__(name=self.name, path=path, logger=logger)
 
     def crawl(self) -> None:
 
         # check if dataset path exist
-        if os.path.exists(self.dataset_path):
+        if os.path.exists(self.data_path):
             self.logger.log(
-                f"dataset path: {self.dataset_path} existed, please double-check"
+                f"dataset path: {self.data_path} existed, please double-check"
             )
             sys.exit("PATH EXISTED")
-        os.makedirs(self.dataset_path)
+        os.makedirs(self.data_path)
 
         # check if project path exist
-        if os.path.exists(self.project_path):
+        project_path = os.path.join(self.data_path, "projects")
+        if os.path.exists(project_path):
             self.logger.log("project path existed, please double-check")
             sys.exit("PATH EXISTED")
-        os.makedirs(self.project_path)
+        os.makedirs(project_path)
 
-        # clone ossfuzz to dataset_path
-        with self.logger.status("Cloning ossfuzz to dataset_path") as status:
+        # clone ossfuzz to data_path
+        with self.logger.status("Cloning ossfuzz to data_path") as status:
             result = subprocess.run(
                 [
                     "git",
@@ -49,38 +98,35 @@ class Ossfuzz(Data):
                 self.logger.log(result.stderr)
                 sys.exit("CLONE ERROR")
 
-            result = subprocess.run(
-                [
-                    "rm",
-                    "-rf",
-                    "oss-fuzz/.git",
-                ]
-            )
-            result = subprocess.run(
-                [
-                    "rm",
-                    "-rf",
-                    "oss-fuzz/*.git",
-                ]
-            )
+            # delete .git
+            for f in os.listdir(os.path.join(self.data_path, "oss-fuzz")):
+                if ".git" in f:
+                    if os.path.isdir(os.path.join(self.data_path, "oss-fuzz", f)):
+                        shutil.rmtree(os.path.join(self.data_path, "oss-fuzz", f))
+                    else:
+                        os.remove(os.path.join(self.data_path, "oss-fuzz", f))
+
+            # print(result.stdout + result.stderr)
             if result.returncode != 0:
                 self.logger.log("Error: .git is not deleted")
                 self.logger.log(result.stderr)
                 sys.exit("DELETE ERROR")
-            self.logger.log("Cloned ossfuzz to dataset_path")
+            self.logger.log("Cloned ossfuzz to data_path")
 
         # get github links of all projects
-        project_paths = os.path.join(
-            os.path.join(self.data_path, "oss-fuzz"), "projects"
+        projects = os.listdir(
+            os.path.join(os.path.join(self.data_path, "oss-fuzz"), "projects")
         )
-        projects = os.listdir(project_paths)
 
         with Progress(console=self.logger) as progress:
 
             task = progress.add_task("Crawling projects", total=len(projects))
 
             for project in projects:
-                project_path = os.path.join(project_paths, project)
+                project_path = os.path.join(
+                    os.path.join(os.path.join(self.data_path, "oss-fuzz"), "projects"),
+                    project,
+                )
                 # read yaml file to dict
                 yaml_file_path = os.path.join(project_path, "project.yaml")
                 with open(yaml_file_path, "r") as file:
@@ -108,7 +154,7 @@ class Ossfuzz(Data):
                     continue
 
                 # create directory
-                os.makedirs(os.path.join(self.project_path, project))
+                os.makedirs(os.path.join(project_path, project))
 
                 # clone project to project_path
                 subprocess.run(
@@ -116,24 +162,145 @@ class Ossfuzz(Data):
                         "git",
                         "clone",
                         github_link,
-                        os.path.join(self.project_path, project, project),
+                        os.path.join(project_path, project, project),
                     ]
                 )
                 self.logger.log(f"Cloned {project} to project_path")
 
-                res_del_git = subprocess.run(
-                    [
-                        "rm",
-                        "-rf",
-                        f"{os.path.join(self.project_path, project, project)}/*.git",
-                    ]
-                )
-                if res_del_git.returncode != 0:
-                    self.logger.log("Error: .git is not deleted")
-                    self.logger.log(res_del_git.stderr)
-                    sys.exit("DELETE ERROR")
+                # delete .git
+                for f in os.listdir(os.path.join(project_path, project, project)):
+                    if ".git" in f:
+                        if os.path.isdir(
+                            os.path.join(project_path, project, project, f)
+                        ):
+                            shutil.rmtree(
+                                os.path.join(project_path, project, project, f)
+                            )
+                        else:
+                            os.remove(os.path.join(project_path, project, project, f))
 
                 progress.advance(task)
 
         self.logger.log("Crawling completed")
-        self.process_raw()
+
+    def process(self) -> None:
+
+        # check if the data has been processeds
+        if os.path.exists(os.path.join(self.data_path, "data.json")):
+            self.logger.log("Found data json file, do not need to process raw data")
+
+            # load data
+            with open(os.path.join(self.data_path, "data.json"), "r") as file:
+                self.data = json.load(file)
+
+            # load stat_info
+            with open(os.path.join(self.data_path, "stat_info.json"), "r") as file:
+                self.stat_info = json.load(file)
+            return
+
+        # process data
+        data = []
+        num_project = 0
+        num_modules = 0
+        project_path = os.path.join(self.data_path, "projects")
+
+        for i, project in enumerate(os.listdir(project_path)):
+
+            dat = {}
+            dat["uuid"] = i + 1
+            dat["project"] = project
+            dat["project_path"] = os.path.join(project_path, project)
+            dat["project_path_in_orignal"] = os.path.join(
+                self.data_path, self.original_name, "projects", project
+            )
+            if "build.sh" in os.listdir(dat["project_path_in_orignal"]):
+                dat["build_path"] = os.path.join(
+                    dat["project_path_in_orignal"], "build.sh"
+                )
+            else:
+
+                if check_package_exists_in_pypi(dat["project"]):
+                    dat["build_path"] = "N/A"
+                else:
+                    continue
+            num_project += 1
+            modules = []
+            project_path = os.path.join(project_path, project, project)
+            for root, dirs, files in os.walk(project_path):
+                for file in files:
+                    if file.endswith(".py") and "__" not in file:
+                        modules.append(file)
+            dat["modules"] = modules
+            num_modules += len(modules)
+            data.append(dat)
+
+        # Create a json object and stor the data
+        with open(os.path.join(self.data_path, "raw_data.json"), "w") as f:
+            json.dump(data, f)
+
+        self.data = data
+        self.logger.log("Processed raw data")
+        self.logger.log(f"Number of projects: {num_project}")
+        self.logger.log(f"Number of modules: {num_modules}")
+
+        # Save statistic information
+        stat_info = {
+            "num_project": num_project,
+            "num_modules": num_modules,
+        }
+        with open(os.path.join(self.data_path, "stat_info.json"), "w") as f:
+            json.dump(stat_info, f)
+        self.stat_info = stat_info
+
+        # create Dockerfile for each project
+        for dat in data:
+            self.create_dockerfile(data=dat)
+            self.create_build_script(data=dat)
+            self.logger.log(f"Created Dockerfile for {dat['project']}")
+        return
+
+    def create_dockerfile(self, data: dict) -> None:
+        with open(os.path.join(data["project_path"], "Dockerfile"), "w") as f:
+            f.write(DOCKERFILE_TEMPLATE)
+
+    def create_build_script(self, data: dict) -> None:
+
+        if check_package_exists_in_pypi(data["project"]):
+            new_build_sh = f"pip install {data['project']}"
+        else:
+            with open(data["build_path"], "r") as file:
+                build_sh = file.read()
+
+            lines = build_sh.split("\n")
+            new_lines = []
+            for line in lines:
+                if "fuzzer" in line.lower():
+                    break
+                new_lines.append(line)
+            new_lines.append(f"pip install pynguin")
+            new_build_sh = "\n".join(new_lines)
+            with open(
+                os.path.join(
+                    data["project_path"], data["project"], "build_for_glmf.sh"
+                ),
+                "w",
+            ) as file:
+                file.write(new_build_sh)
+
+    def create_run_script(self, data: dict) -> None:
+        modules = data["modules"]
+
+        commands = []
+        # run pynguin on all modules in parallel but only 10 at a time
+        for i, module in enumerate(modules):
+            pynguin_command = PYNGUIN_TEMPLATE.format(
+                data["project"],
+                os.path.join("pynguin-results", data["project"], module),
+                module,
+            )
+            commands.append(pynguin_command)
+            if i % 10 == 0:
+                commands.append("sleep 60")
+        command = "\n".join(commands)
+        with open(os.path.join(data["project_path"], "run_pynguin.sh"), "w") as file:
+            file.write(command)

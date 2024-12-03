@@ -1,6 +1,7 @@
 import os
 import pickle
 import random
+import requests
 import numpy as np
 from typing import Dict
 from utils.console import log_table
@@ -44,3 +45,20 @@ def print_args(args):
 
 def get_index_by_value(a, val):
     return (a == val).nonzero(as_tuple=True)[0]
+
+
+def check_package_exists_in_pypi(package_name: str) -> bool:
+
+    url = f"https://pypi.org/pypi/{package_name}/json"
+
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            print(f"The package '{package_name}' exists on PyPI.")
+            return True
+        else:
+            print(f"The package '{package_name}' does NOT exist on PyPI.")
+            return False
+    except requests.RequestException as e:
+        print(f"An error occurred while checking the package: {e}")
+        return False
