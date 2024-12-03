@@ -227,7 +227,7 @@ class OSSFuzz(Data):
             dat["project"] = project
             dat["project_path"] = os.path.join(project_path, project)
             dat["project_path_in_orignal"] = os.path.join(
-                self.data_path, self.original_name, "projects", project
+                self.data_path, "oss-fuzz", "projects", project
             )
             if "build.sh" in os.listdir(dat["project_path_in_orignal"]):
                 dat["build_path"] = os.path.join(
