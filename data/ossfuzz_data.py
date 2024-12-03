@@ -51,6 +51,7 @@ RUN chown -R pynguin_user:pynguin /pynguin_gen
 
 # Switch to the new user
 USER pynguin_user
+RUN conda init bash && echo "conda activate work" >> ~/.bashrc
 """
 
 PYNGUIN_TEMPLATE = """pynguin \
