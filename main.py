@@ -18,7 +18,7 @@ def main(args: Namespace, logger: Console) -> None:
 
     if args.mode == "crawl":
         dataset.crawl()
-        # dataset.process_raw()
+        dataset.process()
 
 
 if __name__ == "__main__":

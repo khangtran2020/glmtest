@@ -123,12 +123,12 @@ class OSSFuzz(Data):
             task = progress.add_task("Crawling projects", total=len(projects))
 
             for project in projects:
-                project_path = os.path.join(
+                oss_fuzz_project_path = os.path.join(
                     os.path.join(os.path.join(self.data_path, "oss-fuzz"), "projects"),
                     project,
                 )
                 # read yaml file to dict
-                yaml_file_path = os.path.join(project_path, "project.yaml")
+                yaml_file_path = os.path.join(oss_fuzz_project_path, "project.yaml")
                 with open(yaml_file_path, "r") as file:
                     project_yaml = yaml.safe_load(file)
 
