@@ -295,16 +295,14 @@ class OSSFuzz(Data):
                 new_lines.append(line)
             new_lines.append(f"pip install pynguin")
             new_build_sh = "\n".join(new_lines)
-            with open(
-                os.path.join(
-                    data["project_path"], data["project"], "build_for_glmf.sh"
-                ),
-                "w",
-            ) as file:
-                file.write(new_build_sh)
-            self.logger.log(
-                f"Created build script for {data['project']} in: {os.path.join(data['project_path'], data['project'], 'build_for_glmf.sh')}"
-            )
+        with open(
+            os.path.join(data["project_path"], data["project"], "build_for_glmf.sh"),
+            "w",
+        ) as file:
+            file.write(new_build_sh)
+        self.logger.log(
+            f"Created build script for {data['project']} in: {os.path.join(data['project_path'], data['project'], 'build_for_glmf.sh')}"
+        )
 
     def create_run_script(self, data: dict) -> None:
         modules = data["modules"]
