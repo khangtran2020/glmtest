@@ -302,6 +302,9 @@ class OSSFuzz(Data):
                 "w",
             ) as file:
                 file.write(new_build_sh)
+            self.logger.log(
+                f"Created build script for {data['project']} in: {os.path.join(data['project_path'], data['project'], 'build_for_glmf.sh')}"
+            )
 
     def create_run_script(self, data: dict) -> None:
         modules = data["modules"]
