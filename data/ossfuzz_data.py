@@ -206,7 +206,9 @@ class OSSFuzz(Data):
                     self.logger.log(f"Found Dockerfile for {dat['project']}")
 
                 if not os.path.exists(
-                    os.path.join(dat["project_path"], "build_for_glmf.sh")
+                    os.path.join(
+                        dat["project_path"], dat["project"], "build_for_glmf.sh"
+                    )
                 ):
                     self.create_build_script(data=dat)
                     self.logger.log(f"Created build script for {dat['project']}")
