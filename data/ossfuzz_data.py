@@ -241,8 +241,8 @@ class OSSFuzz(Data):
                     continue
             num_project += 1
             modules = []
-            project_path = os.path.join(project_path, project, project)
-            for root, dirs, files in os.walk(project_path):
+            current_project_path = os.path.join(project_path, project, project)
+            for root, dirs, files in os.walk(current_project_path):
                 for file in files:
                     if file.endswith(".py") and "__" not in file:
                         modules.append(file)
