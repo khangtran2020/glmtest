@@ -196,6 +196,22 @@ class OSSFuzz(Data):
             # load stat_info
             with open(os.path.join(self.data_path, "stat_info.json"), "r") as file:
                 self.stat_info = json.load(file)
+
+            # check dockerfile and build script
+            for dat in self.data:
+                if not os.path.exists(os.path.join(dat["project_path"], "Dockerfile")):
+                    self.create_dockerfile(data=dat)
+                    self.logger.log(f"Created Dockerfile for {dat['project']}")
+                else:
+                    self.logger.log(f"Found Dockerfile for {dat['project']}")
+
+                if not os.path.exists(
+                    os.path.join(dat["project_path"], "build_for_glmf.sh")
+                ):
+                    self.create_build_script(data=dat)
+                    self.logger.log(f"Created build script for {dat['project']}")
+                else:
+                    self.logger.log(f"Found build script for {dat['project']}")
             return
 
         # process data
