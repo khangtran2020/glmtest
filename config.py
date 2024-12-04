@@ -15,7 +15,7 @@ def add_general_group(group):
 def add_data_group(group):
     group.add_argument("--data_path", type=str, help="dir path to dataset")
     group.add_argument(
-        "--max_pynguin_run_time", type=int, help="time limit for pynguin"
+        "--max_pynguin_run_time", type=int, help="time limit for pynguin", default=10
     )
     group.add_argument("--data", type=str, help="name of dataset")
 
