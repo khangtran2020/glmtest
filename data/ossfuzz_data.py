@@ -339,7 +339,7 @@ class OSSFuzz(Data):
                 self.run_time,
             )
             project_template += "\n" + pynguin_command
-            if i % 10 == 0:
+            if i + 1 % 10 == 0:
                 project_template += "sleep 120"
         with open(os.path.join(data["project_path"], "run_pynguin.sh"), "w") as file:
             file.write(project_template)
