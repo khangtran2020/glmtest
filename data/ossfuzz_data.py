@@ -59,6 +59,20 @@ PYNGUIN_TEMPLATE = """pynguin \
     --output-path {} \
     --module-name {} --maximum-search-time 10 &"""
 
+RUN_TEMPLATE = """#!/bin/bash
+export PATH=$PATH:/home/pynguin_user/.local/bin
+pip install pynguin coverage
+export PYNGUIN_DANGER_AWARE=1
+
+
+cd {}
+bash build_for_glmf.sh
+
+cd ..
+
+
+"""
+
 
 class OSSFuzz(Data):
 
@@ -248,13 +262,13 @@ class OSSFuzz(Data):
             for root, dirs, files in os.walk(current_project_path):
                 for file in files:
                     if file.endswith(".py") and "__" not in file:
-                        modules.append(file)
+                        modules.append(os.path.join(root, file).replace("/", "."))
             dat["modules"] = modules
             num_modules += len(modules)
             data.append(dat)
 
         # Create a json object and stor the data
-        with open(os.path.join(self.data_path, "raw_data.json"), "w") as f:
+        with open(os.path.join(self.data_path, "data.json"), "w") as f:
             json.dump(data, f)
 
         self.data = data
