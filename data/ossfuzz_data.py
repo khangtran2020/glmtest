@@ -56,8 +56,8 @@ RUN conda init bash && echo "conda activate work" >> ~/.bashrc
 
 PYNGUIN_TEMPLATE = """pynguin \
     --project-path {} \
-    --output-path {} \
-    --module-name {} --maximum-search-time 10 &"""
+    --output-path ./test/ \
+    --module-name {} --maximum-search-time {} &"""
 
 RUN_TEMPLATE = """#!/bin/bash
 export PATH=$PATH:/home/pynguin_user/.local/bin
@@ -69,16 +69,15 @@ cd {}
 bash build_for_glmf.sh
 
 cd ..
-
-
 """
 
 
 class OSSFuzz(Data):
 
-    def __init__(self, logger: Console, path: str) -> None:
+    def __init__(self, logger: Console, path: str, run_time: int) -> None:
         self.name = "OSSFuzz"
         self.data_path = os.path.join(path, self.name)
+        self.run_time = run_time
         super().__init__(name=self.name, path=path, logger=logger)
 
     def crawl(self) -> None:
@@ -297,12 +296,13 @@ class OSSFuzz(Data):
         for dat in data:
             self.create_dockerfile(data=dat)
             self.create_build_script(data=dat)
-            self.logger.log(f"Created Dockerfile for {dat['project']}")
+            self.create_run_script(data=dat)
         return
 
     def create_dockerfile(self, data: dict) -> None:
         with open(os.path.join(data["project_path"], "Dockerfile"), "w") as f:
             f.write(DOCKERFILE_TEMPLATE)
+        self.logger.log(f"Created Dockerfile for {data['project']}")
 
     def create_build_script(self, data: dict) -> None:
 
@@ -327,20 +327,27 @@ class OSSFuzz(Data):
             file.write(new_build_sh)
         self.logger.log(f"Created build script for {data['project']}")
 
-    def create_run_script(self, data: dict) -> None:
+    def create_run_pynguin_script(self, data: dict) -> None:
         modules = data["modules"]
 
-        commands = []
+        project_template = "#!/bin/bash\n"
         # run pynguin on all modules in parallel but only 10 at a time
         for i, module in enumerate(modules):
             pynguin_command = PYNGUIN_TEMPLATE.format(
-                data["project"],
-                os.path.join("pynguin-results", data["project"], module),
+                f"./{data['project']}",
                 module,
+                self.run_time,
             )
-            commands.append(pynguin_command)
+            project_template += "\n" + pynguin_command
             if i % 10 == 0:
-                commands.append("sleep 60")
-        command = "\n".join(commands)
+                project_template += "sleep 120"
         with open(os.path.join(data["project_path"], "run_pynguin.sh"), "w") as file:
-            file.write(command)
+            file.write(project_template)
+        self.logger.log(f"Created run pynguin script for {data['project']}")
+
+    def create_run_script(self, data: dict) -> None:
+        run_script = RUN_TEMPLATE.format(data["project"])
+        run_script += "\n" + self.create_run_pynguin_script(data)
+        with open(os.path.join(data["project_path"], "run.sh"), "w") as file:
+            file.write(run_script)
+        self.logger.log(f"Created run script for {data['project']}")
