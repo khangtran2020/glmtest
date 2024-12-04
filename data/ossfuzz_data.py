@@ -262,7 +262,11 @@ class OSSFuzz(Data):
             for root, dirs, files in os.walk(current_project_path):
                 for file in files:
                     if file.endswith(".py") and "__" not in file:
-                        modules.append(os.path.join(root, file).replace("/", "."))
+                        modules.append(
+                            os.path.join(root, file)
+                            .replace(dat["project_path"], "")
+                            .replace("/", ".")
+                        )
             dat["modules"] = modules
             num_modules += len(modules)
             data.append(dat)
