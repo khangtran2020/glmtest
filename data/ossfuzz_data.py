@@ -265,7 +265,8 @@ class OSSFuzz(Data):
                         modules.append(
                             os.path.join(root, file)
                             .replace(
-                                os.path.join(dat["project_path"], dat["project"]), ""
+                                os.path.join(dat["project_path"], dat["project"]) + "/",
+                                "",
                             )
                             .replace("/", ".")
                         )
