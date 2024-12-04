@@ -264,7 +264,9 @@ class OSSFuzz(Data):
                     if file.endswith(".py") and "__" not in file:
                         modules.append(
                             os.path.join(root, file)
-                            .replace(dat["project_path"], "")
+                            .replace(
+                                os.path.join(dat["project_path"], dat["project"]), ""
+                            )
                             .replace("/", ".")
                         )
             dat["modules"] = modules
