@@ -269,6 +269,7 @@ class OSSFuzz(Data):
                                 "",
                             )
                             .replace("/", ".")
+                            .replace(".py", "")
                         )
             dat["modules"] = modules
             num_modules += len(modules)
