@@ -232,6 +232,7 @@ class OSSFuzz(Data):
 
         # process data
         data = []
+        stat_info = {}
         num_project = 0
         num_modules = 0
         project_path = os.path.join(self.data_path, "projects")
@@ -273,6 +274,7 @@ class OSSFuzz(Data):
             dat["modules"] = modules
             num_modules += len(modules)
             data.append(dat)
+            stat_info[project] = len(modules)
 
         # Create a json object and stor the data
         with open(os.path.join(self.data_path, "data.json"), "w") as f:
@@ -284,10 +286,9 @@ class OSSFuzz(Data):
         self.logger.log(f"Number of modules: {num_modules}")
 
         # Save statistic information
-        stat_info = {
-            "num_project": num_project,
-            "num_modules": num_modules,
-        }
+        stat_info["num_project"] = num_project
+        stat_info["num_modules"] = num_modules
+
         with open(os.path.join(self.data_path, "stat_info.json"), "w") as f:
             json.dump(stat_info, f)
         self.stat_info = stat_info
