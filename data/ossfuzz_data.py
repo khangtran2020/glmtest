@@ -327,7 +327,7 @@ class OSSFuzz(Data):
             file.write(new_build_sh)
         self.logger.log(f"Created build script for {data['project']}")
 
-    def create_run_pynguin_script(self, data: dict) -> None:
+    def create_run_pynguin_script(self, data: dict) -> str:
         modules = data["modules"]
 
         project_template = "#!/bin/bash\n"
@@ -344,6 +344,7 @@ class OSSFuzz(Data):
         with open(os.path.join(data["project_path"], "run_pynguin.sh"), "w") as file:
             file.write(project_template)
         self.logger.log(f"Created run pynguin script for {data['project']}")
+        return project_template
 
     def create_run_script(self, data: dict) -> None:
         run_script = RUN_TEMPLATE.format(data["project"])
