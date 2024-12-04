@@ -7,11 +7,13 @@ from data.core import Data
 from rich.console import Console
 
 
-def get_dataset(data_name: str, data_path: str, logger: Console) -> Data:
+def get_dataset(
+    data_name: str, data_path: str, logger: Console, max_pynguin_run_time: int
+) -> Data:
 
     if data_name == "ossfuzz":
         logger.log("Using OSSFuzz dataset")
-        return OSSFuzz(logger=logger, path=data_path)
+        return OSSFuzz(logger=logger, path=data_path, run_time=max_pynguin_run_time)
     else:
         logger.log("Dataset not found")
         return None

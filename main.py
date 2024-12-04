@@ -11,7 +11,12 @@ from rich.console import Console
 def main(args: Namespace, logger: Console) -> None:
 
     # init data
-    dataset = get_dataset(data_name=args.data, data_path=args.data_path, logger=console)
+    dataset = get_dataset(
+        data_name=args.data,
+        data_path=args.data_path,
+        logger=console,
+        max_pynguin_run_time=args.max_pynguin_run_time,
+    )
     if dataset is None:
         logger.log("Dataset not found, exiting...")
         return
