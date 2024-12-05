@@ -7,7 +7,7 @@ import subprocess
 from rich.console import Console
 from rich.progress import Progress
 from data.core import Data
-from utils.utils import check_package_exists_in_pypi
+from utils.utils import check_package_exists_in_pypi, run_command
 
 DOCKERFILE_TEMPLATE = """# Use nvidia/cuda image
 FROM nvidia/cuda:11.1.1-cudnn8-devel-ubuntu18.04
@@ -80,12 +80,6 @@ cd {}
 bash build_for_glmf.sh
 
 cd ..
-"""
-
-DOCKER_SCRIPT = """#!/bin/bash
-
-# remove old docker image
-docker image rm -f $(docker images --format "{{.ID}}" --filter reference={})
 """
 
 
@@ -370,3 +364,43 @@ class OSSFuzz(Data):
         with open(os.path.join(data["project_path"], "run.sh"), "w") as file:
             file.write(run_script)
         self.logger.log(f"Created run script for {data['project']}")
+
+    def run_test_gen_one(self, data: dict) -> None:
+
+        # build docker image
+        command = f"docker build -t {data['project']} -f {data['project_path']}/Dockefile {data['project_path']}"
+        run_command(command=command, capture_output=False)
+        self.logger.log(f"Built docker image for {data['project']}")
+
+        # run docker image
+        container_name = f"{data['project']}_container"
+        command = f"docker run --name {container_name} {data['project']} run.sh"
+        run_command(command=command, capture_output=False)
+        self.logger.log(f"Ran docker image for {data['project']}")
+
+        # copy results
+        command = (
+            f"docker cp {container_name}:/pynguin_gen/test {data['project_path']}/test"
+        )
+        run_command(command=command, capture_output=False)
+        self.logger.log(f"Copied results for {data['project']}")
+
+        # remove container
+        command = f"docker rm -f {container_name}"
+        run_command(command=command, capture_output=False)
+        self.logger.log(f"Removed container for {data['project']}")
+
+        # remove image
+        command = f"""docker image rm -f $(docker images --format "{{.ID}}" --filter reference={data['project']})"""
+        run_command(command=command, capture_output=False)
+        self.logger.log(f"Removed image for {data['project']}")
+
+    def run_test_gen(self) -> None:
+        with Progress(console=self.logger) as progress:
+            task = progress.add_task("Running test generation", total=len(self.data))
+            for dat in self.data:
+                self.run_test_gen_one(data=dat)
+                progress.advance(task)
+                self.logger.log(f"Test generation completed for {dat['project']}")
+        self.logger.log("Test generation completed")
+        return

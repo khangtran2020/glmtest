@@ -2,6 +2,7 @@ import os
 import pickle
 import random
 import requests
+import subprocess
 import numpy as np
 from typing import Dict
 from utils.console import log_table
@@ -62,3 +63,18 @@ def check_package_exists_in_pypi(package_name: str) -> bool:
     except requests.RequestException as e:
         print(f"An error occurred while checking the package: {e}")
         return False
+
+
+def run_command(command: str, capture_output: bool = False):
+    """Run a shell command and optionally capture its output."""
+    try:
+        if capture_output:
+            result = subprocess.run(
+                command, shell=True, text=True, check=True, stdout=subprocess.PIPE
+            )
+            return result.stdout.strip()
+        else:
+            subprocess.run(command, shell=True, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error running command: {e}")
+        exit(1)

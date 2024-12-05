@@ -24,8 +24,12 @@ def main(args: Namespace, logger: Console) -> None:
     if args.mode == "crawl":
         dataset.crawl()
         dataset.process()
+        dataset.run_test_gen()
     elif args.mode == "process":
         dataset.process()
+        dataset.run_test_gen()
+    elif args.mode == "test_gen":
+        dataset.run_test_gen()
 
 
 if __name__ == "__main__":

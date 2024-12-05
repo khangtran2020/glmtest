@@ -41,3 +41,9 @@ class Data(object):
         on the extracted modules and functions
         """
         pass
+
+    def run_test_gen(self) -> None:
+        """
+        Run the test generation process
+        """
+        pass
