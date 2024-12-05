@@ -368,7 +368,7 @@ class OSSFuzz(Data):
     def run_test_gen_one(self, data: dict) -> None:
 
         # build docker image
-        command = f"docker build -t {data['project']} -f {data['project_path']}/Dockefile {data['project_path']}"
+        command = f"docker build -t {data['project']} -f {data['project_path']}/Dockerfile {data['project_path']}"
         run_command(command=command, capture_output=False)
         self.logger.log(f"Built docker image for {data['project']}")
 
