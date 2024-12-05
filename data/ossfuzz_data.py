@@ -396,6 +396,11 @@ class OSSFuzz(Data):
         self.logger.log(f"Removed image for {data['project']}")
 
     def run_test_gen(self) -> None:
+
+        # read data
+        with open(os.path.join(self.data_path, "data.json"), "r") as file:
+            self.data = json.load(file)
+
         with Progress(console=self.logger) as progress:
             task = progress.add_task("Running test generation", total=len(self.data))
             for dat in self.data:
