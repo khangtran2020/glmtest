@@ -7,7 +7,11 @@ import subprocess
 from rich.console import Console
 from rich.progress import Progress
 from data.core import Data
-from utils.utils import check_package_exists_in_pypi, run_command
+from utils.utils import (
+    check_package_exists_in_pypi,
+    run_command,
+    check_docker_image_exists,
+)
 
 DOCKERFILE_TEMPLATE = """# Use nvidia/cuda image
 FROM nvidia/cuda:11.1.1-cudnn8-devel-ubuntu18.04
@@ -309,6 +313,10 @@ class OSSFuzz(Data):
             self.create_dockerfile(data=dat)
             self.create_build_script(data=dat)
             self.create_run_script(data=dat)
+
+        # create dockerfile for all project
+        with open(os.path.join(self.data_path, "Dockerfile"), "w") as f:
+            f.write(DOCKERFILE_TEMPLATE)
         return
 
     def create_dockerfile(self, data: dict) -> None:
@@ -367,14 +375,9 @@ class OSSFuzz(Data):
 
     def run_test_gen_one(self, data: dict) -> None:
 
-        # build docker image
-        command = f"docker build -t {data['project']} -f {data['project_path']}/Dockerfile {data['project_path']}"
-        run_command(command=command, capture_output=False)
-        self.logger.log(f"Built docker image for {data['project']}")
-
         # run docker image
         container_name = f"{data['project']}_container"
-        command = f"docker run --name {container_name} {data['project']} run.sh"
+        command = f"docker run -v {os.path.abspath(data['project_path'])}:/pynguin_gen --name {container_name} glmf run.sh"
         run_command(command=command, capture_output=False)
         self.logger.log(f"Ran docker image for {data['project']}")
 
@@ -390,16 +393,18 @@ class OSSFuzz(Data):
         run_command(command=command, capture_output=False)
         self.logger.log(f"Removed container for {data['project']}")
 
-        # remove image
-        command = f"""docker image rm -f $(docker images --format "{{.ID}}" --filter reference={data['project']})"""
-        run_command(command=command, capture_output=False)
-        self.logger.log(f"Removed image for {data['project']}")
-
     def run_test_gen(self) -> None:
 
         # read data
         with open(os.path.join(self.data_path, "data.json"), "r") as file:
             self.data = json.load(file)
+
+        # check if image exist
+        if not check_docker_image_exists("glmf"):
+            # build docker image for every project
+            command = f"docker build -t glmf -f {os.path.join(self.data_path, 'Dockerfile')} {self.data_path}"
+            run_command(command=command, capture_output=False)
+            self.logger.log(f"Built docker image for for every project")
 
         with Progress(console=self.logger) as progress:
             task = progress.add_task("Running test generation", total=len(self.data))

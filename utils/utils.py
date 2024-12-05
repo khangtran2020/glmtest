@@ -78,3 +78,32 @@ def run_command(command: str, capture_output: bool = False):
     except subprocess.CalledProcessError as e:
         print(f"Error running command: {e}")
         exit(1)
+
+
+def check_docker_image_exists(image_name: str) -> bool:
+    try:
+        # Run the 'docker images' command and capture the output
+        result = subprocess.run(
+            ["docker", "images", "--format", "{{.Repository}}:{{.Tag}}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            print(f"Error checking Docker images: {result.stderr}")
+            return False
+
+        # Check if the image exists in the output
+        images = result.stdout.splitlines()
+        for image in images:
+            if image_name in image:
+                print(f"Image '{image_name}' exists.")
+                return True
+
+        print(f"Image '{image_name}' does not exist.")
+        return False
+
+    except FileNotFoundError:
+        print("Docker is not installed or not in PATH.")
+        return False
