@@ -18,17 +18,28 @@ RUN chsh -s /bin/bash
 SHELL ["/bin/bash", "-c"]
 
 # install anaconda
+
 RUN apt-get update
-RUN apt-get install -y wget bzip2 ca-certificates libglib2.0-0 libxext6 libsm6 libxrender1 git mercurial subversion vim && \
-        apt-get clean
+RUN apt-get install -y wget zip unzip bzip2 libc6-i386 libc6-x32 libfreetype6 \
+    ca-certificates libglib2.0-0 libxext6 libsm6 libxrender1 git mercurial \
+    subversion vim libasound2 libxi6 libxtst6 && \
+    apt-get clean
+
+RUN wget https://download.oracle.com/java/19/archive/jdk-19.0.2_linux-x64_bin.deb && \
+    dpkg -i jdk-19.0.2_linux-x64_bin.deb &&  \
+    update-alternatives --install /usr/bin/java java /usr/lib/jvm/jdk-19/bin/java 1 && \
+    update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/jdk-19/bin/javac 1 && \
+    update-alternatives --config java &&  update-alternatives --config javac
+
+        
 RUN wget --quiet https://repo.anaconda.com/archive/Anaconda3-2024.10-1-Linux-x86_64.sh -O ~/anaconda.sh && \
-        /bin/bash ~/anaconda.sh -b -p /opt/conda && \
-        rm ~/anaconda.sh && \
-        ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
-        echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
-        find /opt/conda/ -follow -type f -name '*.a' -delete && \
-        find /opt/conda/ -follow -type f -name '*.js.map' -delete && \
-        /opt/conda/bin/conda clean -afy
+    /bin/bash ~/anaconda.sh -b -p /opt/conda && \
+    rm ~/anaconda.sh && \
+    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
+    find /opt/conda/ -follow -type f -name '*.a' -delete && \
+    find /opt/conda/ -follow -type f -name '*.js.map' -delete && \
+    /opt/conda/bin/conda clean -afy
 
 # set path to conda
 ENV PATH /opt/conda/bin:$PATH
@@ -69,6 +80,12 @@ cd {}
 bash build_for_glmf.sh
 
 cd ..
+"""
+
+DOCKER_SCRIPT = """#!/bin/bash
+
+# remove old docker image
+docker image rm -f $(docker images --format "{{.ID}}" --filter reference={})
 """
 
 
