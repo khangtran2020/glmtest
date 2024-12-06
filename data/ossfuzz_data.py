@@ -379,6 +379,7 @@ class OSSFuzz(Data):
         container_name = f"{data['project']}_container"
         command = f"docker run -v {os.path.abspath(data['project_path'])}:/pynguin_gen --name {container_name} glmf run.sh"
         self.logger.log(f"Ran docker image for {data['project']}")
+        self.logger.log("Running command: " + command)
         run_command(command=command, capture_output=False)
 
         # copy results
