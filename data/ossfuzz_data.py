@@ -57,16 +57,6 @@ RUN echo "conda activate work" >> ~/.bashrc
 RUN export PYTHONHASHSEED=0
 ENV PATH /opt/conda/envs/pet/bin:$PATH
 ENV CONDA_DEFAULT_ENV $work
-
-# Create a new user and group
-RUN groupadd -r pynguin && useradd -r -m -g pynguin pynguin_user
-
-# Change ownership of the working directory to the new user
-RUN chown -R pynguin_user:pynguin /pynguin_gen
-
-# Switch to the new user
-USER pynguin_user
-RUN conda init bash && echo "conda activate work" >> ~/.bashrc
 """
 
 PYNGUIN_TEMPLATE = """pynguin \
