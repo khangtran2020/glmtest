@@ -2,6 +2,7 @@ import os
 import sys
 import yaml
 import json
+import time
 import shutil
 import subprocess
 from rich.console import Console
@@ -365,19 +366,26 @@ class OSSFuzz(Data):
 
     def run_test_gen_one(self, data: dict) -> None:
 
+        time_wait = len(data["modules"]) * 30 + len(data["modules"]) // 10 * 120
+
         # run docker image
-        container_name = f"{data['project']}_container"
+        container_name = f"{data['project']}"
         command = f"docker run -v {os.path.abspath(data['project_path'])}:/pynguin_gen --name {container_name} glmf bash run.sh"
         self.logger.log(f"Ran docker image for {data['project']}")
         self.logger.log("Running command: " + command)
         run_command(command=command, capture_output=False)
 
-        # copy results
-        command = (
-            f"docker cp {container_name}:/pynguin_gen/test {data['project_path']}/test"
-        )
-        run_command(command=command, capture_output=False)
-        self.logger.log(f"Copied results for {data['project']}")
+        # wait for test generation to complete
+        self.logger.log(f"Waiting for {data['project']} to complete")
+        time.sleep(time_wait)
+        self.logger.log(f"Completed waiting for {data['project']}")
+
+        # # copy results
+        # command = (
+        #     f"docker cp {container_name}:/pynguin_gen/test {data['project_path']}/test"
+        # )
+        # run_command(command=command, capture_output=False)
+        # self.logger.log(f"Copied results for {data['project']}")
 
         # remove container
         command = f"docker rm -f {container_name}"
