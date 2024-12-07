@@ -1,10 +1,4 @@
-import os
-import json
-import subprocess
 from rich.console import Console
-
-# typing
-from typing import List, Dict
 
 
 class Data(object):
