@@ -351,7 +351,7 @@ class OSSFuzz(Data):
             )
             project_template += "\n" + pynguin_command
             if i + 1 % 10 == 0:
-                project_template += "sleep 120"
+                project_template += "sleep 60"
         with open(os.path.join(data["project_path"], "run_pynguin.sh"), "w") as file:
             file.write(project_template)
         self.logger.log(f"Created run pynguin script for {data['project']}")
@@ -366,7 +366,7 @@ class OSSFuzz(Data):
 
     def run_test_gen_one(self, data: dict) -> None:
 
-        time_wait = len(data["modules"]) * 30 + len(data["modules"]) // 10 * 120
+        time_wait = len(data["modules"]) // 10 * 90
 
         # run docker image
         container_name = f"{data['project']}"

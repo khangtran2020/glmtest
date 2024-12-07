@@ -196,7 +196,7 @@ def process_item(
     return found_path
 
 
-def process_module(filepath: str, console: Console):
+def get_all_branch(filepath: str, console: Console):
 
     code, num_line = read_module(filepath=filepath, console=console)
     line_dict, start_line, end_line, loop_line = analyze_code(
