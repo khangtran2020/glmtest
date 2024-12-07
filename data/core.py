@@ -1,7 +1,6 @@
 import os
 import json
 import subprocess
-from branch.extract import process_module
 from rich.console import Console
 
 # typing
