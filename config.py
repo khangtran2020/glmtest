@@ -18,6 +18,9 @@ def add_data_group(group):
         "--max_pynguin_run_time", type=int, help="time limit for pynguin", default=10
     )
     group.add_argument("--data", type=str, help="name of dataset")
+    group.add_argument(
+        "--test_gen_project", type=str, help="name of project to test gen"
+    )
 
 
 def parse_args():
