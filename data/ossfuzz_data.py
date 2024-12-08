@@ -351,6 +351,7 @@ class OSSFuzz(Data):
             )
             project_template += "\n" + pynguin_command
             if i + 1 % 10 == 0:
+                self.logger.log(f"Checking sleeping time for {data['project']} at {i}")
                 project_template += "sleep 60"
         with open(os.path.join(data["project_path"], "run_pynguin.sh"), "w") as file:
             file.write(project_template)
