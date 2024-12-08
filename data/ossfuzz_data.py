@@ -367,6 +367,9 @@ class OSSFuzz(Data):
     def run_test_gen_one(self, data: dict) -> None:
 
         time_wait = len(data["modules"]) // 10 * 90
+        self.logger.log(
+            f"Running test generation for {data['project']} with {time_wait} seconds"
+        )
 
         # run docker image
         container_name = f"{data['project']}"
