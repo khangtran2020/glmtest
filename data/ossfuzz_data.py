@@ -363,7 +363,7 @@ class OSSFuzz(Data):
                 self.logger.log(f"Checking sleeping time for {data['project']} at {i}")
                 project_template += "\n" + "sleep 60"
 
-        if len(modules) % 10 == 0:
+        if len(modules) < 10 or len(modules) % 10 != 0:
             project_template += "\n" + "sleep 60"
 
         with open(os.path.join(data["project_path"], "run_pynguin.sh"), "w") as file:
