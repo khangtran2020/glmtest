@@ -66,7 +66,6 @@ PYNGUIN_TEMPLATE = """pynguin \
     --module-name {} --maximum-search-time {} &"""
 
 RUN_TEMPLATE = """#!/bin/bash
-export PATH=$PATH:/home/pynguin_user/.local/bin
 pip install pynguin coverage
 export PYNGUIN_DANGER_AWARE=1
 
@@ -335,7 +334,7 @@ class OSSFuzz(Data):
             lines = build_sh.split("\n")
             new_lines = []
             for line in lines:
-                if "fuzzer" in line.lower():
+                if "fuzz" in line.lower():
                     break
                 new_lines.append(line)
             new_lines.append(f"pip install pynguin")
@@ -387,7 +386,7 @@ class OSSFuzz(Data):
 
         # run docker image
         container_name = f"{data['project']}"
-        command = f"docker run -v {os.path.abspath(data['project_path'])}:/pynguin_gen --name {container_name} glmf bash run.sh"
+        command = f"""docker run -v {os.path.abspath(data['project_path'])}:/pynguin_gen --name {container_name} -e PATH=/opt/conda/envs/work/bin:/opt/conda/condabin:/opt/conda/envs/pet/bin:/opt/conda/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin -e PYNGUIN_DANGER_AWARE=1 glmf bash run.sh"""
         self.logger.log(f"Ran docker image for {data['project']}")
         self.logger.log("Running command: " + command)
         run_command(command=command, capture_output=False)
@@ -396,13 +395,6 @@ class OSSFuzz(Data):
         self.logger.log(f"Waiting for {data['project']} to complete")
         time.sleep(time_wait)
         self.logger.log(f"Completed waiting for {data['project']}")
-
-        # # copy results
-        # command = (
-        #     f"docker cp {container_name}:/pynguin_gen/test {data['project_path']}/test"
-        # )
-        # run_command(command=command, capture_output=False)
-        # self.logger.log(f"Copied results for {data['project']}")
 
         # remove container
         command = f"docker rm -f {container_name}"
