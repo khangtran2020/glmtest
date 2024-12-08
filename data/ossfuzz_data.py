@@ -350,6 +350,7 @@ class OSSFuzz(Data):
                 self.run_time,
             )
             project_template += "\n" + pynguin_command
+            print(i)
             if i + 1 % 10 == 0:
                 self.logger.log(f"Checking sleeping time for {data['project']} at {i}")
                 project_template += "sleep 60"
