@@ -84,6 +84,15 @@ class OSSFuzz(Data):
         self.name = "OSSFuzz"
         self.data_path = os.path.join(path, self.name)
         self.run_time = run_time
+        # check if data.json exist:
+        if not os.path.exists(os.path.join(self.data_path, "data.json")):
+            self.data = []
+            self.stat_info = {}
+        else:
+            with open(os.path.join(self.data_path, "data.json"), "r") as file:
+                self.data = json.load(file)
+            with open(os.path.join(self.data_path, "stat_info.json"), "r") as file:
+                self.stat_info = json.load(file)
         super().__init__(name=self.name, path=path, logger=logger)
 
     def crawl(self) -> None:

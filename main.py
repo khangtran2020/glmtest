@@ -30,6 +30,11 @@ def main(args: Namespace, logger: Console) -> None:
         # dataset.run_test_gen()
     elif args.mode == "test_gen":
         dataset.run_test_gen()
+    elif args.mode == "test_gen_one":
+        for data in dataset.data:
+            if data["project"] == args.test_gen_project:
+                dataset.run_test_gen_one(data)
+        # dataset.run_test_gen()
 
 
 if __name__ == "__main__":
