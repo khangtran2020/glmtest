@@ -60,7 +60,7 @@ ENV PATH /opt/conda/envs/pet/bin:$PATH
 ENV CONDA_DEFAULT_ENV $work
 """
 
-PYNGUIN_TEMPLATE = """docker run --name {} --rm -v {}:/input:ro -v {}:/output -v {}:/package:ro pynguin-runner \
+PYNGUIN_TEMPLATE = """docker run --rm -v {}:/input:ro -v {}:/output -v {}:/package:ro pynguin-runner \
     --module-name {} --coverage_metrics BRANCH --maximum_search_time {} --report-dir /output &"""
 
 
@@ -278,12 +278,28 @@ class OSSFuzz(Data):
         return
 
     def create_package_txt(self, data: dict) -> None:
-        subprocess.run(["pipreqs", "--force", f"{data['project_path']}"])
-        os.rename(
-            os.path.join(data["project_path"], "requirements.txt"),
-            os.path.join(data["project_path"], "package.txt"),
+        result = subprocess.run(
+            ["pipreqs", "--force", f"{data['project_path']}"],
+            capture_output=True,
+            text=True,
         )
-        self.logger.log(f"Created package.txt for {data['project']}")
+        if "error" in result.stderr.lower():
+            self.logger.log(result.stderr)
+            self.logger.log(
+                f"Error: {data['project']} has error in creating requirements"
+            )
+            if check_package_exists_in_pypi(data["project"]):
+                with open(
+                    os.path.join(data["project_path"], "package.txt"), "w"
+                ) as file:
+                    file.write(data["project"])
+                self.logger.log(f"Created package.txt for {data['project']}")
+        else:
+            os.rename(
+                os.path.join(data["project_path"], "requirements.txt"),
+                os.path.join(data["project_path"], "package.txt"),
+            )
+            self.logger.log(f"Created package.txt for {data['project']}")
 
     def create_run_pynguin_script(self, data: dict) -> str:
 
