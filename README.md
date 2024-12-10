@@ -15,5 +15,5 @@ git clone --recursive https://github.com/khangtran2020/glmf
 First of all, we need to build Docker image of Pynguin. To do so, run this command:
 
 ```shell
-docker build -t pynguin-runner -f pynguin/docker/Dockerfile --platform linux/amd64 .
+docker build -t pynguin-runner -f pynguin/docker/Dockerfile --platform linux/amd64 ./pynguin
 ```

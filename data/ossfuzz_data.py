@@ -60,21 +60,8 @@ ENV PATH /opt/conda/envs/pet/bin:$PATH
 ENV CONDA_DEFAULT_ENV $work
 """
 
-PYNGUIN_TEMPLATE = """pynguin \
-    --project-path {} \
-    --output-path ./test/ \
-    --module-name {} --maximum-search-time {} &"""
-
-RUN_TEMPLATE = """#!/bin/bash
-pip install pynguin coverage
-export PYNGUIN_DANGER_AWARE=1
-
-
-cd {}
-bash build_for_glmf.sh
-
-cd ..
-"""
+PYNGUIN_TEMPLATE = """docker run --name {} --rm -v {}:/input:ro -v {}:/output -v {}:/package:ro pynguin-runner \
+    --module-name {} --coverage_metrics BRANCH --maximum_search_time {} --report-dir /output &"""
 
 
 class OSSFuzz(Data):
@@ -213,35 +200,23 @@ class OSSFuzz(Data):
 
     def process(self) -> None:
 
+        process = False
         # check if the data has been processeds
         if os.path.exists(os.path.join(self.data_path, "data.json")):
             self.logger.log("Found data json file, do not need to process raw data")
-
             # load data
             with open(os.path.join(self.data_path, "data.json"), "r") as file:
                 self.data = json.load(file)
 
+            self.data = sorted(self.data, key=lambda x: x["num_modules"])
+
             # load stat_info
             with open(os.path.join(self.data_path, "stat_info.json"), "r") as file:
                 self.stat_info = json.load(file)
+        else:
+            process = True
 
-            # check dockerfile and build script
-            for dat in self.data:
-                if not os.path.exists(os.path.join(dat["project_path"], "Dockerfile")):
-                    self.create_dockerfile(data=dat)
-                    self.logger.log(f"Created Dockerfile for {dat['project']}")
-                else:
-                    self.logger.log(f"Found Dockerfile for {dat['project']}")
-
-                if not os.path.exists(
-                    os.path.join(
-                        dat["project_path"], dat["project"], "build_for_glmf.sh"
-                    )
-                ):
-                    self.create_build_script(data=dat)
-                    self.logger.log(f"Created build script for {dat['project']}")
-                else:
-                    self.logger.log(f"Found build script for {dat['project']}")
+        if not process:
             return
 
         # process data
@@ -257,19 +232,6 @@ class OSSFuzz(Data):
             dat["uuid"] = i + 1
             dat["project"] = project
             dat["project_path"] = os.path.join(project_path, project)
-            dat["project_path_in_orignal"] = os.path.join(
-                self.data_path, "oss-fuzz", "projects", project
-            )
-            if "build.sh" in os.listdir(dat["project_path_in_orignal"]):
-                dat["build_path"] = os.path.join(
-                    dat["project_path_in_orignal"], "build.sh"
-                )
-            else:
-
-                if check_package_exists_in_pypi(dat["project"]):
-                    dat["build_path"] = "N/A"
-                else:
-                    continue
             num_project += 1
             modules = []
             current_project_path = os.path.join(project_path, project, project)
@@ -286,10 +248,12 @@ class OSSFuzz(Data):
                             .replace(".py", "")
                         )
             dat["modules"] = modules
+            dat["num_modules"] = len(modules)
             num_modules += len(modules)
             data.append(dat)
             stat_info[project] = len(modules)
 
+        data = sorted(data, key=lambda x: x["num_modules"])
         # Create a json object and stor the data
         with open(os.path.join(self.data_path, "data.json"), "w") as f:
             json.dump(data, f)
@@ -307,99 +271,67 @@ class OSSFuzz(Data):
             json.dump(stat_info, f)
         self.stat_info = stat_info
 
-        # create Dockerfile for each project
+        # create package.txt for each project
         for dat in data:
-            self.create_dockerfile(data=dat)
-            self.create_build_script(data=dat)
-            self.create_run_script(data=dat)
-
-        # create dockerfile for all project
-        with open(os.path.join(self.data_path, "Dockerfile"), "w") as f:
-            f.write(DOCKERFILE_TEMPLATE)
+            self.create_package_txt(data=dat)
+            self.create_run_pynguin_script(data=dat)
         return
 
-    def create_dockerfile(self, data: dict) -> None:
-        with open(os.path.join(data["project_path"], "Dockerfile"), "w") as f:
-            f.write(DOCKERFILE_TEMPLATE)
-        self.logger.log(f"Created Dockerfile for {data['project']}")
-
-    def create_build_script(self, data: dict) -> None:
-
-        if check_package_exists_in_pypi(data["project"]):
-            new_build_sh = f"pip install {data['project']}"
-        else:
-            with open(data["build_path"], "r") as file:
-                build_sh = file.read()
-
-            lines = build_sh.split("\n")
-            new_lines = []
-            for line in lines:
-                if "fuzz" in line.lower():
-                    break
-                new_lines.append(line)
-            new_lines.append(f"pip install pynguin")
-            new_build_sh = "\n".join(new_lines)
-        with open(
-            os.path.join(data["project_path"], data["project"], "build_for_glmf.sh"),
-            "w",
-        ) as file:
-            file.write(new_build_sh)
-        self.logger.log(f"Created build script for {data['project']}")
+    def create_package_txt(self, data: dict) -> None:
+        subprocess.run(["pipreqs", "--force", f"{data['project_path']}"])
+        os.rename(
+            os.path.join(data["project_path"], "requirements.txt"),
+            os.path.join(data["project_path"], "package.txt"),
+        )
+        self.logger.log(f"Created package.txt for {data['project']}")
 
     def create_run_pynguin_script(self, data: dict) -> str:
+
         modules = data["modules"]
+        os.makedirs(os.path.join(data["project_path"], "test"), exist_ok=True)
 
         project_template = "#!/bin/bash\n"
         # run pynguin on all modules in parallel but only 10 at a time
         for i, module in enumerate(modules):
             pynguin_command = PYNGUIN_TEMPLATE.format(
-                f"./{data['project']}",
+                os.path.abspath(os.path.join(data["project_path"], data["project"])),
+                os.path.abspath(os.path.join(data["project_path"], "test")),
+                os.path.abspath(data["project_path"]),
                 module,
                 self.run_time,
             )
             project_template += "\n" + pynguin_command
             if (i + 1) % 10 == 0:
                 self.logger.log(f"Checking sleeping time for {data['project']} at {i}")
-                project_template += "\n" + "sleep 60"
+                project_template += "\n" + "sleep 30"
 
         if len(modules) < 10 or len(modules) % 10 != 0:
-            project_template += "\n" + "sleep 60"
+            project_template += "\n" + "sleep 30"
 
         with open(os.path.join(data["project_path"], "run_pynguin.sh"), "w") as file:
             file.write(project_template)
         self.logger.log(f"Created run pynguin script for {data['project']}")
-        return project_template
-
-    def create_run_script(self, data: dict) -> None:
-        run_script = RUN_TEMPLATE.format(data["project"])
-        run_script += "\n" + self.create_run_pynguin_script(data)
-        with open(os.path.join(data["project_path"], "run.sh"), "w") as file:
-            file.write(run_script)
-        self.logger.log(f"Created run script for {data['project']}")
 
     def run_test_gen_one(self, data: dict) -> None:
 
-        time_wait = len(data["modules"]) // 10 * 90
+        time_wait = (
+            len(data["modules"]) // 10 * 30 + 30
+            if len(data["modules"]) % 10 != 0
+            else len(data["modules"]) // 10 * 30
+        )
+        time_wait = max(time_wait, 600)
+
         self.logger.log(
             f"Running test generation for {data['project']} with {time_wait} seconds"
         )
-
-        # run docker image
-        container_name = f"{data['project']}"
-        command = f"""docker run -v {os.path.abspath(data['project_path'])}:/pynguin_gen --name {container_name} -e PATH=/opt/conda/envs/work/bin:/opt/conda/condabin:/opt/conda/envs/pet/bin:/opt/conda/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin -e PYNGUIN_DANGER_AWARE=1 glmf bash run.sh"""
-        self.logger.log(f"Ran docker image for {data['project']}")
-        self.logger.log("Running command: " + command)
+        command = f"bash {data['project_path']}/run_pynguin.sh"
+        self.logger.log(f"Running command for {data['project']}: " + command)
         run_command(command=command, capture_output=False)
 
         # wait for test generation to complete
         self.logger.log(f"Waiting for {data['project']} to complete")
         time.sleep(time_wait)
         self.logger.log(f"Completed waiting for {data['project']}")
-
-        # remove container
-        command = f"docker rm -f {container_name}"
-        run_command(command=command, capture_output=False)
-        self.logger.log(f"Removed container for {data['project']}")
 
     def run_test_gen(self) -> None:
 
@@ -408,9 +340,9 @@ class OSSFuzz(Data):
             self.data = json.load(file)
 
         # check if image exist
-        if not check_docker_image_exists("glmf"):
+        if not check_docker_image_exists("pynguin-runner"):
             # build docker image for every project
-            command = f"docker build -t glmf -f {os.path.join(self.data_path, 'Dockerfile')} {self.data_path}"
+            command = f"docker build -t pynguin-runner -f pynguin/docker/Dockerfile --platform linux/amd64 ./pynguin"
             run_command(command=command, capture_output=False)
             self.logger.log(f"Built docker image for for every project")
 
