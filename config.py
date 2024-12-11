@@ -22,6 +22,7 @@ def add_data_group(group):
         "--test_gen_project", type=str, help="name of project to test gen"
     )
     group.add_argument("--docker-image", type=str, help="docker image to use")
+    group.add_argument("--num_cpu", type=int, default=-1, help="number of cpus to use")
 
 
 def parse_args():

@@ -13,6 +13,7 @@ def get_dataset(
     logger: Console,
     max_pynguin_run_time: int,
     docker_image: str = None,
+    num_cpu: int = -1,
 ) -> Data:
 
     if data_name == "ossfuzz":

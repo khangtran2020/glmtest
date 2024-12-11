@@ -72,7 +72,7 @@ PYNGUIN_TEMPLATE = """docker run --rm -v {}:/input:ro -v {}:/output -v {}:/packa
 class OSSFuzz(Data):
 
     def __init__(
-        self, logger: Console, path: str, run_time: int, docker_image: str
+        self, logger: Console, path: str, run_time: int, docker_image: str, num_cpu: int
     ) -> None:
         if docker_image is None:
             raise ValueError("Docker image is not provided")
@@ -80,6 +80,7 @@ class OSSFuzz(Data):
         self.data_path = os.path.join(path, self.name)
         self.run_time = run_time
         self.docker_image = docker_image
+        self.num_cpu = num_cpu
         # check if data.json exist:
         if not os.path.exists(os.path.join(self.data_path, "data.json")):
             self.data = []
@@ -403,11 +404,23 @@ class OSSFuzz(Data):
         commands_list = []
         for dat in self.data:
             commands_list += self.get_command_for_modules(dat)
-
-        num_jobs = -1  # use all CPUs core
-        self.logger.log(
-            f"Running test generation in parallel with {os.cpu_count()} cores"
-        )
+        if self.num_cpu == -1:
+            num_jobs = -1
+            self.logger.log(
+                f"Running test generation in parallel with {os.cpu_count()} cores"
+            )
+        else:
+            if self.num_cpu > os.cpu_count():
+                num_jobs = os.cpu_count()
+                self.logger.log(
+                    f"The indicated #CPUs is larger than the cores.\n"
+                    + "Running test generation in parallel with {os.cpu_count()} cores"
+                )
+            else:
+                num_jobs = self.num_cpu
+                self.logger.log(
+                    f"Running test generation in parallel with {self.num_cpu} cores"
+                )
         results = Parallel(n_jobs=num_jobs)(
             delayed(run_command)(command=command, capture_output=False)
             for command in tqdm(commands_list)
