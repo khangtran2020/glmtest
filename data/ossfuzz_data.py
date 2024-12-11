@@ -60,16 +60,21 @@ ENV PATH /opt/conda/envs/pet/bin:$PATH
 ENV CONDA_DEFAULT_ENV $work
 """
 
-PYNGUIN_TEMPLATE = """docker run --rm -v {}:/input:ro -v {}:/output -v {}:/package:ro pynguin-runner \
-    --module-name {} --coverage_metrics BRANCH --maximum_search_time {} --report-dir /output &"""
+PYNGUIN_TEMPLATE = """docker run --rm -v {}:/input:ro -v {}:/output -v {}:/package:ro {} \
+    --module-name {} --coverage_metrics BRANCH --maximum_search_time {} --report-dir /output --project_path /input --output-path /output --output_variables TargetModule,CoverageTimeline --assertion-generation NONE &"""
 
 
 class OSSFuzz(Data):
 
-    def __init__(self, logger: Console, path: str, run_time: int) -> None:
+    def __init__(
+        self, logger: Console, path: str, run_time: int, docker_image: str
+    ) -> None:
+        if docker_image is None:
+            raise ValueError("Docker image is not provided")
         self.name = "OSSFuzz"
         self.data_path = os.path.join(path, self.name)
         self.run_time = run_time
+        self.docker_image = docker_image
         # check if data.json exist:
         if not os.path.exists(os.path.join(self.data_path, "data.json")):
             self.data = []
@@ -299,6 +304,17 @@ class OSSFuzz(Data):
                 os.path.join(data["project_path"], "requirements.txt"),
                 os.path.join(data["project_path"], "package.txt"),
             )
+            if check_package_exists_in_pypi(data["project"]):
+                with open(
+                    os.path.join(data["project_path"], "package.txt"), "r"
+                ) as file:
+                    packages = file.read()
+                packages += f"\n{data['project']}"
+                with open(
+                    os.path.join(data["project_path"], "package.txt"), "w"
+                ) as file:
+                    file.write(packages)
+                self.logger.log(f"Created package.txt for {data['project']}")
             self.logger.log(f"Created package.txt for {data['project']}")
 
     def create_run_pynguin_script(self, data: dict) -> str:
@@ -313,6 +329,7 @@ class OSSFuzz(Data):
                 os.path.abspath(os.path.join(data["project_path"], data["project"])),
                 os.path.abspath(os.path.join(data["project_path"], "test")),
                 os.path.abspath(data["project_path"]),
+                self.docker_image,
                 module,
                 self.run_time,
             )

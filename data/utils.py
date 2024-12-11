@@ -8,12 +8,21 @@ from rich.console import Console
 
 
 def get_dataset(
-    data_name: str, data_path: str, logger: Console, max_pynguin_run_time: int
+    data_name: str,
+    data_path: str,
+    logger: Console,
+    max_pynguin_run_time: int,
+    docker_image: str = None,
 ) -> Data:
 
     if data_name == "ossfuzz":
         logger.log("Using OSSFuzz dataset")
-        return OSSFuzz(logger=logger, path=data_path, run_time=max_pynguin_run_time)
+        return OSSFuzz(
+            logger=logger,
+            path=data_path,
+            run_time=max_pynguin_run_time,
+            docker_image=docker_image,
+        )
     else:
         logger.log("Dataset not found")
         return None
