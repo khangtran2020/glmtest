@@ -16,6 +16,7 @@ def main(args: Namespace, logger: Console) -> None:
         data_path=args.data_path,
         logger=console,
         max_pynguin_run_time=args.max_pynguin_run_time,
+        docker_image=args.docker_image,
     )
     if dataset is None:
         logger.log("Dataset not found, exiting...")

@@ -373,9 +373,9 @@ class OSSFuzz(Data):
             self.data = json.load(file)
 
         # check if image exist
-        if not check_docker_image_exists("pynguin-runner"):
+        if not check_docker_image_exists(self.docker_image):
             # build docker image for every project
-            command = f"docker build -t pynguin-runner -f pynguin/docker/Dockerfile --platform linux/amd64 ./pynguin"
+            command = f"docker build -t {self.docker_image} -f pynguin/docker/Dockerfile --platform linux/amd64 ./pynguin"
             run_command(command=command, capture_output=False)
             self.logger.log(f"Built docker image for for every project")
 
