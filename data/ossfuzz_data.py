@@ -5,14 +5,19 @@ import json
 import time
 import shutil
 import subprocess
+from joblib import Parallel, delayed
 from rich.console import Console
 from rich.progress import Progress
 from data.core import Data
+from tqdm import tqdm
 from utils.utils import (
     check_package_exists_in_pypi,
     run_command,
     check_docker_image_exists,
 )
+
+# typing
+from typing import List
 
 DOCKERFILE_TEMPLATE = """# Use nvidia/cuda image
 FROM nvidia/cuda:11.1.1-cudnn8-devel-ubuntu18.04
@@ -61,7 +66,7 @@ ENV CONDA_DEFAULT_ENV $work
 """
 
 PYNGUIN_TEMPLATE = """docker run --rm -v {}:/input:ro -v {}:/output -v {}:/package:ro {} \
-    --module-name {} --coverage_metrics BRANCH --maximum_search_time {} --report-dir /output --project_path /input --output-path /output --output_variables TargetModule,CoverageTimeline --assertion-generation NONE &"""
+    --module-name {} --coverage_metrics BRANCH --maximum_search_time {} --report-dir /output --project_path /input --output-path /output --output_variables TargetModule,CoverageTimeline --assertion-generation NONE"""
 
 
 class OSSFuzz(Data):
@@ -366,6 +371,21 @@ class OSSFuzz(Data):
         time.sleep(time_wait)
         self.logger.log(f"Completed waiting for {data['project']}")
 
+    def get_command_for_modules(self, data: dict) -> List[str]:
+        modules = data["modules"]
+        commands = []
+        for module in modules:
+            pynguin_command = PYNGUIN_TEMPLATE.format(
+                os.path.abspath(os.path.join(data["project_path"], data["project"])),
+                os.path.abspath(os.path.join(data["project_path"], "test")),
+                os.path.abspath(data["project_path"]),
+                self.docker_image,
+                module,
+                self.run_time,
+            )
+            commands.append(pynguin_command)
+        return commands
+
     def run_test_gen(self) -> None:
 
         # read data
@@ -379,11 +399,15 @@ class OSSFuzz(Data):
             run_command(command=command, capture_output=False)
             self.logger.log(f"Built docker image for for every project")
 
-        with Progress(console=self.logger) as progress:
-            task = progress.add_task("Running test generation", total=len(self.data))
-            for dat in self.data:
-                self.run_test_gen_one(data=dat)
-                progress.advance(task)
-                self.logger.log(f"Test generation completed for {dat['project']}")
+        self.logger.log("Running test generation in parallel")
+        commands_list = []
+        for dat in self.data:
+            commands_list += self.get_command_for_modules(dat)
+
+        num_jobs = -1  # use all CPUs core
+        results = Parallel(n_jobs=num_jobs)(
+            delayed(run_command)(command=command, capture_output=False)
+            for command in tqdm(commands_list)
+        )
         self.logger.log("Test generation completed")
         return
