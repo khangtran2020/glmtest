@@ -405,6 +405,9 @@ class OSSFuzz(Data):
             commands_list += self.get_command_for_modules(dat)
 
         num_jobs = -1  # use all CPUs core
+        self.logger.log(
+            f"Running test generation in parallel with {os.cpu_count()} cores"
+        )
         results = Parallel(n_jobs=num_jobs)(
             delayed(run_command)(command=command, capture_output=False)
             for command in tqdm(commands_list)
