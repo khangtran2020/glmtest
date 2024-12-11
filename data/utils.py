@@ -23,6 +23,7 @@ def get_dataset(
             path=data_path,
             run_time=max_pynguin_run_time,
             docker_image=docker_image,
+            num_cpu=num_cpu,
         )
     else:
         logger.log("Dataset not found")
