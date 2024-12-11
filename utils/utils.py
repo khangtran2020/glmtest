@@ -77,7 +77,6 @@ def run_command(command: str, capture_output: bool = False):
             subprocess.run(command, shell=True, check=True)
     except subprocess.CalledProcessError as e:
         print(f"Error running command: {e}")
-        exit(1)
 
 
 def check_docker_image_exists(image_name: str) -> bool:
