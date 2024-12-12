@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.progress import Progress
 from data.core import Data
 from tqdm import tqdm
+from graph.joerngraph import JoernGraph
 from utils.utils import (
     check_package_exists_in_pypi,
     run_command,
@@ -72,7 +73,13 @@ PYNGUIN_TEMPLATE = """docker run --rm -v {}:/input:ro -v {}:/output -v {}:/packa
 class OSSFuzz(Data):
 
     def __init__(
-        self, logger: Console, path: str, run_time: int, docker_image: str, num_cpu: int
+        self,
+        logger: Console,
+        path: str,
+        run_time: int,
+        docker_image: str,
+        num_cpu: int,
+        joern_graph: JoernGraph,
     ) -> None:
         if docker_image is None:
             raise ValueError("Docker image is not provided")
@@ -90,7 +97,9 @@ class OSSFuzz(Data):
                 self.data = json.load(file)
             with open(os.path.join(self.data_path, "stat_info.json"), "r") as file:
                 self.stat_info = json.load(file)
-        super().__init__(name=self.name, path=path, logger=logger)
+        super().__init__(
+            name=self.name, path=path, logger=logger, joern_graph=joern_graph
+        )
 
     def crawl(self) -> None:
 

@@ -1,6 +1,7 @@
 import os
 import requests
 from data.ossfuzz_data import OSSFuzz
+from graph.joerngraph import JoernGraph
 
 # typing
 from data.core import Data
@@ -14,6 +15,7 @@ def get_dataset(
     max_pynguin_run_time: int,
     docker_image: str = None,
     num_cpu: int = -1,
+    graph: JoernGraph = None,
 ) -> Data:
 
     if data_name == "ossfuzz":
@@ -24,6 +26,7 @@ def get_dataset(
             run_time=max_pynguin_run_time,
             docker_image=docker_image,
             num_cpu=num_cpu,
+            graph=graph,
         )
     else:
         logger.log("Dataset not found")

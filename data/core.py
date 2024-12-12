@@ -1,12 +1,16 @@
 from rich.console import Console
+from graph.joerngraph import JoernGraph
 
 
 class Data(object):
 
-    def __init__(self, name: str, path: str, logger: Console) -> None:
+    def __init__(
+        self, name: str, path: str, logger: Console, graph: JoernGraph
+    ) -> None:
         self.name = name  # name of the data
         self.path = path  # path of the raw data
         self.logger = logger
+        self.graph = graph
 
     def crawl(self) -> None:
         """
@@ -38,5 +42,11 @@ class Data(object):
     def run_test_gen(self) -> None:
         """
         Run the test generation process
+        """
+        pass
+
+    def extract_graph(self) -> None:
+        """
+        Extract the graph from the raw data
         """
         pass
