@@ -25,6 +25,26 @@ def add_data_group(group):
     group.add_argument("--num_cpu", type=int, default=-1, help="number of cpus to use")
 
 
+def add_joern_group(group):
+    group.add_argument(
+        "--joern_host", type=str, help="host of joern server", default="localhost"
+    )
+    group.add_argument(
+        "--joern_port", type=str, help="port of joern server", default="8080"
+    )
+    group.add_argument(
+        "--joern_path",
+        type=str,
+        help="path to joern",
+        default="./graph/joern/joern-cli",
+    )
+    group.add_argument(
+        "--test_gen_project", type=str, help="name of project to test gen"
+    )
+    group.add_argument("--docker-image", type=str, help="docker image to use")
+    group.add_argument("--num_cpu", type=int, default=-1, help="number of cpus to use")
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     general_group = parser.add_argument_group(title="General configuration")
