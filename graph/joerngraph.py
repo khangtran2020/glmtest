@@ -3,12 +3,13 @@ import subprocess
 import nest_asyncio
 from cpgqls_client import CPGQLSClient, import_code_query
 from rich.console import Console
+from graph.core import Graph
 from utils.utils import run_command, check_docker_image_exists
 
 nest_asyncio.apply()
 
 
-class JoernGraph(object):
+class JoernGraph(Graph):
 
     def __init__(
         self,
@@ -21,12 +22,11 @@ class JoernGraph(object):
     ) -> None:
         self.host = host
         self.port = port
-        self.logger = logger
         self.graph_path = graph_path
         self.joern_path = joern_path
         self.docker_image = docker_image
         self.client = CPGQLSClient(f"{host}:{port}")
-        self.logger.print(f"Connected to Joern server at {host}:{port}")
+        super().__init__(logger)
 
     def import_code(self, code_path: str, name: str) -> None:
         query = import_code_query(os.path.abspath(code_path), name)

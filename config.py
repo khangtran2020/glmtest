@@ -22,6 +22,7 @@ def add_data_group(group):
         "--test_gen_project", type=str, help="name of project to test gen"
     )
     group.add_argument("--docker-image", type=str, help="docker image to use")
+    group.add_argument("--graph_type", type=str, default="joern", help="graph type")
     group.add_argument("--num_cpu", type=int, default=-1, help="number of cpus to use")
 
 
@@ -39,17 +40,20 @@ def add_joern_group(group):
         default="./graph/joern/joern-cli",
     )
     group.add_argument(
-        "--test_gen_project", type=str, help="name of project to test gen"
+        "--graph_path", type=str, help="path to graph", default="./Graphs"
     )
-    group.add_argument("--docker-image", type=str, help="docker image to use")
-    group.add_argument("--num_cpu", type=int, default=-1, help="number of cpus to use")
+    group.add_argument(
+        "--joern_docker_image", type=str, help="docker image for joern", default="joern"
+    )
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     general_group = parser.add_argument_group(title="General configuration")
     data_group = parser.add_argument_group(title="Data-related configuration")
+    joern_group = parser.add_argument_group(title="Joern-related configuration")
 
+    add_joern_group(joern_group)
     add_data_group(data_group)
     add_general_group(general_group)
     return parser.parse_args()

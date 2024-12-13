@@ -11,7 +11,7 @@ SHELL ["/bin/bash", "-c"]
 RUN apt-get update
 RUN apt-get install -y wget zip unzip bzip2 libc6-i386 libc6-x32 libfreetype6 \
     ca-certificates libglib2.0-0 libxext6 libsm6 libxrender1 git mercurial \
-    subversion vim libasound2 libxi6 libxtst6 && \
+    subversion vim libasound2 libxi6 libxtst6 curl && \
     apt-get clean
 
 RUN wget https://download.oracle.com/java/19/archive/jdk-19.0.2_linux-x64_bin.deb && \

@@ -1,12 +1,10 @@
 from rich.console import Console
-from graph.joerngraph import JoernGraph
+from graph.core import Graph
 
 
 class Data(object):
 
-    def __init__(
-        self, name: str, path: str, logger: Console, graph: JoernGraph
-    ) -> None:
+    def __init__(self, name: str, path: str, logger: Console, graph: Graph) -> None:
         self.name = name  # name of the data
         self.path = path  # path of the raw data
         self.logger = logger
