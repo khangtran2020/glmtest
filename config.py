@@ -37,7 +37,13 @@ def add_joern_group(group):
         "--joern_path",
         type=str,
         help="path to joern",
-        default="./graph/joern/joern-cli",
+        default="./graph/joern/",
+    )
+    group.add_argument(
+        "--joern_install_path",
+        type=str,
+        help="docker image for joern",
+        default="./graph/joern",
     )
     group.add_argument(
         "--graph_path", type=str, help="path to graph", default="./Graphs"

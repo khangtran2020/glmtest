@@ -30,7 +30,10 @@ def main(args: Namespace, logger: Console) -> None:
         dataset.crawl()
     elif args.mode == "process":
         dataset.process()
-        dataset.graph.init_joern_server()
+        if args.graph_type == "joern":
+            dataset.graph.install_joern_local()
+            dataset.extract_graph()
+            dataset.graph.init_joern_server()
     elif args.mode == "test_gen":
         dataset.run_test_gen()
     elif args.mode == "test_gen_one":

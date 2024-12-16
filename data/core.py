@@ -1,3 +1,4 @@
+import os
 from rich.console import Console
 from graph.core import Graph
 
@@ -47,4 +48,17 @@ class Data(object):
         """
         Extract the graph from the raw data
         """
-        pass
+        # check if data is load to self.data
+        if self.data is None:
+            self.logger.log("Data not loaded, exiting...")
+            return
+
+        # extract graph from the data
+        for dat in self.data:
+            if os.path.exists(os.path.join(dat["project_path"], "graph")):
+                self.logger.log(f"Graph already exists for {dat['project']}")
+                continue
+            self.graph.exporting_cpg(
+                code_path=os.path.join(dat["project_path"], dat["project"]),
+                save_path=os.path.join(dat["project_path"], "graph"),
+            )

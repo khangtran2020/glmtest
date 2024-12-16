@@ -1,4 +1,5 @@
 import os
+import shlex
 import pickle
 import random
 import requests
@@ -70,7 +71,11 @@ def run_command(command: str, capture_output: bool = False):
     try:
         if capture_output:
             result = subprocess.run(
-                command, shell=True, text=True, check=True, stdout=subprocess.PIPE
+                shlex.split(command),
+                shell=True,
+                text=True,
+                check=True,
+                stdout=subprocess.PIPE,
             )
             return result.stdout.strip()
         else:

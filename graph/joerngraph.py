@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import nest_asyncio
 from cpgqls_client import CPGQLSClient, import_code_query
@@ -24,6 +25,7 @@ class JoernGraph(Graph):
         self.port = port
         self.graph_path = graph_path
         self.joern_path = joern_path
+        self.execution_path = os.path.join(self.joern_path, "joern-cli")
         self.docker_image = docker_image
         self.client = CPGQLSClient(f"{host}:{port}")
         super().__init__(logger)
@@ -34,18 +36,16 @@ class JoernGraph(Graph):
         self.logger.log("Import code with result:" + result["stdout"])
         return
 
-    def exporting_cpg(self, code_path: str) -> None:
-        subprocess.run([os.path.join(self.joern_path, "joern-parse"), code_path])
-        self.logger.log("Parsed code with Joern")
-        subprocess.run(
-            [
-                os.path.join(self.joern_path, "joern-export"),
-                "--repr=all",
-                "--format=dot",
-                "--out",
-                "",
-            ]
-        )
+    def exporting_cpg(self, code_path: str, save_path: str) -> None:
+        try:
+            command = f"cd {self.execution_path} && ./joern-parse {os.path.abspath(code_path)}"
+            run_command(command=command, capture_output=False)
+            command = f"cd {self.execution_path} && ./joern-export --repr=all --format=dot --out {os.path.abspath(save_path)}"
+            run_command(command=command, capture_output=False)
+            shutil.rmtree(os.path.join(self.execution_path, "workspace"))
+            self.logger.log(f"Exported CPG to {save_path}")
+        except Exception as e:
+            self.logger.log(f"Error exporting CPG: {e}")
         return
 
     def init_joern_server(self) -> None:
@@ -60,4 +60,24 @@ class JoernGraph(Graph):
         command = f"docker run -d -p {self.port}:8080 --name joern {self.docker_image}"
         run_command(command=command, capture_output=False)
         self.logger.log(f"Started Joern server at {self.host}:{self.port}")
+        return
+
+    def install_joern_local(self) -> None:
+
+        # check joern_path exists
+        if not os.path.exists(self.joern_path):
+            os.makedirs(self.joern_path)
+            self.logger.log(f"Created directory {self.joern_path}")
+        else:
+            self.logger.log(f"Directory {self.joern_path} already exists")
+
+        # download joern
+        command = f"""curl -L "https://github.com/joernio/joern/releases/latest/download/joern-install.sh" -o {os.path.join(self.joern_path, 'joern-install.sh')}"""
+        run_command(command=command, capture_output=False)
+        self.logger.log(f"Downloaded Joern to {self.joern_path}")
+
+        # install joern locally
+        command = f"""chmod u+x {os.path.join(self.joern_path, 'joern-install.sh')} && {os.path.join(self.joern_path, 'joern-install.sh')} --install-dir={self.joern_path} --reinstall"""
+        run_command(command=command, capture_output=False)
+        self.logger.log("Installed Joern locally")
         return
