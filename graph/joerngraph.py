@@ -44,7 +44,7 @@ class JoernGraph(Graph):
 
     def exporting_cpg(self, code_path: str, save_path: str) -> None:
         try:
-            command = f"cd {self.execution_path} && ./joern-parse {os.path.abspath(code_path)}"
+            command = f"cd {self.execution_path} && ./joern-parse {os.path.abspath(code_path)} --language=PYTHONSRC"
             run_command(command=command, capture_output=False)
             command = f"cd {self.execution_path} && ./joern-export --repr=all --format=dot --out {os.path.abspath(save_path)}"
             run_command(command=command, capture_output=False)
