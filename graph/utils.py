@@ -12,7 +12,6 @@ def get_graph(graph_type, args, logger):
             host=args.joern_host,
             port=args.joern_port,
             joern_path=args.joern_path,
-            graph_path=args.graph_path,
             docker_image=args.joern_docker_image,
             logger=logger,
         )

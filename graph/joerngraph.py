@@ -23,13 +23,11 @@ class JoernGraph(Graph):
         host: str,
         port: str,
         joern_path: str,
-        graph_path: str,
         docker_image: str,
         logger: Console,
     ) -> None:
         self.host = host
         self.port = port
-        self.graph_path = graph_path
         self.joern_path = joern_path
         self.execution_path = os.path.join(self.joern_path, "joern-cli")
         self.docker_image = docker_image
