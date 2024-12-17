@@ -5,9 +5,13 @@ import subprocess
 import nest_asyncio
 from rich.console import Console
 from graph.core import Graph
-from graph.utils import extract_list_content, handle_location_out
 from cpgqls_client import CPGQLSClient, import_code_query
-from utils.utils import run_command, check_docker_image_exists
+from utils.utils import (
+    run_command,
+    check_docker_image_exists,
+    extract_list_content,
+    handle_location_out,
+)
 
 nest_asyncio.apply()
 

@@ -12,3 +12,6 @@ class Graph(object):
 
     def extract_graph(self, code_path: str, name: str) -> None:
         return
+
+    def read_graph(self) -> None:
+        return
