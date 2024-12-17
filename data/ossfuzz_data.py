@@ -296,6 +296,13 @@ class OSSFuzz(Data):
         return
 
     def create_package_txt(self, data: dict) -> None:
+
+        if check_package_exists_in_pypi(data["project"]):
+            with open(os.path.join(data["project_path"], "package.txt"), "w") as file:
+                file.write(data["project"])
+            self.logger.log(f"Created package.txt for {data['project']}")
+            return
+
         result = subprocess.run(
             ["pipreqs", "--force", f"{data['project_path']}"],
             capture_output=True,
@@ -306,12 +313,6 @@ class OSSFuzz(Data):
             self.logger.log(
                 f"Error: {data['project']} has error in creating requirements"
             )
-            if check_package_exists_in_pypi(data["project"]):
-                with open(
-                    os.path.join(data["project_path"], "package.txt"), "w"
-                ) as file:
-                    file.write(data["project"])
-                self.logger.log(f"Created package.txt for {data['project']}")
         else:
             os.rename(
                 os.path.join(data["project_path"], "requirements.txt"),
