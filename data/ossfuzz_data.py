@@ -97,7 +97,9 @@ class OSSFuzz(Data):
                 self.data = json.load(file)
             with open(os.path.join(self.data_path, "stat_info.json"), "r") as file:
                 self.stat_info = json.load(file)
-        super().__init__(name=self.name, path=path, logger=logger, graph=graph)
+        super().__init__(
+            name=self.name, path=path, logger=logger, graph=graph, num_cpu=num_cpu
+        )
 
     def crawl(self) -> None:
 
@@ -252,6 +254,8 @@ class OSSFuzz(Data):
             dat["project_path"] = os.path.join(project_path, project)
             num_project += 1
             modules = []
+            modules_name = []
+            modules_path = []
             current_project_path = os.path.join(project_path, project, project)
             for root, dirs, files in os.walk(current_project_path):
                 for file in files:
@@ -265,7 +269,19 @@ class OSSFuzz(Data):
                             .replace("/", ".")
                             .replace(".py", "")
                         )
+                        modules_name.append(
+                            os.path.join(root, file)
+                            .replace(
+                                os.path.join(dat["project_path"], dat["project"]) + "/",
+                                "",
+                            )
+                            .replace("/", ".")
+                            .replace(".py", "")
+                            .replace(".", "_")
+                        )
+                        modules_path.append(os.path.abspath(os.path.join(root, file)))
             dat["modules"] = modules
+            dat["module_path"] = modules_path
             dat["num_modules"] = len(modules)
             num_modules += len(modules)
             data.append(dat)
@@ -275,7 +291,6 @@ class OSSFuzz(Data):
         # Create a json object and stor the data
         with open(os.path.join(self.data_path, "data.json"), "w") as f:
             json.dump(data, f)
-
         self.data = data
         self.logger.log("Processed raw data")
         self.logger.log(f"Number of projects: {num_project}")

@@ -1,15 +1,19 @@
 import os
+from joblib import Parallel, delayed
 from rich.console import Console
 from graph.core import Graph
 
 
 class Data(object):
 
-    def __init__(self, name: str, path: str, logger: Console, graph: Graph) -> None:
+    def __init__(
+        self, name: str, path: str, logger: Console, graph: Graph, num_cpu: int
+    ) -> None:
         self.name = name  # name of the data
         self.path = path  # path of the raw data
         self.logger = logger
         self.graph = graph
+        self.num_cpu = num_cpu
 
     def crawl(self) -> None:
         """
@@ -58,9 +62,17 @@ class Data(object):
             if os.path.exists(os.path.join(dat["project_path"], "graph")):
                 self.logger.log(f"Graph already exists for {dat['project']}")
                 continue
-            self.graph.exporting_cpg(
-                code_path=os.path.join(dat["project_path"], dat["project"]),
-                save_path=os.path.join(dat["project_path"], "graph"),
+            num_cores = self.num_cpu
+
+            # parallelize the process
+            Parallel(n_jobs=num_cores)(
+                delayed(self.graph.exporting_cpg)(
+                    code_path=module_path,
+                    save_path=os.path.join(
+                        dat["project_path"], "graph", dat["module_name"][i]
+                    ),
+                )
+                for i, module_path in enumerate(dat["modules_path"])
             )
 
     def extract_locations(self) -> None:

@@ -26,15 +26,17 @@ def main(args: Namespace, logger: Console) -> None:
         logger.log("Dataset not found, exiting...")
         return
 
+    # data
     if args.mode == "crawl":
         dataset.crawl()
     elif args.mode == "process":
         dataset.process()
+    elif args.mode == "extract-graph":
         dataset.extract_graph()
-        if args.graph_type == "joern":
-            dataset.graph.install_joern_local()
-            dataset.graph.init_joern_server()
-            dataset.extract_locations()
+    elif args.mode == "extract-location-joern":
+        dataset.graph.install_joern_local()
+        dataset.graph.init_joern_server()
+        dataset.extract_locations()
     elif args.mode == "test_gen":
         dataset.run_test_gen()
     elif args.mode == "test_gen_one":
