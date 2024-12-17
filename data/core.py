@@ -62,3 +62,21 @@ class Data(object):
                 code_path=os.path.join(dat["project_path"], dat["project"]),
                 save_path=os.path.join(dat["project_path"], "graph"),
             )
+
+    def extract_locations(self) -> None:
+
+        if self.data is None:
+            self.logger.log("Data not loaded, exiting...")
+            return
+
+        # extract graph from the data
+        for dat in self.data:
+            if os.path.exists(os.path.join(dat["project_path"], "graph")):
+                self.logger.log(f"Graph exists for {dat['project']}")
+                self.graph.get_locations_and_id(
+                    code_path=os.path.join(dat["project_path"], dat["project"]),
+                    save_path=os.path.join(
+                        dat["project_path"], "graph", "location.json"
+                    ),
+                    name=dat["project"],
+                )

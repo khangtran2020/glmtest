@@ -1,10 +1,12 @@
 import os
+import json
 import shutil
 import subprocess
 import nest_asyncio
-from cpgqls_client import CPGQLSClient, import_code_query
 from rich.console import Console
 from graph.core import Graph
+from graph.utils import extract_list_content, handle_location_out
+from cpgqls_client import CPGQLSClient, import_code_query
 from utils.utils import run_command, check_docker_image_exists
 
 nest_asyncio.apply()
@@ -81,3 +83,32 @@ class JoernGraph(Graph):
         run_command(command=command, capture_output=False)
         self.logger.log("Installed Joern locally")
         return
+
+    def get_locations_and_id(self, code_path: str, name: str, save_path: str) -> dict:
+
+        self.import_code(code_path, name)
+        # get id of all nodes
+        query = """cpg.all.id.l"""
+        result = self.client.execute(query)
+        ids = [
+            x.strip().replace("L", "")
+            for x in extract_list_content(result["stdout"].replace("\n", " "))[0]
+            .strip()
+            .split(",")
+        ]
+
+        # get location of all nodes
+        query = """cpg.all.location.l"""
+        result = self.client.execute(query)
+        data = handle_location_out(result["stdout"])
+
+        # combine id and location
+        locations = {}
+        for i in range(len(ids)):
+            locations[ids[i]] = data[i]
+        self.logger.log(f"Got locations and id for {name}")
+
+        # save locations to file
+        with open(save_path, "w") as f:
+            json.dump(locations, f)
+        return locations
