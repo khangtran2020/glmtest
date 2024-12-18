@@ -282,8 +282,11 @@ class OSSFuzz(Data):
                         modules_path.append(os.path.abspath(os.path.join(root, file)))
             dat["modules"] = modules
             dat["module_path"] = modules_path
+            dat["module_name"] = modules_name
             dat["num_modules"] = len(modules)
             num_modules += len(modules)
+            if len(modules) == 0:
+                continue
             data.append(dat)
             stat_info[project] = len(modules)
 
