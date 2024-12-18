@@ -72,7 +72,7 @@ class Data(object):
                         dat["project_path"], "graph", dat["module_name"][i]
                     ),
                 )
-                for i, module_path in enumerate(dat["modules_path"])
+                for i, module_path in enumerate(dat["module_path"])
             )
 
     def extract_locations(self) -> None:
