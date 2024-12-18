@@ -59,16 +59,19 @@ class Data(object):
             return
 
         # extract graph from the data
-        for dat in self.data:
-            if os.path.exists(os.path.join(dat["project_path"], "graph")):
-                self.logger.log(f"Graph already exists for {dat['project']}")
-                continue
+        with Progress(console=self.logger) as progress:
 
-            os.makedirs(os.path.join(dat["project_path"], "graph"), exist_ok=False)
+            task = progress.add_task("Extracting graph", total=len(self.data))
 
-            with Progress(console=self.logger) as progress:
-                task = progress.add_task(
-                    "Crawling projects", total=len(dat["module_path"])
+            for dat in self.data:
+                if os.path.exists(os.path.join(dat["project_path"], "graph")):
+                    self.logger.log(f"Graph already exists for {dat['project']}")
+                    continue
+
+                os.makedirs(os.path.join(dat["project_path"], "graph"), exist_ok=False)
+
+                sub_task = progress.add_task(
+                    f"Crawling project {dat['project']}", total=len(dat["module_path"])
                 )
                 for i, module_path in enumerate(dat["module_path"]):
                     self.graph.exporting_cpg(
@@ -77,8 +80,10 @@ class Data(object):
                             dat["project_path"], "graph", dat["module_name"][i]
                         ),
                     )
-                    progress.advance(task)
-                progress.remove_task(task)
+                    progress.advance(sub_task)
+                progress.remove_task(sub_task)
+                progress.advance(task)
+            progress.remove_task(task)
 
     def extract_locations(self) -> None:
 
