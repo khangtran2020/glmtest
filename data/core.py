@@ -1,5 +1,5 @@
 import os
-from joblib import Parallel, delayed
+from tqdm import tqdm
 from rich.console import Console
 from graph.core import Graph
 
@@ -64,16 +64,13 @@ class Data(object):
                 continue
             num_cores = self.num_cpu
 
-            # parallelize the process
-            Parallel(n_jobs=num_cores)(
-                delayed(self.graph.exporting_cpg)(
+            for i, module_path in tqdm(enumerate(dat["module_path"])):
+                self.graph.exporting_cpg(
                     code_path=module_path,
                     save_path=os.path.join(
                         dat["project_path"], "graph", dat["module_name"][i]
                     ),
                 )
-                for i, module_path in enumerate(dat["module_path"])
-            )
 
     def extract_locations(self) -> None:
 
