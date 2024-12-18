@@ -52,40 +52,6 @@ class JoernGraph(Graph):
             self.logger.log(f"Error exporting CPG: {e}")
         return
 
-    def init_joern_server(self) -> None:
-
-        if not check_docker_image_exists(self.docker_image):
-            # build docker image for every project
-            command = f"docker build -t {self.docker_image} -f graph/docker/Dockerfile --platform linux/amd64 ./graph"
-            run_command(command=command, capture_output=False)
-            self.logger.log(f"Built docker image for Joern")
-
-        # run docker container
-        command = f"docker run -d -p {self.port}:8080 --name joern {self.docker_image}"
-        run_command(command=command, capture_output=False)
-        self.logger.log(f"Started Joern server at {self.host}:{self.port}")
-        return
-
-    def install_joern_local(self) -> None:
-
-        # check joern_path exists
-        if not os.path.exists(self.joern_path):
-            os.makedirs(self.joern_path)
-            self.logger.log(f"Created directory {self.joern_path}")
-        else:
-            self.logger.log(f"Directory {self.joern_path} already exists")
-
-        # download joern
-        command = f"""curl -L "https://github.com/joernio/joern/releases/latest/download/joern-install.sh" -o {os.path.join(self.joern_path, 'joern-install.sh')}"""
-        run_command(command=command, capture_output=False)
-        self.logger.log(f"Downloaded Joern to {self.joern_path}")
-
-        # install joern locally
-        command = f"""chmod u+x {os.path.join(self.joern_path, 'joern-install.sh')} && {os.path.join(self.joern_path, 'joern-install.sh')} --install-dir={self.joern_path} --reinstall"""
-        run_command(command=command, capture_output=False)
-        self.logger.log("Installed Joern locally")
-        return
-
     def get_locations_and_id(self, code_path: str, name: str, save_path: str) -> dict:
 
         self.import_code(code_path, name)

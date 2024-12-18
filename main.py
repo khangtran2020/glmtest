@@ -32,9 +32,9 @@ def main(args: Namespace, logger: Console) -> None:
     elif args.mode == "process":
         dataset.process()
     elif args.mode == "extract-graph":
+        dataset.graph.install_joern_local()
         dataset.extract_graph()
     elif args.mode == "extract-location-joern":
-        dataset.graph.install_joern_local()
         dataset.graph.init_joern_server()
         dataset.extract_locations()
     elif args.mode == "test_gen":
