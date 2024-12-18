@@ -30,9 +30,6 @@ def add_data_group(group):
 
 def add_joern_group(group):
     group.add_argument(
-        "--joern_host", type=str, help="host of joern server", default="localhost"
-    )
-    group.add_argument(
         "--joern_port", type=str, help="port of joern server", default="8080"
     )
     group.add_argument(
@@ -40,15 +37,6 @@ def add_joern_group(group):
         type=str,
         help="path to joern",
         default="./graph/joern/",
-    )
-    group.add_argument(
-        "--joern_install_path",
-        type=str,
-        help="docker image for joern",
-        default="./graph/joern",
-    )
-    group.add_argument(
-        "--joern_docker_image", type=str, help="docker image for joern", default="joern"
     )
 
 

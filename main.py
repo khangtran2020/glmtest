@@ -12,7 +12,11 @@ from rich.console import Console
 def main(args: Namespace, logger: Console) -> None:
 
     # init data
-    graph = get_graph(graph_type=args.graph_type, args=args, logger=logger)
+    graph = get_graph(
+        args=args,
+        graph_type=args.graph_type,
+        logger=logger,
+    )
     dataset = get_dataset(
         data_name=args.data,
         data_path=args.data_path,

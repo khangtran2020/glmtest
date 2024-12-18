@@ -20,18 +20,13 @@ class JoernGraph(Graph):
 
     def __init__(
         self,
-        host: str,
         port: str,
         joern_path: str,
-        docker_image: str,
         logger: Console,
     ) -> None:
-        self.host = host
         self.port = port
         self.joern_path = joern_path
-        self.execution_path = os.path.join(self.joern_path, "joern-cli")
-        self.docker_image = docker_image
-        self.client = CPGQLSClient(f"{host}:{port}")
+        self.client = CPGQLSClient(f"localhost:{port}")
         super().__init__(logger)
 
     def import_code(self, code_path: str, name: str) -> None:
@@ -42,11 +37,10 @@ class JoernGraph(Graph):
 
     def exporting_cpg(self, code_path: str, save_path: str) -> None:
         try:
-            command = f"cd {self.execution_path} && ./joern-parse {os.path.abspath(code_path)} --language=PYTHONSRC"
+            command = f"cd {self.joern_path} && ./joern-parse {os.path.abspath(code_path)} --language=PYTHONSRC"
             run_command(command=command, capture_output=False)
-            command = f"cd {self.execution_path} && ./joern-export --repr=all --format=dot --out {os.path.abspath(save_path)}"
+            command = f"cd {self.joern_path} && ./joern-export --repr=all --format=dot --out {os.path.abspath(save_path)}"
             run_command(command=command, capture_output=False)
-            shutil.rmtree(os.path.join(self.execution_path, "workspace"))
             self.logger.log(f"Exported CPG to {save_path}")
         except Exception as e:
             self.logger.log(f"Error exporting CPG: {e}")

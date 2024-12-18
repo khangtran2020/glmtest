@@ -8,9 +8,9 @@ Since GLMF leverage `Pynguin` to create the training data, to clone the project,
 git clone --recursive https://github.com/khangtran2020/glmf 
 ```
 
-## 1. Dataset
+## Dataset
 
-### 1.1 Test generate with Pynguin
+### Test generate with Pynguin
 
 First of all, we need to build Docker image of Pynguin. To do so, run this command:
 
@@ -18,7 +18,7 @@ First of all, we need to build Docker image of Pynguin. To do so, run this comma
 docker build -t pynguin-runner -f pynguin/docker/Dockerfile --platform linux/amd64 ./pynguin
 ```
 
-### 1.2 Extract Joern CPG graph
+### Extract Joern CPG graph
 
 We leverage Joern to extract CPG for each  module (`.py` file). To install Joern, please follow the instruction [here](https://docs.joern.io/installation/).
 
