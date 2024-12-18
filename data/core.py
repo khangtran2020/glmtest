@@ -62,8 +62,8 @@ class Data(object):
             if os.path.exists(os.path.join(dat["project_path"], "graph")):
                 self.logger.log(f"Graph already exists for {dat['project']}")
                 continue
-            num_cores = self.num_cpu
 
+            os.makedirs(os.path.join(dat["project_path"], "graph"), exist_ok=False)
             for i, module_path in tqdm(enumerate(dat["module_path"])):
                 self.graph.exporting_cpg(
                     code_path=module_path,
