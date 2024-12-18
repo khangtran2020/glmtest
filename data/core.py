@@ -91,14 +91,30 @@ class Data(object):
             self.logger.log("Data not loaded, exiting...")
             return
 
-        # extract graph from the data
-        for dat in self.data:
-            if os.path.exists(os.path.join(dat["project_path"], "graph")):
-                self.logger.log(f"Graph exists for {dat['project']}")
-                self.graph.get_locations_and_id(
-                    code_path=os.path.join(dat["project_path"], dat["project"]),
-                    save_path=os.path.join(
-                        dat["project_path"], "graph", "location.json"
-                    ),
-                    name=dat["project"],
+        with Progress(console=self.logger) as progress:
+
+            task = progress.add_task(
+                "Extracting ids and locations", total=len(self.data)
+            )
+
+            for dat in self.data:
+
+                sub_task = progress.add_task(
+                    f"Crawling project {dat['project']}", total=len(dat["module_path"])
                 )
+                for i, module_path in enumerate(dat["module_path"]):
+                    self.graph.get_locations_and_id(
+                        code_path=module_path,
+                        save_path=os.path.join(
+                            dat["project_path"],
+                            "graph",
+                            dat["module_name"][i],
+                            "location.json",
+                        ),
+                        name=dat["module_name"][i],
+                    )
+                    progress.advance(sub_task)
+
+                progress.remove_task(sub_task)
+                progress.advance(task)
+            progress.remove_task(task)
