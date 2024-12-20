@@ -1,4 +1,5 @@
 import os
+import ast
 import sys
 import yaml
 import json
@@ -18,7 +19,7 @@ from utils.utils import (
 )
 
 # typing
-from typing import List
+from typing import List, Union
 
 DOCKERFILE_TEMPLATE = """# Use nvidia/cuda image
 FROM nvidia/cuda:11.1.1-cudnn8-devel-ubuntu18.04
@@ -218,7 +219,7 @@ class OSSFuzz(Data):
 
         self.logger.log("Crawling completed")
 
-    def process(self) -> None:
+    def process_raw(self) -> None:
 
         process = False
         # check if the data has been processeds
@@ -241,9 +242,6 @@ class OSSFuzz(Data):
 
         # process data
         data = []
-        stat_info = {}
-        num_project = 0
-        num_modules = 0
         project_path = os.path.join(self.data_path, "projects")
 
         for i, project in enumerate(os.listdir(project_path)):
@@ -252,7 +250,6 @@ class OSSFuzz(Data):
             dat["uuid"] = i + 1
             dat["project"] = project
             dat["project_path"] = os.path.join(project_path, project)
-            num_project += 1
             modules = []
             modules_name = []
             modules_path = []
@@ -284,33 +281,36 @@ class OSSFuzz(Data):
             dat["module_path"] = modules_path
             dat["module_name"] = modules_name
             dat["num_modules"] = len(modules)
-            num_modules += len(modules)
             if len(modules) == 0:
                 continue
             data.append(dat)
-            stat_info[project] = len(modules)
 
         data = sorted(data, key=lambda x: x["num_modules"])
-        # Create a json object and stor the data
-        with open(os.path.join(self.data_path, "data.json"), "w") as f:
-            json.dump(data, f)
         self.data = data
+        # create package.txt for each project
+        for dat in self.data:
+            self.create_package_txt(data=dat)
+        self.clean_up()
+        with open(os.path.join(self.data_path, "data.json"), "w") as f:
+            json.dump(self.data, f)
+
+        stat_info = {}
+        num_project = len(self.data)
+        num_modules = [dat["num_modules"] for dat in self.data]
         self.logger.log("Processed raw data")
         self.logger.log(f"Number of projects: {num_project}")
         self.logger.log(f"Number of modules: {num_modules}")
 
+        for dat in self.data:
+            stat_info[dat["project"]] = dat["num_modules"]
+
         # Save statistic information
         stat_info["num_project"] = num_project
         stat_info["num_modules"] = num_modules
-
-        with open(os.path.join(self.data_path, "stat_info.json"), "w") as f:
-            json.dump(stat_info, f)
         self.stat_info = stat_info
 
-        # create package.txt for each project
-        for dat in data:
-            self.create_package_txt(data=dat)
-            self.create_run_pynguin_script(data=dat)
+        with open(os.path.join(self.data_path, "stat_info.json"), "w") as f:
+            json.dump(self.stat_info, f)
         return
 
     def create_package_txt(self, data: dict) -> None:
@@ -349,107 +349,180 @@ class OSSFuzz(Data):
                 self.logger.log(f"Created package.txt for {data['project']}")
             self.logger.log(f"Created package.txt for {data['project']}")
 
-    def create_run_pynguin_script(self, data: dict) -> str:
+    def clean_up(self) -> None:
 
-        modules = data["modules"]
-        os.makedirs(os.path.join(data["project_path"], "test"), exist_ok=True)
-
-        project_template = "#!/bin/bash\n"
-        # run pynguin on all modules in parallel but only 10 at a time
-        for i, module in enumerate(modules):
-            pynguin_command = PYNGUIN_TEMPLATE.format(
-                os.path.abspath(os.path.join(data["project_path"], data["project"])),
-                os.path.abspath(os.path.join(data["project_path"], "test")),
-                os.path.abspath(data["project_path"]),
-                self.docker_image,
-                module,
-                self.run_time,
-            )
-            project_template += "\n" + pynguin_command
-            if (i + 1) % 10 == 0:
-                self.logger.log(f"Checking sleeping time for {data['project']} at {i}")
-                project_template += "\n" + "sleep 30"
-
-        if len(modules) < 10 or len(modules) % 10 != 0:
-            project_template += "\n" + "sleep 30"
-
-        with open(os.path.join(data["project_path"], "run_pynguin.sh"), "w") as file:
-            file.write(project_template)
-        self.logger.log(f"Created run pynguin script for {data['project']}")
-
-    def run_test_gen_one(self, data: dict) -> None:
-
-        time_wait = (
-            len(data["modules"]) // 10 * 30 + 30
-            if len(data["modules"]) % 10 != 0
-            else len(data["modules"]) // 10 * 30
-        )
-        time_wait = max(time_wait, 600)
-
-        self.logger.log(
-            f"Running test generation for {data['project']} with {time_wait} seconds"
-        )
-        command = f"bash {data['project_path']}/run_pynguin.sh"
-        self.logger.log(f"Running command for {data['project']}: " + command)
-        run_command(command=command, capture_output=False)
-
-        # wait for test generation to complete
-        self.logger.log(f"Waiting for {data['project']} to complete")
-        time.sleep(time_wait)
-        self.logger.log(f"Completed waiting for {data['project']}")
-
-    def get_command_for_modules(self, data: dict) -> List[str]:
-        modules = data["modules"]
-        commands = []
-        for module in modules:
-            pynguin_command = PYNGUIN_TEMPLATE.format(
-                os.path.abspath(os.path.join(data["project_path"], data["project"])),
-                os.path.abspath(os.path.join(data["project_path"], "test")),
-                os.path.abspath(data["project_path"]),
-                self.docker_image,
-                module,
-                self.run_time,
-            )
-            commands.append(pynguin_command)
-        return commands
-
-    def run_test_gen(self) -> None:
-
-        # read data
-        with open(os.path.join(self.data_path, "data.json"), "r") as file:
-            self.data = json.load(file)
-
-        # check if image exist
-        if not check_docker_image_exists(self.docker_image):
-            # build docker image for every project
-            command = f"docker build -t {self.docker_image} -f pynguin/docker/Dockerfile --platform linux/amd64 ./pynguin"
-            run_command(command=command, capture_output=False)
-            self.logger.log(f"Built docker image for for every project")
-
-        self.logger.log("Running test generation in parallel")
-        commands_list = []
+        # Go over each project and if package.txt is not created, remove that project
+        proj_to_remove = []
         for dat in self.data:
-            commands_list += self.get_command_for_modules(dat)
-        if self.num_cpu == -1:
-            num_jobs = -1
-            self.logger.log(
-                f"Running test generation in parallel with {os.cpu_count()} cores"
-            )
-        else:
-            if self.num_cpu > os.cpu_count():
-                num_jobs = os.cpu_count()
-                self.logger.log(
-                    f"The indicated #CPUs is larger than the cores.\n"
-                    + "Running test generation in parallel with {os.cpu_count()} cores"
-                )
-            else:
-                num_jobs = self.num_cpu
-                self.logger.log(
-                    f"Running test generation in parallel with {self.num_cpu} cores"
-                )
-        results = Parallel(n_jobs=num_jobs)(
-            delayed(run_command)(command=command, capture_output=False)
-            for command in tqdm(commands_list)
+            if not os.path.exists(os.path.join(dat["project_path"], "package.txt")):
+                shutil.rmtree(dat["project_path"])
+                proj_to_remove.append(dat)
+                self.logger.log(f"Removed {dat['project']}")
+
+            # if number of modules is 0, remove that project
+            if dat["num_modules"] == 0:
+                shutil.rmtree(dat["project_path"])
+                self.data.remove(dat)
+                proj_to_remove.append(dat)
+                self.logger.log(f"Removed {dat['project']}")
+
+        for proj in proj_to_remove:
+            self.data.remove(proj)
+        self.logger.log("Cleaned up projects")
+
+    def get_pynguin_command_for_module(self, module_info: dict) -> str:
+
+        pynguin_command = PYNGUIN_TEMPLATE.format(
+            os.path.abspath(module_info["code_path"]),
+            os.path.abspath(module_info["output_path"]),
+            os.path.abspath(module_info["project_path"]),
+            self.docker_image,
+            module_info["module_name"],
+            self.run_time,
         )
-        self.logger.log("Test generation completed")
+        return pynguin_command
+
+    def process_one_module(self, module_info) -> List[dict]:
+
+        module_results_info = {}
+        # gen test case with pynguin
+        command = self.get_pynguin_command_for_module(module_info)
+        run_command(command=command, capture_output=False)
+        # check if test case is generated
+        if not os.path.exists(
+            os.path.join(
+                module_info["output_path"], f"test_{module_info['module_name']}.py"
+            )
+        ):
+            return []
+
+        module_results_info["module_name"] = module_info["module_name"]
+        module_results_info["module_path"] = module_info["module_path"]
+        module_results_info["project"] = module_info["project"]
+
+        # extract joern graph & locations
+        self.graph.extract_graph(
+            module_info["module_path"], save_path=f"{module_info['graph_path']}.json"
+        )
+
+        # if test case is generated, store the test case
+        # count number of test cases
+        test_path = os.path.join(
+            module_info["output_path"], f"test_{module_info['module_name']}.py"
+        )
+        # check correct path
+        assert os.path.exists(test_path)
+        sub_test_path = os.path.join(
+            module_info["output_path"], module_info["module_name"]
+        )
+        os.makedirs(
+            sub_test_path,
+            exist_ok=True,
+        )
+        self.extract_functions_with_imports(
+            file_path=test_path, save_path=sub_test_path
+        )
+
+        # split test case into test cases
+        # run each test case with coverage.py
+        # get the data and analyze the data
         return
+
+    # def run_test_gen(self) -> None:
+
+    #     # read data
+    #     with open(os.path.join(self.data_path, "data.json"), "r") as file:
+    #         self.data = json.load(file)
+
+    #     # check if image exist
+    #     if not check_docker_image_exists(self.docker_image):
+    #         # build docker image for every project
+    #         command = f"docker build -t {self.docker_image} -f pynguin/docker/Dockerfile --platform linux/amd64 ./pynguin"
+    #         run_command(command=command, capture_output=False)
+    #         self.logger.log(f"Built docker image for for every project")
+
+    #     self.logger.log("Running test generation in parallel")
+    #     commands_list = []
+    #     for dat in self.data:
+    #         commands_list += self.get_command_for_modules(dat)
+    #     if self.num_cpu == -1:
+    #         num_jobs = -1
+    #         self.logger.log(
+    #             f"Running test generation in parallel with {os.cpu_count()} cores"
+    #         )
+    #     else:
+    #         if self.num_cpu > os.cpu_count():
+    #             num_jobs = os.cpu_count()
+    #             self.logger.log(
+    #                 f"The indicated #CPUs is larger than the cores.\n"
+    #                 + "Running test generation in parallel with {os.cpu_count()} cores"
+    #             )
+    #         else:
+    #             num_jobs = self.num_cpu
+    #             self.logger.log(
+    #                 f"Running test generation in parallel with {self.num_cpu} cores"
+    #             )
+    #     results = Parallel(n_jobs=num_jobs)(
+    #         delayed(run_command)(command=command, capture_output=False)
+    #         for command in tqdm(commands_list)
+    #     )
+    #     self.logger.log("Test generation completed")
+    #     return
+
+    def count_test_cases(self, test_file: str) -> int:
+
+        try:
+            with open(test_file, "r") as file:
+                file_content = file.read()
+
+            # Parse the file content into an AST
+            tree = ast.parse(file_content)
+
+            # Count the number of function definitions
+            function_count = sum(
+                isinstance(node, ast.FunctionDef) for node in ast.walk(tree)
+            )
+            return function_count
+
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            return 0
+
+    def extract_functions_with_imports(
+        self, file_path: str, save_path: str
+    ) -> Union[None, int]:
+
+        try:
+            with open(file_path, "r") as file:
+                file_content = file.read()
+
+            # Parse the Python file into an AST
+            tree = ast.parse(file_content)
+
+            # Collect all imports and function definitions
+            imports = []
+            functions = []
+
+            for node in tree.body:
+                if isinstance(node, (ast.Import, ast.ImportFrom)):
+                    imports.append(node)
+                elif isinstance(node, ast.FunctionDef):
+                    functions.append(node)
+
+            # Convert imports to code strings
+            import_code = "\n".join(ast.unparse(import_node) for import_node in imports)
+
+            # Convert each function to a string
+            function_dict = {}
+            for func in functions:
+                func_code = ast.unparse(func)
+                function_name = func.name
+                function_dict[function_name] = f"{import_code}\n\n{func_code}"
+
+            for i, key in enumerate(function_dict.keys()):
+                with open(os.path.join(save_path, f"test_case_{i}.py"), "w") as file:
+                    file.write(function_dict[key])
+
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            return -1

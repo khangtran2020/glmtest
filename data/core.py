@@ -71,7 +71,8 @@ class Data(object):
                 os.makedirs(os.path.join(dat["project_path"], "graph"), exist_ok=False)
 
                 sub_task = progress.add_task(
-                    f"Crawling project {dat['project']}", total=len(dat["module_path"])
+                    f"Exporting graphs for project {dat['project']}",
+                    total=len(dat["module_path"]),
                 )
                 for i, module_path in enumerate(dat["module_path"]):
                     self.graph.exporting_cpg(

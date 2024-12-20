@@ -10,7 +10,9 @@ git clone --recursive https://github.com/khangtran2020/glmf
 
 ## Dataset
 
-### Test generate with Pynguin
+### Set up for raw data processing
+
+#### Pynguin container
 
 First of all, we need to build Docker image of Pynguin. To do so, run this command:
 
@@ -18,11 +20,11 @@ First of all, we need to build Docker image of Pynguin. To do so, run this comma
 docker build -t pynguin-runner -f pynguin/docker/Dockerfile --platform linux/amd64 ./pynguin
 ```
 
-### Extract Joern CPG graph
+#### Joern server
 
 We leverage Joern to extract CPG for each  module (`.py` file). To install Joern, please follow the instruction [here](https://docs.joern.io/installation/).
 
-Then, export the path to Joern by the following command:
+If you have `sudo` privilege, we suggest you to create a symlink. On the other heand, you can export the path to Joern by the following command:
 
 ```shell
 export JOERN_PATH= Path/to/Joern
@@ -35,3 +37,5 @@ cd $JOERN_PATH && ./joern --server --server-port <SERVER-PORT>
 ```
 
 This command will run the Joern's server at `http://localhost:<SERVER-PORT>`
+
+#### Coverage.py container

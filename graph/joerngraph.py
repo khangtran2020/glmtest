@@ -35,42 +35,59 @@ class JoernGraph(Graph):
         self.logger.log("Import code with result:" + result["stdout"])
         return
 
-    def exporting_cpg(self, code_path: str, save_path: str) -> None:
+    def extract_graph(self, code_path, save_path) -> None:
+        self.import_code(code_path, "work")
+        graph = self.export_graph_data()
+        self.save_to_json(graph, save_path)
+
+    def run_joern_query(self, query: str) -> str:
         try:
-            command = f"cd {self.joern_path} && ./joern-parse {os.path.abspath(code_path)} --language=PYTHONSRC"
-            run_command(command=command, capture_output=False)
-            command = f"cd {self.joern_path} && ./joern-export --repr=all --format=dot --out {os.path.abspath(save_path)}"
-            run_command(command=command, capture_output=False)
-            self.logger.log(f"Exported CPG to {save_path}")
+            result = self.client.execute(query)
+            print("result: ", result)
+            stdout = result["stdout"]
+
+            # Remove first line, and last two lines (the first and before last lines are just Scala specific output
+            # that we don't need, and the last line is an empty line).
+            stdout = stdout[stdout.find("\n") + 1 : stdout.rfind("\n")]
+            stdout = "[\n" + stdout[: stdout.rfind("\n")] + "\n]"
+            return stdout
         except Exception as e:
-            self.logger.log(f"Error exporting CPG: {e}")
-        return
+            return str(e)
 
-    def get_locations_and_id(self, code_path: str, name: str, save_path: str) -> dict:
+    def export_graph_data(self) -> dict:
+        # Export edges
+        edges_command = 'cpg.graph.allEdges.map(e => Map("src" -> e.src.id, "dst" -> e.dst.id, "label" -> e.label, "id" -> e.hashCode)).l.toJsonPretty'
+        edges_result = self.run_joern_query(edges_command)
+        edges = json.loads(edges_result)
+        filtered_edges = []
+        reachable_nodes = {}
+        for edge in edges:
+            edge["id"] = str(edge["id"])
+            if edge["label"] in [
+                "AST",
+                "CFG",
+                "CALL",
+                "ARGUMENT",
+                "RECEIVER",
+                "CDG",
+                "REACHING_DEF",
+            ]:
+                filtered_edges.append(edge)
+                reachable_nodes[edge["src"]] = True
+                reachable_nodes[edge["dst"]] = True
 
-        self.import_code(code_path, name)
-        # get id of all nodes
-        query = """cpg.all.id.l"""
-        result = self.client.execute(query)
-        ids = [
-            x.strip().replace("L", "")
-            for x in extract_list_content(result["stdout"].replace("\n", " "))[0]
-            .strip()
-            .split(",")
-        ]
+        # Export nodes
+        nodes_command = 'cpg.all.map(n => Map("id" -> n.id, "label" -> n.label, "properties" -> n.properties, "location" -> n.location)).l.toJsonPretty'
+        nodes_result = self.run_joern_query(nodes_command)
+        nodes = json.loads(nodes_result)
+        filtered_nodes = []
+        for node in nodes:
+            if reachable_nodes.get(node["id"], False):
+                filtered_nodes.append(node)
+        graph = {"nodes": filtered_nodes, "edges": filtered_edges}
+        return graph
 
-        # get location of all nodes
-        query = """cpg.all.location.l"""
-        result = self.client.execute(query)
-        data = handle_location_out(result["stdout"])
-
-        # combine id and location
-        locations = {}
-        for i in range(len(ids)):
-            locations[ids[i]] = data[i]
-        self.logger.log(f"Got locations and id for {name}")
-
-        # save locations to file
-        with open(save_path, "w") as f:
-            json.dump(locations, f)
-        return locations
+    def save_to_json(self, data, output_file):
+        with open(output_file, "w") as f:
+            json.dump(data, f, indent=2)
+        print(f"Graph data saved to {output_file}")

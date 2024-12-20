@@ -33,8 +33,8 @@ def main(args: Namespace, logger: Console) -> None:
     # data
     if args.mode == "crawl":
         dataset.crawl()
-    elif args.mode == "process":
-        dataset.process()
+    elif args.mode == "process_raw":
+        dataset.process_raw()
     elif args.mode == "extract-graph":
         dataset.graph.install_joern_local()
         dataset.extract_graph()
