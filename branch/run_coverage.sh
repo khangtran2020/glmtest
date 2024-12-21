@@ -29,8 +29,10 @@ then
   exit 1
 fi
 
-cd /project
 pip install -r "${PACKAGE_DIR}/package.txt"
-
-cp -r "${INPUT_DIR}"/* .
+cd /project
+cp -r "${INPUT_DIR}"/*.py .
 coverage run --branch -m pytest "$@"
+coverage report
+
+mv .coverage /output

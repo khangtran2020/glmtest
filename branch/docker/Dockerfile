@@ -1,5 +1,5 @@
 FROM nvidia/cuda:11.1.1-cudnn8-devel-ubuntu18.04
-WORKDIR /pynguin_gen
+WORKDIR /coverage
 
 # set bash as current shell
 RUN chsh -s /bin/bash
@@ -29,6 +29,8 @@ RUN conda update conda \
     && conda create -n work python=3.10 -y
 
 COPY ./ ./
+RUN chmod +x ./run_coverage.sh
+
 RUN conda init bash
 RUN echo "conda activate work" >> ~/.bashrc
 RUN export PYTHONHASHSEED=0
@@ -37,5 +39,5 @@ ENV CONDA_DEFAULT_ENV $work
 
 RUN pip install coverage
 
-ENTRYPOINT ["./run_coverage.sh"]
+ENTRYPOINT ["bash", "-c", "source /opt/conda/etc/profile.d/conda.sh && conda activate work && ./run_coverage.sh"]
 CMD []
