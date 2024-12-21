@@ -73,18 +73,18 @@ class Data(object):
             return
 
         # create module info from self.data
-        module_info = self.create_module_info()
+        module_infos = self.create_module_info()
         if self.debug:
-            module_info = module_info[:1]
+            module_infos = module_infos[:5]
 
         # process each module
         with Progress() as progress:
             task = progress.add_task(
                 f"[cyan]Processing test generation for {self.name}[/cyan]",
-                total=len(module_info),
+                total=len(module_infos),
             )
-            for module in module_info:
-                self.process_one_module(module)
+            for module_info in module_infos:
+                self.process_one_module(module_info)
                 progress.update(task, advance=1)
 
     def process_one_module(self, module_info) -> List[dict]:
@@ -135,6 +135,10 @@ class Data(object):
         self.extract_functions_with_imports(
             file_path=test_path, save_path=sub_test_path
         )
+        self.logger.log(
+            f"[green]Test case for {module_info['module_name']} is generated[/green]"
+        )
+        self.logger.log(f"Test cases are saved in {sub_test_path}")
 
         # split test case into test cases
         # run each test case with coverage.py

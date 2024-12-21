@@ -335,7 +335,7 @@ class OSSFuzz(Data):
             - graph_name
             - module_name_coverage
         """
-        module_info = []
+        module_infos = []
         for dat in self.data:
             project = dat["project"]
             package_path = dat["project_path"]
@@ -358,5 +358,5 @@ class OSSFuzz(Data):
                 module_info["module_name_coverage"] = (
                     f"coverage_{dat['module_name'][i]}"
                 )
-                module_info.append(module_info)
-        return module_info
+                module_infos.append(module_info)
+        return module_infos
