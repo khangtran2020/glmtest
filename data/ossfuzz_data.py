@@ -296,7 +296,7 @@ class OSSFuzz(Data):
 
         stat_info = {}
         num_project = len(self.data)
-        num_modules = [dat["num_modules"] for dat in self.data]
+        num_modules = sum([dat["num_modules"] for dat in self.data])
         self.logger.log("Processed raw data")
         self.logger.log(f"Number of projects: {num_project}")
         self.logger.log(f"Number of modules: {num_modules}")
