@@ -1,74 +1,15 @@
 import os
-import ast
 import sys
 import yaml
 import json
-import time
 import shutil
 import subprocess
-from joblib import Parallel, delayed
+from typing import List
 from rich.console import Console
 from rich.progress import Progress
 from data.core import Data
-from tqdm import tqdm
-from graph.joerngraph import JoernGraph
-from utils.utils import (
-    check_package_exists_in_pypi,
-    run_command,
-    check_docker_image_exists,
-)
-
-# typing
-from typing import List, Union
-
-DOCKERFILE_TEMPLATE = """# Use nvidia/cuda image
-FROM nvidia/cuda:11.1.1-cudnn8-devel-ubuntu18.04
-WORKDIR /pynguin_gen
-
-# set bash as current shell
-RUN chsh -s /bin/bash
-SHELL ["/bin/bash", "-c"]
-
-# install anaconda
-
-RUN apt-get update
-RUN apt-get install -y wget zip unzip bzip2 libc6-i386 libc6-x32 libfreetype6 \
-    ca-certificates libglib2.0-0 libxext6 libsm6 libxrender1 git mercurial \
-    subversion vim libasound2 libxi6 libxtst6 && \
-    apt-get clean
-
-RUN wget https://download.oracle.com/java/19/archive/jdk-19.0.2_linux-x64_bin.deb && \
-    dpkg -i jdk-19.0.2_linux-x64_bin.deb &&  \
-    update-alternatives --install /usr/bin/java java /usr/lib/jvm/jdk-19/bin/java 1 && \
-    update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/jdk-19/bin/javac 1 && \
-    update-alternatives --config java &&  update-alternatives --config javac
-
-        
-RUN wget --quiet https://repo.anaconda.com/archive/Anaconda3-2024.10-1-Linux-x86_64.sh -O ~/anaconda.sh && \
-    /bin/bash ~/anaconda.sh -b -p /opt/conda && \
-    rm ~/anaconda.sh && \
-    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
-    echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
-    find /opt/conda/ -follow -type f -name '*.a' -delete && \
-    find /opt/conda/ -follow -type f -name '*.js.map' -delete && \
-    /opt/conda/bin/conda clean -afy
-
-# set path to conda
-ENV PATH /opt/conda/bin:$PATH
-
-RUN conda update conda \
-    && conda create -n work python=3.10 -y
-
-COPY ./ ./
-RUN conda init bash
-RUN echo "conda activate work" >> ~/.bashrc
-RUN export PYTHONHASHSEED=0
-ENV PATH /opt/conda/envs/pet/bin:$PATH
-ENV CONDA_DEFAULT_ENV $work
-"""
-
-PYNGUIN_TEMPLATE = """docker run --rm -v {}:/input:ro -v {}:/output -v {}:/package:ro {} \
-    --module-name {} --coverage_metrics BRANCH --maximum_search_time {} --report-dir /output --project_path /input --output-path /output --output_variables TargetModule,CoverageTimeline --assertion-generation NONE"""
+from graph.core import Graph
+from utils.utils import check_package_exists_in_pypi
 
 
 class OSSFuzz(Data):
@@ -80,7 +21,8 @@ class OSSFuzz(Data):
         run_time: int,
         docker_image: str,
         num_cpu: int,
-        graph: JoernGraph,
+        graph: Graph,
+        debug: bool = False,
     ) -> None:
         if docker_image is None:
             raise ValueError("Docker image is not provided")
@@ -89,6 +31,7 @@ class OSSFuzz(Data):
         self.run_time = run_time
         self.docker_image = docker_image
         self.num_cpu = num_cpu
+        self.debug = debug
         # check if data.json exist:
         if not os.path.exists(os.path.join(self.data_path, "data.json")):
             self.data = []
@@ -99,7 +42,12 @@ class OSSFuzz(Data):
             with open(os.path.join(self.data_path, "stat_info.json"), "r") as file:
                 self.stat_info = json.load(file)
         super().__init__(
-            name=self.name, path=path, logger=logger, graph=graph, num_cpu=num_cpu
+            name=self.name,
+            path=path,
+            logger=logger,
+            graph=graph,
+            num_cpu=num_cpu,
+            debug=debug,
         )
 
     def crawl(self) -> None:
@@ -370,159 +318,45 @@ class OSSFuzz(Data):
             self.data.remove(proj)
         self.logger.log("Cleaned up projects")
 
-    def get_pynguin_command_for_module(self, module_info: dict) -> str:
-
-        pynguin_command = PYNGUIN_TEMPLATE.format(
-            os.path.abspath(module_info["code_path"]),
-            os.path.abspath(module_info["output_path"]),
-            os.path.abspath(module_info["project_path"]),
-            self.docker_image,
-            module_info["module_name"],
-            self.run_time,
-        )
-        return pynguin_command
-
-    def process_one_module(self, module_info) -> List[dict]:
-
-        module_results_info = {}
-        # gen test case with pynguin
-        command = self.get_pynguin_command_for_module(module_info)
-        run_command(command=command, capture_output=False)
-        # check if test case is generated
-        if not os.path.exists(
-            os.path.join(
-                module_info["output_path"], f"test_{module_info['module_name']}.py"
-            )
-        ):
-            return []
-
-        module_results_info["module_name"] = module_info["module_name"]
-        module_results_info["module_path"] = module_info["module_path"]
-        module_results_info["project"] = module_info["project"]
-
-        # extract joern graph & locations
-        self.graph.extract_graph(
-            module_info["module_path"], save_path=f"{module_info['graph_path']}.json"
-        )
-
-        # if test case is generated, store the test case
-        # count number of test cases
-        test_path = os.path.join(
-            module_info["output_path"], f"test_{module_info['module_name']}.py"
-        )
-        # check correct path
-        assert os.path.exists(test_path)
-        sub_test_path = os.path.join(
-            module_info["output_path"], module_info["module_name"]
-        )
-        os.makedirs(
-            sub_test_path,
-            exist_ok=True,
-        )
-        self.extract_functions_with_imports(
-            file_path=test_path, save_path=sub_test_path
-        )
-
-        # split test case into test cases
-        # run each test case with coverage.py
-        # get the data and analyze the data
-        return
-
-    # def run_test_gen(self) -> None:
-
-    #     # read data
-    #     with open(os.path.join(self.data_path, "data.json"), "r") as file:
-    #         self.data = json.load(file)
-
-    #     # check if image exist
-    #     if not check_docker_image_exists(self.docker_image):
-    #         # build docker image for every project
-    #         command = f"docker build -t {self.docker_image} -f pynguin/docker/Dockerfile --platform linux/amd64 ./pynguin"
-    #         run_command(command=command, capture_output=False)
-    #         self.logger.log(f"Built docker image for for every project")
-
-    #     self.logger.log("Running test generation in parallel")
-    #     commands_list = []
-    #     for dat in self.data:
-    #         commands_list += self.get_command_for_modules(dat)
-    #     if self.num_cpu == -1:
-    #         num_jobs = -1
-    #         self.logger.log(
-    #             f"Running test generation in parallel with {os.cpu_count()} cores"
-    #         )
-    #     else:
-    #         if self.num_cpu > os.cpu_count():
-    #             num_jobs = os.cpu_count()
-    #             self.logger.log(
-    #                 f"The indicated #CPUs is larger than the cores.\n"
-    #                 + "Running test generation in parallel with {os.cpu_count()} cores"
-    #             )
-    #         else:
-    #             num_jobs = self.num_cpu
-    #             self.logger.log(
-    #                 f"Running test generation in parallel with {self.num_cpu} cores"
-    #             )
-    #     results = Parallel(n_jobs=num_jobs)(
-    #         delayed(run_command)(command=command, capture_output=False)
-    #         for command in tqdm(commands_list)
-    #     )
-    #     self.logger.log("Test generation completed")
-    #     return
-
-    def count_test_cases(self, test_file: str) -> int:
-
-        try:
-            with open(test_file, "r") as file:
-                file_content = file.read()
-
-            # Parse the file content into an AST
-            tree = ast.parse(file_content)
-
-            # Count the number of function definitions
-            function_count = sum(
-                isinstance(node, ast.FunctionDef) for node in ast.walk(tree)
-            )
-            return function_count
-
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            return 0
-
-    def extract_functions_with_imports(
-        self, file_path: str, save_path: str
-    ) -> Union[None, int]:
-
-        try:
-            with open(file_path, "r") as file:
-                file_content = file.read()
-
-            # Parse the Python file into an AST
-            tree = ast.parse(file_content)
-
-            # Collect all imports and function definitions
-            imports = []
-            functions = []
-
-            for node in tree.body:
-                if isinstance(node, (ast.Import, ast.ImportFrom)):
-                    imports.append(node)
-                elif isinstance(node, ast.FunctionDef):
-                    functions.append(node)
-
-            # Convert imports to code strings
-            import_code = "\n".join(ast.unparse(import_node) for import_node in imports)
-
-            # Convert each function to a string
-            function_dict = {}
-            for func in functions:
-                func_code = ast.unparse(func)
-                function_name = func.name
-                function_dict[function_name] = f"{import_code}\n\n{func_code}"
-
-            for i, key in enumerate(function_dict.keys()):
-                with open(os.path.join(save_path, f"test_case_{i}.py"), "w") as file:
-                    file.write(function_dict[key])
-
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            return -1
+    def create_module_info(self) -> List[dict]:
+        """
+        Create a module info from the extracted data
+        Each module info icnludes:
+            - module_name_test_gen (e.g., path.to.module, without .py)
+            - module_path
+            - module_name
+            - project
+            - project_path
+            - code_path to raw project
+            - output_test_path
+            - package_path
+            - module_name_after_test_gen
+            - graph_path
+            - graph_name
+            - module_name_coverage
+        """
+        module_info = []
+        for dat in self.data:
+            project = dat["project"]
+            package_path = dat["project_path"]
+            for i, module in enumerate(dat["modules"]):
+                module_info = {}
+                module_info["module_name_full"] = f"{project}|{dat['module_name'][i]}"
+                module_info["module_name"] = dat["module_name"][i]
+                module_info["module_name_test_gen"] = module
+                module_info["module_path"] = dat["module_path"][i]
+                module_info["project"] = project
+                module_info["project_path"] = package_path
+                module_info["package_path"] = package_path
+                module_info["code_path"] = os.path.join(package_path, project)
+                module_info["output_test_path"] = os.path.join(package_path, "test")
+                module_info["module_name_after_test_gen"] = (
+                    f"test_{dat['module_name'][i]}.py"
+                )
+                module_info["graph_path"] = os.path.join(package_path, "graph")
+                module_info["graph_name"] = f"{dat['module_name'][i]}.json"
+                module_info["module_name_coverage"] = (
+                    f"coverage_{dat['module_name'][i]}"
+                )
+                module_info.append(module_info)
+        return module_info

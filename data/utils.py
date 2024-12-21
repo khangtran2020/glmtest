@@ -16,6 +16,7 @@ def get_dataset(
     docker_image: str = None,
     num_cpu: int = -1,
     graph: JoernGraph = None,
+    debug: bool = False,
 ) -> Data:
 
     if data_name == "ossfuzz":
@@ -27,6 +28,7 @@ def get_dataset(
             docker_image=docker_image,
             num_cpu=num_cpu,
             graph=graph,
+            debug=debug,
         )
     else:
         logger.log("Dataset not found")

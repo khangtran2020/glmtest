@@ -25,6 +25,7 @@ def main(args: Namespace, logger: Console) -> None:
         docker_image=args.docker_image,
         num_cpu=args.num_cpu,
         graph=graph,
+        debug=args.debug,
     )
     if dataset is None:
         logger.log("Dataset not found, exiting...")
@@ -35,18 +36,8 @@ def main(args: Namespace, logger: Console) -> None:
         dataset.crawl()
     elif args.mode == "process_raw":
         dataset.process_raw()
-    elif args.mode == "extract-graph":
-        dataset.graph.install_joern_local()
-        dataset.extract_graph()
-    elif args.mode == "extract-location-joern":
-        dataset.graph.init_joern_server()
-        dataset.extract_locations()
     elif args.mode == "test_gen":
-        dataset.run_test_gen()
-    elif args.mode == "test_gen_one":
-        for data in dataset.data:
-            if data["project"] == args.test_gen_project:
-                dataset.run_test_gen_one(data)
+        dataset.process_test_gen()
 
 
 if __name__ == "__main__":
