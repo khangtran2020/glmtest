@@ -9,7 +9,7 @@ from coverage.parser import PythonParser
 from coverage.data import CoverageData
 from utils.utils import run_command
 
-COVERAGE_TEMPLATE = """docker run --rm -v {}:/project -v {}:/test -v {}:/output -v {}:/package {} {} {}"""
+COVERAGE_TEMPLATE = """docker run --rm --user $(id -u):$(id -g) -v {}:/project -v {}:/test -v {}:/output -v {}:/package {} {} {}"""
 
 
 def read_module(filepath: str, console: Console) -> str:
