@@ -84,24 +84,18 @@ class Data(object):
 
         # process each module
         results = []
-        with Progress() as progress:
-            task = progress.add_task(
-                f"[cyan]Processing test generation for {self.name}[/cyan]",
-                total=len(module_infos),
-            )
-            for i, module_info in tqdm(enumerate(module_infos)):
-                res = self.process_one_module(module_info)
-                if res == {}:  # if no test case is generated
-                    continue
-                res["uuid"] = i
-                results.append(res)
-                progress.update(task, advance=1)
-                # save the processed data every 10 modules
-                if len(results) % 10 == 0:
-                    with open(
-                        os.path.join(self.data_path, "processed_data.json"), "w"
-                    ) as file:
-                        json.dump(results, file, indent=4)
+        for i, module_info in tqdm(enumerate(module_infos)):
+            res = self.process_one_module(module_info)
+            if res == {}:  # if no test case is generated
+                continue
+            res["uuid"] = i
+            results.append(res)
+            # save the processed data every 10 modules
+            if len(results) % 10 == 0:
+                with open(
+                    os.path.join(self.data_path, "processed_data.json"), "w"
+                ) as file:
+                    json.dump(results, file, indent=4)
         self.processed_data = results
         #  save the processed data
         with open(os.path.join(self.data_path, "processed_data.json"), "w") as file:
