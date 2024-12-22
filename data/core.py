@@ -11,7 +11,7 @@ from utils.utils import run_command
 # typing
 from typing import List, Union
 
-PYNGUIN_TEMPLATE = """docker run --rm -v {}:/input:ro -v {}:/output -v {}:/package:ro {} \
+PYNGUIN_TEMPLATE = """docker run --rm --user $(id -u):$(id -g) -v {}:/input:ro -v {}:/output -v {}:/package:ro {} \
     --module-name {} --coverage_metrics BRANCH --maximum_search_time {} --report-dir /output --project_path /input --output-path /output --output_variables TargetModule,CoverageTimeline --assertion-generation NONE"""
 
 
