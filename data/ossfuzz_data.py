@@ -355,8 +355,6 @@ class OSSFuzz(Data):
                 )
                 module_info["graph_path"] = os.path.join(package_path, "graph")
                 module_info["graph_name"] = f"{dat['module_name'][i]}.json"
-                module_info["module_name_coverage"] = (
-                    f"coverage_{dat['module_name'][i]}"
-                )
+                module_info["module_name_coverage"] = module.replace(".", "/")
                 module_infos.append(module_info)
         return module_infos

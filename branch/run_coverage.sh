@@ -32,7 +32,7 @@ fi
 pip install -r "${PACKAGE_DIR}/package.txt"
 cd /project
 cp -r "${INPUT_DIR}"/*.py .
-coverage run --branch -m pytest "$@"
+coverage run --branch --data-file "$2" -m pytest "$1"
 coverage report
 
-mv .coverage /output
+mv "$2" /output

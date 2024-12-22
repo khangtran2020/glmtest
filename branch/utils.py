@@ -6,10 +6,10 @@ from networkx import DiGraph
 from rich.console import Console
 from typing import Tuple, Dict, Set, Union, List
 from coverage.parser import PythonParser
+from coverage.data import CoverageData
+from utils.utils import run_command
 
-COVERAGE_TEMPLATE = (
-    """docker run --rm -v {}:/project -v {}:/test -v {}:/output -v {}:/package {} {}"""
-)
+COVERAGE_TEMPLATE = """docker run --rm -v {}:/project -v {}:/test -v {}:/output -v {}:/package {} {} {}"""
 
 
 def read_module(filepath: str, console: Console) -> str:
@@ -109,6 +109,7 @@ def parse_code(code: str, start_lines: Set, console: Console) -> DiGraph:
 
     log_info = f"# arcs: {len(arcs)}"
     console.log(log_info)
+    return G
 
 
 def DFS_branch(
@@ -252,3 +253,37 @@ def get_all_branch(filepath: str, console: Console):
         )
         res_dict["class"][func_name] = found_branch
     return res_dict
+
+
+def run_coverage(
+    project_path: str,
+    test_path: str,
+    output_path: str,
+    package_path: str,
+    image_name: str,
+    test_file: str,
+    file_name: str,
+    data_name: str = ".coverage",
+) -> None:
+
+    # create command
+    command = COVERAGE_TEMPLATE.format(
+        os.path.abspath(project_path),
+        os.path.abspath(test_path),
+        os.path.abspath(output_path),
+        os.path.abspath(package_path),
+        image_name,
+        test_file,
+        data_name,
+    )
+    run_command(command, capture_output=False)
+    data = CoverageData(
+        basename=os.path.join(os.path.abspath(output_path), data_name),
+        suffix=None,
+        warn=None,
+        debug=None,
+    )
+    data.read()
+    print(data._file_map)
+    arcs = data.arcs(filename=file_name)
+    return arcs

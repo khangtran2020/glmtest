@@ -6,12 +6,6 @@ import nest_asyncio
 from rich.console import Console
 from graph.core import Graph
 from cpgqls_client import CPGQLSClient, import_code_query
-from utils.utils import (
-    run_command,
-    check_docker_image_exists,
-    extract_list_content,
-    handle_location_out,
-)
 
 nest_asyncio.apply()
 
@@ -43,7 +37,7 @@ class JoernGraph(Graph):
     def run_joern_query(self, query: str) -> str:
         try:
             result = self.client.execute(query)
-            print("result: ", result)
+            # print("result: ", result)
             stdout = result["stdout"]
 
             # Remove first line, and last two lines (the first and before last lines are just Scala specific output
