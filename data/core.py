@@ -152,9 +152,11 @@ class Data(object):
         sub_test_path = os.path.join(
             module_info["output_test_path"], module_info["module_name"]
         )
+        os.umask(0)
         os.makedirs(
             sub_test_path,
             exist_ok=True,
+            mode=0o777,
         )
         self.extract_functions_with_imports(
             file_path=test_path, save_path=sub_test_path
