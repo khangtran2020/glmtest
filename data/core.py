@@ -104,6 +104,9 @@ class Data(object):
     def process_one_module(self, module_info) -> dict:
 
         module_results_info = {}
+        # check if test directory is created
+        if not os.path.exists(module_info["output_test_path"]):
+            os.makedirs(module_info["output_test_path"], exist_ok=True)
 
         # gen test case with pynguin
         command = self.get_pynguin_command_for_module(module_info)
