@@ -36,3 +36,4 @@ coverage run --branch --data-file "$2" -m pytest "$1"
 coverage report
 
 mv "$2" /output
+rm test_case_*.py

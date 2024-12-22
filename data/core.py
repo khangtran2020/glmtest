@@ -168,7 +168,7 @@ class Data(object):
         # run each test case with coverage.py
         for i, test_file in enumerate(os.listdir(sub_test_path)):
             arcs = run_coverage(
-                project_path=module_info["project_path"],
+                project_path=module_info["code_path"],
                 test_path=sub_test_path,
                 output_path=sub_test_path,
                 package_path=module_info["package_path"],

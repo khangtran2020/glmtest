@@ -17,7 +17,15 @@ git clone --recursive https://github.com/khangtran2020/glmf
 First of all, we need to build Docker image of Pynguin. To do so, run this command:
 
 ```shell
-docker build -t pynguin-runner -f pynguin/docker/Dockerfile --platform linux/amd64 ./pynguin
+docker build -t pynguin_runner -f pynguin/docker/Dockerfile --platform linux/amd64 ./pynguin
+```
+
+#### Coverage.py container
+
+First of all, we need to build Docker image of Coverage.py. To do so, run this command:
+
+```shell
+docker build -t coverage -f branch/docker/Dockerfile --platform linux/amd64 ./branch
 ```
 
 #### Joern server
@@ -37,5 +45,3 @@ cd $JOERN_PATH && ./joern --server --server-port <SERVER-PORT>
 ```
 
 This command will run the Joern's server at `http://localhost:<SERVER-PORT>`
-
-#### Coverage.py container

@@ -256,7 +256,7 @@ def get_all_branch(filepath: str, console: Console):
 
 
 def run_coverage(
-    project_path: str,
+    code_path: str,
     test_path: str,
     output_path: str,
     package_path: str,
@@ -268,7 +268,7 @@ def run_coverage(
 
     # create command
     command = COVERAGE_TEMPLATE.format(
-        os.path.abspath(project_path),
+        os.path.abspath(code_path),
         os.path.abspath(test_path),
         os.path.abspath(output_path),
         os.path.abspath(package_path),
