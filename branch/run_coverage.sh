@@ -31,7 +31,12 @@ fi
 
 pip install -r "${PACKAGE_DIR}/package.txt"
 cd /project
-cp -r "${INPUT_DIR}"/*.py .
+
+echo "Command is: cp -r ${INPUT_DIR}/$1 ."
+cp -r "${INPUT_DIR}"/"$1" .
+
+echo "Variables is: $1 $2"
+
 coverage run --branch --data-file "$2" -m pytest "$1"
 coverage report
 

@@ -32,6 +32,7 @@ class Data(object):
         self.logger = logger
         self.graph = graph
         self.num_cpu = num_cpu
+        self.debug = debug
         self.coverage_image = coverage_image
 
     def crawl(self) -> None:
@@ -168,7 +169,7 @@ class Data(object):
         # run each test case with coverage.py
         for i, test_file in enumerate(os.listdir(sub_test_path)):
             arcs = run_coverage(
-                project_path=module_info["code_path"],
+                code_path=module_info["code_path"],
                 test_path=sub_test_path,
                 output_path=sub_test_path,
                 package_path=module_info["package_path"],
@@ -177,7 +178,8 @@ class Data(object):
                 file_name=module_info["module_name_coverage"],
             )
             module_results_info["test_cases"][f"test_case_{i}"] = arcs
-
+            if self.debug:
+                break
         # get the data and analyze the data
         return module_results_info
 

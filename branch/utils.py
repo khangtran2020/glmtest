@@ -276,6 +276,7 @@ def run_coverage(
         test_file,
         data_name,
     )
+    print("Running command:", command)
     run_command(command, capture_output=False)
     data = CoverageData(
         basename=os.path.join(os.path.abspath(output_path), data_name),
