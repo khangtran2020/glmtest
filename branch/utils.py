@@ -264,7 +264,7 @@ def run_coverage(
     test_file: str,
     file_name: str,
     data_name: str = ".coverage",
-) -> None:
+) -> Union[List, None]:
 
     # create command
     command = COVERAGE_TEMPLATE.format(
@@ -285,6 +285,25 @@ def run_coverage(
         debug=None,
     )
     data.read()
-    print(data._file_map)
     arcs = data.arcs(filename=file_name)
-    return arcs
+    if arcs is None:
+        return None
+    # for e in arcs:
+    branches = []
+    visited = []
+    for e in arcs:
+        if e[0] < 0:
+            continue
+        if e[1] < 0:
+            continue
+        if e[0] in visited:
+            for i, branch in enumerate(branches):
+                if e[0] in branch:
+                    branches[i].append(e[1])
+                    visited.append(e[1])
+        else:
+            branches.append([e[0], e[1]])
+            visited.append(e[0])
+            visited.append(e[1])
+
+    return branches

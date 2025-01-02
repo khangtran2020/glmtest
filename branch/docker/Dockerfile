@@ -39,5 +39,5 @@ ENV CONDA_DEFAULT_ENV $work
 
 RUN pip install coverage
 
-# ENTRYPOINT ["bash", "-c", "source /opt/conda/etc/profile.d/conda.sh && conda activate work && ./run_coverage.sh"]
-# CMD []
+ENTRYPOINT ["/coverage/run_coverage.sh"]
+CMD []

@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 INPUT_DIR="/test"
 PROJECT_DIR="/project"
 OUTPUT_DIR="/output"

@@ -45,3 +45,25 @@ cd $JOERN_PATH && ./joern --server --server-port <SERVER-PORT>
 ```
 
 This command will run the Joern's server at `http://localhost:<SERVER-PORT>`
+
+### OSS-Fuzz Dataset:
+
+OSS-Fuzz is a framework of Fuzzers. It provide a unified framework to evaluate the ability of different fuzzer for real-world projects. You can read more of it [here](https://github.com/google/oss-fuzz).
+
+To crawl the projects of OSS-Fuzz, run the following command:
+
+```shell
+python main.py --data ossfuzz --data_path ./Dataset --mode crawl --debug 0
+```
+
+Then, to process the raw projects of OSS-Fuzz, run the following command:
+
+```shell
+python main.py --data ossfuzz --data_path ./Dataset --mode process_raw --debug 0
+```
+
+Then, to generate the test-cases for the projects of OSS-Fuzz, run the following command:
+
+```shell
+python main.py --data ossfuzz --data_path ./Dataset --mode test_gen --debug 0
+```

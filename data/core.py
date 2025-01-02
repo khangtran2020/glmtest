@@ -80,7 +80,7 @@ class Data(object):
         # create module info from self.data
         module_infos = self.create_module_info()
         if self.debug:
-            module_infos = module_infos[:5]
+            module_infos = module_infos[:15]
 
         # process each module
         results = []
@@ -138,6 +138,9 @@ class Data(object):
                 module_info["graph_path"], module_info["graph_name"]
             ),
         )
+        module_results_info["graph_path"] = os.path.join(
+            module_info["graph_path"], module_info["graph_name"]
+        )
 
         # if test case is generated, store the test case
         # count number of test cases
@@ -174,8 +177,10 @@ class Data(object):
                 package_path=module_info["package_path"],
                 image_name=self.coverage_image,
                 test_file=test_file,
-                file_name=module_info["module_name_coverage"],
+                file_name=f"/project/{module_info['module_name_coverage']}.py",
             )
+            if arcs is None:
+                continue
             module_results_info["test_cases"][f"test_case_{i}"] = arcs
             if self.debug:
                 break
