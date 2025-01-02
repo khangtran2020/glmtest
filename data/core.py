@@ -1,7 +1,6 @@
 import os
 import ast
 import json
-from tqdm import tqdm
 from rich.progress import Progress
 from rich.console import Console
 from graph.core import Graph
@@ -84,7 +83,7 @@ class Data(object):
 
         # process each module
         results = []
-        for i, module_info in tqdm(enumerate(module_infos)):
+        for i, module_info in enumerate(module_infos):
             res = self.process_one_module(module_info)
             if res == {}:  # if no test case is generated
                 continue
