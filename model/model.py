@@ -160,7 +160,7 @@ class XCodeModelForCausalLM(XCodeModel, GenerationMixin):
 
 
     @staticmethod
-    def _reorder_cache(past_key_values, beam_idx):
+    def _reorder_cache(self,past_key_values, beam_idx):
       return self.model._reorder_cache(past_key_values, beam_idx)
 
     def save_pretrained(
