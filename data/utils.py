@@ -1,6 +1,7 @@
 import os
 import requests
 from data.ossfuzz_data import OSSFuzz
+from data.codamosa_data import Codamosa
 from graph.joerngraph import JoernGraph
 
 # typing
@@ -22,6 +23,17 @@ def get_dataset(
     if data_name == "ossfuzz":
         logger.log("Using OSSFuzz dataset")
         return OSSFuzz(
+            logger=logger,
+            path=data_path,
+            run_time=max_pynguin_run_time,
+            docker_image=docker_image,
+            num_cpu=num_cpu,
+            graph=graph,
+            debug=debug,
+        )
+    elif data_name == "codamosa":
+        logger.log("Using Codamosa dataset")
+        return Codamosa(
             logger=logger,
             path=data_path,
             run_time=max_pynguin_run_time,
