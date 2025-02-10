@@ -1,6 +1,3 @@
 [submodule "pynguin"]
 	path = pynguin
 	url = https://github.com/se2p/pynguin.git
-[submodule "data/testgeneval"]
-	path = data/testgeneval
-	url = https://github.com/khangtran2020/testgeneval.git
