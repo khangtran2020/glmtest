@@ -2,6 +2,7 @@ import os
 import requests
 from data.ossfuzz_data import OSSFuzz
 from data.codamosa_data import Codamosa
+from data.testgeneval_data import TestGenEval
 from graph.joerngraph import JoernGraph
 
 # typing
@@ -42,6 +43,9 @@ def get_dataset(
             graph=graph,
             debug=debug,
         )
+    elif data_name == "testgeneval":
+        logger.log("Using TestGeneval dataset")
+        return TestGenEval(logger=logger, path=data_path, graph=graph, debug=debug)
     else:
         logger.log("Dataset not found")
         return None

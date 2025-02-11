@@ -5,8 +5,8 @@ def add_general_group(group):
     group.add_argument(
         "--mode",
         type=str,
-        default="train",
-        help="mode of the program: train, test, crawl, process",
+        default="data",
+        help="mode of the program: data, train, test",
     )
     group.add_argument("--seed", type=int, default=2605, help="seed value")
     group.add_argument("--debug", type=int, default=1, help="debug mode 1/0")
@@ -26,6 +26,13 @@ def add_data_group(group):
     )
     group.add_argument("--graph_type", type=str, default="joern", help="graph type")
     group.add_argument("--num_cpu", type=int, default=-1, help="number of cpus to use")
+    group.add_argument("--do_crawl", action="store_true", help="crawl the raw data")
+    group.add_argument(
+        "--do_process_raw", action="store_true", help="process the raw data"
+    )
+    group.add_argument(
+        "--test_gen", action="store_true", help="gen test case with pynguin"
+    )
 
 
 def add_joern_group(group):
