@@ -16,6 +16,7 @@ def get_dataset(
     data_path: str,
     logger: Console,
     feat_model: str,
+    llm_model: str,
     max_pynguin_run_time: int,
     docker_image: str = None,
     num_cpu: int = -1,
@@ -26,6 +27,19 @@ def get_dataset(
     model = AutoModel.from_pretrained(feat_model)
     tokenizer = AutoTokenizer.from_pretrained(feat_model)
 
+    llm_tokenizer = AutoTokenizer.from_pretrained(llm_model)
+    llm_tokenizer.add_special_tokens(
+        {
+            "additional_special_tokens": [
+                "<|graph_start|>",
+                "<|graph_pad|>",
+                "<|graph_end|>",
+                "<|fuzz|>",
+                "<|/fuzz|>",
+            ]
+        }
+    )
+
     if data_name == "ossfuzz":
         logger.log("Using OSSFuzz dataset")
         return OSSFuzz(
@@ -34,12 +48,23 @@ def get_dataset(
             run_time=max_pynguin_run_time,
             docker_image=docker_image,
             num_cpu=num_cpu,
+            model=model,
+            tokenizer=tokenizer,
+            llm_tokenizer=llm_tokenizer,
             graph=graph,
             debug=debug,
         )
     elif data_name == "testgeneval":
         logger.log("Using TestGeneval dataset")
-        return TestGenEval(logger=logger, path=data_path, graph=graph, debug=debug)
+        return TestGenEval(
+            logger=logger,
+            path=data_path,
+            graph=graph,
+            model=model,
+            tokenizer=tokenizer,
+            llm_tokenizer=llm_tokenizer,
+            debug=debug,
+        )
     else:
         logger.log("Dataset not found")
         return None

@@ -1,5 +1,6 @@
 import os
 import re
+import torch
 import shlex
 import pickle
 import random
@@ -120,6 +121,10 @@ def extract_list_content(input_string) -> List[str]:
     matches = re.findall(pattern, input_string, re.DOTALL)
 
     return matches
+
+
+def get_index_by_value(a: torch.Tensor, val) -> torch.Tensor:
+    return (a == val).nonzero(as_tuple=True)[0]
 
 
 def handle_location_out(out_str: str) -> List[dict]:

@@ -20,6 +20,7 @@ class TestGenEval(Data):
         graph: Graph,
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizer,
+        llm_tokenizer: PreTrainedTokenizer,
         debug: bool = False,
     ) -> None:
         self.name = "TestGenEval"
@@ -44,6 +45,7 @@ class TestGenEval(Data):
             graph=graph,
             feat_model=model,
             feat_tokenizer=tokenizer,
+            llm_tokenizer=llm_tokenizer,
             num_cpu=-1,
             debug=debug,
         )
@@ -135,7 +137,7 @@ class TestGenEval(Data):
                 progress.update(task, advance=1)
 
         self.data = {dat["uuid"]: dat for dat in data}
-        with open(os.path.join(self.data_path, "processed_data.json"), "w") as f:
+        with open(os.path.join(self.data_path, "data_processed.json"), "w") as f:
             json.dump(self.data, f)
 
         stat_info = {}

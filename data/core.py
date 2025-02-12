@@ -10,7 +10,7 @@ from rich.console import Console
 from graph.core import Graph
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from branch.utils import run_coverage
-from utils.utils import run_command
+from utils.utils import run_command, get_index_by_value
 from sklearn.preprocessing import LabelEncoder
 from copy import deepcopy
 
@@ -57,6 +57,7 @@ class Data(object):
         num_cpu: int,
         feat_model: PreTrainedModel = None,
         feat_tokenizer: PreTrainedTokenizer = None,
+        llm_tokenizer: PreTrainedTokenizer = None,
         coverage_image: str = "coverage",
         debug: bool = False,
     ) -> None:
@@ -68,6 +69,7 @@ class Data(object):
         self.debug = debug
         self.feat_model = feat_model
         self.feat_tokenizer = feat_tokenizer
+        self.llm_tokenizer = llm_tokenizer
         self.coverage_image = coverage_image
 
     def crawl(self) -> None:
@@ -394,7 +396,38 @@ class Data(object):
         with self.logger.status("[green]Preparing training data...[/green]"):
             self.processed_data = []
             for uuid, dat in self.data.items():
-                pass
+                with open(dat["code_path"], "r") as file:
+                    src_code = file.read()
+                graph = self.read_graph(dat)
+                mask = torch.load(dat["graph"]["mask_path"])
+                for testcase in dat["test_cases"].keys():
+                    test_path = dat["test_cases"][testcase]["test_path"]
+                    with open(test_path, "r") as file:
+                        test_code = file.read()
+                    mask_key = int(testcase.split("_")[-1])
+                    branch = mask[mask_key]
+                    active_node = get_index_by_value(a=branch, val=1)
+
+                    prompt, response, full_text = self.get_prompt(
+                        src_code=src_code,
+                        testcase_out=test_code,
+                        mask=active_node,
+                        tokenizer=self.llm_tokenizer,
+                    )
+                    graph_dict = {
+                        key: graph[key]
+                        for key in graph.keys()
+                        if isinstance(graph[key], dgl.DGLGraph)
+                    }
+                    data = {
+                        "uuid": uuid,
+                        "prompt": prompt,
+                        "response": response,
+                        "full_text": full_text,
+                        "graph": graph_dict,
+                        "mask": mask[mask_key],
+                    }
+                    self.processed_data.append(data)
 
     def read_graph(self, data: dict) -> dict:
 
@@ -439,3 +472,33 @@ class Data(object):
             node = graph["nodes"][i]
             node_dict[node["id"]] = i
         return node_dict
+
+    def get_prompt(
+        self,
+        src_code: str,
+        testcase_out: str,
+        mask: torch.Tensor,
+        tokenizer: PreTrainedTokenizer,
+    ):
+        graph_pad = "<|graph_pad|>" * mask.size(0)
+        text = f"""\
+Generate the test case for the code below:
+```
+{src_code}
+```
+Here is the graph:
+```
+<|graph_start|>{graph_pad}<|graph_end|>"
+```
+        """
+        response = f"""\
+{testcase_out}
+        """
+        task_prompt = tokenizer.apply_chat_template(
+            [
+                {"role": "user", "content": text},
+                {"role": "assistant", "content": response},
+            ],
+            tokenize=False,
+        )
+        return text, response, task_prompt

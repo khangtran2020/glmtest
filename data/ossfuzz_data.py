@@ -24,6 +24,7 @@ class OSSFuzz(Data):
         docker_image: str,
         model: AutoModel,
         tokenizer: AutoTokenizer,
+        llm_tokenizer: AutoTokenizer,
         num_cpu: int,
         graph: Graph,
         debug: bool = False,
@@ -54,6 +55,7 @@ class OSSFuzz(Data):
             graph=graph,
             feat_model=model,
             feat_tokenizer=tokenizer,
+            llm_tokenizer=llm_tokenizer,
             num_cpu=num_cpu,
             debug=debug,
         )

@@ -22,6 +22,8 @@ def main(args: Namespace, logger: Console) -> None:
         data_name=args.data,
         data_path=args.data_path,
         logger=console,
+        feat_model=args.feat_model,
+        llm_model=args.llm_model,
         max_pynguin_run_time=args.max_pynguin_run_time,
         docker_image=args.docker_image,
         num_cpu=args.num_cpu,

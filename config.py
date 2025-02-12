@@ -33,6 +33,12 @@ def add_data_group(group):
         help="model to extract node features",
         default="Salesforce/codet5p-110m-embedding",
     )
+    group.add_argument(
+        "--llm_model",
+        type=str,
+        help="llm model to generate test cases",
+        default="Qwen/CodeQwen1.5-7B-Chat",
+    )
 
 
 def add_joern_group(group):
