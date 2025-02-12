@@ -40,7 +40,7 @@ class OSSFuzz(Data):
         self.test_gen_flag = test_gen
         # check if data.json exist:
         if not os.path.exists(os.path.join(self.data_path, "data.json")):
-            self.data = []
+            self.data = None
             self.stat_info = {}
         else:
             with open(os.path.join(self.data_path, "data.json"), "r") as file:

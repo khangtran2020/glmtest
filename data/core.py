@@ -384,3 +384,9 @@ class Data(object):
             }
         )
         return nodes
+
+    def prepare_training_data(self, data: dict) -> None:
+        """
+        Prepare the training data for the model
+        """
+        pass
