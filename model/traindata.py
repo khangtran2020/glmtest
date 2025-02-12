@@ -182,19 +182,20 @@ class TrainDataset():
             res += out +"\n"
         return res
     
-    def get_prompt(self, file_content, output, tokenizer_Qwen):
+    def get_prompt(self, file_content, output,mask, tokenizer_Qwen):
+        graph_pad= "<|graph_pad|>" * mask.size(0)
         input = f"""\
-        Generate the test case for the code below:
-        ```
-        {file_content}
-        ```
-        Here is the graph:
-        ```
-        <|graph_start|><|graph_pad|><|graph_end|>"
-        ```
+Generate the test case for the code below:
+```
+{file_content}
+```
+Here is the graph:
+```
+<|graph_start|>{graph_pad}<|graph_end|>"
+```
         """
         response = f"""\
-        {output}
+{output}
         """
         task_prompt = tokenizer_Qwen.apply_chat_template(
             [
@@ -204,6 +205,9 @@ class TrainDataset():
             tokenize=False,
         )
         return input, response, task_prompt
+        
+    def get_index_by_value(self,a,val):
+        return (a==val).nonzero(as_tuple=True)[0]
     
 
     def preprocess_pipeline(self, dataset_file, graph_file, mask_file, tokenizer_Qwen):
@@ -228,7 +232,10 @@ class TrainDataset():
                         
                         test = self.get_test(testcases, j)
                         mask = self.get_mask(graph,test)
-                        input, output, task_prompt = self.get_prompt(file_content,output,tokenizer_Qwen)
+                        temp = self.get_index_by_value(mask,1)
+                        input, output, task_prompt = self.get_prompt(file_content,output,temp,tokenizer_Qwen)
+
+                        input, output, task_prompt = self.get_prompt(file_content,output,temp,tokenizer_Qwen)
                         graphs = {key: graph_dict[key] for key in graph_dict if isinstance(graph_dict[key], dgl.DGLGraph)}
                 
                         # Store metadata separately
