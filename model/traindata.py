@@ -233,7 +233,7 @@ Here is the graph:
                         test = self.get_test(testcases, j)
                         mask = self.get_mask(graph,test)
                         temp = self.get_index_by_value(mask,1)
-                        input, output, task_prompt = self.get_prompt(file_content,output,temp,tokenizer_Qwen)
+                        # input, output, task_prompt = self.get_prompt(file_content,output,temp,tokenizer_Qwen)
 
                         input, output, task_prompt = self.get_prompt(file_content,output,temp,tokenizer_Qwen)
                         graphs = {key: graph_dict[key] for key in graph_dict if isinstance(graph_dict[key], dgl.DGLGraph)}
