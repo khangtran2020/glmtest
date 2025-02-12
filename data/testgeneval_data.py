@@ -118,10 +118,11 @@ class TestGenEval(Data):
                 )
                 node_feat = self.get_node_features(graph=graph)
                 all_mask = []
-                for tkey in data_dict["test_cases"].keys():
-                    dat["test_cases"][tkey] = {}
-                    dat["test_cases"][tkey]["test_case"] = data_dict["test_cases"][tkey]
-                    dat["test_cases"][tkey]["branch"] = data_dict["branches"][tkey]
+                for i, tkey in enumerate(data_dict["test_cases"].keys()):
+                    nkey = f"test_case_{i}"
+                    dat["test_cases"][nkey] = {}
+                    dat["test_cases"][nkey]["test_case"] = data_dict["test_cases"][tkey]
+                    dat["test_cases"][nkey]["branch"] = data_dict["branches"][tkey]
                     mask = self.get_mask_tensor(
                         graph=graph, branch=data_dict["branches"][tkey]
                     )

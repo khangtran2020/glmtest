@@ -1,5 +1,6 @@
 import os
 import ast
+import dgl
 import json
 import torch
 import numpy as np
@@ -385,8 +386,56 @@ class Data(object):
         )
         return nodes
 
-    def prepare_training_data(self, data: dict) -> None:
+    def prepare_training_data(self) -> None:
         """
         Prepare the training data for the model
         """
-        pass
+        assert self.data is not None
+        with self.logger.status("[green]Preparing training data...[/green]"):
+            self.processed_data = []
+            for uuid, dat in self.data.items():
+                pass
+
+    def read_graph(self, data: dict) -> dict:
+
+        graph_path = data["graph"]["src_graph_path"]
+        with open(graph_path, "r") as file:
+            graph = json.load(file)
+
+        graph_dict = {}
+        num_nodes = len(graph["nodes"])
+        feat = torch.load(data["graph"]["node_feature_path"])
+        assert num_nodes == feat.shape[0]
+
+        edge_dict = self.read_edge(graph)
+
+        for etype in edge_dict.keys():
+            u = torch.Tensor(edge_dict[etype][0]).long()
+            v = torch.Tensor(edge_dict[etype][1]).long()
+            graph = dgl.graph((u, v), num_nodes=num_nodes)
+            graph.ndata["feat"] = feat
+            graph_dict[etype] = graph
+        graph_dict["num_nodes"] = num_nodes
+        graph_dict["feat_size"] = feat.size()
+        return graph_dict
+
+    def read_edge(self, graph: dict) -> dict:
+        node_dict = self.get_node_id_dict(graph)
+        edge_dict = {}
+        for edge in graph["edges"]:
+            if edge["label"] not in edge_dict:
+                edge_dict[edge["label"]] = [
+                    [node_dict[edge["src"]]],
+                    [node_dict[edge["dst"]]],
+                ]
+            else:
+                edge_dict[edge["label"]][0].append(node_dict[edge["src"]])
+                edge_dict[edge["label"]][1].append(node_dict[edge["dst"]])
+        return edge_dict
+
+    def get_node_id_dict(self, graph: dict) -> dict:
+        node_dict = {}
+        for i in range(len(graph["nodes"])):
+            node = graph["nodes"][i]
+            node_dict[node["id"]] = i
+        return node_dict

@@ -220,12 +220,13 @@ class OSSFuzz(Data):
                         graph = json.load(file)
                     node_feat = self.get_node_features(graph=graph)
                     all_mask = []
-                    for tkey in data[key]["test_cases"].keys():
-                        dat["test_cases"][tkey] = {}
-                        dat["test_cases"][tkey]["test_case"] = data[key]["test_cases"][
+                    for i, tkey in enumerate(data[key]["test_cases"].keys()):
+                        nkey = f"test_case_{i}"
+                        dat["test_cases"][nkey] = {}
+                        dat["test_cases"][nkey]["test_case"] = data[key]["test_cases"][
                             tkey
                         ]["test_path"]
-                        dat["test_cases"][tkey]["branch"] = data[key]["test_cases"][
+                        dat["test_cases"][nkey]["branch"] = data[key]["test_cases"][
                             tkey
                         ]["branch"]
                         mask = self.get_mask_tensor(
