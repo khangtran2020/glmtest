@@ -2,6 +2,7 @@ import os
 import sys
 import yaml
 import json
+import torch
 import shutil
 import subprocess
 from typing import List
@@ -10,6 +11,7 @@ from rich.progress import Progress
 from data.core import Data
 from graph.core import Graph
 from utils.utils import check_package_exists_in_pypi
+from transformers import AutoTokenizer, AutoModel
 
 
 class OSSFuzz(Data):
@@ -20,9 +22,12 @@ class OSSFuzz(Data):
         path: str,
         run_time: int,
         docker_image: str,
+        model: AutoModel,
+        tokenizer: AutoTokenizer,
         num_cpu: int,
         graph: Graph,
         debug: bool = False,
+        test_gen: bool = False,
     ) -> None:
         if docker_image is None:
             raise ValueError("Docker image is not provided")
@@ -32,6 +37,7 @@ class OSSFuzz(Data):
         self.docker_image = docker_image
         self.num_cpu = num_cpu
         self.debug = debug
+        self.test_gen_flag = test_gen
         # check if data.json exist:
         if not os.path.exists(os.path.join(self.data_path, "data.json")):
             self.data = []
@@ -46,6 +52,8 @@ class OSSFuzz(Data):
             path=path,
             logger=logger,
             graph=graph,
+            feat_model=model,
+            feat_tokenizer=tokenizer,
             num_cpu=num_cpu,
             debug=debug,
         )
@@ -169,6 +177,72 @@ class OSSFuzz(Data):
 
     def process_raw(self) -> None:
 
+        self.pre_process_raw()
+
+        # check if prcessed data exists
+        if not os.path.exists(os.path.join(self.data_path, "processed_data.json")):
+            if self.test_gen_flag:
+                self.process_test_gen()
+            else:
+                raise ValueError("Test generation is not enabled")
+        else:
+            # load data.json file
+            with open(os.path.join(self.data_path, "processed_data.json"), "r") as file:
+                data = json.load(file)
+
+            data_final = []
+            # repos = []
+            num_module = 0
+            with Progress() as progress:
+                task = progress.add_task("[cyan]Processing...", total=len(data))
+                for i, key in enumerate(data.keys()):
+                    dat = {}
+                    dat["test_cases"] = {}
+                    dat["graph"] = {}
+                    dat["uuid"] = i + 1
+                    dat["code_path"] = data[key]["module_path"]
+                    dat["graph"]["src_graph_path"] = data[key]["graph_path"]
+
+                    graph_path = "/".join(data[key]["graph_path"].split("/")[:-1])
+                    dat["graph"]["node_feature_path"] = os.path.join(
+                        graph_path, f"node_feat_sample_{i}.pt"
+                    )
+                    dat["graph"]["mask_path"] = os.path.join(
+                        graph_path, f"mask_sample_{i}.pt"
+                    )
+                    # with open(dat["code_path"], "w") as file:
+                    #     file.write(data_dict[key]["code_src"])
+
+                    # graph = self.graph.extract_graph(
+                    #     code_path=dat["code_path"], graph_path=dat["graph_path"]
+                    # )
+                    with open(dat["graph"]["src_graph_path"], "r") as file:
+                        graph = json.load(file)
+                    node_feat = self.get_node_features(graph=graph)
+                    all_mask = []
+                    for tkey in data[key]["test_cases"].keys():
+                        dat["test_cases"][tkey] = {}
+                        dat["test_cases"][tkey]["test_case"] = data[key]["test_cases"][
+                            tkey
+                        ]["test_path"]
+                        dat["test_cases"][tkey]["branch"] = data[key]["test_cases"][
+                            tkey
+                        ]["branch"]
+                        mask = self.get_mask_tensor(
+                            graph=graph, branch=data[key]["test_cases"][tkey]["branch"]
+                        )
+                        all_mask.append(mask)
+                    torch.save(all_mask, dat["graph"]["mask_path"])
+                    torch.save(node_feat, dat["graph"]["node_feature_path"])
+                    data_final.append(dat)
+                    progress.update(task, advance=1)
+
+            self.data = {dat["uuid"]: dat for dat in data}
+            with open(os.path.join(self.data_path, "processed_data.json"), "w") as f:
+                json.dump(self.data, f)
+
+    def pre_process_raw(self) -> bool:
+
         process = False
         # check if the data has been processeds
         if os.path.exists(os.path.join(self.data_path, "data.json")):
@@ -186,7 +260,7 @@ class OSSFuzz(Data):
             process = True
 
         if not process:
-            return
+            return process
 
         # process data
         data = []
@@ -259,7 +333,7 @@ class OSSFuzz(Data):
 
         with open(os.path.join(self.data_path, "stat_info.json"), "w") as f:
             json.dump(self.stat_info, f)
-        return
+        return False
 
     def create_package_txt(self, data: dict) -> None:
 

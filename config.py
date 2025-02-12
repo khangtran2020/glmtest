@@ -19,9 +19,6 @@ def add_data_group(group):
     )
     group.add_argument("--data", type=str, help="name of dataset")
     group.add_argument(
-        "--test_gen_project", type=str, help="name of project to test gen"
-    )
-    group.add_argument(
         "--docker-image", type=str, help="docker image to use", default="pynguin_runner"
     )
     group.add_argument("--graph_type", type=str, default="joern", help="graph type")
@@ -31,7 +28,10 @@ def add_data_group(group):
         "--do_process_raw", action="store_true", help="process the raw data"
     )
     group.add_argument(
-        "--test_gen", action="store_true", help="gen test case with pynguin"
+        "--feat_model",
+        type=str,
+        help="model to extract node features",
+        default="Salesforce/codet5p-110m-embedding",
     )
 
 

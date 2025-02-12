@@ -33,6 +33,7 @@ class JoernGraph(Graph):
         self.import_code(code_path, "work")
         graph = self.export_graph_data()
         self.save_to_json(graph, save_path)
+        return graph
 
     def run_joern_query(self, query: str) -> str:
         try:
@@ -81,7 +82,7 @@ class JoernGraph(Graph):
         graph = {"nodes": filtered_nodes, "edges": filtered_edges}
         return graph
 
-    def save_to_json(self, data, output_file):
+    def save_to_json(self, data: dict, output_file: str) -> None:
         with open(output_file, "w") as f:
             json.dump(data, f, indent=2)
         print(f"Graph data saved to {output_file}")

@@ -36,10 +36,9 @@ def main(args: Namespace, logger: Console) -> None:
     if args.mode == "data":
         if args.do_crawl:
             dataset.crawl()
+
         if args.do_process_raw:
             dataset.process_raw()
-        if args.test_gen:
-            dataset.test_gen()
 
     #     dataset.crawl()
     # elif args.mode == "process_raw":

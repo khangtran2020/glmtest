@@ -1,5 +1,6 @@
 import os
 import json
+import torch
 import shutil
 from data.testgeneval_pipeline.swebench_docker.constants import KEY_ID
 from typing import List
@@ -7,6 +8,7 @@ from rich.console import Console
 from rich.progress import Progress
 from data.core import Data
 from graph.core import Graph
+from transformers import PreTrainedModel, PreTrainedTokenizer
 
 
 class TestGenEval(Data):
@@ -16,6 +18,8 @@ class TestGenEval(Data):
         logger: Console,
         path: str,
         graph: Graph,
+        model: PreTrainedModel,
+        tokenizer: PreTrainedTokenizer,
         debug: bool = False,
     ) -> None:
         self.name = "TestGenEval"
@@ -37,6 +41,8 @@ class TestGenEval(Data):
             path=path,
             logger=logger,
             graph=graph,
+            feat_model=model,
+            feat_tokenizer=tokenizer,
             num_cpu=-1,
             debug=debug,
         )
@@ -52,15 +58,13 @@ class TestGenEval(Data):
 
         process = False
         # check if the data has been processeds
-        if os.path.exists(os.path.join(self.data_path, "data_processed.jsonl")):
+        if os.path.exists(os.path.join(self.data_path, "data_processed.json")):
             self.logger.log(
                 "Found data_processed jsonl file, do not need to process raw data"
             )
             # load data
-            with open(
-                os.path.join(self.data_path, "data_processed.jsonl"), "r"
-            ) as file:
-                self.data = [json.loads(l) for l in file.readlines()]
+            with open(os.path.join(self.data_path, "data_processed.json"), "r") as file:
+                self.data = json.load(file)
         else:
             process = True
 
@@ -72,15 +76,16 @@ class TestGenEval(Data):
 
         with open(os.path.join(self.data_path, "data.jsonl"), "r") as file:
             raw_data = [json.loads(l) for l in file.readlines()]
+
         data_dict = {task[KEY_ID]: task for task in raw_data}
         # make projects dir
-        project_path = os.path.join(self.data_path, "projects")
+        code_path = os.path.join(self.data_path, "codes")
         graph_path = os.path.join(self.data_path, "graphs")
-        if os.path.exists(project_path):
-            shutil.rmtree(project_path)
+        if os.path.exists(code_path):
+            shutil.rmtree(code_path)
         if os.path.exists(graph_path):
             shutil.rmtree(graph_path)
-        os.makedirs(project_path)
+        os.makedirs(code_path)
         os.makedirs(graph_path)
         data = []
         repos = []
@@ -89,29 +94,47 @@ class TestGenEval(Data):
             task = progress.add_task("[cyan]Processing...", total=len(data_dict))
             for i, key in enumerate(data_dict.keys()):
                 dat = {}
+                dat["test_cases"] = {}
+                dat["graph"] = {}
                 dat["uuid"] = i + 1
-                dat["project"] = data_dict[key][KEY_ID]
                 dat["code_path"] = os.path.join(
-                    project_path, f"{data_dict[key][KEY_ID]}.py"
+                    code_path, f"{data_dict[key][KEY_ID]}.py"
                 )
-                dat["graph_path"] = os.path.join(
+                dat["graph"]["src_graph_path"] = os.path.join(
                     graph_path, f"{data_dict[key][KEY_ID]}.json"
+                )
+                dat["graph"]["node_feature_path"] = os.path.join(
+                    graph_path, f"{data_dict[key][KEY_ID]}.pt"
+                )
+                dat["graph"]["mask_path"] = os.path.join(
+                    graph_path, f"{data_dict[key][KEY_ID]}_mask.pt"
                 )
                 with open(dat["code_path"], "w") as file:
                     file.write(data_dict[key]["code_src"])
 
-                self.graph.extract_graph(
+                graph = self.graph.extract_graph(
                     code_path=dat["code_path"], graph_path=dat["graph_path"]
                 )
+                node_feat = self.get_node_features(graph=graph)
+                all_mask = []
+                for tkey in data_dict["test_cases"].keys():
+                    dat["test_cases"][tkey] = {}
+                    dat["test_cases"][tkey]["test_case"] = data_dict["test_cases"][tkey]
+                    dat["test_cases"][tkey]["branch"] = data_dict["branches"][tkey]
+                    mask = self.get_mask_tensor(
+                        graph=graph, branch=data_dict["branches"][tkey]
+                    )
+                    all_mask.append(mask)
+                torch.save(all_mask, dat["graph"]["mask_path"])
+                torch.save(node_feat, dat["graph"]["node_feature_path"])
                 data.append(dat)
                 repos.append(data_dict[key]["repo"])
                 num_module += 1
                 progress.update(task, advance=1)
 
-        self.data = data
-        with open(os.path.join(self.data_path, "data_processed.jsonl"), "w") as f:
-            for item in self.data:
-                f.write(json.dumps(item) + "\n")
+        self.data = {dat["uuid"]: dat for dat in data}
+        with open(os.path.join(self.data_path, "processed_data.json"), "w") as f:
+            json.dump(self.data, f)
 
         stat_info = {}
         num_project = len(set(repos))

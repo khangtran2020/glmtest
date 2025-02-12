@@ -1,20 +1,51 @@
 import os
 import ast
 import json
+import torch
+import numpy as np
+import pandas as pd
 from rich.progress import Progress
 from rich.console import Console
 from graph.core import Graph
+from transformers import PreTrainedModel, PreTrainedTokenizer
 from branch.utils import run_coverage
 from utils.utils import run_command
+from sklearn.preprocessing import LabelEncoder
+from copy import deepcopy
 
 # typing
-from typing import List, Union
+from typing import List, Union, Dict
 
 PYNGUIN_TEMPLATE = """docker run --rm -v {}:/input:ro -v {}:/output -v {}:/package:ro {} \
     --module-name {} --coverage_metrics BRANCH --maximum_search_time {} --report-dir /output --project_path /input --output-path /output --output_variables TargetModule,CoverageTimeline --assertion-generation NONE"""
 
 
 class Data(object):
+    """
+    Data class to crawl, process and generate test cases for the given data
+    In the end, it will save the test cases to the given path in json format
+    The data will be saved in the following format:
+    {
+        "uuid": unique id for each data point,
+        "code_path": path to the code,
+        "test_cases": {
+            "test_case_1": {
+                "test_case": test case 1,
+                "branch": arcs for the test case 1
+            },
+            "test_case_2": {
+                "test_case": test case 2,
+                "branch": arcs for the test case 2
+            }
+            ...
+        }
+        "graph": {
+            "src_graph_path": path to the graph of src_code,
+            "node_feature_path": path to the node feature of src_code,
+            "mask_path": path to the mask of branches,
+        }
+    }
+    """
 
     def __init__(
         self,
@@ -23,6 +54,8 @@ class Data(object):
         logger: Console,
         graph: Graph,
         num_cpu: int,
+        feat_model: PreTrainedModel = None,
+        feat_tokenizer: PreTrainedTokenizer = None,
         coverage_image: str = "coverage",
         debug: bool = False,
     ) -> None:
@@ -32,6 +65,8 @@ class Data(object):
         self.graph = graph
         self.num_cpu = num_cpu
         self.debug = debug
+        self.feat_model = feat_model
+        self.feat_tokenizer = feat_tokenizer
         self.coverage_image = coverage_image
 
     def crawl(self) -> None:
@@ -66,7 +101,7 @@ class Data(object):
         """
         pass
 
-    def process_test_gen(self) -> List[dict]:
+    def process_test_gen(self) -> None:
         """
         - process the extracted data to generate test cases
         - save the test cases to the given path
@@ -180,7 +215,11 @@ class Data(object):
             )
             if arcs is None:
                 continue
-            module_results_info["test_cases"][f"test_case_{i}"] = arcs
+            module_results_info["test_cases"][f"test_case_{i}"] = {}
+            module_results_info["test_cases"][f"test_case_{i}"]["test_path"] = (
+                os.path.join(sub_test_path, test_file)
+            )
+            module_results_info["test_cases"][f"test_case_{i}"]["branch"] = arcs
             if self.debug:
                 break
         # get the data and analyze the data
@@ -255,3 +294,93 @@ class Data(object):
         except Exception as e:
             print(f"An error occurred: {e}")
             return -1
+
+    def get_mask_tensor(self, graph: Dict, branch: List) -> torch.Tensor:
+
+        mask = np.zeros(len(graph["nodes"]))
+        line_list = list(set(np.concatenate(np.array(branch, dtype=object)).tolist()))
+        for i in range(len(graph["nodes"])):
+            node = graph["nodes"][i]
+            if node["location"]["filename"] == "N/A":
+                try:
+                    if node["properties"]["LINE_NUMBER"] in line_list:
+                        mask[i] = 1
+                except:
+                    mask[i] = 0
+        mask = torch.Tensor([mask])
+        self.logger.log(f"Size of mask: {mask.size()}")
+        return mask
+
+    def get_node_features(self, graph: Dict) -> torch.Tensor:
+        df = self.preprocess(graph)
+        embeddings = []
+        labels = df["LABELS"]
+
+        # Encode LABELS to integers
+        label_encoder = LabelEncoder()
+        df["LABELS_ENCODED"] = label_encoder.fit_transform(labels)
+
+        # Get Code Embedding
+        for code in df["CODE"].tolist():
+            inputs = self.tokenizer(
+                code, padding=True, truncation=True, return_tensors="pt", max_length=128
+            ).to(self.model.device)
+            with torch.no_grad():
+                embedding = self.model.encoder(**inputs).last_hidden_state.mean(dim=1)[
+                    0
+                ]
+            embeddings.append(embedding.to("cpu").numpy())
+
+        df["CODE_FEATURE"] = embeddings
+        # df = df.drop(["LABELS","CODE"],axis=1)
+        c_features = deepcopy(df["CODE_FEATURE"])
+        df = df[["LABELS_ENCODED", "COLUMN_NUMBER", "ORDER", "LINE_NUMBER"]]
+        feat_df = torch.from_numpy(df.values).float()
+        c_features = np.concatenate([np.expand_dims(e, 0) for e in c_features], axis=0)
+        c_features = torch.from_numpy(c_features).float()
+        feat = torch.cat([feat_df, c_features], dim=1)
+        self.logger.log(f"Size of node features: {feat.size()}")
+        return feat
+
+    def preprocess(self, graph):
+        labels = []
+        cnum = []
+        order = []
+        code = []
+        lnum = []
+
+        for node in graph["nodes"]:
+            properties = node["properties"]
+            labels.append(node["label"])
+            try:
+                cnum.append(properties["COLUMN_NUMBER"])
+            except:
+                cnum.append(-1)
+            try:
+                order.append(properties["ORDER"])
+            except:
+                order.append(-1)
+
+            try:
+                lnum.append(properties["LINE_NUMBER"])
+            except:
+                lnum.append(-1)
+
+            try:
+                if properties["CODE"] != "":
+                    code.append(properties["CODE"])
+                else:
+                    code.append("EMPTY")
+            except:
+                code.append("EMPTY")
+
+        nodes = pd.DataFrame(
+            {
+                "LABELS": np.array(labels),
+                "COLUMN_NUMBER": np.array(cnum),
+                "ORDER": np.array(order),
+                "CODE": np.array(code),
+                "LINE_NUMBER": np.array(lnum),
+            }
+        )
+        return nodes
