@@ -1,5 +1,6 @@
 import os
 import re
+import ast
 import torch
 import shlex
 import pickle
@@ -154,3 +155,15 @@ def handle_location_out(out_str: str) -> List[dict]:
             stack = []
             data.append(new_data)
     return data
+
+
+class ConstantTagger(ast.NodeTransformer):
+
+    def __init__(self, tag: str):
+        self.tag = tag
+        super().__init__()
+
+    def visit_Constant(self, node):
+        """Modify all constant values by wrapping them in <tag></tag>"""
+        new_value = f"<{self.tag}>{node.value}</{self.tag}>"
+        return ast.Constant(value=new_value)

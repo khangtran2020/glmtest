@@ -10,7 +10,7 @@ from rich.console import Console
 from graph.core import Graph
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from branch.utils import run_coverage
-from utils.utils import run_command, get_index_by_value
+from utils.utils import run_command, get_index_by_value, ConstantTagger
 from sklearn.preprocessing import LabelEncoder
 from copy import deepcopy
 
@@ -404,6 +404,7 @@ class Data(object):
                     test_path = dat["test_cases"][testcase]["test_path"]
                     with open(test_path, "r") as file:
                         test_code = file.read()
+                        test_code = self.add_fuzz_tags(test_code)
                     mask_key = int(testcase.split("_")[-1])
                     branch = mask[mask_key]
                     active_node = get_index_by_value(a=branch, val=1)
@@ -502,3 +503,11 @@ Here is the graph:
             tokenize=False,
         )
         return text, response, task_prompt
+
+    def add_fuzz_tags(self, code: str, tag: str = "fuzz") -> str:
+
+        tree = ast.parse(code)
+        tagger = ConstantTagger(tag=tag)
+        modified_tree = tagger.visit(tree)
+        modified_code = ast.unparse(modified_tree)
+        return modified_code

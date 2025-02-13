@@ -1,5 +1,3 @@
-import os
-import requests
 from data.ossfuzz_data import OSSFuzz
 from data.codamosa_data import Codamosa
 from data.testgeneval_data import TestGenEval
