@@ -120,8 +120,11 @@ class TestGenEval(Data):
                 )
                 node_feat = self.get_node_features(graph=graph)
                 all_mask = []
+                idx = 0
                 for i, tkey in enumerate(data_dict["test_cases"].keys()):
-                    nkey = f"test_case_{i}"
+                    if data_dict["branches"][tkey] == []:
+                        continue
+                    nkey = f"test_case_{idx}"
                     dat["test_cases"][nkey] = {}
                     dat["test_cases"][nkey]["test_case"] = data_dict["test_cases"][tkey]
                     dat["test_cases"][nkey]["branch"] = data_dict["branches"][tkey]
@@ -129,6 +132,7 @@ class TestGenEval(Data):
                         graph=graph, branch=data_dict["branches"][tkey]
                     )
                     all_mask.append(mask)
+                    idx += 1
                 torch.save(all_mask, dat["graph"]["mask_path"])
                 torch.save(node_feat, dat["graph"]["node_feature_path"])
                 data.append(dat)

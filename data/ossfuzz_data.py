@@ -222,8 +222,11 @@ class OSSFuzz(Data):
                         graph = json.load(file)
                     node_feat = self.get_node_features(graph=graph)
                     all_mask = []
+                    idx = 0
                     for i, tkey in enumerate(data[key]["test_cases"].keys()):
-                        nkey = f"test_case_{i}"
+                        if len(data[key]["test_cases"]) == 0:
+                            continue
+                        nkey = f"test_case_{idx}"
                         dat["test_cases"][nkey] = {}
                         dat["test_cases"][nkey]["test_case"] = data[key]["test_cases"][
                             tkey
@@ -235,6 +238,7 @@ class OSSFuzz(Data):
                             graph=graph, branch=data[key]["test_cases"][tkey]["branch"]
                         )
                         all_mask.append(mask)
+                        idx += 1
                     torch.save(all_mask, dat["graph"]["mask_path"])
                     torch.save(node_feat, dat["graph"]["node_feature_path"])
                     data_final.append(dat)
