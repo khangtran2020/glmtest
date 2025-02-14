@@ -324,15 +324,23 @@ class Data(object):
         df["LABELS_ENCODED"] = label_encoder.fit_transform(labels)
 
         # Get Code Embedding
-        for code in df["CODE"].tolist():
-            inputs = self.feat_tokenizer(
-                code, padding=True, truncation=True, return_tensors="pt", max_length=128
-            ).to(self.feat_model.device)
-            with torch.no_grad():
-                embedding = self.feat_model.encoder(**inputs).last_hidden_state.mean(
-                    dim=1
-                )[0]
-            embeddings.append(embedding.to("cpu").numpy())
+        self.logger.log("[green]Embedding code...[/green]")
+        with Progress() as progress:
+            task = progress.add_task("[green]Embedding code...", total=len(df))
+            for code in df["CODE"].tolist():
+                inputs = self.feat_tokenizer(
+                    code,
+                    padding=True,
+                    truncation=True,
+                    return_tensors="pt",
+                    max_length=128,
+                ).to(self.feat_model.device)
+                with torch.no_grad():
+                    embedding = self.feat_model.encoder(
+                        **inputs
+                    ).last_hidden_state.mean(dim=1)[0]
+                embeddings.append(embedding.to("cpu").numpy())
+                progress.update(task, advance=1)
 
         df["CODE_FEATURE"] = embeddings
         # df = df.drop(["LABELS","CODE"],axis=1)
