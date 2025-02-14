@@ -70,8 +70,10 @@ def parse_args():
     general_group = parser.add_argument_group(title="General configuration")
     data_group = parser.add_argument_group(title="Data-related configuration")
     joern_group = parser.add_argument_group(title="Joern-related configuration")
+    training_group = parser.add_argument_group(title="Training-related configuration")
 
     add_joern_group(joern_group)
     add_data_group(data_group)
     add_general_group(general_group)
+    add_training_group(training_group)
     return parser.parse_args()
