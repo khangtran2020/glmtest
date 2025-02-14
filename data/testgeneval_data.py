@@ -37,7 +37,12 @@ class TestGenEval(Data):
                 ) as file:
                     self.data = [json.loads(l) for l in file.readlines()]
             else:
-                logger.log("data_processed.jsonl not found, please crawl the data")
+                if not os.path.exists(os.path.join(self.data_path, "data.jsonl")):
+                    logger.log("data.jsonl not found, please crawl the data")
+                else:
+                    logger.log(
+                        "Found data.jsonl file, but not processed. PLEASE RUN `process_raw`"
+                    )
 
         super().__init__(
             name=self.name,
