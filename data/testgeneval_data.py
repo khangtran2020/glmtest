@@ -25,6 +25,19 @@ class TestGenEval(Data):
         llm_tokenizer: PreTrainedTokenizer,
         debug: bool = False,
     ) -> None:
+
+        super().__init__(
+            name=self.name,
+            path=path,
+            logger=logger,
+            graph=graph,
+            feat_model=model,
+            feat_tokenizer=tokenizer,
+            llm_tokenizer=llm_tokenizer,
+            num_cpu=-1,
+            debug=debug,
+        )
+
         self.name = "TestGenEval"
         self.data_path = os.path.join(path, self.name)
         self.debug = debug
@@ -48,18 +61,6 @@ class TestGenEval(Data):
                     logger.log(
                         "Found data.jsonl file, but not processed. PLEASE RUN `process_raw`"
                     )
-
-        super().__init__(
-            name=self.name,
-            path=path,
-            logger=logger,
-            graph=graph,
-            feat_model=model,
-            feat_tokenizer=tokenizer,
-            llm_tokenizer=llm_tokenizer,
-            num_cpu=-1,
-            debug=debug,
-        )
         self.logger.log(
             f"Initialized {self.name} dataset, with model on device: {self.feat_model.device}"
         )
