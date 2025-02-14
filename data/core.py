@@ -326,7 +326,7 @@ class Data(object):
 
         # Get Code Embedding
         self.logger.log("[green]Embedding code...[/green]")
-        for code in tqdm(df["CODE"].tolist(), leave=False):
+        for code in df["CODE"].tolist():
             inputs = self.feat_tokenizer(
                 code,
                 padding=True,
