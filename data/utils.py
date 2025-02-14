@@ -24,6 +24,7 @@ def get_dataset(
 ) -> Data:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
 
     model = AutoModel.from_pretrained(feat_model, trust_remote_code=True).to(device)
     tokenizer = AutoTokenizer.from_pretrained(feat_model, trust_remote_code=True)

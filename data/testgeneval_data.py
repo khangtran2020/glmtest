@@ -56,6 +56,9 @@ class TestGenEval(Data):
             num_cpu=-1,
             debug=debug,
         )
+        self.logger.log(
+            f"Initialized {self.name} dataset, with model: {model} on device: {self.model.device}"
+        )
 
     def crawl(self) -> None:
         info = f"""To crawl this data, please do as following:
