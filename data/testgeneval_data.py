@@ -31,7 +31,11 @@ class TestGenEval(Data):
         self.data = None
         if not os.path.exists(self.data_path):
             os.makedirs(self.data_path)
+            self.logger.log(
+                f"Data path not found, created a new one at {self.data_path}"
+            )
         else:
+            self.logger.log(f"Data path found at {self.data_path}")
             if os.path.exists(os.path.join(self.data_path, "data_processed.jsonl")):
                 with open(
                     os.path.join(self.data_path, "data_processed.jsonl"), "r"
