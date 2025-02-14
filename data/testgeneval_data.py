@@ -1,4 +1,5 @@
 import os
+import ast
 import json
 import torch
 import shutil
@@ -142,6 +143,10 @@ class TestGenEval(Data):
                         continue
                     nkey = f"test_case_{idx}"
                     dat["test_cases"][nkey] = {}
+                    try:
+                        ast.parse(data_dict[key]["test_cases"][tkey])
+                    except Exception as e:
+                        self.logger.log(f"Error parsing test case {key}, {tkey}")
                     dat["test_cases"][nkey]["test_case"] = data_dict[key]["test_cases"][
                         tkey
                     ]
