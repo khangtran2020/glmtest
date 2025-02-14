@@ -94,7 +94,7 @@ class TestGenEval(Data):
         with open(os.path.join(self.data_path, "data.jsonl"), "r") as file:
             raw_data = [json.loads(l) for l in file.readlines()]
 
-        data_dict = {task[NEW_KEY_ID]: task for task in raw_data}
+        raw_data = {task[NEW_KEY_ID]: task for task in raw_data}
         # make projects dir
         code_path = os.path.join(self.data_path, "codes")
         graph_path = os.path.join(self.data_path, "graphs")
@@ -108,26 +108,26 @@ class TestGenEval(Data):
         repos = []
         num_module = 0
         with Progress() as progress:
-            task = progress.add_task("[cyan]Processing...", total=len(data_dict))
-            for i, key in enumerate(data_dict.keys()):
+            task = progress.add_task("[cyan]Processing...", total=len(raw_data))
+            for i, key in enumerate(raw_data.keys()):
                 dat = {}
                 dat["test_cases"] = {}
                 dat["graph"] = {}
                 dat["uuid"] = i + 1
                 dat["code_path"] = os.path.join(
-                    code_path, f"{data_dict[key][NEW_KEY_ID]}.py"
+                    code_path, f"{raw_data[key][NEW_KEY_ID]}.py"
                 )
                 dat["graph"]["src_graph_path"] = os.path.join(
-                    graph_path, f"{data_dict[key][NEW_KEY_ID]}.json"
+                    graph_path, f"{raw_data[key][NEW_KEY_ID]}.json"
                 )
                 dat["graph"]["node_feature_path"] = os.path.join(
-                    graph_path, f"{data_dict[key][NEW_KEY_ID]}.pt"
+                    graph_path, f"{raw_data[key][NEW_KEY_ID]}.pt"
                 )
                 dat["graph"]["mask_path"] = os.path.join(
-                    graph_path, f"{data_dict[key][NEW_KEY_ID]}_mask.pt"
+                    graph_path, f"{raw_data[key][NEW_KEY_ID]}_mask.pt"
                 )
                 with open(dat["code_path"], "w") as file:
-                    file.write(data_dict[key]["code_src"])
+                    file.write(raw_data[key]["code_src"])
 
                 graph = self.graph.extract_graph(
                     code_path=dat["code_path"],
@@ -136,30 +136,30 @@ class TestGenEval(Data):
                 node_feat = self.get_node_features(graph=graph)
                 all_mask = []
                 idx = 0
-                for i, tkey in enumerate(data_dict[key]["test_cases"].keys()):
-                    if data_dict[key]["branches"][tkey] == []:
+                for i, tkey in enumerate(raw_data[key]["test_cases"].keys()):
+                    if raw_data[key]["branches"][tkey] == []:
                         continue
-                    if data_dict[key]["test_cases"][tkey] == "":
+                    if raw_data[key]["test_cases"][tkey] == "":
+                        continue
+                    try:
+                        ast.parse(raw_data[key]["test_cases"][tkey])
+                    except Exception as e:
                         continue
                     nkey = f"test_case_{idx}"
                     dat["test_cases"][nkey] = {}
-                    try:
-                        ast.parse(data_dict[key]["test_cases"][tkey])
-                    except Exception as e:
-                        self.logger.log(f"Error parsing test case {key}, {tkey}")
-                    dat["test_cases"][nkey]["test_case"] = data_dict[key]["test_cases"][
+                    dat["test_cases"][nkey]["test_case"] = raw_data[key]["test_cases"][
                         tkey
                     ]
-                    dat["test_cases"][nkey]["branch"] = data_dict[key]["branches"][tkey]
+                    dat["test_cases"][nkey]["branch"] = raw_data[key]["branches"][tkey]
                     mask = self.get_mask_tensor(
-                        graph=graph, branch=data_dict[key]["branches"][tkey]
+                        graph=graph, branch=raw_data[key]["branches"][tkey]
                     )
                     all_mask.append(mask)
                     idx += 1
                 torch.save(all_mask, dat["graph"]["mask_path"])
                 torch.save(node_feat, dat["graph"]["node_feature_path"])
                 data.append(dat)
-                repos.append(data_dict[key]["repo"])
+                repos.append(raw_data[key]["repo"])
                 num_module += 1
                 progress.update(task, advance=1)
 
