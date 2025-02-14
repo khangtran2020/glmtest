@@ -5,6 +5,7 @@ import json
 import torch
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 from rich.progress import Progress
 from rich.console import Console
 from graph.core import Graph
@@ -325,22 +326,19 @@ class Data(object):
 
         # Get Code Embedding
         self.logger.log("[green]Embedding code...[/green]")
-        with Progress() as progress:
-            task = progress.add_task("[green]Embedding code...", total=len(df))
-            for code in df["CODE"].tolist():
-                inputs = self.feat_tokenizer(
-                    code,
-                    padding=True,
-                    truncation=True,
-                    return_tensors="pt",
-                    max_length=128,
-                ).to(self.feat_model.device)
-                with torch.no_grad():
-                    embedding = self.feat_model.encoder(
-                        **inputs
-                    ).last_hidden_state.mean(dim=1)[0]
-                embeddings.append(embedding.to("cpu").numpy())
-                progress.update(task, advance=1)
+        for code in tqdm(df["CODE"].tolist()):
+            inputs = self.feat_tokenizer(
+                code,
+                padding=True,
+                truncation=True,
+                return_tensors="pt",
+                max_length=128,
+            ).to(self.feat_model.device)
+            with torch.no_grad():
+                embedding = self.feat_model.encoder(**inputs).last_hidden_state.mean(
+                    dim=1
+                )[0]
+            embeddings.append(embedding.to("cpu").numpy())
 
         df["CODE_FEATURE"] = embeddings
         # df = df.drop(["LABELS","CODE"],axis=1)
