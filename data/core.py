@@ -325,13 +325,13 @@ class Data(object):
 
         # Get Code Embedding
         for code in df["CODE"].tolist():
-            inputs = self.tokenizer(
+            inputs = self.feat_tokenizer(
                 code, padding=True, truncation=True, return_tensors="pt", max_length=128
-            ).to(self.model.device)
+            ).to(self.feat_model.device)
             with torch.no_grad():
-                embedding = self.model.encoder(**inputs).last_hidden_state.mean(dim=1)[
-                    0
-                ]
+                embedding = self.feat_model.encoder(**inputs).last_hidden_state.mean(
+                    dim=1
+                )[0]
             embeddings.append(embedding.to("cpu").numpy())
 
         df["CODE_FEATURE"] = embeddings
