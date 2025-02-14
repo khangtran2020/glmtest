@@ -511,6 +511,7 @@ Here is the graph:
 
     def add_fuzz_tags(self, code: str, tag: str = "fuzz") -> str:
 
+        print(code)
         tree = ast.parse(code)
         locations = []
         for node in ast.walk(tree):
