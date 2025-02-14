@@ -133,7 +133,9 @@ class TestGenEval(Data):
                 all_mask = []
                 idx = 0
                 for i, tkey in enumerate(data_dict[key]["test_cases"].keys()):
-                    if data_dict["branches"][tkey] == []:
+                    if data_dict[key]["branches"][tkey] == []:
+                        continue
+                    if data_dict[key]["test_cases"][tkey] == "":
                         continue
                     nkey = f"test_case_{idx}"
                     dat["test_cases"][nkey] = {}
