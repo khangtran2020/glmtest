@@ -57,7 +57,7 @@ class TestGenEval(Data):
             debug=debug,
         )
         self.logger.log(
-            f"Initialized {self.name} dataset, with model: {model} on device: {self.model.device}"
+            f"Initialized {self.name} dataset, with model on device: {self.feat_model.device}"
         )
 
     def crawl(self) -> None:
