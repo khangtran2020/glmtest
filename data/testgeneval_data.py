@@ -36,11 +36,11 @@ class TestGenEval(Data):
             )
         else:
             self.logger.log(f"Data path found at {self.data_path}")
-            if os.path.exists(os.path.join(self.data_path, "data_processed.jsonl")):
+            if os.path.exists(os.path.join(self.data_path, "data_processed.json")):
                 with open(
-                    os.path.join(self.data_path, "data_processed.jsonl"), "r"
+                    os.path.join(self.data_path, "data_processed.json"), "r"
                 ) as file:
-                    self.data = [json.loads(l) for l in file.readlines()]
+                    self.data = json.load(file)
             else:
                 if not os.path.exists(os.path.join(self.data_path, "data.jsonl")):
                     logger.log("data.jsonl not found, please crawl the data")
