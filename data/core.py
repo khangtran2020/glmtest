@@ -11,7 +11,7 @@ from rich.console import Console
 from graph.core import Graph
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from branch.utils import run_coverage
-from utils.utils import run_command, get_index_by_value, ConstantTagger
+from utils.utils import run_command, get_index_by_value
 from sklearn.preprocessing import LabelEncoder
 from copy import deepcopy
 
@@ -512,7 +512,38 @@ Here is the graph:
     def add_fuzz_tags(self, code: str, tag: str = "fuzz") -> str:
 
         tree = ast.parse(code)
-        tagger = ConstantTagger(tag=tag)
-        modified_tree = tagger.visit(tree)
-        modified_code = ast.unparse(modified_tree)
-        return modified_code
+        locations = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant):
+                node_location = (
+                    node.lineno,
+                    node.col_offset,
+                    node.end_lineno,
+                    node.end_col_offset,
+                )
+                locations.append(node_location)
+        locations = sorted(locations, key=lambda x: x[0])
+        lines = code.split("\n")
+
+        for loc in locations:
+            start_line, start_col, end_line, end_col = loc
+            if start_line == end_line:
+                lines[start_line - 1] = (
+                    lines[start_line - 1][:start_col]
+                    + f"<{tag}>"
+                    + lines[start_line - 1][start_col:end_col]
+                    + f"</{tag}>"
+                    + lines[start_line - 1][end_col:]
+                )
+            else:
+                lines[start_line - 1] = (
+                    lines[start_line - 1][:start_col]
+                    + f"<{tag}>"
+                    + lines[start_line - 1][start_col:]
+                )
+                lines[end_line - 1] = (
+                    lines[end_line - 1][:end_col]
+                    + f"</{tag}>"
+                    + lines[end_line - 1][end_col:]
+                )
+        return "\n".join(lines)
