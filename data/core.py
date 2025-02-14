@@ -393,12 +393,12 @@ class Data(object):
         )
         return nodes
 
-    def prepare_training_data(self) -> None:
+    def prepare_data(self) -> None:
         """
         Prepare the training data for the model
         """
         assert self.data is not None
-        with self.logger.status("[green]Preparing training data...[/green]"):
+        with self.logger.status("[green]Preparing data...[/green]"):
             self.processed_data = []
             for uuid, dat in self.data.items():
                 with open(dat["code_path"], "r") as file:
@@ -434,6 +434,8 @@ class Data(object):
                         "mask": mask[mask_key],
                     }
                     self.processed_data.append(data)
+        self.logger.log("[green]Data is ready![/green]")
+        self.logger.log(f"Size of data data: {len(self.processed_data)}")
 
     def read_graph(self, data: dict) -> dict:
 

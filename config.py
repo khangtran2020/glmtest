@@ -33,12 +33,6 @@ def add_data_group(group):
         help="model to extract node features",
         default="Salesforce/codet5p-110m-embedding",
     )
-    group.add_argument(
-        "--llm_model",
-        type=str,
-        help="llm model to generate test cases",
-        default="Qwen/CodeQwen1.5-7B-Chat",
-    )
 
 
 def add_joern_group(group):
@@ -50,6 +44,24 @@ def add_joern_group(group):
         type=str,
         help="path to joern",
         default="./graph/joern/",
+    )
+
+
+def add_training_group(group):
+    group.add_argument(
+        "--llm_model",
+        type=str,
+        help="llm model to generate test cases",
+        default="Qwen/CodeQwen1.5-7B-Chat",
+    )
+    group.add_argument(
+        "--do_eval", action="store_true", help="evaluate the model with val set"
+    )
+    group.add_argument(
+        "--do_train", action="store_true", help="train the model on the train set"
+    )
+    group.add_argument(
+        "--do_test", action="store_true", help="test the model in the test set"
     )
 
 

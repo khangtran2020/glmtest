@@ -41,11 +41,9 @@ def main(args: Namespace, logger: Console) -> None:
         if args.do_process_raw:
             dataset.process_raw()
 
-    #     dataset.crawl()
-    # elif args.mode == "process_raw":
-    #     dataset.process_raw()
-    # elif args.mode == "test_gen":
-    #     dataset.process_test_gen()
+    # training
+    if args.mode == "train":
+        dataset.prepare_data()
 
 
 if __name__ == "__main__":
