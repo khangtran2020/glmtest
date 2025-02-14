@@ -404,12 +404,10 @@ class Data(object):
                 with open(dat["code_path"], "r") as file:
                     src_code = file.read()
                 graph = self.read_graph(dat)
-                mask = torch.load(dat["graph"]["mask_path"])
+                mask = torch.load(dat["graph"]["mask_path"], weights_only=True)
                 for testcase in dat["test_cases"].keys():
-                    test_path = dat["test_cases"][testcase]["test_path"]
-                    with open(test_path, "r") as file:
-                        test_code = file.read()
-                        test_code = self.add_fuzz_tags(test_code)
+                    test_code = dat["test_cases"][testcase]["test_case"]
+                    test_code = self.add_fuzz_tags(test_code)
                     mask_key = int(testcase.split("_")[-1])
                     branch = mask[mask_key]
                     active_node = get_index_by_value(a=branch, val=1)
@@ -445,7 +443,7 @@ class Data(object):
 
         graph_dict = {}
         num_nodes = len(graph["nodes"])
-        feat = torch.load(data["graph"]["node_feature_path"])
+        feat = torch.load(data["graph"]["node_feature_path"], weights_only=True)
         assert num_nodes == feat.shape[0]
 
         edge_dict = self.read_edge(graph)
