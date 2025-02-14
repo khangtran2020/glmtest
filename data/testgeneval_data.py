@@ -2,13 +2,14 @@ import os
 import json
 import torch
 import shutil
-from data.testgeneval_pipeline.swebench_docker.constants import KEY_ID
 from typing import List
 from rich.console import Console
 from rich.progress import Progress
 from data.core import Data
 from graph.core import Graph
 from transformers import PreTrainedModel, PreTrainedTokenizer
+
+KEY_ID = "id"
 
 
 class TestGenEval(Data):

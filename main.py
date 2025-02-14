@@ -38,7 +38,6 @@ def main(args: Namespace, logger: Console) -> None:
     if args.mode == "data":
         if args.do_crawl:
             dataset.crawl()
-
         if args.do_process_raw:
             dataset.process_raw()
 
