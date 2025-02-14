@@ -408,6 +408,8 @@ class Data(object):
                 for testcase in dat["test_cases"].keys():
                     test_code = dat["test_cases"][testcase]["test_case"]
                     test_code = self.add_fuzz_tags(test_code)
+                    if test_code == "N/A":
+                        continue
                     mask_key = int(testcase.split("_")[-1])
                     branch = mask[mask_key]
                     active_node = get_index_by_value(a=branch, val=1)
@@ -511,8 +513,11 @@ Here is the graph:
 
     def add_fuzz_tags(self, code: str, tag: str = "fuzz") -> str:
 
-        print(code)
-        tree = ast.parse(code)
+        # print(code)
+        try:
+            tree = ast.parse(code)
+        except:
+            return "N/A"
         locations = []
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant):
