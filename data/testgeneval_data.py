@@ -10,6 +10,7 @@ from graph.core import Graph
 from transformers import PreTrainedModel, PreTrainedTokenizer
 
 KEY_ID = "id"
+NEW_KEY_ID = "uuid"
 
 
 class TestGenEval(Data):
@@ -86,7 +87,7 @@ class TestGenEval(Data):
         with open(os.path.join(self.data_path, "data.jsonl"), "r") as file:
             raw_data = [json.loads(l) for l in file.readlines()]
 
-        data_dict = {task[KEY_ID]: task for task in raw_data}
+        data_dict = {task[NEW_KEY_ID]: task for task in raw_data}
         # make projects dir
         code_path = os.path.join(self.data_path, "codes")
         graph_path = os.path.join(self.data_path, "graphs")
@@ -107,16 +108,16 @@ class TestGenEval(Data):
                 dat["graph"] = {}
                 dat["uuid"] = i + 1
                 dat["code_path"] = os.path.join(
-                    code_path, f"{data_dict[key][KEY_ID]}.py"
+                    code_path, f"{data_dict[key][NEW_KEY_ID]}.py"
                 )
                 dat["graph"]["src_graph_path"] = os.path.join(
-                    graph_path, f"{data_dict[key][KEY_ID]}.json"
+                    graph_path, f"{data_dict[key][NEW_KEY_ID]}.json"
                 )
                 dat["graph"]["node_feature_path"] = os.path.join(
-                    graph_path, f"{data_dict[key][KEY_ID]}.pt"
+                    graph_path, f"{data_dict[key][NEW_KEY_ID]}.pt"
                 )
                 dat["graph"]["mask_path"] = os.path.join(
-                    graph_path, f"{data_dict[key][KEY_ID]}_mask.pt"
+                    graph_path, f"{data_dict[key][NEW_KEY_ID]}_mask.pt"
                 )
                 with open(dat["code_path"], "w") as file:
                     file.write(data_dict[key]["code_src"])

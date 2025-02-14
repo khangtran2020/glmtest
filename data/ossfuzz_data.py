@@ -228,9 +228,12 @@ class OSSFuzz(Data):
                             continue
                         nkey = f"test_case_{idx}"
                         dat["test_cases"][nkey] = {}
-                        dat["test_cases"][nkey]["test_case"] = data[key]["test_cases"][
-                            tkey
-                        ]["test_path"]
+                        with open(
+                            data[key]["test_cases"][tkey]["test_path"], "r"
+                        ) as file:
+                            test_code = file.read()
+                        dat["test_cases"][nkey]["test_code"] = test_code
+
                         dat["test_cases"][nkey]["branch"] = data[key]["test_cases"][
                             tkey
                         ]["branch"]
