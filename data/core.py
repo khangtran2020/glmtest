@@ -312,7 +312,6 @@ class Data(object):
                 except:
                     mask[i] = 0
         mask = torch.Tensor([mask])
-        self.logger.log(f"Size of mask: {mask.size()}")
         return mask
 
     def get_node_features(self, graph: Dict) -> torch.Tensor:
