@@ -123,7 +123,8 @@ class TestGenEval(Data):
                     file.write(data_dict[key]["code_src"])
 
                 graph = self.graph.extract_graph(
-                    code_path=dat["code_path"], graph_path=dat["graph_path"]
+                    code_path=dat["code_path"],
+                    graph_path=dat["graph"]["src_graph_path"],
                 )
                 node_feat = self.get_node_features(graph=graph)
                 all_mask = []
