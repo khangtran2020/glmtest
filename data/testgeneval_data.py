@@ -28,9 +28,9 @@ class TestGenEval(Data):
         self.name = "TestGenEval"
         self.data_path = os.path.join(path, self.name)
         self.debug = debug
+        self.data = None
         if not os.path.exists(self.data_path):
             os.makedirs(self.data_path)
-            self.data = None
         else:
             if os.path.exists(os.path.join(self.data_path, "data_processed.jsonl")):
                 with open(
