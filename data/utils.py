@@ -22,10 +22,10 @@ def get_dataset(
     debug: bool = False,
 ) -> Data:
 
-    model = AutoModel.from_pretrained(feat_model)
-    tokenizer = AutoTokenizer.from_pretrained(feat_model)
+    model = AutoModel.from_pretrained(feat_model, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(feat_model, trust_remote_code=True)
 
-    llm_tokenizer = AutoTokenizer.from_pretrained(llm_model)
+    llm_tokenizer = AutoTokenizer.from_pretrained(llm_model, trust_remote_code=True)
     llm_tokenizer.add_special_tokens(
         {
             "additional_special_tokens": [
