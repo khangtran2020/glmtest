@@ -25,7 +25,7 @@ class TestGenEval(Data):
         llm_tokenizer: PreTrainedTokenizer,
         debug: bool = False,
     ) -> None:
-
+        self.name = "TestGenEval"
         super().__init__(
             name=self.name,
             path=path,
@@ -37,8 +37,6 @@ class TestGenEval(Data):
             num_cpu=-1,
             debug=debug,
         )
-
-        self.name = "TestGenEval"
         self.data_path = os.path.join(path, self.name)
         self.debug = debug
         self.data = None
