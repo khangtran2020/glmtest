@@ -1,3 +1,4 @@
+import torch
 from data.ossfuzz_data import OSSFuzz
 from data.codamosa_data import Codamosa
 from data.testgeneval_data import TestGenEval
@@ -22,7 +23,9 @@ def get_dataset(
     debug: bool = False,
 ) -> Data:
 
-    model = AutoModel.from_pretrained(feat_model, trust_remote_code=True)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model = AutoModel.from_pretrained(feat_model, trust_remote_code=True).to(device)
     tokenizer = AutoTokenizer.from_pretrained(feat_model, trust_remote_code=True)
 
     llm_tokenizer = AutoTokenizer.from_pretrained(llm_model, trust_remote_code=True)
