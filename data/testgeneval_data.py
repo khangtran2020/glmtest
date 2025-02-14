@@ -124,7 +124,7 @@ class TestGenEval(Data):
 
                 graph = self.graph.extract_graph(
                     code_path=dat["code_path"],
-                    graph_path=dat["graph"]["src_graph_path"],
+                    save_path=dat["graph"]["src_graph_path"],
                 )
                 node_feat = self.get_node_features(graph=graph)
                 all_mask = []
