@@ -553,3 +553,25 @@ Here is the graph:
                     + lines[end_line - 1][end_col:]
                 )
         return "\n".join(lines)
+
+    def train_test_split(
+        self, val_split: float = 0.1, test_split: float = 0.15
+    ) -> None:
+        """
+        Split the data into training, validation and test sets
+        """
+        assert self.processed_data is not None
+        data = deepcopy(self.processed_data)
+        np.random.shuffle(data)
+        num_val = int(val_split * len(data))
+        num_test = int(test_split * len(data))
+        val_data = data[:num_val]
+        test_data = data[num_val : num_val + num_test]
+        train_data = data[num_val + num_test :]
+        self.train_data = train_data
+        self.val_data = val_data
+        self.test_data = test_data
+        self.logger.log("[green]Data is split![/green]")
+        self.logger.log(
+            f"Size of training data: {len(self.train_data)}, Validation data: {len(self.val_data)}, Test data: {len(self.test_data)}"
+        )

@@ -44,6 +44,7 @@ def main(args: Namespace, logger: Console) -> None:
     # training
     if args.mode == "train":
         dataset.prepare_data()
+        dataset.train_test_split()
 
 
 if __name__ == "__main__":
