@@ -55,6 +55,18 @@ def add_training_group(group):
         default="Qwen/CodeQwen1.5-7B-Chat",
     )
     group.add_argument(
+        "--max_seq_length",
+        type=int,
+        help="max sequence length",
+        default=12000,
+    )
+    group.add_argument(
+        "--batch_size",
+        type=int,
+        help="batch size",
+        default=1,
+    )
+    group.add_argument(
         "--do_eval", action="store_true", help="evaluate the model with val set"
     )
     group.add_argument(
