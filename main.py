@@ -66,7 +66,7 @@ def main(args: Namespace, logger: Console) -> None:
                 train_dataset,
                 batch_size=args.batch_size,
                 shuffle=True,
-                num_workers=args.num_cpu,
+                num_workers=0,
                 collate_fn=collate_fn,
             )
         if args.do_eval:
@@ -80,7 +80,7 @@ def main(args: Namespace, logger: Console) -> None:
                 val_dataset,
                 batch_size=args.batch_size,
                 shuffle=False,
-                num_workers=args.num_cpu,
+                num_workers=0,
                 collate_fn=collate_fn,
             )
         if args.do_test:
@@ -94,7 +94,7 @@ def main(args: Namespace, logger: Console) -> None:
                 test_dataset,
                 batch_size=args.batch_size,
                 shuffle=False,
-                num_workers=args.num_cpu,
+                num_workers=0,
                 collate_fn=collate_fn,
             )
 
