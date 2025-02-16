@@ -98,6 +98,14 @@ def main(args: Namespace, logger: Console) -> None:
                 collate_fn=collate_fn,
             )
 
+        console.log("Data prepared:")
+        if train_loader is not None:
+            console.log(f"Train data: {len(train_loader)} batches")
+        if val_loader is not None:
+            console.log(f"Val data: {len(val_loader)} batches")
+        if test_loader is not None:
+            console.log(f"Test data: {len(test_loader)} batches")
+
 
 if __name__ == "__main__":
     args = parse_args()
