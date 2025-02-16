@@ -69,7 +69,7 @@ def main(args: Namespace, logger: Console) -> None:
                 num_workers=args.num_cpu,
                 collate_fn=collate_fn,
             )
-        if args.do_val:
+        if args.do_eval:
             val_dataset = GLMFDataset(
                 data=dataset.val_data,
                 tokenizer=dataset.llm_tokenizer,
