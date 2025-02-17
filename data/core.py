@@ -518,7 +518,7 @@ Here is the graph:
         )
         return text, response, task_prompt
 
-    def add_fuzz_tags(self, code: str, tag: str = "|fuzz|") -> str:
+    def add_fuzz_tags(self, code: str, tag: str = "fuzz") -> str:
 
         # print(code)
         try:
@@ -543,20 +543,20 @@ Here is the graph:
             if start_line == end_line:
                 lines[start_line - 1] = (
                     lines[start_line - 1][:start_col]
-                    + f"<{tag}>"  # <|fuzz|>
+                    + f"<|{tag}|>"  # <|fuzz|>
                     + lines[start_line - 1][start_col:end_col]
-                    + f"</{tag}>"  # </|fuzz|>
+                    + f"<|/{tag}|>"  # </|fuzz|>
                     + lines[start_line - 1][end_col:]
                 )
             else:
                 lines[start_line - 1] = (
                     lines[start_line - 1][:start_col]
-                    + f"<{tag}>"
+                    + f"<|{tag}|>"
                     + lines[start_line - 1][start_col:]
                 )
                 lines[end_line - 1] = (
                     lines[end_line - 1][:end_col]
-                    + f"</{tag}>"
+                    + f"<|/{tag}|>"
                     + lines[end_line - 1][end_col:]
                 )
         return "\n".join(lines)
