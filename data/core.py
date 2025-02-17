@@ -405,6 +405,7 @@ class Data(object):
                     src_code = file.read()
                 graph = self.read_graph(dat)
                 mask = torch.load(dat["graph"]["mask_path"], weights_only=True)
+                num_tokens = []
                 for testcase in dat["test_cases"].keys():
                     test_code = dat["test_cases"][testcase]["test_case"]
                     test_code = self.add_fuzz_tags(test_code)
@@ -420,6 +421,10 @@ class Data(object):
                         mask=active_node,
                         tokenizer=self.llm_tokenizer,
                     )
+
+                    num_token = len(self.llm_tokenizer.tokenize(full_text)["input_ids"])
+                    num_tokens.append(num_token)
+
                     graph_dict = {
                         key: graph[key]
                         for key in graph.keys()
@@ -436,6 +441,8 @@ class Data(object):
                     self.processed_data.append(data)
         self.logger.log("[green]Data is ready![/green]")
         self.logger.log(f"Size of data data: {len(self.processed_data)}")
+        quartiles = np.quantile(num_tokens, [0, 0.25, 0.5, 0.75, 1])
+        self.logger.log(f"Statistics of # tokens: {quartiles}")
 
     def read_graph(self, data: dict) -> dict:
 
