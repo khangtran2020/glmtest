@@ -422,7 +422,7 @@ class Data(object):
                         tokenizer=self.llm_tokenizer,
                     )
 
-                    num_token = len(self.llm_tokenizer.tokenize(full_text)["input_ids"])
+                    num_token = len(self.llm_tokenizer.tokenize(full_text))
                     num_tokens.append(num_token)
 
                     graph_dict = {
