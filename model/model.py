@@ -1,8 +1,8 @@
-from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer, AutoConfig
+from glmf.model import model
 import torch
 from torch import nn
 from transformers.configuration_utils import PretrainedConfig
-from transformers import AutoConfig
 import os
 from typing import Callable, List, Optional, Tuple, Union
 from transformers import AutoModel, AutoModelForCausalLM
@@ -19,6 +19,7 @@ from datasets import load_dataset, concatenate_datasets, DatasetDict, load_from_
 # from utils.prompter import Prompter
 import transformers
 from gnn import MultiGAT
+from peft import get_peft_model, LoraConfig, TaskType
 
 
 class XCodeConfig(PretrainedConfig):
@@ -33,6 +34,14 @@ class XCodeConfig(PretrainedConfig):
         n_layers=4,
         num_head=8,
         dropout=0.2,
+        dtype="float32",       
+        device_map=None,
+        # LoRA parameters
+        use_lora: bool = False,
+        lora_r: int = 4,
+        lora_alpha: int = 32,
+        lora_dropout: float = 0.1,
+        lora_target_modules: List[str] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -45,6 +54,19 @@ class XCodeConfig(PretrainedConfig):
         self.n_layers = n_layers
         self.num_head = num_head
         self.dropout = dropout
+        self.dtype = dtype          
+        self.device_map = device_map
+
+        if lora_target_modules is None:
+            # This can be adjusted depending on your underlying model's architecture.
+            lora_target_modules = ['q_proj','k_proj','v_proj','o_proj','gate_proj','down_proj','up_proj','lm_head',]
+        self.use_lora = use_lora
+        self.lora_r = lora_r
+        self.lora_alpha = lora_alpha
+        self.lora_dropout = lora_dropout
+        self.lora_target_modules = lora_target_modules
+        
+        # self.dtype = dtype
         self.graph_token_id = [92302, 92303,92304]
         super().__init__(**vlconfig ,**kwargs)
 
@@ -57,16 +79,46 @@ class XCodeModelForCausalLM(XCodeModel, GenerationMixin):
 
     def __init__(self, config: XCodeConfig):
         super().__init__(config)
-        
         self.gnn = MultiGAT(config.mode, config.in_feats, config.n_hidden, config.hidden_size, config.n_layers, config.num_head, config.dropout)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            config.model_name, device_map="auto"
-        )
+        if config.dtype == "float16":
+            self.model = AutoModelForCausalLM.from_pretrained(
+                config.model_name,
+                # load_in_8bit=True,
+                torch_dtype=torch.float16,
+                device_map=config.device_map,
+            )
+        elif config.dtype == "bfloat16":
+            self.model = AutoModelForCausalLM.from_pretrained(
+                config.model_name,
+                # load_in_8bit=True,
+                torch_dtype=torch.bfloat16,
+                device_map=config.device_map,
+            )
+        else:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                config.model_name,
+                # load_in_8bit=True,
+                device_map=config.device_map,
+            )
 
-        import gc  # garbage collect library
+        #LoRA init
 
+        if config.use_lora:
+            lora_config = LoraConfig(
+                r=config.lora_r,
+                lora_alpha=config.lora_alpha,
+                target_modules=config.lora_target_modules,
+                lora_dropout=config.lora_dropout,
+                bias="none",
+                task_type=TaskType.CAUSAL_LM,
+            )
+            self.model = get_peft_model(self.model, lora_config)
+
+        # del self.model
+        import gc
         gc.collect()
         torch.cuda.empty_cache()
+
     def forward(
         self,
         input_ids: Optional[torch.LongTensor] = None,
@@ -83,8 +135,8 @@ class XCodeModelForCausalLM(XCodeModel, GenerationMixin):
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
-        print("Start")
-        print(inputs_embeds)
+        # print("Start")
+        # print(inputs_embeds)
 
     
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
@@ -97,60 +149,35 @@ class XCodeModelForCausalLM(XCodeModel, GenerationMixin):
             raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
 
         if inputs_embeds is None:
-            inputs_embeds = self.model.model.embed_tokens(input_ids)
-            print("Test Inputs Before")
+            # inputs_embeds = self.model.model.embed_tokens(input_ids)
+            inputs_embeds = self.model.get_input_embeddings()(input_ids)
+            print(inputs_embeds.device)
+            # print("Test Inputs Before")
             print(inputs_embeds.size())
-            print(inputs_embeds)
 
         if graph is not None:
             assert graph_mask is not None
-            print("Test Graph")
+            # print("Test Graph")
             index = torch.where(input_ids == self.config.graph_token_id[1])[1]
             graph_embeds = self.gnn(graph, graph_mask).to(inputs_embeds.device)
-            print(graph_embeds)
-            print(graph_embeds.size())
+            # graph_embeds = self.gnn(graph, graph_mask)
+            # print(graph_embeds)
+            print("Graph_embeds: ", graph_embeds.size())
             # assert graph_embeds.size(2) == inputs_embeds.size(2)
-            print(index)
+            
+            inputs_embeds[0, index[0]:(index[-1]+1), :] = graph_embeds
+            del graph_embeds
 
-        print(inputs_embeds)
-        left = inputs_embeds[:, :index, :]   # Shape: (batch_size, index, embedding_dim)
-        print(left.size())
-        right = inputs_embeds[:, index:, :]   # Shape: (batch_size, seq_length-index, embedding_dim)
-        print(right.size())
-        
-        graph_embeds = graph_embeds.unsqueeze(0)
-        print(graph_embeds.size())
-        
-        inputs_embeds = torch.cat((left, graph_embeds, right), dim=1)
-        # inputs_embeds[0, index, :] = graph_embeds
-        print("Test Inputs After")
-        print(inputs_embeds.size())
-        print(inputs_embeds)
-        
-        attention_mask = torch.ones(inputs_embeds.size()).to(self.model.device)
-        hidden_states = inputs_embeds
-        print("Position Id")
-        print(position_ids)
-        print(position_ids.size())
-
-        position_ids = torch.arange(inputs_embeds.size(1)).unsqueeze(0).to(self.model.device)
-        print(position_ids)
-        print(position_ids.size())
+        # print(inputs_embeds.size())
         
         output = self.model(
-            inputs_embeds=inputs_embeds.to(self.model.device),
-            # inputs_embeds = hidden_states.to(self.model.device),
-            hidden_states = hidden_states,
+            input_ids = None,
+            inputs_embeds=inputs_embeds,
             position_ids=position_ids,
             attention_mask=attention_mask,
             use_cache=False,
             labels=labels,
-            graph=None,
         )
-        print("Output")
-        print(output)
-        # hidden_states = output[0]
-
         return output
 
     def prepare_inputs_for_generation(
