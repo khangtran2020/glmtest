@@ -125,10 +125,6 @@ if __name__ == "__main__":
                         help="Path to the pre-trained model directory (for VL model).")
     parser.add_argument("--data", type=str, required=True,
                         help="Path to the JSON dataset file.")
-    parser.add_argument("--graph_data", type=str, required=True,
-                        help="Path to the graph data file (torch format).")
-    parser.add_argument("--graph_masks", type=str, required=True,
-                        help="Path to the graph masks file (torch format).")
     parser.add_argument("--output_dir", type=str, required=True,
                         help="Directory to save the trained model and tokenizer.")
     parser.add_argument("--use_lora", action="store_true",default = False,
