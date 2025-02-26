@@ -16,6 +16,11 @@ class CodeDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
+        # print("Idx:", idx)
+        # print("graph: ", self.graph_list[idx])
+        # print(len(self.graph_list))
+        # print("masks: ", self.graph_mask)
+        # print("masks Size: ", len(self.graph_mask[idx]))
         sample = self.data[idx]
         graph = self.graph_list[idx]
         
@@ -31,7 +36,7 @@ class CodeDataset(Dataset):
             # return_tensors="pt"
         )
 
-        print(tokenized["labels"].size())
+        # print(tokenized["labels"].size())
         tokenized_user_prompt = self.tokenizer(sample["input"])
         user_prompt_len = len(tokenized_user_prompt["input_ids"])
 
@@ -42,6 +47,15 @@ class CodeDataset(Dataset):
         ]], dim=1).long()
         
         
+        
+        
+        # graph = self.graph_list[idx]
+        # # for key in graph:
+        # for key in graph.keys():
+        #     graph[key].ndata['feat'] = graph[key].ndata['feat'].to(torch.float16)
+
+        
+        
         input_ids = tokenized["input_ids"]
         if self.graph_token_id in input_ids:
             has_graph = True
@@ -50,6 +64,16 @@ class CodeDataset(Dataset):
         
         return {
             "input": tokenized,
+            # "attention_mask": tokenized["attention_mask"],
+            # "labels": self.tokenizer(
+            #     sample["response"],
+            #     # max_length=self.max_seq_length,
+            #     # padding="max_length",
+            #     # truncation=True,
+            #     return_tensors="pt"
+            # )["input_ids"],
+            # "graph": self.graph_list,  # Should be a dictionary of graph structures
+            # "graph_mask": torch.tensor(self.graph_mask, dtype=torch.float)
             "graph": graph,  # Should be a dictionary of graph structures
             "graph_mask": torch.tensor(self.graph_mask[idx], dtype=torch.float)
         }
@@ -87,18 +111,3 @@ class CodeDataset(Dataset):
         result["labels"] = result["input_ids"].clone()
     
         return result
-    
-def collate_fn(batch):
-    collated_input = {}
-    for key in batch[0]["input"]:
-        # Stack the tensors corresponding to the same key across the batch
-        collated_input[key] = torch.stack([sample["input"][key] for sample in batch])
-    collated = {
-        "input": collated_input,
-        # "attention_mask": torch.stack([x["attention_mask"] for x in batch]),
-        # "labels": torch.stack([x["labels"] for x in batch]),
-        "graph_mask": torch.stack([x["graph_mask"] for x in batch]),
-        # Leave the graph as a list of dictionaries (or process as needed for your GNN)
-        "graph": [x["graph"] for x in batch],
-    }
-    return collated
