@@ -25,6 +25,7 @@ class TestGenEval(Data):
         tokenizer: PreTrainedTokenizer,
         llm_tokenizer: PreTrainedTokenizer,
         debug: bool = False,
+        baseline_prompt: str = "code",
     ) -> None:
         self.name = "TestGenEval"
         super().__init__(
@@ -37,6 +38,7 @@ class TestGenEval(Data):
             llm_tokenizer=llm_tokenizer,
             num_cpu=-1,
             debug=debug,
+            baseline_prompt=baseline_prompt,
         )
         self.data_path = os.path.join(path, self.name)
         self.debug = debug

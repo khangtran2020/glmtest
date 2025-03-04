@@ -1,0 +1,5 @@
+GRAPH_START_TOKEN = "<|graph_start|>"
+GRAPH_PAD_TOKEN = "<|graph_pad|>"
+GRAPH_END_TOKEN = "<|graph_end|>"
+FUZZ_START_TOKEN = "<|fuzz|>"
+FUZZ_END_TOKEN = "<|/fuzz|>"

@@ -30,6 +30,7 @@ def main(args: Namespace, logger: Console) -> None:
         docker_image=args.docker_image,
         num_cpu=args.num_cpu,
         graph=graph,
+        baseline_prompt=args.baseline_prompt,
         debug=args.debug,
     )
     if dataset is None:

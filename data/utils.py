@@ -4,6 +4,13 @@ from data.codamosa_data import Codamosa
 from data.testgeneval_data import TestGenEval
 from graph.joerngraph import JoernGraph
 from transformers import AutoTokenizer, AutoModel
+from utils.constant import (
+    GRAPH_START_TOKEN,
+    GRAPH_PAD_TOKEN,
+    GRAPH_END_TOKEN,
+    FUZZ_START_TOKEN,
+    FUZZ_END_TOKEN,
+)
 
 # typing
 from data.core import Data
@@ -20,6 +27,7 @@ def get_dataset(
     docker_image: str = None,
     num_cpu: int = -1,
     graph: JoernGraph = None,
+    baseline_prompt: str = "code",
     debug: bool = False,
 ) -> Data:
 
@@ -33,11 +41,11 @@ def get_dataset(
     llm_tokenizer.add_special_tokens(
         {
             "additional_special_tokens": [
-                "<|graph_start|>",
-                "<|graph_pad|>",
-                "<|graph_end|>",
-                "<|fuzz|>",
-                "<|/fuzz|>",
+                GRAPH_START_TOKEN,
+                GRAPH_PAD_TOKEN,
+                GRAPH_END_TOKEN,
+                FUZZ_START_TOKEN,
+                FUZZ_END_TOKEN,
             ]
         }
     )

@@ -33,6 +33,12 @@ def add_data_group(group):
         help="model to extract node features",
         default="Salesforce/codet5p-110m-embedding",
     )
+    group.add_argument(
+        "--baseline_prompt",
+        type=str,
+        help="baseline of input prompts",
+        default="code",
+    )
 
 
 def add_joern_group(group):

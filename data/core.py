@@ -12,6 +12,7 @@ from graph.core import Graph
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from branch.utils import run_coverage
 from utils.utils import run_command, get_index_by_value
+from utils.code_analyzer import analyze_code, remove_method_from_class
 from sklearn.preprocessing import LabelEncoder
 from copy import deepcopy
 
@@ -20,6 +21,33 @@ from typing import List, Union, Dict
 
 PYNGUIN_TEMPLATE = """docker run --rm -v {}:/input:ro -v {}:/output -v {}:/package:ro {} \
     --module-name {} --coverage_metrics BRANCH --maximum_search_time {} --report-dir /output --project_path /input --output-path /output --output_variables TargetModule,CoverageTimeline --assertion-generation NONE"""
+
+PROMPT_CODE = """Generate the test case for the code below:
+```python
+{}
+```
+"""
+
+PROMPT_GRAPH = """Generate the test case for the graph embedding of a targeted execution branch below:
+{}
+"""
+
+PROMPT_CODE_GRAPH = """Generate the test case for the code below and the corresponding graph embedding of a targeted execution branch:
+
+Here is the code:
+```python
+{}
+```
+
+Here is the graph embedding:
+{}
+"""
+
+RESPONSE_TEMPLATE = """Here is the test case:
+```python
+{}
+```
+"""
 
 
 class Data(object):
@@ -61,6 +89,7 @@ class Data(object):
         llm_tokenizer: PreTrainedTokenizer = None,
         coverage_image: str = "coverage",
         debug: bool = False,
+        baseline_prompt: str = "code",
     ) -> None:
         self.name = name  # name of the data
         self.path = path  # path of the raw data
@@ -72,6 +101,7 @@ class Data(object):
         self.feat_tokenizer = feat_tokenizer
         self.llm_tokenizer = llm_tokenizer
         self.coverage_image = coverage_image
+        self.baseline_prompt = baseline_prompt
 
     def crawl(self) -> None:
         """
@@ -493,22 +523,29 @@ class Data(object):
         src_code: str,
         testcase_out: str,
         mask: torch.Tensor,
+        branch: List,
         tokenizer: PreTrainedTokenizer,
     ):
+
         graph_pad = "<|graph_pad|>" * mask.size(0)
-        text = f"""\
-Generate the test case for the code below:
-```
-{src_code}
-```
-Here is the graph:
-```
-<|graph_start|>{graph_pad}<|graph_end|>"
-```
-        """
-        response = f"""\
-{testcase_out}
-        """
+        if self.baseline_prompt == "code":
+            text = PROMPT_CODE.format(src_code)
+            response = RESPONSE_TEMPLATE.format(testcase_out)
+        elif self.baseline_prompt == "graph":
+            text = PROMPT_GRAPH.format(graph_pad)
+            response = RESPONSE_TEMPLATE.format(testcase_out)
+        elif self.baseline_prompt == "code_graph":
+            text = PROMPT_CODE_GRAPH.format(src_code, graph_pad)
+            response = RESPONSE_TEMPLATE.format(testcase_out)
+        elif self.baseline_prompt == "code_tr":
+            trucated_code = self.truncate_code(src_code=src_code, branch=branch)
+            text = PROMPT_CODE.format(trucated_code)
+            response = RESPONSE_TEMPLATE.format(testcase_out)
+        elif self.baseline_prompt == "graph_tr":
+            trucated_code = self.truncate_code(src_code=src_code, branch=branch)
+            text = PROMPT_CODE_GRAPH.format(trucated_code, graph_pad)
+            response = RESPONSE_TEMPLATE.format(testcase_out)
+
         task_prompt = tokenizer.apply_chat_template(
             [
                 {"role": "user", "content": text},
@@ -582,3 +619,87 @@ Here is the graph:
         self.logger.log(
             f"Size of training data: {len(self.train_data)}, Validation data: {len(self.val_data)}, Test data: {len(self.test_data)}"
         )
+
+    def truncate_code(self, src_code: str, branch: list) -> str:
+
+        code_info = analyze_code(src_code)
+        imports = ""
+        for imp, pack in code_info["imports"]:
+            packs = ", ".join(pack)
+            if "from" in imp:
+                imports += f"{imp} import {packs}\n"
+            else:
+                imports += f"{imp} {packs}\n"
+
+        func_checked = []
+        class_checked = {}
+
+        for item in branch:
+            for line in item:
+
+                found = False
+                # Get the functions containing the line
+                for func in code_info["functions"]:
+                    if (
+                        (func["start_line"] <= line)
+                        and (line <= func["end_line"])
+                        and (func["name"] not in func_checked)
+                    ):
+                        # body += func["code"] + "\n\n"
+                        func_checked.append(func["name"])
+                        found = True
+                if found:
+                    continue
+
+                # Get the class content that contains the line
+                for class_item in code_info["classes"]:
+                    if (class_item["start_line"] <= line) and (
+                        line <= class_item["end_line"]
+                    ):
+                        # print(class_item['name'])
+                        if class_item["name"] not in class_checked.keys():
+                            class_check_info = {"class": True, "method_checked": []}
+                        else:
+                            class_check_info = class_checked[class_item["name"]]
+
+                        for func in class_item["methods"]:
+                            if (
+                                (func["start_line"] <= line)
+                                and (line <= func["end_line"])
+                                and (
+                                    func["name"]
+                                    not in class_check_info["method_checked"]
+                                )
+                            ):
+                                class_check_info["method_checked"].append(func["name"])
+                                found = True
+                        class_checked[class_item["name"]] = class_check_info
+                if found:
+                    continue
+
+        body = ""
+        for func in code_info["functions"]:
+            if func["name"] in func_checked:
+                body += func["code"] + "\n\n"
+
+        for class_item in code_info["classes"]:
+
+            if class_item["name"] in class_checked.keys():
+
+                # print(class_item)
+                body += class_item["code"] + "\n\n"
+                # print(body)
+
+                for func in class_item["methods"]:
+                    if (
+                        func["name"]
+                        not in class_checked[class_item["name"]]["method_checked"]
+                    ):
+                        body = remove_method_from_class(
+                            code=body,
+                            class_name=class_item["name"],
+                            method_name=func["name"],
+                        )
+
+        truncated_code = f"{imports}\n{body}"
+        return truncated_code
