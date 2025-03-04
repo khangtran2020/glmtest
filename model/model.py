@@ -1,40 +1,35 @@
-from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer, AutoConfig
-from glmf.model import model
-import torch
-from torch import nn
-from transformers.configuration_utils import PretrainedConfig
 import os
-from typing import Callable, List, Optional, Tuple, Union
-from transformers import AutoModel, AutoModelForCausalLM
+import torch
+
+from transformers import AutoModelForCausalLM, AutoConfig
+from transformers.configuration_utils import PretrainedConfig
+from transformers import AutoModelForCausalLM
 from transformers.modeling_utils import PreTrainedModel
 from transformers.configuration_utils import PretrainedConfig
 from transformers.generation.utils import GenerationMixin
-# from .config import XCodeConfig
-import torch.nn as nn
-import torch
-from transformers.modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
+from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.cache_utils import Cache
-from transformers import set_seed
-from datasets import load_dataset, concatenate_datasets, DatasetDict, load_from_disk
+
 # from utils.prompter import Prompter
-import transformers
-from gnn import MultiGAT
+from model.gnn import MultiGAT
 from peft import get_peft_model, LoraConfig, TaskType
 
+# typing
+from typing import Callable, List, Optional, Tuple, Union
 
-class XCodeConfig(PretrainedConfig):
-    model_type = "xcode"
+
+class GLMFModelConfig(PretrainedConfig):
 
     def __init__(
         self,
-        vlmodel = f"../Qwen2-VL-7B-Testcase",
-        mode = "node",
+        llm_model=f"../Qwen2-VL-7B-Testcase",
+        mode="node",
         in_feats=772,
         n_hidden=512,
         n_layers=4,
         num_head=8,
         dropout=0.2,
-        dtype="float32",       
+        dtype="float32",
         device_map=None,
         # LoRA parameters
         use_lora: bool = False,
@@ -45,41 +40,62 @@ class XCodeConfig(PretrainedConfig):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        vlconfig = AutoConfig.from_pretrained(vlmodel).to_dict()
-        self.model_name = vlconfig["_name_or_path"]
+        config = AutoConfig.from_pretrained(llm_model).to_dict()
+        self.model_name = config["_name_or_path"]
         self.mode = mode
-        self.hidden_size = vlconfig["hidden_size"]
+        self.hidden_size = config["hidden_size"]
         self.in_feats = in_feats
-        self.n_hidden= n_hidden        
+        self.n_hidden = n_hidden
         self.n_layers = n_layers
         self.num_head = num_head
         self.dropout = dropout
-        self.dtype = dtype          
+        self.dtype = dtype
         self.device_map = device_map
 
         if lora_target_modules is None:
             # This can be adjusted depending on your underlying model's architecture.
-            lora_target_modules = ['q_proj','k_proj','v_proj','o_proj','gate_proj','down_proj','up_proj','lm_head',]
+            lora_target_modules = [
+                "q_proj",
+                "k_proj",
+                "v_proj",
+                "o_proj",
+                "gate_proj",
+                "down_proj",
+                "up_proj",
+                "lm_head",
+            ]
         self.use_lora = use_lora
         self.lora_r = lora_r
         self.lora_alpha = lora_alpha
         self.lora_dropout = lora_dropout
         self.lora_target_modules = lora_target_modules
-        
+
         # self.dtype = dtype
-        self.graph_token_id = [92302, 92303,92304]
-        super().__init__(**vlconfig ,**kwargs)
+        self.graph_token_id = [92302, 92303, 92304]
+        super().__init__(**config, **kwargs)
 
 
-class XCodeModel(PreTrainedModel):
+class GLMFModel(PreTrainedModel):
     pass
 
-class XCodeModelForCausalLM(XCodeModel, GenerationMixin):
-    config_class = XCodeConfig
 
-    def __init__(self, config: XCodeConfig):
+class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
+
+    config_class = GLMFModelConfig
+
+    def __init__(self, config: GLMFModelConfig):
+
         super().__init__(config)
-        self.gnn = MultiGAT(config.mode, config.in_feats, config.n_hidden, config.hidden_size, config.n_layers, config.num_head, config.dropout)
+
+        self.gnn = MultiGAT(
+            config.mode,
+            config.in_feats,
+            config.n_hidden,
+            config.hidden_size,
+            config.n_layers,
+            config.num_head,
+            config.dropout,
+        )
         if config.dtype == "float16":
             self.model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
@@ -101,7 +117,7 @@ class XCodeModelForCausalLM(XCodeModel, GenerationMixin):
                 device_map=config.device_map,
             )
 
-        #LoRA init
+        # LoRA init
 
         if config.use_lora:
             lora_config = LoraConfig(
@@ -116,6 +132,7 @@ class XCodeModelForCausalLM(XCodeModel, GenerationMixin):
 
         # del self.model
         import gc
+
         gc.collect()
         torch.cuda.empty_cache()
 
@@ -138,15 +155,24 @@ class XCodeModelForCausalLM(XCodeModel, GenerationMixin):
         # print("Start")
         # print(inputs_embeds)
 
-    
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
         )
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        output_hidden_states = (
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
+        )
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         if (input_ids is None) ^ (inputs_embeds is not None):
-            raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
+            raise ValueError(
+                "You must specify exactly one of input_ids or inputs_embeds"
+            )
 
         if inputs_embeds is None:
             # inputs_embeds = self.model.model.embed_tokens(input_ids)
@@ -164,14 +190,14 @@ class XCodeModelForCausalLM(XCodeModel, GenerationMixin):
             # print(graph_embeds)
             print("Graph_embeds: ", graph_embeds.size())
             # assert graph_embeds.size(2) == inputs_embeds.size(2)
-            
-            inputs_embeds[0, index[0]:(index[-1]+1), :] = graph_embeds
+
+            inputs_embeds[0, index[0] : (index[-1] + 1), :] = graph_embeds
             del graph_embeds
 
         # print(inputs_embeds.size())
-        
+
         output = self.model(
-            input_ids = None,
+            input_ids=None,
             inputs_embeds=inputs_embeds,
             position_ids=position_ids,
             attention_mask=attention_mask,
@@ -181,14 +207,20 @@ class XCodeModelForCausalLM(XCodeModel, GenerationMixin):
         return output
 
     def prepare_inputs_for_generation(
-        self, input_ids, past_key_values=None, attention_mask=None, inputs_embeds=None, **kwargs
+        self,
+        input_ids,
+        past_key_values=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        **kwargs,
     ):
-        return self.model.prepare_inputs_for_generation(input_ids, past_key_values, attention_mask, inputs_embeds, **kwargs)
-
+        return self.model.prepare_inputs_for_generation(
+            input_ids, past_key_values, attention_mask, inputs_embeds, **kwargs
+        )
 
     @staticmethod
-    def _reorder_cache(self,past_key_values, beam_idx):
-      return self.model._reorder_cache(past_key_values, beam_idx)
+    def _reorder_cache(self, past_key_values, beam_idx):
+        return self.model._reorder_cache(past_key_values, beam_idx)
 
     def save_pretrained(
         self,
@@ -206,7 +238,7 @@ class XCodeModelForCausalLM(XCodeModel, GenerationMixin):
         state_dict = {}
         # Remove the middle model
         for key in self.state_dict().keys():
-            #if not key.startswith("middle"):
+            # if not key.startswith("middle"):
             state_dict[key] = self.state_dict()[key]
 
         # Save the encoder-decoder model
