@@ -105,12 +105,6 @@ def add_training_group(group):
         help="evaluate the model",
     )
     group.add_argument(
-        "--batch_size",
-        type=int,
-        help="batch size",
-        default=1,
-    )
-    group.add_argument(
         "--learning_rate",
         type=float,
         help="learning rate",

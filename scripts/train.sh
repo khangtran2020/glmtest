@@ -1,0 +1,18 @@
+python main.py --mode train \
+    --seed 42 \
+    --data_path Dataset \
+    --data testgeneval \
+    --baseline_prompt code_tr \
+    --llm_model "HuggingFaceTB/SmolLM2-135M-Instruct" \
+    --max_seq_len 8192 \
+    --batch_size 1 \
+    --gradient_accumulation_steps 4 \
+    --num_gpu 1 \
+    --output_dir "./results/models/" \
+    --overwrite_output_dir \
+    --do_train \
+    --do_eval \
+    --learning_rate 5e-5 \
+    --max_grad_norm 1.0 \
+    --num_train_epochs 1 \
+    --dtype bfloat16
