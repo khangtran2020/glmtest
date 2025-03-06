@@ -105,7 +105,7 @@ def main(args: Namespace, logger: Console, device: torch.device) -> None:
         trainer = initialize_trainer_single_gpu(
             model=model,
             train_dataset=train_dataset,
-            val_dataset=val_dataset,
+            valid_dataset=val_dataset,
             tokenizer=tokenizer,
             args=args,
         )

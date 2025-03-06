@@ -473,6 +473,8 @@ class Data(object):
                     self.processed_data.append(data)
         self.logger.log("[green]Data is ready![/green]")
         self.logger.log(f"Size of data data: {len(self.processed_data)}")
+        if self.debug:
+            self.logger.log(f"Sample prompt: {full_text}")
         quartiles = np.quantile(num_tokens, [0, 0.25, 0.5, 0.75, 1])
         self.logger.log(f"Statistics of # tokens: {quartiles}")
 
