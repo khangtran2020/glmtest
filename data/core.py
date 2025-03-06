@@ -56,6 +56,15 @@ class FuzzTagTransformer(ast.NodeTransformer):
     def __init__(self, tag: str):
         self.tag = tag
 
+    def visit_UnaryOp(self, node):
+        if isinstance(node.op, ast.USub) and isinstance(node.operand, ast.Constant):
+            if isinstance(node.operand.value, (int, float)):
+                node.operand.value = (
+                    f"<|{self.tag}|>-{node.operand.value}<|/{self.tag}|>"
+                )
+            return node
+        return self.generic_visit(node)
+
     def visit_Constant(self, node):
         if isinstance(node.value, (int, float, str)):
             node.value = f"<|{self.tag}|>{node.value}<|/{self.tag}|>"
