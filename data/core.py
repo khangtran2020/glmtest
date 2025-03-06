@@ -49,6 +49,18 @@ RESPONSE_TEMPLATE = """Here is the test case:
 ```
 """
 
+import ast
+
+
+class FuzzTagTransformer(ast.NodeTransformer):
+    def __init__(self, tag: str):
+        self.tag = tag
+
+    def visit_Constant(self, node):
+        if isinstance(node.value, (int, float, str)):
+            node.value = f"<|{self.tag}|>{node.value}<|/{self.tag}|>"
+        return node
+
 
 class Data(object):
     """
@@ -561,47 +573,15 @@ class Data(object):
         return text, response, task_prompt
 
     def add_fuzz_tags(self, code: str, tag: str = "fuzz") -> str:
-
-        # print(code)
         try:
             tree = ast.parse(code)
-        except:
+        except SyntaxError:
             return "N/A"
-        locations = []
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Constant):
-                node_location = (
-                    node.lineno,
-                    node.col_offset,
-                    node.end_lineno,
-                    node.end_col_offset,
-                )
-                locations.append(node_location)
-        locations = sorted(locations, key=lambda x: x[0])
-        lines = code.split("\n")
 
-        for loc in locations:
-            start_line, start_col, end_line, end_col = loc
-            if start_line == end_line:
-                lines[start_line - 1] = (
-                    lines[start_line - 1][:start_col]
-                    + f"<|{tag}|>"  # <|fuzz|>
-                    + lines[start_line - 1][start_col:end_col]
-                    + f"<|/{tag}|>"  # </|fuzz|>
-                    + lines[start_line - 1][end_col:]
-                )
-            else:
-                lines[start_line - 1] = (
-                    lines[start_line - 1][:start_col]
-                    + f"<|{tag}|>"
-                    + lines[start_line - 1][start_col:]
-                )
-                lines[end_line - 1] = (
-                    lines[end_line - 1][:end_col]
-                    + f"<|/{tag}|>"
-                    + lines[end_line - 1][end_col:]
-                )
-        return "\n".join(lines)
+        transformer = FuzzTagTransformer(tag)
+        tree = transformer.visit(tree)
+
+        return ast.unparse(tree)
 
     def train_test_split(
         self, val_split: float = 0.1, test_split: float = 0.15
