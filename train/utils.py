@@ -92,10 +92,11 @@ def smart_tokenizer_and_embedding_resize(
     """Resize tokenizer and embedding.
     Note: This is the unoptimized version that may make your embedding size not be divisible by 64.
     """
-    num_new_tokens = (
-        tokenizer.add_special_tokens(special_tokens_dict) - 3
+    num_new_tokens = tokenizer.add_special_tokens(
+        special_tokens_dict
     )  # minus 3 for the three special tokens due to graph tokens
-    print("len(tokenizer)", len(tokenizer))
+    print("len(tokenizer)", len(tokenizer), num_new_tokens)
+    num_new_tokens -= 3
     # model.resize_token_embeddings(len(tokenizer))
 
     if num_new_tokens > 0:
