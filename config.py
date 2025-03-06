@@ -73,13 +73,71 @@ def add_training_group(group):
         default=1,
     )
     group.add_argument(
-        "--do_eval", action="store_true", help="evaluate the model with val set"
+        "--gradient_accumulation_steps",
+        type=int,
+        help="gradient accumulation steps",
+        default=4,
     )
     group.add_argument(
-        "--do_train", action="store_true", help="train the model on the train set"
+        "--num_gpu",
+        type=int,
+        help="number of gpus",
+        default=1,
     )
     group.add_argument(
-        "--do_test", action="store_true", help="test the model in the test set"
+        "output_dir",
+        type=str,
+        help="output directory to save model",
+    )
+    group.add_argument(
+        "--overwrite_output_dir",
+        action="store_true",
+        help="overwrite output directory",
+    )
+    group.add_argument(
+        "--do_train",
+        action="store_true",
+        help="train the model",
+    )
+    group.add_argument(
+        "--do_eval",
+        action="store_true",
+        help="evaluate the model",
+    )
+    group.add_argument(
+        "--batch_size",
+        type=int,
+        help="batch size",
+        default=1,
+    )
+    group.add_argument(
+        "--learning_rate",
+        type=float,
+        help="learning rate",
+        default=5e-5,
+    )
+    group.add_argument(
+        "--max_grad_norm",
+        type=float,
+        help="max gradient norm",
+        default=1.0,
+    )
+    group.add_argument(
+        "--num_train_epochs",
+        type=int,
+        help="number of training epochs",
+        default=3,
+    )
+    group.add_argument(
+        "--dtype",
+        type=str,
+        help="model and data type, float32/bfloat16",
+        default="bfloat16",
+    )
+    group.add_argument(
+        "--resume_from_checkpoint",
+        action="store_true",
+        help="resume from checkpoint",
     )
 
 

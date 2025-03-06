@@ -11,6 +11,7 @@ from utils.constant import (
     FUZZ_START_TOKEN,
     FUZZ_END_TOKEN,
 )
+from model.train import smart_tokenizer_and_embedding_resize
 
 # typing
 from data.core import Data
@@ -37,18 +38,31 @@ def get_dataset(
     model = AutoModel.from_pretrained(feat_model, trust_remote_code=True).to(device)
     tokenizer = AutoTokenizer.from_pretrained(feat_model, trust_remote_code=True)
 
+    special_tokens_dict = {
+        "graph_start_token": GRAPH_START_TOKEN,
+        "graph_pad_token": GRAPH_PAD_TOKEN,
+        "graph_end_token": GRAPH_END_TOKEN,
+        "fuzz_start_token": FUZZ_START_TOKEN,
+        "fuzz_end_token": FUZZ_END_TOKEN,
+    }
+
     llm_tokenizer = AutoTokenizer.from_pretrained(llm_model, trust_remote_code=True)
-    llm_tokenizer.add_special_tokens(
-        {
-            "additional_special_tokens": [
-                GRAPH_START_TOKEN,
-                GRAPH_PAD_TOKEN,
-                GRAPH_END_TOKEN,
-                FUZZ_START_TOKEN,
-                FUZZ_END_TOKEN,
-            ]
-        }
+    smart_tokenizer_and_embedding_resize(
+        special_tokens_dict=special_tokens_dict,
+        tokenizer=llm_tokenizer,
+        model=llm_model,
     )
+    # llm_tokenizer.add_special_tokens(
+    #     {
+    #         "additional_special_tokens": [
+    #             GRAPH_START_TOKEN,
+    #             GRAPH_PAD_TOKEN,
+    #             GRAPH_END_TOKEN,
+    #             FUZZ_START_TOKEN,
+    #             FUZZ_END_TOKEN,
+    #         ]
+    #     }
+    # )
 
     if data_name == "ossfuzz":
         logger.log("Using OSSFuzz dataset")

@@ -5,13 +5,16 @@ from utils.utils import print_args, seed_everything
 from data.utils import get_dataset
 from data.loader import GLMFDataset, collate_fn
 from graph.utils import get_graph
+from train.train_single_gpu import initialize_trainer_single_gpu
+from train.utils import judge_dir
+from model.model import GLMFModelForCausalLM, GLMFModelConfig
 
 # typing
 from argparse import Namespace
 from rich.console import Console
 
 
-def main(args: Namespace, logger: Console) -> None:
+def main(args: Namespace, logger: Console, device: torch.device) -> None:
 
     # init data
 
@@ -49,67 +52,55 @@ def main(args: Namespace, logger: Console) -> None:
         dataset.prepare_data()
         dataset.train_test_split()
 
-        train_dataset = None
-        val_dataset = None
-        test_dataset = None
-        train_loader = None
-        val_loader = None
-        test_loader = None
-
-        if args.do_train:
-            train_dataset = GLMFDataset(
-                data=dataset.train_data,
-                tokenizer=dataset.llm_tokenizer,
-                max_seq_length=args.max_seq_length,
-                debug=args.debug,
-            )
-            train_loader = torch.utils.data.DataLoader(
-                train_dataset,
-                batch_size=args.batch_size,
-                shuffle=True,
-                num_workers=0,
-                collate_fn=collate_fn,
-            )
-        if args.do_eval:
-            val_dataset = GLMFDataset(
-                data=dataset.val_data,
-                tokenizer=dataset.llm_tokenizer,
-                max_seq_length=args.max_seq_length,
-                debug=args.debug,
-            )
-            val_loader = torch.utils.data.DataLoader(
-                val_dataset,
-                batch_size=args.batch_size,
-                shuffle=False,
-                num_workers=0,
-                collate_fn=collate_fn,
-            )
-        if args.do_test:
-            test_dataset = GLMFDataset(
-                data=dataset.test_data,
-                tokenizer=dataset.llm_tokenizer,
-                max_seq_length=args.max_seq_length,
-                debug=args.debug,
-            )
-            test_loader = torch.utils.data.DataLoader(
-                test_dataset,
-                batch_size=args.batch_size,
-                shuffle=False,
-                num_workers=0,
-                collate_fn=collate_fn,
-            )
+        train_dataset = GLMFDataset(
+            data=dataset.train_data,
+            tokenizer=dataset.llm_tokenizer,
+            max_seq_length=args.max_seq_length,
+            debug=args.debug,
+        )
+        val_dataset = GLMFDataset(
+            data=dataset.val_data,
+            tokenizer=dataset.llm_tokenizer,
+            max_seq_length=args.max_seq_length,
+            debug=args.debug,
+        )
 
         console.log("Data prepared:")
-        if train_loader is not None:
-            console.log(f"Train data: {len(train_loader)} batches")
-        if val_loader is not None:
-            console.log(f"Val data: {len(val_loader)} batches")
-        if test_loader is not None:
-            console.log(f"Test data: {len(test_loader)} batches")
+        console.log(f"Train data: {len(train_dataset)} data points")
+        console.log(f"Val data: {len(val_dataset)} data points")
+
+        tokenizer = dataset.llm_tokenizer
+        config = GLMFModelConfig(
+            llm_model=args.model_path,
+            use_lora=args.use_lora,
+            dtype=args.dtype,
+            device_map=device,
+        )
+        model = GLMFModelForCausalLM(config=config)
+        if args.debug:
+            console.log("Model & tokenizer loaded")
+
+        trainer = initialize_trainer_single_gpu(
+            model=model,
+            train_dataset=train_dataset,
+            val_dataset=val_dataset,
+            tokenizer=tokenizer,
+            args=args,
+        )
+        if args.debug:
+            console.log("Trainer initialized")
+
+        if args.resume_from_checkpoint and judge_dir(args.output_dir):
+            trainer.train(resume_from_checkpoint=True)
+        else:
+            trainer.train()
+        trainer.save_state()
+        trainer.save_model(output_dir=args.output_dir)
 
 
 if __name__ == "__main__":
     args = parse_args()
     print_args(args=args)
     seed_everything(args.seed)
-    main(args=args, logger=console)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    main(args=args, logger=console, device=device)

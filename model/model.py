@@ -135,6 +135,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         gc.collect()
         torch.cuda.empty_cache()
+        self.model_type = config.model_type
 
     def forward(
         self,
