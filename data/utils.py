@@ -11,7 +11,6 @@ from utils.constant import (
     FUZZ_START_TOKEN,
     FUZZ_END_TOKEN,
 )
-from train.utils import smart_tokenizer_and_embedding_resize
 
 # typing
 from data.core import Data
@@ -49,11 +48,7 @@ def get_dataset(
     }
 
     llm_tokenizer = AutoTokenizer.from_pretrained(llm_model, trust_remote_code=True)
-    smart_tokenizer_and_embedding_resize(
-        special_tokens_dict=special_tokens_dict,
-        tokenizer=llm_tokenizer,
-        model=llm_model,
-    )
+
     # llm_tokenizer.add_special_tokens(
     #     {
     #         "additional_special_tokens": [

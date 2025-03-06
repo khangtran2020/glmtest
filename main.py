@@ -8,6 +8,14 @@ from graph.utils import get_graph
 from train.train_single_gpu import initialize_trainer_single_gpu
 from train.utils import judge_dir
 from model.model import GLMFModelForCausalLM, GLMFModelConfig
+from train.utils import smart_tokenizer_and_embedding_resize
+from utils.constant import (
+    GRAPH_START_TOKEN,
+    GRAPH_PAD_TOKEN,
+    GRAPH_END_TOKEN,
+    FUZZ_START_TOKEN,
+    FUZZ_END_TOKEN,
+)
 
 # typing
 from argparse import Namespace
@@ -77,6 +85,22 @@ def main(args: Namespace, logger: Console, device: torch.device) -> None:
             device_map=device,
         )
         model = GLMFModelForCausalLM(config=config)
+        special_tokens_dict = {
+            {
+                "additional_special_tokens": [
+                    GRAPH_START_TOKEN,
+                    GRAPH_PAD_TOKEN,
+                    GRAPH_END_TOKEN,
+                    FUZZ_START_TOKEN,
+                    FUZZ_END_TOKEN,
+                ]
+            }
+        }
+        smart_tokenizer_and_embedding_resize(
+            special_tokens_dict=special_tokens_dict,
+            tokenizer=tokenizer,
+            model=model.llm_model,
+        )
         if args.debug:
             console.log("Model & tokenizer loaded")
 

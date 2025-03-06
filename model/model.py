@@ -97,21 +97,21 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             config.dropout,
         )
         if config.dtype == "float16":
-            self.model = AutoModelForCausalLM.from_pretrained(
+            self.llm_model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
                 # load_in_8bit=True,
                 torch_dtype=torch.float16,
                 device_map=config.device_map,
             )
         elif config.dtype == "bfloat16":
-            self.model = AutoModelForCausalLM.from_pretrained(
+            self.llm_model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
                 # load_in_8bit=True,
                 torch_dtype=torch.bfloat16,
                 device_map=config.device_map,
             )
         else:
-            self.model = AutoModelForCausalLM.from_pretrained(
+            self.llm_model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
                 # load_in_8bit=True,
                 device_map=config.device_map,
@@ -128,7 +128,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 bias="none",
                 task_type=TaskType.CAUSAL_LM,
             )
-            self.model = get_peft_model(self.model, lora_config)
+            self.llm_model = get_peft_model(self.llm_model, lora_config)
 
         # del self.model
         import gc
@@ -177,7 +177,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         if inputs_embeds is None:
             # inputs_embeds = self.model.model.embed_tokens(input_ids)
-            inputs_embeds = self.model.get_input_embeddings()(input_ids)
+            inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
             print(inputs_embeds.device)
             # print("Test Inputs Before")
             print(inputs_embeds.size())
@@ -197,7 +197,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         # print(inputs_embeds.size())
 
-        output = self.model(
+        output = self.llm_model(
             input_ids=None,
             inputs_embeds=inputs_embeds,
             position_ids=position_ids,
@@ -215,13 +215,13 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         inputs_embeds=None,
         **kwargs,
     ):
-        return self.model.prepare_inputs_for_generation(
+        return self.llm_model.prepare_inputs_for_generation(
             input_ids, past_key_values, attention_mask, inputs_embeds, **kwargs
         )
 
     @staticmethod
     def _reorder_cache(self, past_key_values, beam_idx):
-        return self.model._reorder_cache(past_key_values, beam_idx)
+        return self.llm_model._reorder_cache(past_key_values, beam_idx)
 
     def save_pretrained(
         self,
