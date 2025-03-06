@@ -34,7 +34,7 @@ def initialize_trainer_single_gpu(
         warmup_ratio=0.01,
         save_strategy="steps",
         save_steps=500,
-        optim="adamw",
+        optim="adamw_torch",
         logging_dir=args.output_dir,
         logging_steps=100,
         report_to="tensorboard",
