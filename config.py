@@ -85,7 +85,7 @@ def add_training_group(group):
         default=1,
     )
     group.add_argument(
-        "output_dir",
+        "--output_dir",
         type=str,
         help="output directory to save model",
     )
