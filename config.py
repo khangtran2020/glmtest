@@ -105,6 +105,11 @@ def add_training_group(group):
         help="evaluate the model",
     )
     group.add_argument(
+        "--use_lora",
+        action="store_true",
+        help="train the model",
+    )
+    group.add_argument(
         "--learning_rate",
         type=float,
         help="learning rate",
