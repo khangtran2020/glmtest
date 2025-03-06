@@ -105,6 +105,11 @@ def add_training_group(group):
         help="evaluate the model",
     )
     group.add_argument(
+        "--do_predict",
+        action="store_true",
+        help="predict the model",
+    )
+    group.add_argument(
         "--use_lora",
         action="store_true",
         help="train the model",

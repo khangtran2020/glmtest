@@ -15,4 +15,5 @@ python main.py --mode train \
     --learning_rate 5e-5 \
     --max_grad_norm 1.0 \
     --num_train_epochs 1 \
-    --dtype bfloat16
+    --dtype bfloat16 \
+    --debug
