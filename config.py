@@ -9,7 +9,7 @@ def add_general_group(group):
         help="mode of the program: data, train, test",
     )
     group.add_argument("--seed", type=int, default=2605, help="seed value")
-    group.add_argument("--debug", type=int, default=1, help="debug mode 1/0")
+    group.add_argument("--debug", action="store_true", help="debug mode")
 
 
 def add_data_group(group):
