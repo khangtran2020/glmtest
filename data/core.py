@@ -443,6 +443,7 @@ class Data(object):
                         continue
                     mask_key = int(testcase.split("_")[-1])
                     branch = mask[mask_key]
+                    branch_line = dat["test_cases"][testcase]["branch"]
                     active_node = get_index_by_value(a=branch, val=1)
 
                     prompt, response, full_text = self.get_prompt(
@@ -450,6 +451,7 @@ class Data(object):
                         testcase_out=test_code,
                         mask=active_node,
                         tokenizer=self.llm_tokenizer,
+                        branch=branch_line,
                     )
 
                     num_token = len(self.llm_tokenizer.tokenize(full_text))
