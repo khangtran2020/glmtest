@@ -39,11 +39,13 @@ def get_dataset(
     tokenizer = AutoTokenizer.from_pretrained(feat_model, trust_remote_code=True)
 
     special_tokens_dict = {
-        "graph_start_token": GRAPH_START_TOKEN,
-        "graph_pad_token": GRAPH_PAD_TOKEN,
-        "graph_end_token": GRAPH_END_TOKEN,
-        "fuzz_start_token": FUZZ_START_TOKEN,
-        "fuzz_end_token": FUZZ_END_TOKEN,
+        "additional_special_tokens": [
+            GRAPH_START_TOKEN,
+            GRAPH_PAD_TOKEN,
+            GRAPH_END_TOKEN,
+            FUZZ_START_TOKEN,
+            FUZZ_END_TOKEN,
+        ]
     }
 
     llm_tokenizer = AutoTokenizer.from_pretrained(llm_model, trust_remote_code=True)
