@@ -11,7 +11,7 @@ from utils.constant import (
     FUZZ_START_TOKEN,
     FUZZ_END_TOKEN,
 )
-from model.train import smart_tokenizer_and_embedding_resize
+from train.utils import smart_tokenizer_and_embedding_resize
 
 # typing
 from data.core import Data
