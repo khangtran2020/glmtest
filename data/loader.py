@@ -27,6 +27,7 @@ class GLMFDataset(Dataset):
         sample = self.data[idx]
         graph = sample["graph"]
         full_text = sample["full_text"]
+        graph_mask = sample["mask"]
 
         # Tokenize text input
         tokenized = self.tokenize(full_text)
@@ -55,7 +56,7 @@ class GLMFDataset(Dataset):
         return {
             "input": tokenized,
             "graph": graph,  # Should be a dictionary of graph structures
-            "graph_mask": torch.tensor(self.graph_mask[idx], dtype=torch.float),
+            "graph_mask": torch.tensor(graph_mask, dtype=torch.float),
         }
 
     def tokenize(self, prompt: str, add_eos_token: bool = True) -> dict:
