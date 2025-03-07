@@ -74,7 +74,7 @@ def analyze_code(code_snippet):
 
 
 def remove_method_from_class(code, class_name, method_name):
-    """Removes a method from a class in the given Python source code."""
+    """Removes a method and its decorators from a class in the given Python source code."""
     lines = code.splitlines()
     try:
         tree = ast.parse(code)
@@ -93,10 +93,15 @@ def remove_method_from_class(code, class_name, method_name):
                     isinstance(subnode, (ast.FunctionDef, ast.AsyncFunctionDef))
                     and subnode.name == method_name
                 ):
-                    # Remove the method lines
-                    for i in range(subnode.lineno - 1, subnode.end_lineno):
+                    # Remove method including decorators
+                    start_lineno = subnode.lineno - 1
+                    end_lineno = subnode.end_lineno
+                    if subnode.decorator_list:
+                        start_lineno = subnode.decorator_list[0].lineno - 1
+
+                    for i in range(start_lineno, end_lineno):
                         new_code_lines[i] = ""
 
-    # Rebuild the source code without the method
+    # Rebuild the source code without the method and its decorators
     cleaned_code = "\n".join([line for line in new_code_lines])
     return cleaned_code
