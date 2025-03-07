@@ -73,6 +73,7 @@ def get_dataset(
             tokenizer=tokenizer,
             llm_tokenizer=llm_tokenizer,
             graph=graph,
+            baseline_prompt=baseline_prompt,
             debug=debug,
         )
     elif data_name == "testgeneval":
@@ -84,6 +85,7 @@ def get_dataset(
             model=model,
             tokenizer=tokenizer,
             llm_tokenizer=llm_tokenizer,
+            baseline_prompt=baseline_prompt.
             debug=debug,
         )
     else:
