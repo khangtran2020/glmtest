@@ -79,7 +79,7 @@ def main(args: Namespace, logger: Console, device: torch.device) -> None:
 
         tokenizer = dataset.llm_tokenizer
         config = GLMFModelConfig(
-            model=args.llm_model,
+            llm_model=args.llm_model,
             use_lora=args.use_lora,
             dtype=args.dtype,
             device_map=device,

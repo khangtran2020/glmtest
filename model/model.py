@@ -22,7 +22,7 @@ class GLMFModelConfig(PretrainedConfig):
 
     def __init__(
         self,
-        model: str,
+        llm_model: str,
         mode: str = "node",
         in_feats: int = 772,
         n_hidden: int = 512,
@@ -39,8 +39,8 @@ class GLMFModelConfig(PretrainedConfig):
         lora_target_modules: List[str] = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        config = AutoConfig.from_pretrained(model).to_dict()
+        # super().__init__(**kwargs)
+        config = AutoConfig.from_pretrained(llm_model).to_dict()
         self.model_name = config["_name_or_path"]
         self.mode = mode
         self.hidden_size = config["hidden_size"]
@@ -73,6 +73,11 @@ class GLMFModelConfig(PretrainedConfig):
         # self.dtype = dtype
         self.graph_token_id = [92302, 92303, 92304]
         super().__init__(**config, **kwargs)
+
+    def to_diff_dict(self):
+        # Instead of comparing with a default instance (which fails),
+        # simply return the full dict.
+        return self.to_dict()
 
 
 class GLMFModel(PreTrainedModel):
