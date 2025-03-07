@@ -15,7 +15,6 @@ def initialize_trainer_single_gpu(
     model: GLMFModelForCausalLM,
     tokenizer: PreTrainedTokenizer,
 ) -> Trainer:
-    pass
 
     training_args = TrainingArguments(
         output_dir=args.output_dir,
