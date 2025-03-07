@@ -686,6 +686,8 @@ class Data(object):
 
         for class_item in code_info["classes"]:
 
+            body += "\n\n"
+
             if class_item["name"] in class_checked.keys():
 
                 # print(class_item)
