@@ -696,4 +696,6 @@ class Data(object):
                         )
 
         truncated_code = f"{imports}\n{body}"
+        if self.debug:
+            self.logger.log(f"Truncated code: {truncated_code == src_code}")
         return truncated_code
