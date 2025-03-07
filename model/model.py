@@ -22,7 +22,7 @@ class GLMFModelConfig(PretrainedConfig):
 
     def __init__(
         self,
-        llm_model: str,
+        model: str,
         mode: str = "node",
         in_feats: int = 772,
         n_hidden: int = 512,
@@ -40,8 +40,7 @@ class GLMFModelConfig(PretrainedConfig):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        config = AutoConfig.from_pretrained(llm_model).to_dict()
-        self.llm_model = llm_model
+        config = AutoConfig.from_pretrained(model).to_dict()
         self.model_name = config["_name_or_path"]
         self.mode = mode
         self.hidden_size = config["hidden_size"]

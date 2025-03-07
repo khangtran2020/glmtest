@@ -79,13 +79,14 @@ def main(args: Namespace, logger: Console, device: torch.device) -> None:
 
         tokenizer = dataset.llm_tokenizer
         config = GLMFModelConfig(
-            llm_model=args.llm_model,
+            model=args.llm_model,
             use_lora=args.use_lora,
             dtype=args.dtype,
             device_map=device,
         )
         if args.debug:
             console.log(f"Model config initialized: {config}")
+
         model = GLMFModelForCausalLM(config=config)
         if args.debug:
             console.log(f"Model initialized with config: {config}")
