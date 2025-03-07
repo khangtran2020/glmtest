@@ -84,6 +84,8 @@ def main(args: Namespace, logger: Console, device: torch.device) -> None:
             dtype=args.dtype,
             device_map=device,
         )
+        if args.debug:
+            console.log(f"Model config initialized: {config}")
         model = GLMFModelForCausalLM(config=config)
         if args.debug:
             console.log(f"Model initialized with config: {config}")
