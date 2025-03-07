@@ -80,7 +80,6 @@ def remove_method_from_class(code, class_name, method_name):
         tree = ast.parse(code)
     except SyntaxError as e:
         print(f"Syntax Error: {e}")
-        print(code)
         return code
     new_code_lines = lines[:]
 
