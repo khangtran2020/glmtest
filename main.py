@@ -85,6 +85,8 @@ def main(args: Namespace, logger: Console, device: torch.device) -> None:
             device_map=device,
         )
         model = GLMFModelForCausalLM(config=config)
+        if args.debug:
+            console.log(f"Model initialized with config: {config}")
         special_tokens_dict = {
             "additional_special_tokens": [
                 GRAPH_START_TOKEN,
