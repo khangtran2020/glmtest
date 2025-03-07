@@ -22,7 +22,7 @@ class GLMFModelConfig(PretrainedConfig):
 
     def __init__(
         self,
-        llm_model: str,
+        llm_model: str = "Qwen/CodeQwen1.5-7B-Chat",
         mode: str = "node",
         in_feats: int = 772,
         n_hidden: int = 512,
