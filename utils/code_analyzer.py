@@ -91,5 +91,5 @@ def remove_method_from_class(code, class_name, method_name):
                         new_code_lines[i] = ""
 
     # Rebuild the source code without the method
-    cleaned_code = "\n".join([line for line in new_code_lines if line.strip()])
+    cleaned_code = "\n".join([line for line in new_code_lines])
     return cleaned_code
