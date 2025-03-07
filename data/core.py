@@ -466,7 +466,7 @@ class Data(object):
                     branch = mask[mask_key]
                     branch_line = dat["test_cases"][testcase]["branch"]
                     active_node = get_index_by_value(a=branch, val=1)
-                    self.logger.log("Preparing prompts for {}...".format(testcase))
+                    # self.logger.log("Preparing prompts for {}...".format(testcase))
                     prompt, response, full_text = self.get_prompt(
                         src_code=src_code,
                         testcase_out=test_code,
@@ -554,6 +554,9 @@ class Data(object):
         tokenizer: PreTrainedTokenizer,
     ):
 
+        self.logger.log(
+            f"Preparing prompts with baseline_prompt: {self.baseline_prompt}"
+        )
         graph_pad = "<|graph_pad|>" * mask.size(0)
         if self.baseline_prompt == "code":
             text = PROMPT_CODE.format(src_code)
