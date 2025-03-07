@@ -76,7 +76,12 @@ def analyze_code(code_snippet):
 def remove_method_from_class(code, class_name, method_name):
     """Removes a method from a class in the given Python source code."""
     lines = code.splitlines()
-    tree = ast.parse(code)
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        print(f"Syntax Error: {e}")
+        print(code)
+        return code
     new_code_lines = lines[:]
 
     for node in ast.walk(tree):
