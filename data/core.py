@@ -622,6 +622,9 @@ class Data(object):
     def truncate_code(self, src_code: str, branch: list) -> str:
 
         code_info = analyze_code(src_code)
+        if code_info is None:
+            return src_code
+
         imports = ""
         for imp, pack in code_info["imports"]:
             packs = ", ".join(pack)

@@ -65,8 +65,12 @@ class CodeAnalyzer(ast.NodeVisitor):
 
 # Example Usage
 def analyze_code(code_snippet):
-    analyzer = CodeAnalyzer(code_snippet)
-    return analyzer.get_results()
+    try:
+        analyzer = CodeAnalyzer(code_snippet)
+        return analyzer.get_results()
+    except SyntaxError as e:
+        print(f"Syntax Error: {e}")
+        return None
 
 
 def remove_method_from_class(code, class_name, method_name):
