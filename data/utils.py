@@ -85,7 +85,7 @@ def get_dataset(
             model=model,
             tokenizer=tokenizer,
             llm_tokenizer=llm_tokenizer,
-            baseline_prompt=baseline_prompt.
+            baseline_prompt=baseline_prompt,
             debug=debug,
         )
     else:
