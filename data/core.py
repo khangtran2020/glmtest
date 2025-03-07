@@ -565,6 +565,7 @@ class Data(object):
             text = PROMPT_CODE_GRAPH.format(src_code, graph_pad)
             response = RESPONSE_TEMPLATE.format(testcase_out)
         elif self.baseline_prompt == "code_tr":
+            self.logger.log("Truncating code...")
             trucated_code = self.truncate_code(src_code=src_code, branch=branch)
             text = PROMPT_CODE.format(trucated_code)
             response = RESPONSE_TEMPLATE.format(testcase_out)

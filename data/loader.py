@@ -10,10 +10,12 @@ class GLMFDataset(Dataset):
         data: List[Dict[str, Any]],
         tokenizer: PreTrainedTokenizer,
         max_seq_length: int = 12000,
+        baseline_prompt: str = "code",
         debug: bool = False,
     ):
         self.data = data
         self.tokenizer = tokenizer
+        self.baseline_prompt = baseline_prompt
         self.max_seq_length = max_seq_length
         self.graph_token_id = self.tokenizer.convert_tokens_to_ids(["<|graph_pad|>"])[0]
         self.debug = debug
@@ -44,7 +46,10 @@ class GLMFDataset(Dataset):
         ).long()
         input_ids = tokenized["input_ids"]
 
-        if self.graph_token_id not in input_ids:
+        if (
+            self.baseline_prompt in ["graph", "graph_tr"]
+            and self.graph_token_id not in input_ids
+        ):
             raise ValueError("Input must contain graph token")
 
         return {
