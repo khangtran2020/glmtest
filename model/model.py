@@ -41,7 +41,7 @@ class GLMFModelConfig(PretrainedConfig):
     ):
         super().__init__(**kwargs)
         config = AutoConfig.from_pretrained(llm_model).to_dict()
-        print(config)
+        self.llm_model = llm_model
         self.model_name = config["_name_or_path"]
         self.mode = mode
         self.hidden_size = config["hidden_size"]
