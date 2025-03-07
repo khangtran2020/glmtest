@@ -22,7 +22,7 @@ class GLMFModelConfig(PretrainedConfig):
 
     def __init__(
         self,
-        llm_model: str = "Qwen/CodeQwen1.5-7B-Chat",
+        llm_model: str,
         mode: str = "node",
         in_feats: int = 772,
         n_hidden: int = 512,
@@ -30,7 +30,7 @@ class GLMFModelConfig(PretrainedConfig):
         num_head: int = 8,
         dropout: float = 0.2,
         dtype: str = "float32",
-        device_map: torch.device = None,
+        device_map=None,
         # LoRA parameters
         use_lora: bool = False,
         lora_r: int = 4,
