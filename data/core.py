@@ -62,7 +62,7 @@ class FuzzTagTransformer(ast.NodeTransformer):
                 node.operand.value = (
                     f"<|{self.tag}|>-{node.operand.value}<|/{self.tag}|>"
                 )
-            return node
+                return node.operand
         return self.generic_visit(node)
 
     def visit_Constant(self, node):
