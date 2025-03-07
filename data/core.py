@@ -554,9 +554,9 @@ class Data(object):
         tokenizer: PreTrainedTokenizer,
     ):
 
-        self.logger.log(
-            f"Preparing prompts with baseline_prompt: {self.baseline_prompt}"
-        )
+        # self.logger.log(
+        #     f"Preparing prompts with baseline_prompt: {self.baseline_prompt}"
+        # )
         graph_pad = "<|graph_pad|>" * mask.size(0)
         if self.baseline_prompt == "code":
             text = PROMPT_CODE.format(src_code)
