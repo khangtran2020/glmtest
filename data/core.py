@@ -467,14 +467,16 @@ class Data(object):
                     branch_line = dat["test_cases"][testcase]["branch"]
                     active_node = get_index_by_value(a=branch, val=1)
                     # self.logger.log("Preparing prompts for {}...".format(testcase))
-                    prompt, response, full_text = self.get_prompt(
+                    result = self.get_prompt(
                         src_code=src_code,
                         testcase_out=test_code,
                         mask=active_node,
                         tokenizer=self.llm_tokenizer,
                         branch=branch_line,
                     )
-
+                    if result is None:
+                        continue
+                    prompt, response, full_text = result
                     num_token = len(self.llm_tokenizer.tokenize(full_text))
                     num_tokens.append(num_token)
 
@@ -570,6 +572,9 @@ class Data(object):
         elif self.baseline_prompt == "code_tr":
             self.logger.log("Truncating code...")
             trucated_code = self.truncate_code(src_code=src_code, branch=branch)
+            if trucated_code is None:
+                self.logger.log("Truncated code is None")
+                return None
             text = PROMPT_CODE.format(trucated_code)
             response = RESPONSE_TEMPLATE.format(testcase_out)
         elif self.baseline_prompt == "graph_tr":
@@ -704,6 +709,8 @@ class Data(object):
                             class_name=class_item["name"],
                             method_name=func["name"],
                         )
+                        if body is None:
+                            return None
 
         truncated_code = f"{imports}\n{body}"
         if self.debug:
