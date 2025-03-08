@@ -82,7 +82,6 @@ def main(args: Namespace, logger: Console, device: torch.device) -> None:
             llm_model=args.llm_model,
             use_lora=args.use_lora,
             dtype=args.dtype,
-            use_trainer=args.use_trainer,
             device_map="cuda" if torch.cuda.is_available() else "cpu",
         )
         if args.debug:

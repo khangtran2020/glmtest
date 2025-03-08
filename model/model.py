@@ -36,7 +36,6 @@ class GLMFModelConfig(PretrainedConfig):
         lora_r: int = 4,
         lora_alpha: int = 32,
         lora_dropout: float = 0.1,
-        use_trainer: bool = False,
         lora_target_modules: List[str] = None,
         **kwargs,
     ):
@@ -51,7 +50,6 @@ class GLMFModelConfig(PretrainedConfig):
         self.num_head = num_head
         self.dropout = dropout
         self.dtype = dtype
-        self.use_trainer = use_trainer
         self.device_map = device_map
 
         if lora_target_modules is None:
@@ -93,7 +91,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
     def __init__(self, config: GLMFModelConfig):
 
         super().__init__(config)
-        self.config = config
+
         self.gnn = MultiGAT(
             config.mode,
             config.in_feats,
@@ -144,14 +142,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         torch.cuda.empty_cache()
         self.model_type = config.model_type
 
-    def forward(self, inputs):
-        if self.config.use_trainer:
-            inputs = inputs["input"]
-            self.forward_(*inputs)
-        else:
-            self.forward_(*inputs)
-
-    def forward_(
+    def forward(
         self,
         input_ids: Optional[torch.LongTensor] = None,
         attention_mask: Optional[torch.Tensor] = None,

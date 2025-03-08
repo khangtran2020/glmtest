@@ -143,11 +143,6 @@ def add_training_group(group):
         action="store_true",
         help="resume from checkpoint",
     )
-    group.add_argument(
-        "--use_trainer",
-        action="store_true",
-        help="resume from checkpoint",
-    )
 
 
 def parse_args():
