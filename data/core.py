@@ -585,7 +585,7 @@ class Data(object):
             if trucated_code is None:
                 self.logger.log("Truncated code is None")
                 return None
-            text = PROMPT_CODE.format(trucated_code)
+            text = PROMPT_CODE_TR.format(trucated_code)
             response = RESPONSE_TEMPLATE.format(testcase_out)
         elif self.baseline_prompt == "graph_tr":
             trucated_code = self.truncate_code(src_code=src_code, branch=branch)
