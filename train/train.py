@@ -155,6 +155,9 @@ def train_single_gpu(
                         "labels": batch_input["labels"][i].to(device),
                     }
 
+                    if args.debug:
+                        console.log(f"Micro input: {micro_input}")
+
                     graph = batch["graph"][i]
                     graph_mask = batch["graph_mask"][i]
 
