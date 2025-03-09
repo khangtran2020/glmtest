@@ -16,4 +16,5 @@ python main.py --mode train \
     --max_grad_norm 1.0 \
     --num_train_epochs 1 \
     --dtype bfloat16 \
-    --debug
+    --debug \
+    --model_debug
