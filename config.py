@@ -16,6 +16,7 @@ def add_general_group(group):
     )
     group.add_argument("--seed", type=int, default=2605, help="seed value")
     group.add_argument("--debug", action="store_true", help="debug mode")
+    group.add_argument("--model_debug", action="store_true", help="debug mode")
 
 
 def add_data_group(group):

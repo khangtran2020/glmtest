@@ -37,6 +37,7 @@ class GLMFModelConfig(PretrainedConfig):
         lora_alpha: int = 32,
         lora_dropout: float = 0.1,
         lora_target_modules: List[str] = None,
+        debug: bool = False,
         **kwargs,
     ):
         # super().__init__(**kwargs)
@@ -51,6 +52,7 @@ class GLMFModelConfig(PretrainedConfig):
         self.dropout = dropout
         self.dtype = dtype
         self.device_map = device_map
+        self.debug = debug
 
         if lora_target_modules is None:
             # This can be adjusted depending on your underlying model's architecture.
@@ -71,7 +73,7 @@ class GLMFModelConfig(PretrainedConfig):
         self.lora_target_modules = lora_target_modules
 
         # self.dtype = dtype
-        self.graph_token_id = [92302, 92303, 92304]
+        # self.graph_token_id = [92302, 92303, 92304]
         super().__init__(**config, **kwargs)
 
     def to_diff_dict(self):

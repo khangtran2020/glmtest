@@ -52,27 +52,28 @@ def train_single_gpu(
         config=vars(args),
     )
 
-    tr_dataset = GLMFDataset(
-        data=dataset.train_data,
-        tokenizer=dataset.llm_tokenizer,
-        max_seq_length=args.max_seq_length,
-        debug=args.debug,
-    )
-    va_dataset = GLMFDataset(
-        data=dataset.val_data,
-        tokenizer=dataset.llm_tokenizer,
-        max_seq_length=args.max_seq_length,
-        debug=args.debug,
-    )
-    tr_loader = DataLoader(
-        tr_dataset, batch_size=1, shuffle=True, collate_fn=collate_fn
-    )
-    va_loader = DataLoader(
-        va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
-    )
-    console.log("Data prepared:")
-    console.log(f"Train data: {len(tr_dataset)} data points")
-    console.log(f"Valid data: {len(va_dataset)} data points")
+    if args.model_debug == False:
+        tr_dataset = GLMFDataset(
+            data=dataset.train_data,
+            tokenizer=dataset.llm_tokenizer,
+            max_seq_length=args.max_seq_length,
+            debug=args.debug,
+        )
+        va_dataset = GLMFDataset(
+            data=dataset.val_data,
+            tokenizer=dataset.llm_tokenizer,
+            max_seq_length=args.max_seq_length,
+            debug=args.debug,
+        )
+        tr_loader = DataLoader(
+            tr_dataset, batch_size=1, shuffle=True, collate_fn=collate_fn
+        )
+        va_loader = DataLoader(
+            va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
+        )
+        console.log("Data prepared:")
+        console.log(f"Train data: {len(tr_dataset)} data points")
+        console.log(f"Valid data: {len(va_dataset)} data points")
 
     tokenizer = dataset.llm_tokenizer
     config = GLMFModelConfig(
@@ -101,6 +102,19 @@ def train_single_gpu(
         tokenizer=tokenizer,
         model=model.llm_model,
     )
+
+    model.config.graph_token_id = [
+        tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
+        tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
+        tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
+    ]
+
+    console.log(
+        f"Special tokens added to tokenizer and model: {model.config.graph_token_id}"
+    )
+    if args.model_debug:
+        return
+
     if args.debug:
         console.log("Model & tokenizer loaded")
 

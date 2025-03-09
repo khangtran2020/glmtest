@@ -22,27 +22,28 @@ def main(args: Namespace, logger: Console, device: torch.device) -> None:
 
     # init data
 
-    graph = get_graph(
-        args=args,
-        graph_type=args.graph_type,
-        logger=logger,
-    )
-    dataset = get_dataset(
-        data_name=args.data,
-        data_path=args.data_path,
-        logger=console,
-        feat_model=args.feat_model,
-        llm_model=args.llm_model,
-        max_pynguin_run_time=args.max_pynguin_run_time,
-        docker_image=args.docker_image,
-        num_cpu=args.num_cpu,
-        graph=graph,
-        baseline_prompt=args.baseline_prompt,
-        debug=args.debug,
-    )
-    if dataset is None:
-        logger.log("Dataset not found, exiting...")
-        return
+    if args.model_debug == False:
+        graph = get_graph(
+            args=args,
+            graph_type=args.graph_type,
+            logger=logger,
+        )
+        dataset = get_dataset(
+            data_name=args.data,
+            data_path=args.data_path,
+            logger=console,
+            feat_model=args.feat_model,
+            llm_model=args.llm_model,
+            max_pynguin_run_time=args.max_pynguin_run_time,
+            docker_image=args.docker_image,
+            num_cpu=args.num_cpu,
+            graph=graph,
+            baseline_prompt=args.baseline_prompt,
+            debug=args.debug,
+        )
+        if dataset is None:
+            logger.log("Dataset not found, exiting...")
+            return
 
     # data
     if args.mode == "data":
@@ -53,15 +54,24 @@ def main(args: Namespace, logger: Console, device: torch.device) -> None:
 
     # training
     if args.mode == "train":
-        dataset.prepare_data()
-        dataset.train_test_split()
 
-        train(
-            args=args,
-            dataset=dataset,
-            console=console,
-            device=device,
-        )
+        if args.model_debug == False:
+            dataset.prepare_data()
+            dataset.train_test_split()
+
+            train(
+                args=args,
+                dataset=dataset,
+                console=console,
+                device=device,
+            )
+        else:
+            train(
+                args=args,
+                dataset=None,
+                console=console,
+                device=device,
+            )
 
 
 if __name__ == "__main__":
