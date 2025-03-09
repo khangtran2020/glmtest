@@ -8,6 +8,12 @@ def add_general_group(group):
         default="data",
         help="mode of the program: data, train, test",
     )
+    group.add_argument(
+        "--name",
+        type=str,
+        default="testing",
+        help="Name to logs to wandb",
+    )
     group.add_argument("--seed", type=int, default=2605, help="seed value")
     group.add_argument("--debug", action="store_true", help="debug mode")
 
