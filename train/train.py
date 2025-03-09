@@ -119,7 +119,9 @@ def train_single_gpu(
 
     with Progress(
         SpinnerColumn(),  # Shows a spinner
-        TextColumn("[bold blue]{task.fields[info]}"),  # Displays additional info
+        TextColumn(
+            "[progress.description]{task.description}"
+        ),  # Displays additional info
         BarColumn(),  # Displays a progress bar
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),  # Shows percentage
     ) as progress:
