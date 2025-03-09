@@ -143,6 +143,24 @@ def add_training_group(group):
         action="store_true",
         help="resume from checkpoint",
     )
+    group.add_argument(
+        "--logging_steps",
+        type=int,
+        help="number of steps to logs",
+        default=200,
+    )
+    group.add_argument(
+        "--validating_steps",
+        type=int,
+        help="number of steps to validate",
+        default=200,
+    )
+    group.add_argument(
+        "--run_name",
+        type=str,
+        help="name of the run for wandb",
+        default="testing",
+    )
 
 
 def parse_args():

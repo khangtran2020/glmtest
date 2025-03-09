@@ -3,12 +3,7 @@ from config import parse_args
 from utils.console import console
 from utils.utils import print_args, seed_everything
 from data.utils import get_dataset
-from data.loader import GLMFDataset, collate_fn
 from graph.utils import get_graph
-from train.train_single_gpu import initialize_trainer_single_gpu
-from train.utils import judge_dir
-from model.model import GLMFModelForCausalLM, GLMFModelConfig
-from train.utils import smart_tokenizer_and_embedding_resize
 from utils.constant import (
     GRAPH_START_TOKEN,
     GRAPH_PAD_TOKEN,
@@ -16,6 +11,7 @@ from utils.constant import (
     FUZZ_START_TOKEN,
     FUZZ_END_TOKEN,
 )
+from train.train import train
 
 # typing
 from argparse import Namespace
@@ -60,69 +56,12 @@ def main(args: Namespace, logger: Console, device: torch.device) -> None:
         dataset.prepare_data()
         dataset.train_test_split()
 
-        train_dataset = GLMFDataset(
-            data=dataset.train_data,
-            tokenizer=dataset.llm_tokenizer,
-            max_seq_length=args.max_seq_length,
-            debug=args.debug,
-        )
-        val_dataset = GLMFDataset(
-            data=dataset.val_data,
-            tokenizer=dataset.llm_tokenizer,
-            max_seq_length=args.max_seq_length,
-            debug=args.debug,
-        )
-
-        console.log("Data prepared:")
-        console.log(f"Train data: {len(train_dataset)} data points")
-        console.log(f"Val data: {len(val_dataset)} data points")
-
-        tokenizer = dataset.llm_tokenizer
-        config = GLMFModelConfig(
-            llm_model=args.llm_model,
-            use_lora=args.use_lora,
-            dtype=args.dtype,
-            device_map="cuda" if torch.cuda.is_available() else "cpu",
-        )
-        if args.debug:
-            console.log(f"Model config initialized: {config}")
-
-        model = GLMFModelForCausalLM(config=config)
-        if args.debug:
-            console.log(f"Model initialized with config: {config}")
-        special_tokens_dict = {
-            "additional_special_tokens": [
-                GRAPH_START_TOKEN,
-                GRAPH_PAD_TOKEN,
-                GRAPH_END_TOKEN,
-                FUZZ_START_TOKEN,
-                FUZZ_END_TOKEN,
-            ]
-        }
-        smart_tokenizer_and_embedding_resize(
-            special_tokens_dict=special_tokens_dict,
-            tokenizer=tokenizer,
-            model=model.llm_model,
-        )
-        if args.debug:
-            console.log("Model & tokenizer loaded")
-
-        trainer = initialize_trainer_single_gpu(
-            model=model,
-            train_dataset=train_dataset,
-            valid_dataset=val_dataset,
-            tokenizer=tokenizer,
+        train(
             args=args,
+            dataset=dataset,
+            console=console,
+            device=device,
         )
-        if args.debug:
-            console.log("Trainer initialized")
-
-        if args.resume_from_checkpoint and judge_dir(args.output_dir):
-            trainer.train(resume_from_checkpoint=True)
-        else:
-            trainer.train()
-        trainer.save_state()
-        trainer.save_model(output_dir=args.output_dir)
 
 
 if __name__ == "__main__":

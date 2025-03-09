@@ -22,8 +22,17 @@ from typing import List, Union, Dict
 PYNGUIN_TEMPLATE = """docker run --rm -v {}:/input:ro -v {}:/output -v {}:/package:ro {} \
     --module-name {} --coverage_metrics BRANCH --maximum_search_time {} --report-dir /output --project_path /input --output-path /output --output_variables TargetModule,CoverageTimeline --assertion-generation NONE"""
 
-PROMPT_CODE = """Generate the test case for the code below:
-```python
+PROMPT_CODE = """Given a code script and an execution code lines, generate the test case for the corresponding code snippet:
+```
+{}
+```
+
+Here is the execution code lines:
+{}
+"""
+
+PROMPT_CODE_TR = """Generate the test case for the code snippet:
+```
 {}
 ```
 """
@@ -35,7 +44,7 @@ PROMPT_GRAPH = """Generate the test case for the graph embedding of a targeted e
 PROMPT_CODE_GRAPH = """Generate the test case for the code below and the corresponding graph embedding of a targeted execution branch:
 
 Here is the code:
-```python
+```
 {}
 ```
 
@@ -44,7 +53,7 @@ Here is the graph embedding:
 """
 
 RESPONSE_TEMPLATE = """Here is the test case:
-```python
+```
 {}
 ```
 """
@@ -561,7 +570,8 @@ class Data(object):
         # )
         graph_pad = "<|graph_pad|>" * mask.size(0)
         if self.baseline_prompt == "code":
-            text = PROMPT_CODE.format(src_code)
+            code_line = self.generate_code_line(branch)
+            text = PROMPT_CODE.format(src_code, code_line)
             response = RESPONSE_TEMPLATE.format(testcase_out)
         elif self.baseline_prompt == "graph":
             text = PROMPT_GRAPH.format(graph_pad)
@@ -716,3 +726,11 @@ class Data(object):
         if self.debug:
             self.logger.log(f"Truncated code: {truncated_code == src_code}")
         return truncated_code
+
+    def generate_code_line(self, branch):
+
+        code_line = ""
+        for item in branch:
+            line = "->".join([str(i) for i in item])
+            code_line += line + "\n"
+        return code_line
