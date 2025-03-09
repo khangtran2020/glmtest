@@ -178,7 +178,7 @@ def train_single_gpu(
                 avg_batch_loss = batch_loss / batch_size
                 train_epoch_task.update(
                     advance=1,
-                    info=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f}",
+                    description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f}",
                 )
                 epoch_loss += avg_batch_loss * batch_size
                 num_items += batch_size
@@ -224,13 +224,16 @@ def train_single_gpu(
                             val_loss += batch_loss
                         val_loss /= num_item
                         wandb.log({"val_loss": val_loss})
+                        console.log(
+                            f"Validation loss: {val_loss:.4f} at step {global_step}"
+                        )
                         # model.train()
 
             progress.remove_task(train_epoch_task)
             progress.update(
                 train_task,
                 advance=1,
-                info=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
+                description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
             )
 
     if model.config.use_lora == True:
