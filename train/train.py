@@ -234,7 +234,7 @@ def train_single_gpu(
             )
 
     if model.config.use_lora == True:
-        model.model = model.model.merge_and_unload()
+        model.llm_model = model.llm_model.merge_and_unload()
 
     model.save_pretrained(args.output_dir)
     tokenizer.save_pretrained(args.output_dir)
