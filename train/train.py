@@ -158,12 +158,12 @@ def train_single_gpu(
             num_items = 0.0
 
             for step, batch in enumerate(tr_loader):
+                global_step += 1
                 batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
 
                 # Process each sample in the batch as a micro-batch.
                 for i in range(batch_size):
-                    global_step += 1
 
                     batch_input = batch["input"].copy()
                     if "token_type_ids" in batch_input:
@@ -209,10 +209,10 @@ def train_single_gpu(
                 epoch_loss += avg_batch_loss * batch_size
                 num_items += batch_size
 
-                if step % args.logging_steps == 0:
+                if global_step % args.logging_steps == 0:
                     wandb.log({"train_loss": avg_batch_loss})
 
-                if step % args.validating_steps == 0:
+                if global_step % args.validating_steps == 0:
                     model.eval()
                     with torch.no_grad():
 
@@ -225,7 +225,7 @@ def train_single_gpu(
 
                             # Process each sample in the batch as a micro-batch.
                             for i in range(batch_size):
-                                global_step += 1
+                                # global_step += 1
                                 batch_input = batch["input"].copy()
                                 if "token_type_ids" in batch_input:
                                     batch_input.pop("token_type_ids")

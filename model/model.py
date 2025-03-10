@@ -185,10 +185,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             )
 
         if inputs_embeds is None:
-            print(input_ids)
+            # print(input_ids)
             inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
-            print(inputs_embeds.device)
-            print(inputs_embeds.size())
+            # print(inputs_embeds.device)
+            # print(inputs_embeds.size())
 
         if (graph is not None) and ("graph" in self.baseline_prompt):
             assert graph_mask is not None
@@ -198,7 +198,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             graph_embeds = self.gnn(graph, graph_mask).to(inputs_embeds.device)
             # graph_embeds = self.gnn(graph, graph_mask)
             # print(graph_embeds)
-            print("Graph_embeds: ", graph_embeds.size())
+            # print("Graph_embeds: ", graph_embeds.size())
             # assert graph_embeds.size(2) == inputs_embeds.size(2)
 
             inputs_embeds[0, index[0] : (index[-1] + 1), :] = graph_embeds

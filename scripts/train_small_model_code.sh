@@ -4,9 +4,9 @@ python main.py --mode train \
     --data testgeneval \
     --baseline_prompt code \
     --llm_model "HuggingFaceTB/SmolLM2-135M-Instruct" \
-    --max_seq_len 8192 \
+    --max_seq_len 16384 \
     --batch_size 1 \
-    --gradient_accumulation_steps 4 \
+    --gradient_accumulation_steps 16 \
     --num_gpu 1 \
     --output_dir "./results/models/" \
     --overwrite_output_dir \
