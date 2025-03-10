@@ -190,7 +190,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             elif self.config.model_type == "qwen2":
                 inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
             print(inputs_embeds.device)
-            # print("Test Inputs Before")
             print(inputs_embeds.size())
 
         if (graph is not None) and ("graph" in self.baseline_prompt):
