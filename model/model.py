@@ -194,13 +194,13 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             assert graph_mask is not None
             # print("Test Graph")
             # print(self.config.graph_token_id[1])
+            print(input_ids.size(), input_ids.device, self.config.graph_token_id[1])
             index = torch.where(input_ids.to("cpu") == self.config.graph_token_id[1])[1]
             graph_embeds = self.gnn(graph, graph_mask).to(inputs_embeds.device)
             # graph_embeds = self.gnn(graph, graph_mask)
             # print(graph_embeds)
             # print("Graph_embeds: ", graph_embeds.size())
             # assert graph_embeds.size(2) == inputs_embeds.size(2)
-            print(inputs_embeds.size(), graph_embeds.size(), index)
             inputs_embeds[0, index[0] : (index[-1] + 1), :] = graph_embeds
             del graph_embeds
 
