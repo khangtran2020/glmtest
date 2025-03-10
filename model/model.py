@@ -185,10 +185,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             )
 
         if inputs_embeds is None:
-            if self.config.model_type == "llama":
-                inputs_embeds = self.llm_model.embed_tokens(input_ids)
-            elif self.config.model_type == "qwen2":
-                inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
+            print(input_ids)
+            inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
             print(inputs_embeds.device)
             print(inputs_embeds.size())
 

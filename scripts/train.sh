@@ -2,7 +2,7 @@ python main.py --mode train \
     --seed 42 \
     --data_path Dataset \
     --data testgeneval \
-    --baseline_prompt code_tr \
+    --baseline_prompt code \
     --llm_model "HuggingFaceTB/SmolLM2-135M-Instruct" \
     --max_seq_len 8192 \
     --batch_size 1 \
