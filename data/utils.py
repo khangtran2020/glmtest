@@ -48,18 +48,7 @@ def get_dataset(
     }
 
     llm_tokenizer = AutoTokenizer.from_pretrained(llm_model, trust_remote_code=True)
-
-    # llm_tokenizer.add_special_tokens(
-    #     {
-    #         "additional_special_tokens": [
-    #             GRAPH_START_TOKEN,
-    #             GRAPH_PAD_TOKEN,
-    #             GRAPH_END_TOKEN,
-    #             FUZZ_START_TOKEN,
-    #             FUZZ_END_TOKEN,
-    #         ]
-    #     }
-    # )
+    llm_tokenizer.add_special_tokens(special_tokens_dict)
 
     if data_name == "ossfuzz":
         logger.log("Using OSSFuzz dataset")
