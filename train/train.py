@@ -212,7 +212,7 @@ def train_single_gpu(
                 if step % args.logging_steps == 0:
                     wandb.log({"train_loss": avg_batch_loss})
 
-                if step % args.validation_steps == 0:
+                if step % args.validating_steps == 0:
                     model.eval()
                     with torch.no_grad():
 
