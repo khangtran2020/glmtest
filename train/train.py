@@ -85,7 +85,7 @@ def train_single_gpu(
     if args.debug:
         console.log(f"Model config initialized: {config}")
 
-    model = GLMFModelForCausalLM(config=config)
+    model = GLMFModelForCausalLM(config=config, baseline_prompt=args.baseline_prompt)
     if args.debug:
         console.log(f"Model initialized with config: {config}")
     special_tokens_dict = {

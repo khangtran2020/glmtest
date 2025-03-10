@@ -90,9 +90,11 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
     config_class = GLMFModelConfig
 
-    def __init__(self, config: GLMFModelConfig):
+    def __init__(self, config: GLMFModelConfig, baseline_prompt=None):
 
         super().__init__(config)
+
+        self.baseline_prompt = baseline_prompt
 
         self.gnn = MultiGAT(
             config.mode,
@@ -189,9 +191,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             # print("Test Inputs Before")
             print(inputs_embeds.size())
 
-        if graph is not None:
+        if (graph is not None) and ("graph" in self.baseline_prompt):
             assert graph_mask is not None
             # print("Test Graph")
+            # print(self.config.graph_token_id[1])
             index = torch.where(input_ids == self.config.graph_token_id[1])[1]
             graph_embeds = self.gnn(graph, graph_mask).to(inputs_embeds.device)
             # graph_embeds = self.gnn(graph, graph_mask)
