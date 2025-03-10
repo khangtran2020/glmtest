@@ -200,7 +200,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             # print(graph_embeds)
             # print("Graph_embeds: ", graph_embeds.size())
             # assert graph_embeds.size(2) == inputs_embeds.size(2)
-
+            print(inputs_embeds.size(), graph_embeds.size())
             inputs_embeds[0, index[0] : (index[-1] + 1), :] = graph_embeds
             del graph_embeds
 
