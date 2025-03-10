@@ -149,6 +149,7 @@ def train_single_gpu(
 
         for epoch in range(args.num_train_epochs):
             model.train()
+
             train_epoch_task = progress.add_task(
                 f"Epoch {epoch + 1}/{args.num_train_epochs}", total=len(tr_loader)
             )
@@ -200,7 +201,8 @@ def train_single_gpu(
 
                 # Log average loss for this batch.
                 avg_batch_loss = batch_loss / batch_size
-                train_epoch_task.update(
+                progress.update(
+                    train_epoch_task,
                     advance=1,
                     description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f}",
                 )
