@@ -82,26 +82,31 @@ def train_single_gpu(
         dtype=args.dtype,
         device_map="cuda" if torch.cuda.is_available() else "cpu",
     )
+    if config.model_type not in ["llama", "qwen2"]:
+        raise ValueError(
+            f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2'."
+        )
+
     if args.debug:
         console.log(f"Model config initialized: {config}")
 
     model = GLMFModelForCausalLM(config=config, baseline_prompt=args.baseline_prompt)
     if args.debug:
         console.log(f"Model initialized with config: {config}")
-    special_tokens_dict = {
-        "additional_special_tokens": [
-            GRAPH_START_TOKEN,
-            GRAPH_PAD_TOKEN,
-            GRAPH_END_TOKEN,
-            FUZZ_START_TOKEN,
-            FUZZ_END_TOKEN,
-        ]
-    }
-    smart_tokenizer_and_embedding_resize(
-        special_tokens_dict=special_tokens_dict,
-        tokenizer=tokenizer,
-        model=model.llm_model,
-    )
+    # special_tokens_dict = {
+    #     "additional_special_tokens": [
+    #         GRAPH_START_TOKEN,
+    #         GRAPH_PAD_TOKEN,
+    #         GRAPH_END_TOKEN,
+    #         FUZZ_START_TOKEN,
+    #         FUZZ_END_TOKEN,
+    #     ]
+    # }
+    # smart_tokenizer_and_embedding_resize(
+    #     special_tokens_dict=special_tokens_dict,
+    #     tokenizer=tokenizer,
+    #     model=model.llm_model,
+    # )
 
     model.config.graph_token_id = [
         tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
