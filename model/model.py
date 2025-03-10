@@ -197,7 +197,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             print(
                 "Assesing info:",
                 input_ids.size(),
-                input_ids.cpu().device,
+                input_ids[0] == 1,
                 self.config.graph_token_id[1],
             )
 
