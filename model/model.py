@@ -194,6 +194,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if (graph is not None) and ("graph" in self.baseline_prompt):
             assert graph_mask is not None
             assert graph_token_index is not None
+            print("Graph token index ======", graph_token_index)
             # print("Test Graph")
             # print(self.config.graph_token_id[1])
             # print(
