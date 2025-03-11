@@ -92,6 +92,8 @@ def train_single_gpu(
         console.log(f"Model config initialized: {config}")
 
     model = GLMFModelForCausalLM(config=config, baseline_prompt=args.baseline_prompt)
+    tokenizer = dataset.llm_tokenizer
+    model.llm_model.resize_token_embeddings(len(tokenizer))
     if args.debug:
         console.log(f"Model initialized with config: {config}")
     # special_tokens_dict = {
