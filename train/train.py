@@ -125,7 +125,7 @@ def train_single_gpu(
         console.log("Model & tokenizer loaded")
 
     model.to(device)
-    model.gnn.to("cpu")
+    # model.gnn.to("cpu")
     model.train()
 
     optimizer = AdamW(
