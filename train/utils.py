@@ -175,3 +175,7 @@ def initialize_trainer_multi_gpu(
             Qwen2RotaryEmbedding.forward = forward_embed
         elif model.model_type == "llama":
             LlamaRotaryEmbedding.forward = forward_embed
+
+
+def get_index_by_value(a, val):
+    return (a == val).nonzero(as_tuple=True)[0]

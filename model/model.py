@@ -152,6 +152,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         attention_mask: Optional[torch.Tensor] = None,
         graph: Optional[dict] = None,
         graph_mask: Optional[torch.Tensor] = None,
+        graph_token_index: Optional[torch.LongTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[Union[Cache, List[torch.FloatTensor]]] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
@@ -192,14 +193,14 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         if (graph is not None) and ("graph" in self.baseline_prompt):
             assert graph_mask is not None
+            assert graph_token_index is not None
             # print("Test Graph")
             # print(self.config.graph_token_id[1])
-            print(
-                "Assesing info:",
-                input_ids.size(),
-                input_ids[0] == 1,
-                self.config.graph_token_id[1],
-            )
+            # print(
+            #     "Assesing info:",
+            #     input_ids.size(),
+            #     self.config.graph_token_id[1],
+            # )
 
             index = torch.where(input_ids.to("cpu") == self.config.graph_token_id[1])[1]
             graph_embeds = self.gnn(graph, graph_mask).to(inputs_embeds.device)
@@ -207,8 +208,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             # print(graph_embeds)
             # print("Graph_embeds: ", graph_embeds.size())
             # assert graph_embeds.size(2) == inputs_embeds.size(2)
-            inputs_embeds[0, index[0] : (index[-1] + 1), :] = graph_embeds
-            del graph_embeds
+            inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :] = (
+                graph_embeds
+            )
+            # del graph_embeds
 
         # print(inputs_embeds.size())
 

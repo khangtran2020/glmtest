@@ -8,6 +8,7 @@ from utils.constant import (
     FUZZ_START_TOKEN,
     FUZZ_END_TOKEN,
 )
+from utils.utils import get_index_by_value
 from data.loader import GLMFDataset, collate_fn
 from model.model import GLMFModelForCausalLM, GLMFModelConfig
 from train.utils import smart_tokenizer_and_embedding_resize
@@ -180,11 +181,21 @@ def train_single_gpu(
 
                     graph = batch["graph"][i]
                     graph_mask = batch["graph_mask"][i]
+                    if "graph" in args.baseline_prompt:
+                        graph_token_index = get_index_by_value(
+                            a=micro_input["input_ids"],
+                            val=model.config.graph_token_id[1],
+                        )
+                        if args.debug:
+                            console.log(f"Graph token id: {graph_token_index}")
+                    else:
+                        graph_token_index = None
 
                     outputs = model(
                         **micro_input,
                         graph=graph,
                         graph_mask=graph_mask,
+                        graph_token_index=graph_token_index,
                     )
 
                     loss = outputs.loss
