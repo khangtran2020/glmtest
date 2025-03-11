@@ -202,7 +202,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             #     self.config.graph_token_id[1],
             # )
 
-            index = torch.where(input_ids.to("cpu") == self.config.graph_token_id[1])[1]
+            # index = torch.where(input_ids.to("cpu") == self.config.graph_token_id[1])[1]
             graph_embeds = self.gnn(graph, graph_mask).to(inputs_embeds.device)
             # graph_embeds = self.gnn(graph, graph_mask)
             # print(graph_embeds)

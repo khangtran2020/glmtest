@@ -182,10 +182,9 @@ def train_single_gpu(
                     graph = batch["graph"][i]
                     graph_mask = batch["graph_mask"][i]
                     if "graph" in args.baseline_prompt:
-                        graph_token_index = get_index_by_value(
-                            a=micro_input["input_ids"],
-                            val=model.config.graph_token_id[1],
-                        )
+                        graph_token_index = torch.where(
+                            micro_input["input_ids"] == model.config.graph_token_id[1]
+                        )[1]
                         if args.debug:
                             console.log(f"Graph token id: {graph_token_index}")
                     else:
