@@ -127,7 +127,7 @@ def train_single_gpu(
         console.log("Model & tokenizer loaded")
 
     model.to(device)
-    model.gnn.to("cpu")
+    # model.gnn.to("cpu")
     model.train()
 
     optimizer = AdamW(
@@ -182,7 +182,12 @@ def train_single_gpu(
                         console.log(f"Micro input: {micro_input}")
 
                     graph = batch["graph"][i]
-                    graph_mask = batch["graph_mask"][i]
+                    for key in model.gnn.type_of_graph:
+                        if key in graph.keys():
+                            graph[key] = graph[key].to(device)
+
+                    graph_mask = batch["graph_mask"][i].to(device)
+
                     if "graph" in args.baseline_prompt:
                         graph_token_index = torch.where(
                             micro_input["input_ids"] == model.config.graph_token_id[1]
