@@ -75,6 +75,7 @@ if __name__ == "__main__":
             console.log(f"Using {n_gpus} GPUs.")
             accelerator = Accelerator()
             device = accelerator.device
+            args.num_gpu = n_gpus
         else:
             console.log("Using 1 GPU.")
             device = torch.device("cuda")
