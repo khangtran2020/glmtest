@@ -1,5 +1,6 @@
 import os
 import torch
+import warnings
 from config import parse_args
 from utils.console import console
 from utils.utils import print_args, seed_everything
@@ -11,6 +12,8 @@ import torch.distributed as dist
 # typing
 from argparse import Namespace
 from rich.console import Console
+
+warnings.filterwarnings("ignore")
 
 
 def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> None:
