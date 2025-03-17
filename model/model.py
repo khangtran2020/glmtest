@@ -3,7 +3,7 @@ import torch
 
 from transformers import AutoModelForCausalLM, AutoConfig
 from transformers.configuration_utils import PretrainedConfig
-from transformers import AutoModelForCausalLM
+from transformers import AutoModelForCausalLM, PreTrainedTokenizer
 from transformers.modeling_utils import PreTrainedModel
 from transformers.configuration_utils import PretrainedConfig
 from transformers.generation.utils import GenerationMixin
@@ -92,7 +92,13 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
     config_class = GLMFModelConfig
 
-    def __init__(self, config: GLMFModelConfig, baseline_prompt=None, multi_gpu=False):
+    def __init__(
+        self,
+        config: GLMFModelConfig,
+        tokenizer: PreTrainedTokenizer = None,
+        baseline_prompt: str = None,
+        multi_gpu: bool = False,
+    ):
 
         super().__init__(config)
 
@@ -128,6 +134,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 # load_in_8bit=True,
                 device_map=config.device_map,
             )
+
+        self.llm_model.resize_token_embeddings(len(tokenizer))
 
         # LoRA init
 
