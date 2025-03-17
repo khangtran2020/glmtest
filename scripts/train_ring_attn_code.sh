@@ -35,4 +35,5 @@ torchrun --nnodes=$n_node --nproc_per_node=4 --master_port=25001 \
     --dtype bfloat16 \
     --debug \
     --use_lora \
+    --logging_steps 1 \
     --longlora 
