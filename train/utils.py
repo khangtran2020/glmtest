@@ -160,8 +160,17 @@ def run_nvidia_smi(console: Console):
             text=True,  # This makes stdout and stderr strings instead of bytes
         )
         if result.returncode == 0:
-            console.log("nvidia-smi output:\n", result.stdout)
+            if console is not None:
+                console.log("nvidia-smi output:\n", result.stdout)
+            else:
+                print("nvidia-smi output:\n", result.stdout)
         else:
-            console.log("Error executing nvidia-smi:\n", result.stderr)
+            if console is not None:
+                console.log("Error executing nvidia-smi:\n", result.stderr)
+            else:
+                print("Error executing nvidia-smi:\n", result.stderr)
     except Exception as e:
-        console.log("An exception occurred:", e)
+        if console is not None:
+            console.log("An exception occurred:", e)
+        else:
+            print("An exception occurred:", e)

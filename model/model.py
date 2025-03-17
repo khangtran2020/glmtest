@@ -12,6 +12,7 @@ from transformers.cache_utils import Cache
 import torch.distributed as dist
 
 # from utils.prompter import Prompter
+from train.utils import run_nvidia_smi
 from model.gnn import MultiGAT
 from train.utils import extract_local
 from peft import get_peft_model, LoraConfig, TaskType
@@ -235,6 +236,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             )
             # del graph_embeds
 
+        print("After take graph embedding")
+        run_nvidia_smi(console=None)
         # print(inputs_embeds.size())
         if self.multi_gpu:
             return self.forward_llm(
