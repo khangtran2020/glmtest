@@ -328,13 +328,15 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
         seq_len = inputs_embeds.shape[-2]
-        rank = dist.get_rank()
+        rank = int(os.environ["LOCAL_RANK"])
         num_processes = dist.get_world_size()
         inputs_embeds = extract_local(
             inputs_embeds, rank, num_processes, inputs_embeds.device
         )
         if self.debug:
-            print(f"Rank {rank} inputs_embeds: {inputs_embeds.size()}")
+            print(
+                f"Rank {rank} inputs_embeds: {inputs_embeds.size()}, device: {inputs_embeds.device}"
+            )
         if labels is not None:
             labels = extract_local(labels, rank, num_processes, labels.device)
         position_ids = (
