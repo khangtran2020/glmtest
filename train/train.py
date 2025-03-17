@@ -14,9 +14,9 @@ from torch.distributed import barrier
 from data.loader import GLMFDataset, collate_fn
 from model.model import GLMFModelForCausalLM, GLMFModelConfig
 from transformers import AdamW
+from transformers.trainer_utils import seed_worker
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from train.utils import patch_model, run_nvidia_smi
-from accelerate import Accelerator
 
 
 # typing
@@ -341,9 +341,20 @@ def train_multi_gpu_ringattn(
             max_seq_length=args.max_seq_length,
             debug=args.debug,
         )
-        tr_loader = DataLoader(
-            tr_dataset, batch_size=1, shuffle=True, collate_fn=collate_fn
-        )
+
+        dataloader_params = {
+            "batch_size": args.batch_size,
+            "collate_fn": collate_fn,
+            "num_workers": 64,
+            "pin_memory": True,
+            "persistent_workers": True,
+        }
+
+        if not isinstance(tr_dataset, torch.utils.data.IterableDataset):
+            dataloader_params["drop_last"] = True
+            dataloader_params["worker_init_fn"] = seed_worker
+
+        tr_loader = DataLoader(tr_dataset, **dataloader_params)
         va_loader = DataLoader(
             va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
         )
