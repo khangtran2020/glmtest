@@ -30,12 +30,17 @@ def get_dataset(
     baseline_prompt: str = "code",
     data_max_length: int = 16384,
     debug: bool = False,
+    mode: str = "train",
 ) -> Data:
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    if mode == "data":
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Using device: {device}")
 
-    model = AutoModel.from_pretrained(feat_model, trust_remote_code=True).to(device)
+        model = AutoModel.from_pretrained(feat_model, trust_remote_code=True).to(device)
+    else:
+        model = None
+
     tokenizer = AutoTokenizer.from_pretrained(feat_model, trust_remote_code=True)
 
     special_tokens_dict = {

@@ -37,6 +37,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
         data_max_length=args.model_max_length,
         baseline_prompt=args.baseline_prompt,
         debug=args.debug,
+        mode=args.mode,
     )
     if dataset is None:
         logger.log("Dataset not found, exiting...")
