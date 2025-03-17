@@ -405,7 +405,7 @@ def train_multi_gpu_ringattn(
     console.log(
         f"Model & optimizer prepared for multi-GPU training with device: {device}"
     )
-    run_nvidia_smi(console=console)
+    # run_nvidia_smi(console=console)
     barrier()
 
     with Progress(
@@ -481,6 +481,7 @@ def train_multi_gpu_ringattn(
                         graph=graph,
                         graph_mask=graph_mask,
                         graph_token_index=graph_token_index,
+                        step=global_step,
                     )
 
                     loss = outputs.loss

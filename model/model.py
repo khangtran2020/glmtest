@@ -172,6 +172,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
+        step: int = 0,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
         output_attentions = (
@@ -232,6 +233,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 attention_mask=attention_mask,
                 use_cache=False,
                 labels=labels,
+                step=step,
             )
         else:
             return self.llm_model(
@@ -306,6 +308,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
+        step: int = 0,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
         seq_len = inputs_embeds.shape[-2]
@@ -316,7 +319,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         )
         if self.debug:
             print(
-                f"Rank {rank} inputs_embeds: {inputs_embeds.size()}, device: {inputs_embeds.device}"
+                f"Rank {rank} inputs_embeds at step {step}: {inputs_embeds.size()}, device: {inputs_embeds.device}"
             )
         if labels is not None:
             labels = extract_local(labels, rank, num_processes, labels.device)
