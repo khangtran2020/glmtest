@@ -108,7 +108,10 @@ def train_single_gpu(
         console.log(f"Model config initialized: {config}")
 
     model = GLMFModelForCausalLM(
-        config=config, tokenizer=tokenizer, baseline_prompt=args.baseline_prompt
+        config=config,
+        tokenizer=tokenizer,
+        baseline_prompt=args.baseline_prompt,
+        debug=args.debug,
     )
     # tokenizer = dataset.llm_tokenizer
 
@@ -369,7 +372,10 @@ def train_multi_gpu_ringattn(
         console.log(f"Model config initialized: {config}")
 
     model = GLMFModelForCausalLM(
-        config=config, baseline_prompt=args.baseline_prompt, tokenizer=tokenizer
+        config=config,
+        baseline_prompt=args.baseline_prompt,
+        tokenizer=tokenizer,
+        debug=args.debug,
     )
     tokenizer = dataset.llm_tokenizer
     model.llm_model.resize_token_embeddings(len(tokenizer))
