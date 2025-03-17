@@ -18,6 +18,7 @@ from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from train.utils import patch_model
 from accelerate import Accelerator
 
+
 # typing
 from argparse import Namespace
 from rich.console import Console
@@ -29,6 +30,7 @@ def train(
     console: Console,
     device: torch.device,
     collate_fn: callable = collate_fn,
+    accelerator: Accelerator = None,
 ):
     if args.num_gpu == 1:
         train_single_gpu(
@@ -39,7 +41,14 @@ def train(
             collate_fn=collate_fn,
         )
     elif args.num_gpu > 1:
-        pass
+        train_multi_gpu_ringattn(
+            args=args,
+            dataset=dataset,
+            console=console,
+            device=device,
+            collate_fn=collate_fn,
+            accelerator=accelerator,
+        )
 
 
 def train_single_gpu(
@@ -303,6 +312,7 @@ def train_multi_gpu_ringattn(
     console: Console,
     device: torch.device = None,
     collate_fn: callable = collate_fn,
+    accelerator: Accelerator = None,
 ):
     dist.init_process_group(backend="nccl")
     rank = dist.get_rank()
@@ -314,7 +324,6 @@ def train_multi_gpu_ringattn(
             config=vars(args),
         )
 
-    accelerator = Accelerator()
     if args.model_debug == False:
         tr_dataset = GLMFDataset(
             data=dataset.train_data,

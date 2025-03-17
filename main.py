@@ -4,21 +4,17 @@ from utils.console import console
 from utils.utils import print_args, seed_everything
 from data.utils import get_dataset
 from graph.utils import get_graph
-from utils.constant import (
-    GRAPH_START_TOKEN,
-    GRAPH_PAD_TOKEN,
-    GRAPH_END_TOKEN,
-    FUZZ_START_TOKEN,
-    FUZZ_END_TOKEN,
-)
 from train.train import train
+from accelerate import Accelerator
 
 # typing
 from argparse import Namespace
 from rich.console import Console
 
 
-def main(args: Namespace, logger: Console, device: torch.device) -> None:
+def main(
+    args: Namespace, logger: Console, device: torch.device, accelerator: Accelerator
+) -> None:
 
     # init data
 
@@ -71,5 +67,22 @@ if __name__ == "__main__":
     args = parse_args()
     print_args(args=args)
     seed_everything(args.seed)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    main(args=args, logger=console, device=device)
+
+    # count number of gpus
+    if torch.cuda.is_available():
+        n_gpus = torch.cuda.device_count()
+        if n_gpus > 1:
+            console.log(f"Using {n_gpus} GPUs.")
+            accelerator = Accelerator()
+            device = accelerator.device
+        else:
+            console.log("Using 1 GPU.")
+            device = torch.device("cuda")
+            accelerator = None
+    else:
+        n_gpus = 0
+        console.log("No GPUs available, using CPU instead.")
+        device = torch.device("cpu")
+        accelerator = None
+
+    main(args=args, logger=console, device=device, accelerator=accelerator)
