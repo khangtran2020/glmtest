@@ -327,7 +327,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         cache_position: Optional[torch.LongTensor] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
-        seq_len = inputs_embeds.shape[-1]
+        seq_len = inputs_embeds.shape[-2]
         rank = dist.get_rank()
         num_processes = dist.get_world_size()
         inputs_embeds = extract_local(
