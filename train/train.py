@@ -369,7 +369,9 @@ def train_multi_gpu_ringattn(
     if (args.debug) and (rank == 0):
         console.log(f"Model config initialized: {config}")
 
-    model = GLMFModelForCausalLM(config=config, baseline_prompt=args.baseline_prompt)
+    model = GLMFModelForCausalLM(
+        config=config, baseline_prompt=args.baseline_prompt, tokenizer=tokenizer
+    )
     tokenizer = dataset.llm_tokenizer
     model.llm_model.resize_token_embeddings(len(tokenizer))
     if (args.debug) and (rank == 0):
