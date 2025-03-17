@@ -3,7 +3,7 @@ python main.py --mode train \
     --data_path Dataset \
     --data testgeneval \
     --baseline_prompt code \
-    --llm_model "HuggingFaceTB/SmolLM2-135M-Instruct" \
+    --llm_model "Qwen/CodeQwen1.5-7B-Chat" \
     --max_seq_len 16384 \
     --batch_size 1 \
     --gradient_accumulation_steps 16 \
@@ -16,4 +16,6 @@ python main.py --mode train \
     --max_grad_norm 1.0 \
     --num_train_epochs 1 \
     --dtype bfloat16 \
-    --debug 
+    --debug \
+    --use_lora \
+    --longlora 
