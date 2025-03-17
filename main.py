@@ -16,6 +16,8 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
 
     # init data
 
+    console.log("Running on device:", device)
+
     graph = get_graph(
         args=args,
         graph_type=args.graph_type,
@@ -67,6 +69,7 @@ if __name__ == "__main__":
         if n_gpus > 1:
             dist.init_process_group(backend="nccl")
             rank = dist.get_rank()
+            # args.rank = rank
             console.log(f"Using {n_gpus} GPUs.")
             device = torch.device(f"cuda:{rank}")
             args.num_gpu = n_gpus
