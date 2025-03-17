@@ -469,9 +469,13 @@ def train_multi_gpu_ringattn(
 
                     if (args.debug) and (rank == 0):
                         console.log("Logging nvidia-smi with micro_input")
-                        run_nvidia_smi(console=console)
+                        # run_nvidia_smi(console=console)
                         console.log(
-                            f"Micro input: {[micro_input[key].size() for key in micro_input]}"
+                            "=" * 100
+                            + "\n" * 2
+                            + f"Micro input at : {[micro_input[key].size() for key in micro_input]}"
+                            + "\n" * 2
+                            + "=" * 100
                         )
 
                     graph = batch["graph"][i]
