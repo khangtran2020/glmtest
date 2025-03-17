@@ -15,7 +15,7 @@ from data.loader import GLMFDataset, collate_fn
 from model.model import GLMFModelForCausalLM, GLMFModelConfig
 from transformers import AdamW
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
-from train.utils import patch_model
+from train.utils import patch_model, run_nvidia_smi
 from accelerate import Accelerator
 
 
@@ -402,6 +402,7 @@ def train_multi_gpu_ringattn(
     optimizer.zero_grad()
     # model, optimizer, tr_loader = accelerator.prepare(model, optimizer, tr_loader)
     console.log("Model & optimizer prepared for multi-GPU training.")
+    run_nvidia_smi(console=console)
 
     with Progress(
         SpinnerColumn(),  # Shows a spinner
@@ -443,6 +444,9 @@ def train_multi_gpu_ringattn(
                         "attention_mask": batch_input["attention_mask"][i].to(device),
                         "labels": batch_input["labels"][i].to(device),
                     }
+
+                    console.log("Logging nvidia-smi with micro_input")
+                    run_nvidia_smi(console=console)
 
                     if (args.debug) and (rank == 0):
                         console.log(f"Micro input: {micro_input}")

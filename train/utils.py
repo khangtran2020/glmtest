@@ -1,6 +1,7 @@
 import os
 import copy
 import torch
+import subprocess
 import transformers
 import torch.distributed as dist
 
@@ -9,6 +10,7 @@ from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding
 from ring_flash_attn.zigzag_ring_flash_attn import zigzag_ring_flash_attn_func
 from transformers.modeling_flash_attention_utils import _flash_attention_forward
 from typing import Optional
+from rich.console import Console
 
 old_flash_attn = _flash_attention_forward
 
@@ -146,3 +148,20 @@ def longlora_flash_attention_forward(
     )
 
     return attn_output
+
+
+def run_nvidia_smi(console: Console):
+    try:
+        # Run the command and capture output
+        result = subprocess.run(
+            ["nvidia-smi"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,  # This makes stdout and stderr strings instead of bytes
+        )
+        if result.returncode == 0:
+            console.log("nvidia-smi output:\n", result.stdout)
+        else:
+            console.log("Error executing nvidia-smi:\n", result.stderr)
+    except Exception as e:
+        console.log("An exception occurred:", e)
