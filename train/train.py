@@ -401,7 +401,9 @@ def train_multi_gpu_ringattn(
     # Zero gradients initially.
     optimizer.zero_grad()
     # model, optimizer, tr_loader = accelerator.prepare(model, optimizer, tr_loader)
-    console.log("Model & optimizer prepared for multi-GPU training.")
+    console.log(
+        f"Model & optimizer prepared for multi-GPU training with device: {device}"
+    )
     run_nvidia_smi(console=console)
 
     with Progress(
