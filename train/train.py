@@ -375,6 +375,7 @@ def train_multi_gpu_ringattn(
         config=config,
         baseline_prompt=args.baseline_prompt,
         tokenizer=tokenizer,
+        multi_gpu=True,
         debug=args.debug,
     )
     tokenizer = dataset.llm_tokenizer
