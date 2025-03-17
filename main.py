@@ -63,13 +63,21 @@ if __name__ == "__main__":
 
     # count number of gpus
     if torch.cuda.is_available():
-        dist.init_process_group(backend="nccl")
-        rank = dist.get_rank()
-        console.log("Using 1 GPU.")
-        device = torch.device(f"cuda:{rank}")
+        n_gpus = torch.cuda.device_count()
+        if n_gpus > 1:
+            dist.init_process_group(backend="nccl")
+            rank = dist.get_rank()
+            console.log(f"Using {n_gpus} GPUs.")
+            device = torch.device(f"cuda:{rank}")
+            args.num_gpu = n_gpus
+        else:
+            console.log("Using 1 GPU.")
+            device = torch.device(f"cuda:0")
+            rank = 0
     else:
         n_gpus = 0
         console.log("No GPUs available, using CPU instead.")
         device = torch.device("cpu")
+        rank = -1
 
     main(args=args, logger=console, device=device, rank=rank)
