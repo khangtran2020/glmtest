@@ -62,9 +62,10 @@ class TestGenEval(Data):
                     logger.log(
                         "Found data.jsonl file, but not processed. PLEASE RUN `process_raw`"
                     )
-        self.logger.log(
-            f"Initialized {self.name} dataset, with model on device: {self.feat_model.device}"
-        )
+        if self.feat_model is not None:
+            self.logger.log(
+                f"Initialized {self.name} dataset, with model on device: {self.feat_model.device}"
+            )
 
     def crawl(self) -> None:
         info = f"""To crawl this data, please do as following:
