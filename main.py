@@ -12,7 +12,7 @@ from argparse import Namespace
 from rich.console import Console
 
 
-def main(args: Namespace, logger: Console, device: torch.device) -> None:
+def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> None:
 
     # init data
 
@@ -53,12 +53,7 @@ def main(args: Namespace, logger: Console, device: torch.device) -> None:
             dataset.prepare_data()
             dataset.train_test_split()
 
-        train(
-            args=args,
-            dataset=dataset,
-            console=console,
-            device=device,
-        )
+        train(args=args, dataset=dataset, console=console, device=device, rank=rank)
 
 
 if __name__ == "__main__":
@@ -68,6 +63,7 @@ if __name__ == "__main__":
 
     # count number of gpus
     if torch.cuda.is_available():
+        dist.init_process_group(backend="nccl")
         rank = dist.get_rank()
         console.log("Using 1 GPU.")
         device = torch.device(f"cuda:{rank}")
@@ -76,4 +72,4 @@ if __name__ == "__main__":
         console.log("No GPUs available, using CPU instead.")
         device = torch.device("cpu")
 
-    main(args=args, logger=console, device=device)
+    main(args=args, logger=console, device=device, rank=rank)
