@@ -55,8 +55,6 @@ def train_single_gpu(
         name=args.name,
         config=vars(args),
     )
-    if args.longlora:
-        patch_model(model_type=args.llm_model, mode="longlora")
 
     if args.model_debug == False:
         tr_dataset = GLMFDataset(
@@ -88,6 +86,9 @@ def train_single_gpu(
         dtype=args.dtype,
         device_map="cuda" if torch.cuda.is_available() else "cpu",
     )
+    if args.longlora:
+        patch_model(model_type=args.llm_model, mode="longlora")
+        setattr(config, "group_size_ratio", 0.25)
     if config.model_type not in ["llama", "qwen2"]:
         raise ValueError(
             f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2'."
