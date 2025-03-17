@@ -11,7 +11,7 @@ echo "JobID: $SLURM_JOB_ID | Full list: $worker_list"
 model_max_length=32768
 rope_theta=3580165449
 
-torchrun --nnodes=$n_node --nproc_per_node=4 --master_port=25001 \
+torchrun --nnodes=$n_node --nproc_per_node=2 --master_port=25001 \
     --master_addr $MASTER_ADDR --node_rank=$CURRENT_RANK \
     main.py --mode train \
     --seed 42 \
