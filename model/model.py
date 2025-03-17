@@ -1,4 +1,5 @@
 import os
+import gc
 import torch
 
 from transformers import AutoModelForCausalLM, AutoConfig
@@ -122,28 +123,24 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if config.dtype == "float16":
             self.llm_model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
-                # load_in_8bit=True,
                 torch_dtype=torch.float16,
                 device_map=config.device_map,
             )
         elif config.dtype == "bfloat16":
             self.llm_model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
-                # load_in_8bit=True,
                 torch_dtype=torch.bfloat16,
                 device_map=config.device_map,
             )
         else:
             self.llm_model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
-                # load_in_8bit=True,
                 device_map=config.device_map,
             )
 
         self.llm_model.resize_token_embeddings(len(tokenizer))
 
         # LoRA init
-
         if config.use_lora:
             lora_config = LoraConfig(
                 r=config.lora_r,
@@ -154,9 +151,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 task_type=TaskType.CAUSAL_LM,
             )
             self.llm_model = get_peft_model(self.llm_model, lora_config)
-
-        # del self.model
-        import gc
 
         gc.collect()
         torch.cuda.empty_cache()
@@ -179,8 +173,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
-        # print("Start")
-        # print(inputs_embeds)
 
         output_attentions = (
             output_attentions
@@ -202,26 +194,13 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             )
 
         if inputs_embeds is None:
-            # print(input_ids)
             inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
-            # print(inputs_embeds.device)
-            # print(inputs_embeds.size())
 
         if (graph is not None) and ("graph" in self.baseline_prompt):
             assert graph_mask is not None
             assert graph_token_index is not None
-            # print("Graph token index ======", graph_token_index)
-            # print("Test Graph")
-            # print(self.config.graph_token_id[1])
-            # print(
-            #     "Assesing info:",
-            #     input_ids.size(),
-            #     self.config.graph_token_id[1],
-            # )
 
-            # index = torch.where(input_ids.to("cpu") == self.config.graph_token_id[1])[1]
             graph_embeds = self.gnn(graph, graph_mask)
-            # print("Graph_embeds: ", graph_embeds.size(), graph_embeds.device)
             graph_embeds = graph_embeds.to(inputs_embeds.device)
             assert (
                 graph_embeds.shape
@@ -236,14 +215,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     inputs_embeds.size(),
                     graph_embeds.size(),
                 )
-            # graph_embeds = self.gnn(graph, graph_mask)
-            # print(graph_embeds)
-            # print("Graph_embeds: ", graph_embeds.size())
-            # assert graph_embeds.size(2) == inputs_embeds.size(2)
+
             inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :] = (
                 graph_embeds
             )
-            # del graph_embeds
 
         if self.debug:
             print("After take graph embedding")

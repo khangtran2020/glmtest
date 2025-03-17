@@ -467,7 +467,7 @@ def train_multi_gpu_ringattn(
                         "labels": batch_input["labels"][i].to(device),
                     }
 
-                    if (args.debug) and (rank == 0):
+                    if args.debug:
                         console.log("Logging nvidia-smi with micro_input")
                         # run_nvidia_smi(console=console)
                         console.log(

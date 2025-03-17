@@ -29,7 +29,7 @@ class MultiGAT(nn.Module):
         self.model_argument = GAT(
             in_feats=in_feats,
             n_hidden=n_hidden,
-            mode = mode,
+            mode=mode,
             hidden_size=hidden_size,
             n_layers=n_layers,
             num_head=num_head,
@@ -38,7 +38,7 @@ class MultiGAT(nn.Module):
         self.model_receiver = GAT(
             in_feats=in_feats,
             n_hidden=n_hidden,
-            mode = mode,
+            mode=mode,
             hidden_size=hidden_size,
             n_layers=n_layers,
             num_head=num_head,
@@ -47,7 +47,7 @@ class MultiGAT(nn.Module):
         self.model_call = GAT(
             in_feats=in_feats,
             n_hidden=n_hidden,
-            mode = mode,
+            mode=mode,
             hidden_size=hidden_size,
             n_layers=n_layers,
             num_head=num_head,
@@ -56,7 +56,7 @@ class MultiGAT(nn.Module):
         self.model_reaching_def = GAT(
             in_feats=in_feats,
             n_hidden=n_hidden,
-            mode = mode,
+            mode=mode,
             hidden_size=hidden_size,
             n_layers=n_layers,
             num_head=num_head,
@@ -65,7 +65,7 @@ class MultiGAT(nn.Module):
         self.model_cdg = GAT(
             in_feats=in_feats,
             n_hidden=n_hidden,
-            mode = mode,
+            mode=mode,
             hidden_size=hidden_size,
             n_layers=n_layers,
             num_head=num_head,
@@ -74,7 +74,7 @@ class MultiGAT(nn.Module):
         self.model_cfg = GAT(
             in_feats=in_feats,
             n_hidden=n_hidden,
-            mode = mode,
+            mode=mode,
             hidden_size=hidden_size,
             n_layers=n_layers,
             num_head=num_head,
@@ -83,7 +83,7 @@ class MultiGAT(nn.Module):
         self.model_ast = GAT(
             in_feats=in_feats,
             n_hidden=n_hidden,
-            mode = mode,
+            mode=mode,
             hidden_size=hidden_size,
             n_layers=n_layers,
             num_head=num_head,
@@ -222,7 +222,7 @@ class GAT(nn.Module):
         self.last_layer = torch.nn.Linear(
             in_features=n_hidden * num_head, out_features=hidden_size
         )
-        assert mode in ["branch","node"]
+        assert mode in ["branch", "node"]
         self.mode = mode
 
         self.n_layers = n_layers
@@ -251,8 +251,8 @@ class GAT(nn.Module):
             h = self.layers[i](blocks[i], (h, h_dst))
             h = self.activation(h)
             h = h.flatten(1)
-            
-        h = h * (mask.view(-1,1))
+
+        h = h * (mask.view(-1, 1))
         if self.mode == "branch":
             # h = h * mask
             h = h.mean(0)
@@ -272,9 +272,9 @@ class GAT(nn.Module):
         h = self.last_layer(h)
         h = self.activation(h)
         h = h.flatten(1)
-        # print(h)   
-        h = h * (mask.view(-1,1))
-        temp = self.get_index_by_value(mask[0],1)
+        # print(h)
+        h = h * (mask.view(-1, 1))
+        temp = self.get_index_by_value(mask[0], 1)
         if self.mode == "branch":
             h = h.mean(0)
         else:
@@ -282,5 +282,5 @@ class GAT(nn.Module):
         # h = h.mean(0)
         return h
 
-    def get_index_by_value(self,a,val):
-        return (a==val).nonzero(as_tuple=True)[0]
+    def get_index_by_value(self, a, val):
+        return (a == val).nonzero(as_tuple=True)[0]
