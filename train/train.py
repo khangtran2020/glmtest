@@ -391,9 +391,6 @@ def train_multi_gpu_ringattn(
     config.rope_theta = args.rope_theta
     config.max_position_embeddings = args.model_max_length
 
-    # device = accelerator.device
-    # barrier()
-
     model.to(device)
     model.train()
     optimizer = AdamW(
@@ -458,7 +455,7 @@ def train_multi_gpu_ringattn(
                         console.log(
                             "=" * 100
                             + "\n" * 2
-                            + f"Micro input at : {[micro_input[key].size() for key in micro_input]}"
+                            + f"Micro input at rank {rank} | step {global_step}: {[micro_input[key].size() for key in micro_input]}"
                             + "\n" * 2
                             + "=" * 100
                         )
