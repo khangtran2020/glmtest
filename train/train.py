@@ -343,11 +343,11 @@ def train_multi_gpu_ringattn(
             va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
         )
 
-        if rank == 0:
-            barrier()
-            console.log("Data prepared:")
-            console.log(f"Train data: {len(tr_dataset)} data points")
-            console.log(f"Valid data: {len(va_dataset)} data points")
+        # if rank == 0:
+        barrier()
+        console.log("Data prepared:")
+        console.log(f"Train data: {len(tr_dataset)} data points")
+        console.log(f"Valid data: {len(va_dataset)} data points")
 
     tokenizer = dataset.llm_tokenizer
     config = GLMFModelConfig(
@@ -403,6 +403,7 @@ def train_multi_gpu_ringattn(
         f"Model & optimizer prepared for multi-GPU training with device: {device}"
     )
     run_nvidia_smi(console=console)
+    barrier()
 
     with Progress(
         SpinnerColumn(),  # Shows a spinner
