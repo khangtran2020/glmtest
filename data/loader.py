@@ -32,8 +32,8 @@ class GLMFDataset(Dataset):
         # Tokenize text input
         tokenized = self.tokenize(full_text)
 
-        if self.debug:
-            print(tokenized["labels"].size())
+        # if self.debug:
+        #     print(tokenized["labels"].size())
 
         tokenized_user_prompt = self.tokenizer(sample["prompt"])
         user_prompt_len = len(tokenized_user_prompt["input_ids"])

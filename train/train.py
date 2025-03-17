@@ -115,24 +115,9 @@ def train_single_gpu(
         debug=args.debug,
         rank=rank,
     )
-    # tokenizer = dataset.llm_tokenizer
 
     if args.debug:
         console.log(f"Model initialized with config: {config}")
-    # special_tokens_dict = {
-    #     "additional_special_tokens": [
-    #         GRAPH_START_TOKEN,
-    #         GRAPH_PAD_TOKEN,
-    #         GRAPH_END_TOKEN,
-    #         FUZZ_START_TOKEN,
-    #         FUZZ_END_TOKEN,
-    #     ]
-    # }
-    # smart_tokenizer_and_embedding_resize(
-    #     special_tokens_dict=special_tokens_dict,
-    #     tokenizer=tokenizer,
-    #     model=model.llm_model,
-    # )
 
     model.config.graph_token_id = [
         tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
