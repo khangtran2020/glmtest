@@ -229,7 +229,11 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             ), "Shape mismatch in assignment!"
 
             if self.debug:
-                print(inputs_embeds.device, graph_embeds.device)
+                print(
+                    "Printing the size of inputs_embeds, and graph_embeds",
+                    inputs_embeds.size(),
+                    graph_embeds.size(),
+                )
             # graph_embeds = self.gnn(graph, graph_mask)
             # print(graph_embeds)
             # print("Graph_embeds: ", graph_embeds.size())

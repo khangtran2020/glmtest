@@ -486,6 +486,7 @@ def train_multi_gpu_ringattn(
                     loss = outputs.loss
                     loss = loss / args.gradient_accumulation_steps
                     loss.backward()
+                    barrier()
                     batch_loss += (
                         outputs.loss.item()
                     )  # For logging (using the unscaled loss).
