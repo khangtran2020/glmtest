@@ -99,12 +99,14 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         tokenizer: PreTrainedTokenizer = None,
         baseline_prompt: str = None,
         multi_gpu: bool = False,
+        debug: bool = False,
     ):
 
         super().__init__(config)
 
         self.baseline_prompt = baseline_prompt
         self.multi_gpu = multi_gpu
+        self.debug = debug
 
         self.gnn = MultiGAT(
             config.mode,
@@ -226,7 +228,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 ].shape
             ), "Shape mismatch in assignment!"
 
-            print(inputs_embeds.device, graph_embeds.device)
+            if self.debug:
+                print(inputs_embeds.device, graph_embeds.device)
             # graph_embeds = self.gnn(graph, graph_mask)
             # print(graph_embeds)
             # print("Graph_embeds: ", graph_embeds.size())
@@ -236,8 +239,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             )
             # del graph_embeds
 
-        print("After take graph embedding")
-        run_nvidia_smi(console=None)
+        if self.debug:
+            print("After take graph embedding")
+            run_nvidia_smi(console=None)
         # print(inputs_embeds.size())
         if self.multi_gpu:
             return self.forward_llm(
@@ -329,6 +333,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         inputs_embeds = extract_local(
             inputs_embeds, rank, num_processes, inputs_embeds.device
         )
+        if self.debug:
+            print(f"Rank {rank} inputs_embeds: {inputs_embeds.size()}")
         if labels is not None:
             labels = extract_local(labels, rank, num_processes, labels.device)
         position_ids = (
