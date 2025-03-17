@@ -128,6 +128,18 @@ def add_training_group(group):
         default=5e-5,
     )
     group.add_argument(
+        "--rope_theta",
+        type=float,
+        help="rope theta",
+        default=500000.0,
+    )
+    group.add_argument(
+        "--model_max_length",
+        type=float,
+        help="model_max_length",
+        default=16384,
+    )
+    group.add_argument(
         "--max_grad_norm",
         type=float,
         help="max gradient norm",
@@ -168,6 +180,7 @@ def add_training_group(group):
         help="name of the run for wandb",
         default="testing",
     )
+    group.add_argument("--longlora", action="store_true", help="Train with LongLoRA")
 
 
 def parse_args():

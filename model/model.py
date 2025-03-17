@@ -9,9 +9,11 @@ from transformers.configuration_utils import PretrainedConfig
 from transformers.generation.utils import GenerationMixin
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.cache_utils import Cache
+import torch.distributed as dist
 
 # from utils.prompter import Prompter
 from model.gnn import MultiGAT
+from train.utils import extract_local
 from peft import get_peft_model, LoraConfig, TaskType
 
 # typing
@@ -90,11 +92,12 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
     config_class = GLMFModelConfig
 
-    def __init__(self, config: GLMFModelConfig, baseline_prompt=None):
+    def __init__(self, config: GLMFModelConfig, baseline_prompt=None, multi_gpu=False):
 
         super().__init__(config)
 
         self.baseline_prompt = baseline_prompt
+        self.multi_gpu = multi_gpu
 
         self.gnn = MultiGAT(
             config.mode,
@@ -225,16 +228,24 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             # del graph_embeds
 
         # print(inputs_embeds.size())
-
-        output = self.llm_model(
-            input_ids=None,
-            inputs_embeds=inputs_embeds,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            use_cache=False,
-            labels=labels,
-        )
-        return output
+        if self.multi_gpu:
+            return self.forward_llm(
+                input_ids=None,
+                inputs_embeds=inputs_embeds,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                use_cache=False,
+                labels=labels,
+            )
+        else:
+            return self.llm_model(
+                input_ids=None,
+                inputs_embeds=inputs_embeds,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                use_cache=False,
+                labels=labels,
+            )
 
     def prepare_inputs_for_generation(
         self,
@@ -284,4 +295,51 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             token=token,
             save_peft_format=save_peft_format,
             **kwargs,
+        )
+
+    def forward_llm(
+        self,
+        input_ids: torch.LongTensor = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        past_key_values: Optional[List[torch.FloatTensor]] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
+        use_cache: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+        cache_position: Optional[torch.LongTensor] = None,
+    ) -> Union[Tuple, CausalLMOutputWithPast]:
+
+        seq_len = input_ids.shape[-1]
+        rank = dist.get_rank()
+        num_processes = dist.get_world_size()
+        inputs_embeds = extract_local(
+            inputs_embeds, rank, num_processes, inputs_embeds.device
+        )
+        if labels is not None:
+            labels = extract_local(labels, rank, num_processes, labels.device)
+        position_ids = (
+            torch.arange(seq_len, device=inputs_embeds.device, dtype=torch.long)
+            .unsqueeze(0)
+            .expand(inputs_embeds.shape[0], -1)
+        )
+        position_ids = extract_local(
+            position_ids, rank, num_processes, position_ids.device
+        )
+
+        return self.llm_model(
+            self=self,
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+            inputs_embeds=inputs_embeds,
+            labels=labels,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            cache_position=cache_position,
         )

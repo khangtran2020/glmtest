@@ -28,6 +28,7 @@ def get_dataset(
     num_cpu: int = -1,
     graph: JoernGraph = None,
     baseline_prompt: str = "code",
+    data_max_length: int = 16384,
     debug: bool = False,
 ) -> Data:
 
@@ -47,7 +48,13 @@ def get_dataset(
         ]
     }
 
-    llm_tokenizer = AutoTokenizer.from_pretrained(llm_model, trust_remote_code=True)
+    llm_tokenizer = AutoTokenizer.from_pretrained(
+        llm_model,
+        trust_remote_code=True,
+        model_max_length=data_max_length,
+        padding_side="right",
+        use_fast=True,
+    )
     llm_tokenizer.add_special_tokens(special_tokens_dict)
 
     if data_name == "ossfuzz":

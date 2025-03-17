@@ -37,6 +37,7 @@ def main(args: Namespace, logger: Console, device: torch.device) -> None:
         docker_image=args.docker_image,
         num_cpu=args.num_cpu,
         graph=graph,
+        data_max_length=args.model_max_length,
         baseline_prompt=args.baseline_prompt,
         debug=args.debug,
     )
