@@ -57,6 +57,7 @@ def train_single_gpu(
     console: Console,
     device: torch.device,
     collate_fn: callable = collate_fn,
+    rank: int = 0,
 ):
     # init wandb
     wandb.init(
@@ -112,6 +113,7 @@ def train_single_gpu(
         tokenizer=tokenizer,
         baseline_prompt=args.baseline_prompt,
         debug=args.debug,
+        rank=rank,
     )
     # tokenizer = dataset.llm_tokenizer
 
@@ -377,6 +379,7 @@ def train_multi_gpu_ringattn(
         tokenizer=tokenizer,
         multi_gpu=True,
         debug=args.debug,
+        rank=rank,
     )
     tokenizer = dataset.llm_tokenizer
     model.llm_model.resize_token_embeddings(len(tokenizer))

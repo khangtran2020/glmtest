@@ -96,6 +96,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
     def __init__(
         self,
         config: GLMFModelConfig,
+        rank: int,
         tokenizer: PreTrainedTokenizer = None,
         baseline_prompt: str = None,
         multi_gpu: bool = False,
@@ -107,6 +108,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         self.baseline_prompt = baseline_prompt
         self.multi_gpu = multi_gpu
         self.debug = debug
+        self.rank = rank
 
         self.gnn = MultiGAT(
             config.mode,
@@ -332,7 +334,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
         seq_len = inputs_embeds.shape[-2]
-        rank = int(os.environ["LOCAL_RANK"])
+        rank = self.rank
         num_processes = dist.get_world_size()
         inputs_embeds = extract_local(
             inputs_embeds, rank, num_processes, inputs_embeds.device
