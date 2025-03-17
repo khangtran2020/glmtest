@@ -60,6 +60,7 @@ def main(
             dataset=dataset,
             console=console,
             device=device,
+            accelerator=accelerator,
         )
 
 
@@ -86,4 +87,5 @@ if __name__ == "__main__":
         device = torch.device("cpu")
         accelerator = None
 
+    console.log(f"Using acclerator: {accelerator}")
     main(args=args, logger=console, device=device, accelerator=accelerator)
