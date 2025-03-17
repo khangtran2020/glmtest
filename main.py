@@ -1,3 +1,4 @@
+import os
 import torch
 from config import parse_args
 from utils.console import console
@@ -68,7 +69,7 @@ if __name__ == "__main__":
         n_gpus = torch.cuda.device_count()
         if n_gpus > 1:
             dist.init_process_group(backend="nccl")
-            rank = dist.get_rank()
+            rank = int(os.environ["LOCAL_RANK"])  # Get local rank assigned by torchrun
             # args.rank = rank
             console.log(f"Using {n_gpus} GPUs.")
             device = torch.device(f"cuda:{rank}")
