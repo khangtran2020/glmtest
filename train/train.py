@@ -30,7 +30,6 @@ def train(
     console: Console,
     device: torch.device,
     collate_fn: callable = collate_fn,
-    accelerator: Accelerator = None,
 ):
     if args.num_gpu == 1:
         train_single_gpu(
@@ -47,7 +46,6 @@ def train(
             console=console,
             device=device,
             collate_fn=collate_fn,
-            accelerator=accelerator,
         )
 
 
@@ -315,7 +313,7 @@ def train_multi_gpu_ringattn(
     collate_fn: callable = collate_fn,
     accelerator: Accelerator = None,
 ):
-    # dist.init_process_group(backend="nccl")
+    dist.init_process_group(backend="nccl")
     rank = dist.get_rank()
 
     if rank == 0:
