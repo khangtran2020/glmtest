@@ -1,6 +1,7 @@
 master_addr=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 export MASTER_ADDR=${master_addr:-"127.0.0.1"}
 export CURRENT_RANK=${SLURM_PROCID:-"0"}
+export OMP_NUM_THREADS=1
 worker_list=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | tr '\n' ' ')
 n_node=${SLURM_JOB_NUM_NODES:-1}
 
