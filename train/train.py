@@ -487,11 +487,12 @@ def train_multi_gpu_ringattn(
 
                 # Log average loss for this batch.
                 avg_batch_loss = batch_loss / batch_size
-                progress.update(
-                    train_epoch_task,
-                    advance=1,
-                    description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f}",
-                )
+                if rank == 0:
+                    progress.update(
+                        train_epoch_task,
+                        advance=1,
+                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f}",
+                    )
                 epoch_loss += avg_batch_loss * batch_size
                 num_items += batch_size
 
