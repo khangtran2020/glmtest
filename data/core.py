@@ -536,7 +536,7 @@ class Data(object):
             os.path.join(
                 self.data_path, f"processed_prompt_{self.baseline_prompt}.pkl"
             ),
-            "w",
+            "wb",
         ) as file:
             pickle.dump(self.processed_data, file)
         self.logger.log("[green]Data is ready![/green]")
