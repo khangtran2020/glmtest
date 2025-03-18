@@ -2,6 +2,7 @@ import os
 import ast
 import dgl
 import json
+import pickle
 import torch
 import numpy as np
 import pandas as pd
@@ -460,17 +461,15 @@ class Data(object):
         assert self.data is not None
 
         if os.path.exists(
-            os.path.join(
-                self.data_path, f"processed_prompt_{self.baseline_prompt}.json"
-            )
+            os.path.join(self.data_path, f"processed_prompt_{self.baseline_prompt}.pkl")
         ):
             with open(
                 os.path.join(
-                    self.data_path, f"processed_prompt_{self.baseline_prompt}.json"
+                    self.data_path, f"processed_prompt_{self.baseline_prompt}.pkl"
                 ),
                 "r",
             ) as file:
-                self.processed_data = json.load(file)
+                self.processed_data = pickle.load(file)
 
             num_tokens = []
             for data in self.processed_data:
@@ -535,11 +534,11 @@ class Data(object):
 
         with open(
             os.path.join(
-                self.data_path, f"processed_prompt_{self.baseline_prompt}.json"
+                self.data_path, f"processed_prompt_{self.baseline_prompt}.pkl"
             ),
             "w",
         ) as file:
-            json.dump(self.processed_data, file, indent=4)
+            pickle.dump(self.processed_data, file)
         self.logger.log("[green]Data is ready![/green]")
         self.logger.log(f"Size of data data: {len(self.processed_data)}")
         if self.debug:
