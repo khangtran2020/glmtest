@@ -487,12 +487,11 @@ def train_multi_gpu_ringattn(
                     loss = outputs.loss
                     loss = loss / args.gradient_accumulation_steps
                     loss.backward()
+                    batch_loss += outputs.loss.item()
                     del outputs, loss  # Free memory
                     torch.cuda.empty_cache()
                     barrier()
-                    batch_loss += (
-                        outputs.loss.item()
-                    )  # For logging (using the unscaled loss).
+                    # For logging (using the unscaled loss).
 
                     # Update parameters once enough gradients have been accumulated.
                     if global_step % args.gradient_accumulation_steps == 0:
