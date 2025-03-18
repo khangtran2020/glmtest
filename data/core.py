@@ -510,7 +510,11 @@ class Data(object):
             # self.logger.log(f"Sample prompt: {full_text}")
             # self.logger.log(f"Branch line: {branch_line}")
         quartiles = np.quantile(num_tokens, [0, 0.25, 0.5, 0.75, 1])
-        self.logger.log(f"Statistics of # tokens: {quartiles}")
+        max_num_tokens = max(num_tokens)
+        min_num_tokens = min(num_tokens)
+        self.logger.log(
+            f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}"
+        )
 
     def read_graph(self, data: dict) -> dict:
 
