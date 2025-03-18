@@ -178,7 +178,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if self.debug:
             print("=" * 100 + f"Rank {self.rank} - Step {step}" + "\n\n")
             print(
-                f"Before take graph embedding, size of inputs_embeds: {inputs_embeds.size()}"
+                f"Before take graph embedding, size of inputs_embeds: {input_ids.size()}"
             )
             print("\n\n" + "=" * 100)
             # run_nvidia_smi(console=None)
