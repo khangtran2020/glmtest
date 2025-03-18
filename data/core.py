@@ -532,6 +532,8 @@ class Data(object):
                     }
                     self.processed_data.append(data)
 
+                self.logger.log(f"Size of data data: {len(num_tokens)}")
+
         with open(
             os.path.join(prompt_path),
             "w",
