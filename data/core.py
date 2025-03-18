@@ -475,12 +475,12 @@ class Data(object):
             self.processed_data = []
             if processed_prompt == False:
                 prompts = {}
+            num_tokens = []
             for uuid, dat in self.data.items():
                 with open(dat["code_path"], "r") as file:
                     src_code = file.read()
                 graph = self.read_graph(dat)
                 mask = torch.load(dat["graph"]["mask_path"], weights_only=True)
-                num_tokens = []
                 for testcase in dat["test_cases"].keys():
                     test_code = dat["test_cases"][testcase]["test_case"]
                     test_code = self.add_fuzz_tags(test_code)
@@ -531,8 +531,6 @@ class Data(object):
                         "full_text": full_text,
                     }
                     self.processed_data.append(data)
-
-                self.logger.log(f"Size of data data: {len(num_tokens)}")
 
         with open(
             os.path.join(prompt_path),
