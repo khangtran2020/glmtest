@@ -547,7 +547,7 @@ class Data(object):
         max_num_tokens = max(num_tokens)
         min_num_tokens = min(num_tokens)
         self.logger.log(
-            f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}"
+            f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_token)}"
         )
 
     def read_graph(self, data: dict) -> dict:

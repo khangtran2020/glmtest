@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizer
 from typing import List, Dict, Any
+from utils.constant import GRAPH_PAD_TOKEN
 
 
 class GLMFDataset(Dataset):
@@ -17,7 +18,7 @@ class GLMFDataset(Dataset):
         self.tokenizer = tokenizer
         self.baseline_prompt = baseline_prompt
         self.max_seq_length = max_seq_length
-        self.graph_token_id = self.tokenizer.convert_tokens_to_ids(["<|graph_pad|>"])[0]
+        self.graph_token_id = self.tokenizer.convert_tokens_to_ids([GRAPH_PAD_TOKEN])[0]
         self.debug = debug
 
     def __len__(self):
