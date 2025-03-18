@@ -175,6 +175,14 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         step: int = 0,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
+        if self.debug:
+            print("=" * 100 + f"Rank {self.rank} - Step {step}" + "\n\n")
+            print(
+                f"Before take graph embedding, size of inputs_embeds: {inputs_embeds.size()}"
+            )
+            print("\n\n" + "=" * 100)
+            # run_nvidia_smi(console=None)
+
         output_attentions = (
             output_attentions
             if output_attentions is not None
@@ -220,6 +228,13 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :] = (
                 graph_embeds
             )
+
+            if self.debug:
+                print("=" * 100 + f"Rank {self.rank} - Step {step}" + "\n\n")
+                print(
+                    f"After take graph embedding, size of inputs_embeds: {inputs_embeds.size()}"
+                )
+                print("\n\n" + "=" * 100)
 
         if self.debug:
             print("After take graph embedding")
