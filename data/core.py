@@ -458,6 +458,35 @@ class Data(object):
         Prepare the training data for the model
         """
         assert self.data is not None
+
+        if os.path.exists(
+            os.path.join(
+                self.data_path, f"processed_prompt_{self.baseline_prompt}.json"
+            )
+        ):
+            with open(
+                os.path.join(
+                    self.data_path, f"processed_prompt_{self.baseline_prompt}.json"
+                ),
+                "r",
+            ) as file:
+                self.processed_data = json.load(file)
+
+            num_tokens = []
+            for data in self.processed_data:
+                num_token = len(self.llm_tokenizer.tokenize(data["full_text"]))
+                num_tokens.append(num_token)
+
+            self.logger.log("[green]Data is ready![/green]")
+            self.logger.log(f"Size of data data: {len(self.processed_data)}")
+            quartiles = np.quantile(num_tokens, [0, 0.25, 0.5, 0.75, 1])
+            max_num_tokens = max(num_tokens)
+            min_num_tokens = min(num_tokens)
+            self.logger.log(
+                f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}"
+            )
+            return
+
         with self.logger.status("[green]Preparing data...[/green]"):
             self.processed_data = []
             for uuid, dat in self.data.items():
@@ -503,6 +532,14 @@ class Data(object):
                         "mask": mask[mask_key],
                     }
                     self.processed_data.append(data)
+
+        with open(
+            os.path.join(
+                self.data_path, f"processed_prompt_{self.baseline_prompt}.json"
+            ),
+            "w",
+        ) as file:
+            json.dump(self.processed_data, file, indent=4)
         self.logger.log("[green]Data is ready![/green]")
         self.logger.log(f"Size of data data: {len(self.processed_data)}")
         if self.debug:
