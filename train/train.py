@@ -487,6 +487,7 @@ def train_multi_gpu_ringattn(
                     loss = outputs.loss
                     loss = loss / args.gradient_accumulation_steps
                     loss.backward()
+
                     batch_loss += outputs.loss.item()
                     del outputs, loss, micro_input, graph, graph_mask  # Free memory
                     torch.cuda.empty_cache()
@@ -499,7 +500,7 @@ def train_multi_gpu_ringattn(
                             model.parameters(), max_norm=args.max_grad_norm
                         )
                         optimizer.step()  # Update parameters.
-                        optimizer.zero_grad()  # Reset gradients.
+                        optimizer.zero_grad(set_to_none=True)  # Reset gradients.
 
                 # Log average loss for this batch.
                 avg_batch_loss = batch_loss / batch_size
@@ -575,3 +576,7 @@ def train_multi_gpu_ringattn(
 
         model.save_pretrained(args.output_dir)
         tokenizer.save_pretrained(args.output_dir)
+
+
+def update_model():
+    pass
