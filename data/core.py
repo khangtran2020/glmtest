@@ -467,7 +467,7 @@ class Data(object):
                 os.path.join(
                     self.data_path, f"processed_prompt_{self.baseline_prompt}.pkl"
                 ),
-                "r",
+                "rb",
             ) as file:
                 self.processed_data = pickle.load(file)
 
