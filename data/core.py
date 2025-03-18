@@ -2,7 +2,6 @@ import os
 import ast
 import dgl
 import json
-import pickle
 import torch
 import numpy as np
 import pandas as pd
@@ -460,34 +459,22 @@ class Data(object):
         """
         assert self.data is not None
 
-        if os.path.exists(
-            os.path.join(self.data_path, f"processed_prompt_{self.baseline_prompt}.pkl")
-        ):
+        processed_prompt = False
+        prompt_path = os.path.join(
+            self.data_path, f"processed_prompt_{self.baseline_prompt}.json"
+        )
+        if os.path.exists(prompt_path):
             with open(
-                os.path.join(
-                    self.data_path, f"processed_prompt_{self.baseline_prompt}.pkl"
-                ),
-                "rb",
+                prompt_path,
+                "r",
             ) as file:
-                self.processed_data = pickle.load(file)
-
-            num_tokens = []
-            for data in self.processed_data:
-                num_token = len(self.llm_tokenizer.tokenize(data["full_text"]))
-                num_tokens.append(num_token)
-
-            self.logger.log("[green]Data is ready![/green]")
-            self.logger.log(f"Size of data data: {len(self.processed_data)}")
-            quartiles = np.quantile(num_tokens, [0, 0.25, 0.5, 0.75, 1])
-            max_num_tokens = max(num_tokens)
-            min_num_tokens = min(num_tokens)
-            self.logger.log(
-                f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}"
-            )
-            return
+                prompts = json.load(file)
+            processed_prompt = True
 
         with self.logger.status("[green]Preparing data...[/green]"):
             self.processed_data = []
+            if processed_prompt == False:
+                prompts = {}
             for uuid, dat in self.data.items():
                 with open(dat["code_path"], "r") as file:
                     src_code = file.read()
@@ -504,16 +491,24 @@ class Data(object):
                     branch_line = dat["test_cases"][testcase]["branch"]
                     active_node = get_index_by_value(a=branch, val=1)
                     # self.logger.log("Preparing prompts for {}...".format(testcase))
-                    result = self.get_prompt(
-                        src_code=src_code,
-                        testcase_out=test_code,
-                        mask=active_node,
-                        tokenizer=self.llm_tokenizer,
-                        branch=branch_line,
-                    )
-                    if result is None:
-                        continue
-                    prompt, response, full_text = result
+                    if processed_prompt == False:
+                        result = self.get_prompt(
+                            src_code=src_code,
+                            testcase_out=test_code,
+                            mask=active_node,
+                            tokenizer=self.llm_tokenizer,
+                            branch=branch_line,
+                        )
+                        if result is None:
+                            continue
+                        prompt, response, full_text = result
+                    else:
+                        if f"{uuid}_{testcase}" not in prompts.keys():
+                            continue
+                        prompt = prompts[f"{uuid}_{testcase}"]["prompt"]
+                        response = prompts[f"{uuid}_{testcase}"]["response"]
+                        full_text = prompts[f"{uuid}_{testcase}"]["full_text"]
+
                     num_token = len(self.llm_tokenizer.tokenize(full_text))
                     num_tokens.append(num_token)
 
@@ -530,15 +525,18 @@ class Data(object):
                         "graph": graph_dict,
                         "mask": mask[mask_key],
                     }
+                    prompts[f"{uuid}_{testcase}"] = {
+                        "prompt": prompt,
+                        "response": response,
+                        "full_text": full_text,
+                    }
                     self.processed_data.append(data)
 
         with open(
-            os.path.join(
-                self.data_path, f"processed_prompt_{self.baseline_prompt}.pkl"
-            ),
-            "wb",
+            os.path.join(prompt_path),
+            "w",
         ) as file:
-            pickle.dump(self.processed_data, file)
+            json.dump(self.processed_data, prompts)
         self.logger.log("[green]Data is ready![/green]")
         self.logger.log(f"Size of data data: {len(self.processed_data)}")
         if self.debug:
