@@ -536,7 +536,7 @@ class Data(object):
             os.path.join(prompt_path),
             "w",
         ) as file:
-            json.dump(self.processed_data, prompts)
+            json.dump(prompts, file, indent=4)
         self.logger.log("[green]Data is ready![/green]")
         self.logger.log(f"Size of data data: {len(self.processed_data)}")
         if self.debug:

@@ -377,7 +377,7 @@ def train_multi_gpu_ringattn(
         debug=args.debug,
         rank=rank,
     )
-    tokenizer = dataset.llm_tokenizer
+    # tokenizer = dataset.llm_tokenizer
     model.llm_model.resize_token_embeddings(len(tokenizer))
     if (args.debug) and (rank == 0):
         console.log(f"Model initialized with config: {config}")

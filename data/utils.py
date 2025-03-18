@@ -58,7 +58,7 @@ def get_dataset(
         trust_remote_code=True,
         model_max_length=data_max_length,
         padding_side="right",
-        use_fast=True,
+        use_fast=False,
     )
     llm_tokenizer.add_special_tokens(special_tokens_dict)
 
