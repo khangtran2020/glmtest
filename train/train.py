@@ -330,7 +330,7 @@ def train_multi_gpu_ringattn(
         dataloader_params = {
             "batch_size": args.batch_size,
             "collate_fn": collate_fn,
-            "num_workers": 64,
+            "num_workers": 4,
             "pin_memory": True,
             "persistent_workers": True,
         }
@@ -487,6 +487,8 @@ def train_multi_gpu_ringattn(
                     loss = outputs.loss
                     loss = loss / args.gradient_accumulation_steps
                     loss.backward()
+                    del outputs, loss  # Free memory
+                    torch.cuda.empty_cache()
                     barrier()
                     batch_loss += (
                         outputs.loss.item()
