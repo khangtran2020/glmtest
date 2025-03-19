@@ -3,7 +3,7 @@ accelerate launch main.py --mode train \
     --data_path Dataset \
     --data testgeneval \
     --baseline_prompt code_tr \
-    --llm_model "HuggingFaceTB/SmolLM2-135M-Instruct" \
+    --llm_model "Qwen/CodeQwen1.5-7B-Chat" \
     --max_seq_len 16384 \
     --batch_size 1 \
     --gradient_accumulation_steps 16 \
