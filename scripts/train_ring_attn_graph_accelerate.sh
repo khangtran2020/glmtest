@@ -6,7 +6,7 @@ accelerate launch main.py --mode train \
     --llm_model "Qwen/CodeQwen1.5-7B-Chat" \
     --max_seq_len 16384 \
     --batch_size 1 \
-    --gradient_accumulation_steps 16 \
+    --gradient_accumulation_steps 1 \
     --num_gpu 2 \
     --output_dir "./results/models/" \
     --overwrite_output_dir \
