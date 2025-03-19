@@ -97,6 +97,12 @@ def add_training_group(group):
         help="output directory to save model",
     )
     group.add_argument(
+        "--log_dir",
+        default="./logs/",
+        type=str,
+        help="output directory to save model",
+    )
+    group.add_argument(
         "--overwrite_output_dir",
         action="store_true",
         help="overwrite output directory",
@@ -169,6 +175,12 @@ def add_training_group(group):
         default=200,
     )
     group.add_argument(
+        "--save_steps",
+        type=int,
+        help="number of steps to save checkpoint",
+        default=200,
+    )
+    group.add_argument(
         "--validating_steps",
         type=int,
         help="number of steps to validate",
@@ -181,6 +193,11 @@ def add_training_group(group):
         default="testing",
     )
     group.add_argument("--longlora", action="store_true", help="Train with LongLoRA")
+    group.add_argument(
+        "--use_accelerate",
+        action="store_true",
+        help="Train with accelerate",
+    )
 
 
 def parse_args():

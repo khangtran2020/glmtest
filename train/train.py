@@ -13,7 +13,8 @@ import torch.distributed as dist
 from torch.distributed import barrier
 from data.loader import GLMFDataset, collate_fn
 from model.model import GLMFModelForCausalLM, GLMFModelConfig
-from transformers import AdamW
+from transformers import AdamW, get_scheduler
+from accelerate import Accelerator
 from transformers.trainer_utils import seed_worker
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from train.utils import patch_model, run_nvidia_smi
@@ -32,23 +33,28 @@ def train(
     collate_fn: callable = collate_fn,
     rank: int = 0,
 ):
-    if args.num_gpu == 1:
-        train_single_gpu(
-            args=args,
-            dataset=dataset,
-            console=console,
-            device=device,
-            collate_fn=collate_fn,
+    if args.use_accelerate:
+        train_single_gpu_accelerate(
+            args=args, dataset=dataset, console=console, collate_fn=collate_fn, rank=-1
         )
-    elif args.num_gpu > 1:
-        train_multi_gpu_ringattn(
-            args=args,
-            dataset=dataset,
-            console=console,
-            device=device,
-            collate_fn=collate_fn,
-            rank=rank,
-        )
+    else:
+        if args.num_gpu == 1:
+            train_single_gpu(
+                args=args,
+                dataset=dataset,
+                console=console,
+                device=device,
+                collate_fn=collate_fn,
+            )
+        elif args.num_gpu > 1:
+            train_multi_gpu_ringattn(
+                args=args,
+                dataset=dataset,
+                console=console,
+                device=device,
+                collate_fn=collate_fn,
+                rank=rank,
+            )
 
 
 def train_single_gpu(
@@ -59,6 +65,7 @@ def train_single_gpu(
     collate_fn: callable = collate_fn,
     rank: int = 0,
 ):
+
     # init wandb
     wandb.init(
         project="GLMFuzz",
@@ -578,5 +585,329 @@ def train_multi_gpu_ringattn(
         tokenizer.save_pretrained(args.output_dir)
 
 
-def update_model():
-    pass
+def train_single_gpu_accelerate(
+    args: Namespace,
+    dataset: GLMFDataset,
+    console: Console,
+    collate_fn: callable = collate_fn,
+    rank: int = 0,
+    mixed_precision: str = "bf16",
+):
+
+    # init wandb
+    wandb.init(
+        project="GLMFuzz",
+        name=args.name,
+        config=vars(args),
+    )
+
+    accelerator = Accelerator(
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
+        mixed_precision=mixed_precision,
+        log_with="wandb",
+        project_dir=args.log_dir,
+    )
+
+    # Initialize W&B run if main process
+    if accelerator.is_main_process:
+        accelerator.init_trackers(
+            project_name="GLMFuzz",
+            config={
+                "model_name": args.llm_model,
+                "dataset": args.data,
+                "learning_rate": args.learning_rate,
+                "batch_size": args.batch_size,
+                "gradient_accumulation_steps": args.gradient_accumulation_steps,
+                "effective_batch_size": args.batch_size
+                * args.gradient_accumulation_steps
+                * accelerator.num_processes,
+                "max_steps": args.num_train_epochs,
+                "mixed_precision": mixed_precision,
+                "seed": args.seed,
+            },
+            init_kwargs={"wandb": {"name": args.name}},
+        )
+
+    device = accelerator.device
+    accelerator.print(f"Using {accelerator.num_processes} devices")
+    accelerator.print(f"Mixed precision: {mixed_precision}")
+
+    if args.model_debug == False:
+        tr_dataset = GLMFDataset(
+            data=dataset.train_data,
+            tokenizer=dataset.llm_tokenizer,
+            max_seq_length=args.max_seq_length,
+            debug=args.debug,
+        )
+        va_dataset = GLMFDataset(
+            data=dataset.val_data,
+            tokenizer=dataset.llm_tokenizer,
+            max_seq_length=args.max_seq_length,
+            debug=args.debug,
+        )
+        tr_loader = DataLoader(
+            tr_dataset, batch_size=1, shuffle=True, collate_fn=collate_fn
+        )
+        va_loader = DataLoader(
+            va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
+        )
+        console.log("Data prepared:")
+        console.log(f"Train data: {len(tr_dataset)} data points")
+        console.log(f"Valid data: {len(va_dataset)} data points")
+
+    tokenizer = dataset.llm_tokenizer
+    config = GLMFModelConfig(
+        llm_model=args.llm_model,
+        use_lora=args.use_lora,
+        dtype=args.dtype,
+        device_map="auto",
+    )
+    if args.longlora:
+        patch_model(model_type=args.llm_model, mode="longlora")
+        setattr(config, "group_size_ratio", 0.25)
+        console.log("Model patched with longlora")
+    if config.model_type not in ["llama", "qwen2"]:
+        raise ValueError(
+            f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2'."
+        )
+
+    if args.debug:
+        console.log(f"Model config initialized: {config}")
+
+    model = GLMFModelForCausalLM(
+        config=config,
+        tokenizer=tokenizer,
+        baseline_prompt=args.baseline_prompt,
+        debug=args.debug,
+        rank=rank,
+    )
+    model.llm_model.gradient_checkpointing_enable()
+
+    if args.debug:
+        console.log(f"Model initialized with config: {config}")
+
+    model.config.graph_token_id = [
+        tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
+        tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
+        tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
+    ]
+    if args.model_debug:
+        return
+
+    if args.debug:
+        console.log("Model & tokenizer loaded")
+        console.log(
+            f"Special tokens added to tokenizer and model: {model.config.graph_token_id}"
+        )
+
+    optimizer = AdamW(
+        filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
+    )
+    lr_scheduler = get_scheduler(
+        name="cosine",
+        optimizer=optimizer,
+        num_warmup_steps=100,
+        num_training_steps=args.num_train_epochs,
+    )
+
+    # Prepare everything with accelerator
+    model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
+
+    global_step = 0
+
+    # Zero gradients initially.
+    optimizer.zero_grad()
+
+    with Progress(
+        SpinnerColumn(),  # Shows a spinner
+        TextColumn(
+            "[progress.description]{task.description}"
+        ),  # Displays additional info
+        BarColumn(),  # Displays a progress bar
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),  # Shows percentage
+    ) as progress:
+
+        if accelerator.is_main_process:
+            train_task = progress.add_task("Training...", total=args.num_train_epochs)
+
+        for epoch in range(args.num_train_epochs):
+            model.train()
+
+            train_epoch_task = progress.add_task(
+                f"Epoch {epoch + 1}/{args.num_train_epochs}", total=len(tr_loader)
+            )
+
+            epoch_loss = 0.0
+            num_items = 0.0
+
+            for step, batch in enumerate(tr_loader):
+                global_step += args.batch_size
+                batch_loss = 0.0
+                batch_size = batch["input"]["input_ids"].size(0)
+
+                # Process each sample in the batch as a micro-batch.
+                for i in range(batch_size):
+
+                    batch_input = batch["input"].copy()
+                    if "token_type_ids" in batch_input:
+                        batch_input.pop("token_type_ids")
+
+                    micro_input = {
+                        "input_ids": batch_input["input_ids"][i].to(device),
+                        "attention_mask": batch_input["attention_mask"][i].to(device),
+                        "labels": batch_input["labels"][i].to(device),
+                    }
+
+                    if args.debug:
+                        console.log(f"Micro input: {micro_input}")
+
+                    graph = batch["graph"][i]
+                    for key in model.gnn.type_of_graph:
+                        if key in graph.keys():
+                            graph[key] = graph[key].to(device)
+
+                    graph_mask = batch["graph_mask"][i].to(device)
+
+                    if "graph" in args.baseline_prompt:
+                        graph_token_index = torch.where(
+                            micro_input["input_ids"] == model.config.graph_token_id[1]
+                        )[1].tolist()
+                        if args.debug:
+                            console.log(f"Graph token id: {graph_token_index}")
+                    else:
+                        graph_token_index = None
+
+                    with accelerator.accumulate(model):
+                        outputs = model(
+                            **micro_input,
+                            graph=graph,
+                            graph_mask=graph_mask,
+                            graph_token_index=graph_token_index,
+                        )
+
+                        loss = outputs.loss
+                        accelerator.backward(loss)
+
+                        if accelerator.sync_gradients:
+                            accelerator.clip_grad_norm_(model.parameters(), 1.0)
+                            optimizer.step()
+                            lr_scheduler.step()
+                            optimizer.zero_grad()
+
+                    batch_loss += loss.item()
+
+                avg_batch_loss = batch_loss / batch_size
+                if accelerator.is_main_process:
+                    progress.update(
+                        train_epoch_task,
+                        advance=1,
+                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f}",
+                    )
+                epoch_loss += avg_batch_loss * batch_size
+                num_items += batch_size
+
+                if global_step % args.logging_steps == 0:
+                    current_lr = lr_scheduler.get_last_lr()[0]
+                    if accelerator.is_main_process:
+                        accelerator.log(
+                            {
+                                "train/loss": avg_batch_loss,
+                                "train/learning_rate": current_lr,
+                                "train/step": global_step,
+                            },
+                            step=global_step,
+                        )
+                    accelerator.print(
+                        f"Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}"
+                    )
+
+                if accelerator.sync_gradients and global_step % args.save_steps == 0:
+                    checkpoint_dir = (
+                        f"{args.output_dir}/{args.name}-checkpoint-{global_step}"
+                    )
+                    accelerator.save_state(checkpoint_dir)
+                    if accelerator.is_main_process:
+                        accelerator.print(f"Saving checkpoint to {checkpoint_dir}")
+
+                del outputs, loss, micro_input, graph, graph_mask  # Free memory
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+
+                if global_step % args.validating_steps == 0:
+                    model.eval()
+                    with torch.no_grad():
+
+                        val_loss = 0.0
+                        num_item = 0
+                        for step, batch in enumerate(va_loader):
+                            batch_loss = 0.0
+                            batch_size = batch["input"]["input_ids"].size(0)
+                            num_item += batch_size
+
+                            # Process each sample in the batch as a micro-batch.
+                            for i in range(batch_size):
+                                # global_step += 1
+                                batch_input = batch["input"].copy()
+                                if "token_type_ids" in batch_input:
+                                    batch_input.pop("token_type_ids")
+                                micro_input = {
+                                    "input_ids": batch_input["input_ids"][i].to(device),
+                                    "attention_mask": batch_input["attention_mask"][
+                                        i
+                                    ].to(device),
+                                    "labels": batch_input["labels"][i].to(device),
+                                }
+
+                                graph = batch["graph"][i]
+                                graph_mask = batch["graph_mask"][i]
+                                outputs = model(
+                                    **micro_input,
+                                    graph=graph,
+                                    graph_mask=graph_mask,
+                                )
+                                loss = outputs.loss
+                                batch_loss += loss.item()
+
+                            val_loss += batch_loss
+                        val_loss /= num_item
+                        accelerator.log({"val_loss": val_loss}, step=global_step)
+                        console.log(
+                            f"Validation loss: {val_loss:.4f} at step {global_step}"
+                        )
+                        # model.train()
+
+            progress.remove_task(train_epoch_task)
+            progress.update(
+                train_task,
+                advance=1,
+                description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
+            )
+
+    if model.config.use_lora == True:
+        model.llm_model = model.llm_model.merge_and_unload()
+
+    accelerator.wait_for_everyone()
+    unwrapped_model = accelerator.unwrap_model(model)
+    final_model_path = f"{args.output_dir}/{args.name}"
+
+    unwrapped_model.save_pretrained(
+        final_model_path,
+        is_main_process=accelerator.is_main_process,
+        save_function=accelerator.save,
+    )
+
+    if accelerator.is_main_process:
+        tokenizer.save_pretrained(final_model_path)
+
+        # Log final model to W&B
+        if wandb.run is not None:
+            model_artifact = wandb.Artifact(
+                name=f"model-{wandb.run.id}",
+                type="model",
+                description=f"Final model checkpoint",
+            )
+            model_artifact.add_dir(final_model_path)
+            wandb.log_artifact(model_artifact)
+
+    # End W&B run
+    accelerator.end_training()

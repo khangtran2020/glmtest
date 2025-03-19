@@ -175,7 +175,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         step: int = 0,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
-        if self.debug:
+        if self.debug and (self.rank >= 0):
             print("=" * 100 + f"Rank {self.rank} - Step {step}" + "\n\n")
             print(
                 f"Before take graph embedding, size of inputs_embeds: {input_ids.size()}"
@@ -229,7 +229,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 graph_embeds
             )
 
-        if self.debug:
+        if self.debug and (self.rank >= 0):
             print("=" * 100 + f"Rank {self.rank} - Step {step}" + "\n\n")
             print(
                 f"After take graph embedding, size of inputs_embeds: {inputs_embeds.size()}"
