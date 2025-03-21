@@ -7,7 +7,7 @@ accelerate launch main.py --mode train \
     --max_seq_len 16384 \
     --batch_size 1 \
     --gradient_accumulation_steps 1 \
-    --num_gpu 2 \
+    --num_gpu 4 \
     --output_dir "./results/models/" \
     --overwrite_output_dir \
     --do_train \
