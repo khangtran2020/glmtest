@@ -17,9 +17,6 @@ warnings.filterwarnings("ignore")
 
 
 def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> None:
-
-    # init data
-
     console.log("Running on device:", device)
 
     graph = get_graph(
@@ -46,17 +43,14 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
         logger.log("Dataset not found, exiting...")
         return
 
-    # data
     if args.mode == "data":
         if args.do_crawl:
             dataset.crawl()
         if args.do_process_raw:
             dataset.process_raw()
 
-    # training
     if args.mode == "train":
-
-        if args.model_debug == False:
+        if not args.model_debug:
             dataset.prepare_data()
             dataset.train_test_split()
 
@@ -68,22 +62,32 @@ if __name__ == "__main__":
     print_args(args=args)
     seed_everything(args.seed)
 
-    # count number of gpus
+    # Device and Distributed Training Setup
     if torch.cuda.is_available():
-        n_gpus = torch.cuda.device_count()
-        if n_gpus > 1:
-            dist.init_process_group(backend="nccl")
-            rank = int(os.environ["LOCAL_RANK"])  # Get local rank assigned by torchrun
-            # args.rank = rank
-            console.log(f"Using {n_gpus} GPUs.")
-            device = torch.device(f"cuda:{rank}")
-            args.num_gpu = n_gpus
+        # Check if distributed training is enabled (this is the case when using Accelerate or torchrun with multi-node)
+        if "WORLD_SIZE" in os.environ and int(os.environ["WORLD_SIZE"]) > 1:
+            # Initialize distributed group using the environment variables set by Accelerate
+            dist.init_process_group(backend="nccl", init_method="env://")
+            rank = int(os.environ.get("RANK", 0))
+            # LOCAL_RANK is typically set by Accelerate and indicates the GPU device on the local machine
+            local_rank = int(os.environ.get("LOCAL_RANK", rank % torch.cuda.device_count()))
+            world_size = int(os.environ["WORLD_SIZE"])
+            device = torch.device("cuda", local_rank)
+            console.log(f"Distributed training: rank {rank}/{world_size}, using device {device}.")
+            args.num_gpu = world_size  # Total GPUs across nodes
         else:
-            console.log("Using 1 GPU.")
-            device = torch.device(f"cuda:0")
-            rank = 0
+            # Fallback for single-node training, single or multi GPU.
+            n_gpus = torch.cuda.device_count()
+            if n_gpus > 1:
+                console.log(f"Using {n_gpus} GPUs on a single node.")
+                device = torch.device("cuda:0")
+                rank = 0
+                args.num_gpu = n_gpus
+            else:
+                console.log("Using 1 GPU.")
+                device = torch.device("cuda:0")
+                rank = 0
     else:
-        n_gpus = 0
         console.log("No GPUs available, using CPU instead.")
         device = torch.device("cpu")
         rank = -1
