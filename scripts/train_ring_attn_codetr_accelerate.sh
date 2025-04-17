@@ -8,7 +8,7 @@ accelerate launch main.py --mode train \
     --batch_size 1 \
     --gradient_accumulation_steps 16 \
     --num_gpu 2 \
-    --output_dir "./results/models/" \
+    --output_dir "./results/models/testing/" \
     --overwrite_output_dir \
     --do_train \
     --do_eval \

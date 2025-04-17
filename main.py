@@ -7,7 +7,9 @@ from utils.utils import print_args, seed_everything
 from data.utils import get_dataset
 from graph.utils import get_graph
 from train.train import train
+from train.test import test
 import torch.distributed as dist
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # typing
 from argparse import Namespace
@@ -48,13 +50,22 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             dataset.crawl()
         if args.do_process_raw:
             dataset.process_raw()
+        return
+
+    if not args.model_debug:
+        dataset.prepare_data()
+        dataset.train_test_split()
 
     if args.mode == "train":
-        if not args.model_debug:
-            dataset.prepare_data()
-            dataset.train_test_split()
-
         train(args=args, dataset=dataset, console=console, device=device, rank=rank)
+        if args.do_test:
+            model = AutoModelForCausalLM.from_pretrained(args.output_dir)
+            test(args=args, data=dataset.test_data, model=model, console=console)
+
+    elif args.mode == "test":
+        # load model
+        model = AutoModelForCausalLM.from_pretrained(args.model_dir)
+        test(args=args, data=dataset.test_data, model=model, console=console)
 
 
 if __name__ == "__main__":
@@ -70,10 +81,14 @@ if __name__ == "__main__":
             dist.init_process_group(backend="nccl", init_method="env://")
             rank = int(os.environ.get("RANK", 0))
             # LOCAL_RANK is typically set by Accelerate and indicates the GPU device on the local machine
-            local_rank = int(os.environ.get("LOCAL_RANK", rank % torch.cuda.device_count()))
+            local_rank = int(
+                os.environ.get("LOCAL_RANK", rank % torch.cuda.device_count())
+            )
             world_size = int(os.environ["WORLD_SIZE"])
             device = torch.device("cuda", local_rank)
-            console.log(f"Distributed training: rank {rank}/{world_size}, using device {device}.")
+            console.log(
+                f"Distributed training: rank {rank}/{world_size}, using device {device}."
+            )
             args.num_gpu = world_size  # Total GPUs across nodes
         else:
             # Fallback for single-node training, single or multi GPU.
@@ -91,5 +106,15 @@ if __name__ == "__main__":
         console.log("No GPUs available, using CPU instead.")
         device = torch.device("cpu")
         rank = -1
+
+    if os.path.exists(args.output_dir) == False:
+        os.makedirs(args.output_dir)
+    if os.path.exists(args.log_dir) == False:
+        os.makedirs(args.log_dir)
+    if os.path.exists(args.gen_dir) == False:
+        os.makedirs(args.gen_dir)
+
+    if args.model_dir is None:
+        args.model_dir = args.output_dir
 
     main(args=args, logger=console, device=device, rank=rank)

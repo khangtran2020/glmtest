@@ -103,12 +103,29 @@ def add_training_group(group):
         help="output directory to save model",
     )
     group.add_argument(
+        "--gen_dir",
+        default="./results/generated/",
+        type=str,
+        help="output directory to save model",
+    )
+    group.add_argument(
+        "--model_dir",
+        default=None,
+        type=str,
+        help="Model directory of the testing model",
+    )
+    group.add_argument(
         "--overwrite_output_dir",
         action="store_true",
         help="overwrite output directory",
     )
     group.add_argument(
         "--do_train",
+        action="store_true",
+        help="train the model",
+    )
+    group.add_argument(
+        "--do_test  ",
         action="store_true",
         help="train the model",
     )
@@ -144,6 +161,12 @@ def add_training_group(group):
         type=float,
         help="model_max_length",
         default=16384,
+    )
+    group.add_argument(
+        "--model_new_tokens",
+        type=float,
+        help="max new tokens to generate",
+        default=1024,
     )
     group.add_argument(
         "--max_grad_norm",

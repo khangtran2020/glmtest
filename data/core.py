@@ -518,7 +518,7 @@ class Data(object):
                         if isinstance(graph[key], dgl.DGLGraph)
                     }
                     data = {
-                        "uuid": uuid,
+                        "uuid": f"{uuid}_{testcase}",
                         "prompt": prompt,
                         "response": response,
                         "full_text": full_text,

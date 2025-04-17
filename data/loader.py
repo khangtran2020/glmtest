@@ -20,42 +20,66 @@ class GLMFDataset(Dataset):
         self.max_seq_length = max_seq_length
         self.graph_token_id = self.tokenizer.convert_tokens_to_ids([GRAPH_PAD_TOKEN])[0]
         self.debug = debug
+        self.testing = False
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        sample = self.data[idx]
-        graph = sample["graph"]
-        full_text = sample["full_text"]
-        graph_mask = sample["mask"]
+        if self.testing == False:
+            sample = self.data[idx]
+            graph = sample["graph"]
+            full_text = sample["full_text"]
+            graph_mask = sample["mask"]
 
-        # Tokenize text input
-        tokenized = self.tokenize(full_text)
+            # Tokenize text input
+            tokenized = self.tokenize(full_text)
 
-        tokenized_user_prompt = self.tokenizer(sample["prompt"])
-        user_prompt_len = len(tokenized_user_prompt["input_ids"])
+            tokenized_user_prompt = self.tokenizer(sample["prompt"])
+            user_prompt_len = len(tokenized_user_prompt["input_ids"])
 
-        tokenized["labels"] = torch.cat(
-            [
-                torch.Tensor([-100] * user_prompt_len).unsqueeze(0),
-                tokenized["labels"][:, user_prompt_len:],
-            ],
-            dim=1,
-        ).long()
-        input_ids = tokenized["input_ids"]
+            tokenized["labels"] = torch.cat(
+                [
+                    torch.Tensor([-100] * user_prompt_len).unsqueeze(0),
+                    tokenized["labels"][:, user_prompt_len:],
+                ],
+                dim=1,
+            ).long()
+            input_ids = tokenized["input_ids"]
 
-        if (
-            self.baseline_prompt in ["graph", "graph_tr"]
-            and self.graph_token_id not in input_ids
-        ):
-            raise ValueError("Input must contain graph token")
+            if (
+                self.baseline_prompt in ["graph", "graph_tr"]
+                and self.graph_token_id not in input_ids
+            ):
+                raise ValueError("Input must contain graph token")
 
-        return {
-            "input": tokenized,
-            "graph": graph,  # Should be a dictionary of graph structures
-            "graph_mask": torch.tensor(graph_mask, dtype=torch.float),
-        }
+            return {
+                "input": tokenized,
+                "graph": graph,  # Should be a dictionary of graph structures
+                "graph_mask": torch.tensor(graph_mask, dtype=torch.float),
+            }
+        else:
+            sample = self.data[idx]
+            graph = sample["graph"]
+            prompt = sample["prompt"]
+            graph_mask = sample["mask"]
+            uuid = sample["uuid"]
+
+            # Tokenize text input
+            tokenized = self.tokenize(prompt)
+            input_ids = tokenized["input_ids"]
+
+            if (
+                self.baseline_prompt in ["graph", "graph_tr"]
+                and self.graph_token_id not in input_ids
+            ):
+                raise ValueError("Input must contain graph token")
+
+            return uuid, {
+                "input": tokenized,
+                "graph": graph,  # Should be a dictionary of graph structures
+                "graph_mask": torch.tensor(graph_mask, dtype=torch.float),
+            }
 
     def tokenize(self, prompt: str, add_eos_token: bool = True) -> dict:
 

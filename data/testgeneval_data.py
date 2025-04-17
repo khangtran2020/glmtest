@@ -88,7 +88,7 @@ class TestGenEval(Data):
         else:
             process = True
 
-        if not process:
+        if process:
             return
 
         if not os.path.exists(os.path.join(self.data_path, "data.jsonl")):
@@ -116,7 +116,7 @@ class TestGenEval(Data):
                 dat = {}
                 dat["test_cases"] = {}
                 dat["graph"] = {}
-                dat["uuid"] = i + 1
+                dat["uuid"] = key
                 dat["code_path"] = os.path.join(
                     code_path, f"{raw_data[key][NEW_KEY_ID]}.py"
                 )
