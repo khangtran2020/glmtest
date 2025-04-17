@@ -26,7 +26,7 @@ class GLMFModelConfig(PretrainedConfig):
 
     def __init__(
         self,
-        llm_model: str,
+        llm_model: Optional[str] = None,
         mode: str = "node",
         in_feats: int = 772,
         n_hidden: int = 512,
@@ -46,6 +46,13 @@ class GLMFModelConfig(PretrainedConfig):
     ):
         # super().__init__(**kwargs)
         config = AutoConfig.from_pretrained(llm_model).to_dict()
+        if llm_model is None:
+            #print("1")
+            raise ValueError("`llm_model` must be provided to XCodeConfig")
+
+        config = AutoConfig.from_pretrained(llm_model).to_dict()
+        super().__init__(**config, **kwargs)
+ 
         self.model_name = config["_name_or_path"]
         self.mode = mode
         self.hidden_size = config["hidden_size"]
@@ -78,7 +85,7 @@ class GLMFModelConfig(PretrainedConfig):
 
         # self.dtype = dtype
         # self.graph_token_id = [92302, 92303, 92304]
-        super().__init__(**config, **kwargs)
+        # super().__init__(**config, **kwargs)
 
     def to_diff_dict(self):
         # Instead of comparing with a default instance (which fails),
