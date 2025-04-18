@@ -458,8 +458,8 @@ def train_multi_gpu_ringattn(
                         graph_token_index = torch.where(
                             micro_input["input_ids"] == model.config.graph_token_id[1]
                         )[1].tolist()
-                        if (args.debug) and (rank == 0):
-                            console.log(f"Graph token id: {graph_token_index}")
+                        # if (args.debug) and (rank == 0):
+                        #     console.log(f"Graph token id: {graph_token_index}")
                     else:
                         graph_token_index = None
 
@@ -708,8 +708,8 @@ def train_single_gpu_accelerate(
                         graph_token_index = torch.where(
                             micro_input["input_ids"] == model.config.graph_token_id[1]
                         )[1].tolist()
-                        if args.debug:
-                            console.log(f"Graph token id: {graph_token_index}")
+                        # if args.debug:
+                        #     console.log(f"Graph token id: {graph_token_index}")
                     else:
                         graph_token_index = None
 
@@ -1015,8 +1015,8 @@ def train_multi_gpu_accelerate(
                         graph_token_index = torch.where(
                             micro_input["input_ids"] == model.config.graph_token_id[1]
                         )[1].tolist()
-                        if args.debug and accelerator.is_main_process:
-                            console.log(f"Graph token id: {graph_token_index}")
+                        # if args.debug and accelerator.is_main_process:
+                        #     console.log(f"Graph token id: {graph_token_index}")
                     else:
                         graph_token_index = None
 
