@@ -154,7 +154,7 @@ def validate(args, loader, model, device):
                         batch_loss += loss.item()
                 except torch.cuda.OutOfMemoryError as e:
                     print(
-                        f"OOM in batch {step}: len input_dis {len(micro_input['input_ids'])} - len graph_mask {len(graph_mask)}"
+                        f"OOM in batch {step}: input_dis {micro_input['input_ids'].size()} - graph_mask {graph_mask.size()}"
                     )
                     torch.cuda.empty_cache()
                     continue
