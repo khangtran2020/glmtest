@@ -97,3 +97,57 @@ def test(
                 for key, value in item.items():
                     f.write(f"{key}: {value}\n")
     console.log(f"Results saved to {save_dir}")
+
+
+def validate(args, loader, model, device):
+    model.eval()
+    with torch.no_grad():
+
+        val_loss = 0.0
+        num_item = 0
+
+        for step, batch in enumerate(loader):
+            batch_loss = 0.0
+            batch_size = batch["input"]["input_ids"].size(0)
+            num_item += batch_size
+
+            # Process each sample in the batch as a micro-batch.
+            for i in range(batch_size):
+                # global_step += 1
+                batch_input = batch["input"].copy()
+                if "token_type_ids" in batch_input:
+                    batch_input.pop("token_type_ids")
+                micro_input = {
+                    "input_ids": batch_input["input_ids"][i].to(device),
+                    "attention_mask": batch_input["attention_mask"][i].to(device),
+                    "labels": batch_input["labels"][i].to(device),
+                }
+
+                graph = batch["graph"][i]
+                for key in model.gnn.type_of_graph:
+                    if key in graph.keys():
+                        graph[key] = graph[key].to(device)
+
+                graph_mask = batch["graph_mask"][i]
+
+                if "graph" in args.baseline_prompt:
+                    graph_token_index = torch.where(
+                        micro_input["input_ids"] == model.config.graph_token_id[1]
+                    )[1].tolist()
+                else:
+                    graph_token_index = None
+
+                outputs = model(
+                    **micro_input,
+                    graph=graph,
+                    graph_mask=graph_mask,
+                    graph_token_index=graph_token_index,
+                )
+                loss = outputs.loss
+                batch_loss += loss.item()
+
+            val_loss += batch_loss
+
+        val_loss /= num_item
+        return val_loss
+        # model.train()

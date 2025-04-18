@@ -16,6 +16,7 @@ from accelerate import Accelerator
 from transformers.trainer_utils import seed_worker
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from train.utils import patch_model
+from train.test import validate
 
 
 # typing
@@ -219,8 +220,8 @@ def train_single_gpu(
                         graph_token_index = torch.where(
                             micro_input["input_ids"] == model.config.graph_token_id[1]
                         )[1].tolist()
-                        if args.debug:
-                            console.log(f"Graph token id: {graph_token_index}")
+                        # if args.debug:
+                        #     console.log(f"Graph token id: {graph_token_index}")
                     else:
                         graph_token_index = None
 
@@ -260,56 +261,14 @@ def train_single_gpu(
                     wandb.log({"train_loss": avg_batch_loss})
 
                 if global_step % args.validating_steps == 0:
-                    model.eval()
-                    with torch.no_grad():
-
-                        val_loss = 0.0
-                        num_item = 0
-
-                        va_task = progress.add_task(
-                            "Validating...", total=len(va_loader), visible=False
-                        )
-                        for step, batch in enumerate(va_loader):
-                            batch_loss = 0.0
-                            batch_size = batch["input"]["input_ids"].size(0)
-                            num_item += batch_size
-
-                            # Process each sample in the batch as a micro-batch.
-                            for i in range(batch_size):
-                                # global_step += 1
-                                batch_input = batch["input"].copy()
-                                if "token_type_ids" in batch_input:
-                                    batch_input.pop("token_type_ids")
-                                micro_input = {
-                                    "input_ids": batch_input["input_ids"][i].to(device),
-                                    "attention_mask": batch_input["attention_mask"][
-                                        i
-                                    ].to(device),
-                                    "labels": batch_input["labels"][i].to(device),
-                                }
-
-                                graph = batch["graph"][i]
-                                graph_mask = batch["graph_mask"][i]
-                                outputs = model(
-                                    **micro_input,
-                                    graph=graph,
-                                    graph_mask=graph_mask,
-                                )
-                                loss = outputs.loss
-                                batch_loss += loss.item()
-
-                            val_loss += batch_loss
-                            progress.update(
-                                va_task,
-                                advance=1,
-                                description=f"Validating... {step + 1}/{len(va_loader)}",
-                            )
-                        val_loss /= num_item
-                        wandb.log({"val_loss": val_loss})
-                        console.log(
-                            f"Validation loss: {val_loss:.4f} at step {global_step}"
-                        )
-                        # model.train()
+                    val_loss = validate(
+                        args=args, loader=va_loader, model=model, device=device
+                    )
+                    wandb.log({"val_loss": val_loss})
+                    console.log(
+                        f"Validation loss: {val_loss:.4f} at step {global_step}"
+                    )
+                    # model.train()
 
             progress.remove_task(train_epoch_task)
             progress.update(
@@ -547,57 +506,14 @@ def train_multi_gpu_ringattn(
 
                 if global_step % args.validating_steps == 0:
                     if rank == 0:
-                        model.eval()
-                        with torch.no_grad():
+                        val_loss = validate(
+                            args=args, loader=va_loader, model=model, device=device
+                        )
+                        wandb.log({"val_loss": val_loss})
+                        console.log(
+                            f"Validation loss: {val_loss:.4f} at step {global_step}"
+                        )
 
-                            val_loss = 0.0
-                            num_item = 0
-                            va_task = progress.add_task(
-                                "Validating...", total=len(va_loader), visible=False
-                            )
-                            for step, batch in enumerate(va_loader):
-                                batch_loss = 0.0
-                                batch_size = batch["input"]["input_ids"].size(0)
-                                num_item += batch_size
-
-                                # Process each sample in the batch as a micro-batch.
-                                for i in range(batch_size):
-                                    # global_step += 1
-                                    batch_input = batch["input"].copy()
-                                    if "token_type_ids" in batch_input:
-                                        batch_input.pop("token_type_ids")
-                                    micro_input = {
-                                        "input_ids": batch_input["input_ids"][i].to(
-                                            device
-                                        ),
-                                        "attention_mask": batch_input["attention_mask"][
-                                            i
-                                        ].to(device),
-                                        "labels": batch_input["labels"][i].to(device),
-                                    }
-
-                                    graph = batch["graph"][i]
-                                    graph_mask = batch["graph_mask"][i]
-                                    outputs = model(
-                                        **micro_input,
-                                        graph=graph,
-                                        graph_mask=graph_mask,
-                                    )
-                                    loss = outputs.loss
-                                    batch_loss += loss.item()
-
-                                val_loss += batch_loss
-                                progress.update(
-                                    va_task,
-                                    advance=1,
-                                    description=f"Validating... {step + 1}/{len(va_loader)}",
-                                )
-                            val_loss /= num_item
-                            wandb.log({"val_loss": val_loss})
-                            console.log(
-                                f"Validation loss: {val_loss:.4f} at step {global_step}"
-                            )
-                            # model.train()
             if rank == 0:
                 progress.remove_task(train_epoch_task)
                 progress.update(
@@ -854,55 +770,13 @@ def train_single_gpu_accelerate(
                     torch.cuda.empty_cache()
 
                 if global_step % args.validating_steps == 0:
-                    model.eval()
-                    with torch.no_grad():
-
-                        val_loss = 0.0
-                        num_item = 0
-                        va_task = progress.add_task(
-                            "Validating...", total=len(va_loader), visible=False
-                        )
-                        for step, batch in enumerate(va_loader):
-                            batch_loss = 0.0
-                            batch_size = batch["input"]["input_ids"].size(0)
-                            num_item += batch_size
-
-                            # Process each sample in the batch as a micro-batch.
-                            for i in range(batch_size):
-                                # global_step += 1
-                                batch_input = batch["input"].copy()
-                                if "token_type_ids" in batch_input:
-                                    batch_input.pop("token_type_ids")
-                                micro_input = {
-                                    "input_ids": batch_input["input_ids"][i].to(device),
-                                    "attention_mask": batch_input["attention_mask"][
-                                        i
-                                    ].to(device),
-                                    "labels": batch_input["labels"][i].to(device),
-                                }
-
-                                graph = batch["graph"][i]
-                                graph_mask = batch["graph_mask"][i]
-                                outputs = model(
-                                    **micro_input,
-                                    graph=graph,
-                                    graph_mask=graph_mask,
-                                )
-                                loss = outputs.loss
-                                batch_loss += loss.item()
-
-                            val_loss += batch_loss
-                            progress.update(
-                                va_task,
-                                advance=1,
-                                description=f"Validating... {step + 1}/{len(va_loader)}",
-                            )
-                        val_loss /= num_item
-                        accelerator.log({"val_loss": val_loss}, step=global_step)
-                        console.log(
-                            f"Validation loss: {val_loss:.4f} at step {global_step}"
-                        )
-                        # model.train()
+                    val_loss = validate(
+                        args=args, loader=va_loader, model=model, device=device
+                    )
+                    wandb.log({"val_loss": val_loss})
+                    console.log(
+                        f"Validation loss: {val_loss:.4f} at step {global_step}"
+                    )
 
             progress.remove_task(train_epoch_task)
             progress.update(
@@ -1215,55 +1089,14 @@ def train_multi_gpu_accelerate(
                     and accelerator.is_main_process
                 ):
 
-                    model.eval()
-                    with torch.no_grad():
+                    val_loss = validate(
+                        args=args, loader=va_loader, model=model, device=device
+                    )
+                    wandb.log({"val_loss": val_loss})
+                    console.log(
+                        f"Validation loss: {val_loss:.4f} at step {global_step}"
+                    )
 
-                        val_loss = 0.0
-                        num_item = 0
-                        va_task = progress.add_task(
-                            "Validating...", total=len(va_loader), visible=False
-                        )
-                        for step, batch in enumerate(va_loader):
-                            batch_loss = 0.0
-                            batch_size = batch["input"]["input_ids"].size(0)
-                            num_item += batch_size
-
-                            # Process each sample in the batch as a micro-batch.
-                            for i in range(batch_size):
-                                # global_step += 1
-                                batch_input = batch["input"].copy()
-                                if "token_type_ids" in batch_input:
-                                    batch_input.pop("token_type_ids")
-                                micro_input = {
-                                    "input_ids": batch_input["input_ids"][i].to(device),
-                                    "attention_mask": batch_input["attention_mask"][
-                                        i
-                                    ].to(device),
-                                    "labels": batch_input["labels"][i].to(device),
-                                }
-
-                                graph = batch["graph"][i]
-                                graph_mask = batch["graph_mask"][i]
-                                outputs = model(
-                                    **micro_input,
-                                    graph=graph,
-                                    graph_mask=graph_mask,
-                                )
-                                loss = outputs.loss
-                                batch_loss += loss.item()
-
-                            val_loss += batch_loss
-                            progress.update(
-                                va_task,
-                                advance=1,
-                                description=f"Validating... {step + 1}/{len(va_loader)}",
-                            )
-                        val_loss /= num_item
-                        accelerator.log({"val_loss": val_loss}, step=global_step)
-                        console.log(
-                            f"Validation loss: {val_loss:.4f} at step {global_step}"
-                        )
-                        # model.train()
             if accelerator.is_main_process:
                 progress.remove_task(train_epoch_task)
                 progress.update(
