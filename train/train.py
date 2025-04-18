@@ -261,6 +261,10 @@ def train_single_gpu(
 
                         val_loss = 0.0
                         num_item = 0
+
+                        va_task = progress.add_task(
+                            "Validating...", total=len(va_loader), visible=False
+                        )
                         for step, batch in enumerate(va_loader):
                             batch_loss = 0.0
                             batch_size = batch["input"]["input_ids"].size(0)
@@ -291,6 +295,11 @@ def train_single_gpu(
                                 batch_loss += loss.item()
 
                             val_loss += batch_loss
+                            progress.update(
+                                va_task,
+                                advance=1,
+                                description=f"Validating... {step + 1}/{len(va_loader)}",
+                            )
                         val_loss /= num_item
                         wandb.log({"val_loss": val_loss})
                         console.log(
