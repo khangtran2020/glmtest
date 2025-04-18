@@ -120,8 +120,8 @@ def train_single_gpu(
             f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2'."
         )
 
-    if args.debug:
-        console.log(f"Model config initialized: {config}")
+    # if args.debug:
+    #     console.log(f"Model config initialized: {config}")
 
     model = GLMFModelForCausalLM(
         config=config,
@@ -131,8 +131,8 @@ def train_single_gpu(
         rank=rank,
     )
 
-    if args.debug:
-        console.log(f"Model initialized with config: {config}")
+    # if args.debug:
+    #     console.log(f"Model initialized with config: {config}")
 
     model.config.graph_token_id = [
         tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
