@@ -92,7 +92,7 @@ class TestGenEval(Data):
         else:
             process = True
 
-        if process:
+        if not process:
             return
 
         if not os.path.exists(os.path.join(self.data_path, "data.jsonl")):
