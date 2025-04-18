@@ -13,7 +13,6 @@ from transformers.cache_utils import Cache
 import torch.distributed as dist
 
 # from utils.prompter import Prompter
-from train.utils import run_nvidia_smi
 from model.gnn import MultiGAT
 from train.utils import extract_local
 from peft import get_peft_model, LoraConfig, TaskType
@@ -47,12 +46,12 @@ class GLMFModelConfig(PretrainedConfig):
         # super().__init__(**kwargs)
         config = AutoConfig.from_pretrained(llm_model).to_dict()
         if llm_model is None:
-            #print("1")
+            # print("1")
             raise ValueError("`llm_model` must be provided to XCodeConfig")
 
         config = AutoConfig.from_pretrained(llm_model).to_dict()
         super().__init__(**config, **kwargs)
- 
+
         self.model_name = config["_name_or_path"]
         self.mode = mode
         self.hidden_size = config["hidden_size"]
@@ -243,9 +242,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             )
             print("\n\n" + "=" * 100)
 
-        if self.debug:
-            print("After take graph embedding")
-            run_nvidia_smi(console=None)
+        # if self.debug:
+        #     print("After take graph embedding")
+        #     run_nvidia_smi(console=None)
         # print(inputs_embeds.size())
         if self.multi_gpu:
             return self.forward_llm(

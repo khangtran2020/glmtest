@@ -6,8 +6,6 @@ from utils.constant import (
     GRAPH_START_TOKEN,
     GRAPH_PAD_TOKEN,
     GRAPH_END_TOKEN,
-    FUZZ_START_TOKEN,
-    FUZZ_END_TOKEN,
 )
 import torch.distributed as dist
 from torch.distributed import barrier
@@ -17,7 +15,7 @@ from transformers import AdamW, get_scheduler
 from accelerate import Accelerator
 from transformers.trainer_utils import seed_worker
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
-from train.utils import patch_model, run_nvidia_smi
+from train.utils import patch_model
 
 
 # typing
