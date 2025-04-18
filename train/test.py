@@ -156,7 +156,8 @@ def validate(args, loader, model, device):
                     print(
                         f"Error in batch {step}: len input_dis {len(micro_input['input_ids'])} - len graph_mask {len(graph_mask)}"
                     )
-                    sys.exit(1)
+                    torch.cuda.empty_cache()
+                    continue
 
                 val_loss += batch_loss
                 pbar.update(1)
