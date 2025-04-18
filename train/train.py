@@ -33,6 +33,7 @@ def train(
 ):
     if args.use_accelerate:
         if args.num_gpu == 1:
+            console.log("Training on single GPU with mode: train_single_gpu_accelerate")
             train_single_gpu_accelerate(
                 args=args,
                 dataset=dataset,
@@ -41,6 +42,7 @@ def train(
                 rank=-1,
             )
         else:
+            console.log("Training on multi GPU with mode: train_multi_gpu_accelerate")
             train_multi_gpu_accelerate(
                 args=args,
                 dataset=dataset,
@@ -50,6 +52,7 @@ def train(
             )
     else:
         if args.num_gpu == 1:
+            console.log("Training on single GPU with mode: train_single_gpu")
             train_single_gpu(
                 args=args,
                 dataset=dataset,
@@ -58,6 +61,7 @@ def train(
                 collate_fn=collate_fn,
             )
         elif args.num_gpu > 1:
+            console.log("Training on multi GPU with mode: train_multi_gpu_ringattn")
             train_multi_gpu_ringattn(
                 args=args,
                 dataset=dataset,
@@ -548,6 +552,9 @@ def train_multi_gpu_ringattn(
 
                             val_loss = 0.0
                             num_item = 0
+                            va_task = progress.add_task(
+                                "Validating...", total=len(va_loader), visible=False
+                            )
                             for step, batch in enumerate(va_loader):
                                 batch_loss = 0.0
                                 batch_size = batch["input"]["input_ids"].size(0)
@@ -580,6 +587,11 @@ def train_multi_gpu_ringattn(
                                     batch_loss += loss.item()
 
                                 val_loss += batch_loss
+                                progress.update(
+                                    va_task,
+                                    advance=1,
+                                    description=f"Validating... {step + 1}/{len(va_loader)}",
+                                )
                             val_loss /= num_item
                             wandb.log({"val_loss": val_loss})
                             console.log(
@@ -847,6 +859,9 @@ def train_single_gpu_accelerate(
 
                         val_loss = 0.0
                         num_item = 0
+                        va_task = progress.add_task(
+                            "Validating...", total=len(va_loader), visible=False
+                        )
                         for step, batch in enumerate(va_loader):
                             batch_loss = 0.0
                             batch_size = batch["input"]["input_ids"].size(0)
@@ -877,6 +892,11 @@ def train_single_gpu_accelerate(
                                 batch_loss += loss.item()
 
                             val_loss += batch_loss
+                            progress.update(
+                                va_task,
+                                advance=1,
+                                description=f"Validating... {step + 1}/{len(va_loader)}",
+                            )
                         val_loss /= num_item
                         accelerator.log({"val_loss": val_loss}, step=global_step)
                         console.log(
@@ -1200,6 +1220,9 @@ def train_multi_gpu_accelerate(
 
                         val_loss = 0.0
                         num_item = 0
+                        va_task = progress.add_task(
+                            "Validating...", total=len(va_loader), visible=False
+                        )
                         for step, batch in enumerate(va_loader):
                             batch_loss = 0.0
                             batch_size = batch["input"]["input_ids"].size(0)
@@ -1230,6 +1253,11 @@ def train_multi_gpu_accelerate(
                                 batch_loss += loss.item()
 
                             val_loss += batch_loss
+                            progress.update(
+                                va_task,
+                                advance=1,
+                                description=f"Validating... {step + 1}/{len(va_loader)}",
+                            )
                         val_loss /= num_item
                         accelerator.log({"val_loss": val_loss}, step=global_step)
                         console.log(
