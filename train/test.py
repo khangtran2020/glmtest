@@ -108,7 +108,15 @@ def validate(args, loader, model, device):
         val_loss = 0.0
         num_item = 0
 
-        with tqdm(total=len(loader), position=0, leave=True, ncols=80) as pbar:
+        with tqdm(
+            total=len(loader),
+            position=0,
+            leave=True,
+            ncols=80,
+            dynamic_ncols=True,
+            mininterval=1.0,
+            smoothing=0.1,
+        ) as pbar:
 
             for step, batch in enumerate(loader):
                 batch_loss = 0.0
@@ -153,7 +161,7 @@ def validate(args, loader, model, device):
                         loss = outputs.loss
                         batch_loss += loss.item()
                 except torch.cuda.OutOfMemoryError as e:
-                    print(
+                    tqdm.write(
                         f"OOM in batch {step}: input_dis {micro_input['input_ids'].size()} - graph_mask {graph_mask.size()}"
                     )
                     torch.cuda.empty_cache()
