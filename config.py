@@ -296,9 +296,12 @@ def parse_args():
     data_group = parser.add_argument_group(title="Data-related configuration")
     joern_group = parser.add_argument_group(title="Joern-related configuration")
     training_group = parser.add_argument_group(title="Training-related configuration")
+    model_group = parser.add_argument_group(title="Model-related configuration")
 
     add_joern_group(joern_group)
     add_data_group(data_group)
     add_general_group(general_group)
     add_training_group(training_group)
+    add_model_group(model_group)
+
     return parser.parse_args()
