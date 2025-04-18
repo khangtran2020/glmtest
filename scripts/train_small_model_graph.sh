@@ -1,4 +1,4 @@
-python main.py --mode train \
+CUDA_VISIBLE_DEVICES=0 python main.py --mode train \
     --seed 42 \
     --data_path Dataset \
     --data testgeneval \
@@ -8,7 +8,7 @@ python main.py --mode train \
     --batch_size 1 \
     --gradient_accumulation_steps 16 \
     --num_gpu 1 \
-    --output_dir "./results/models/" \
+    --output_dir "./results/models/small_graph" \
     --overwrite_output_dir \
     --do_train \
     --do_eval \
@@ -16,4 +16,7 @@ python main.py --mode train \
     --max_grad_norm 1.0 \
     --num_train_epochs 1 \
     --dtype bfloat16 \
-    --debug 
+    --debug \
+    --use_lora \
+    --validating_steps 10 \
+    --do_test

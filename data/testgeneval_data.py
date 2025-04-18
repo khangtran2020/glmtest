@@ -26,6 +26,8 @@ class TestGenEval(Data):
         llm_tokenizer: PreTrainedTokenizer,
         debug: bool = False,
         baseline_prompt: str = "code",
+        graph_sampling: bool = False,
+        **kwargs,
     ) -> None:
         self.name = "TestGenEval"
         super().__init__(
@@ -39,6 +41,8 @@ class TestGenEval(Data):
             num_cpu=-1,
             debug=debug,
             baseline_prompt=baseline_prompt,
+            graph_sampling=graph_sampling,
+            **kwargs,
         )
         self.data_path = os.path.join(path, self.name)
         self.debug = debug

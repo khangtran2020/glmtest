@@ -117,6 +117,16 @@ def train_single_gpu(
         llm_model=args.llm_model,
         use_lora=args.use_lora,
         dtype=args.dtype,
+        mode=args.gnn_mode,
+        in_feats=args.in_feats,
+        n_hidden=args.n_hidden,
+        n_layers=args.n_layers,
+        n_heads=args.n_heads,
+        dropout=args.dropout,
+        lora_r=args.lora_r,
+        lora_alpha=args.lora_alpha,
+        lora_dropout=args.lora_dropout,
+        lora_target_modules=args.lora_target_modules,
         device_map="cuda" if torch.cuda.is_available() else "cpu",
     )
 

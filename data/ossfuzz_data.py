@@ -30,6 +30,8 @@ class OSSFuzz(Data):
         debug: bool = False,
         test_gen: bool = False,
         baseline_prompt: str = "code",
+        graph_sampling: bool = False,
+        **kwargs,
     ) -> None:
         if docker_image is None:
             raise ValueError("Docker image is not provided")
@@ -60,6 +62,8 @@ class OSSFuzz(Data):
             num_cpu=num_cpu,
             debug=debug,
             baseline_prompt=baseline_prompt,
+            graph_sampling=graph_sampling,
+            **kwargs,
         )
 
     def crawl(self) -> None:

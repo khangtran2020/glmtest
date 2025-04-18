@@ -120,6 +120,8 @@ class Data(object):
         coverage_image: str = "coverage",
         debug: bool = False,
         baseline_prompt: str = "code",
+        graph_sampling: bool = False,
+        n_hops: int = 2,
     ) -> None:
         self.name = name  # name of the data
         self.path = path  # path of the raw data
@@ -132,6 +134,8 @@ class Data(object):
         self.llm_tokenizer = llm_tokenizer
         self.coverage_image = coverage_image
         self.baseline_prompt = baseline_prompt
+        self.graph_sampling = graph_sampling
+        self.n_hops = n_hops
 
     def crawl(self) -> None:
         """
@@ -517,6 +521,15 @@ class Data(object):
                         for key in graph.keys()
                         if isinstance(graph[key], dgl.DGLGraph)
                     }
+
+                    if self.graph_sampling:
+                        for key in graph_dict.keys():
+                            graph_dict[key] = self.sampling_neighbor(
+                                graph=graph_dict[key],
+                                mask=mask[mask_key],
+                                n_hops=self.n_hops,
+                            )
+
                     data = {
                         "uuid": f"{uuid}_{testcase}",
                         "prompt": prompt,
@@ -772,3 +785,19 @@ class Data(object):
             line = "->".join([str(i) for i in item])
             code_line += line + "\n"
         return code_line
+
+    def sampling_neighbor(
+        self, graph: dgl.DGLGraph, mask: torch.Tensor, n_hops: int = 2
+    ) -> dgl.DGLGraph:
+        """
+        Sample the neighbors of the graph
+        """
+        sub_graph: dgl.DGLGraph = None
+        for i in range(n_hops):
+            if sub_graph is None:
+                nodes = torch.nonzero(mask, as_tuple=False).squeeze(1)
+                sub_graph = dgl.sampling.sample_neighbors(graph, nodes, fanout=-1)
+            else:
+                nodes = sub_graph.nodes()
+                sub_graph = dgl.sampling.sample_neighbors(sub_graph, nodes, fanout=-1)
+        return sub_graph

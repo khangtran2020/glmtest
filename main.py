@@ -40,6 +40,8 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
         baseline_prompt=args.baseline_prompt,
         debug=args.debug,
         mode=args.mode,
+        graph_sampling=args.graph_sampling,
+        n_hops=args.n_layers,
     )
     if dataset is None:
         logger.log("Dataset not found, exiting...")

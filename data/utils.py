@@ -31,6 +31,8 @@ def get_dataset(
     data_max_length: int = 16384,
     debug: bool = False,
     mode: str = "train",
+    graph_sampling: bool = False,
+    **kwargs,
 ) -> Data:
 
     if mode == "data":
@@ -76,6 +78,8 @@ def get_dataset(
             graph=graph,
             baseline_prompt=baseline_prompt,
             debug=debug,
+            graph_sampling=graph_sampling,
+            n_hops=kwargs.get("n_hops", 1),
         )
     elif data_name == "testgeneval":
         logger.log("Using TestGeneval dataset")
@@ -88,6 +92,8 @@ def get_dataset(
             llm_tokenizer=llm_tokenizer,
             baseline_prompt=baseline_prompt,
             debug=debug,
+            graph_sampling=graph_sampling,
+            n_hops=kwargs.get("n_hops", 1),
         )
     else:
         logger.log("Dataset not found")

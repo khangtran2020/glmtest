@@ -32,6 +32,9 @@ def add_data_group(group):
     group.add_argument("--num_cpu", type=int, default=-1, help="number of cpus to use")
     group.add_argument("--do_crawl", action="store_true", help="crawl the raw data")
     group.add_argument(
+        "--graph_sampling", action="store_true", help="crawl the raw data"
+    )
+    group.add_argument(
         "--do_process_raw", action="store_true", help="process the raw data"
     )
     group.add_argument(
@@ -57,6 +60,70 @@ def add_joern_group(group):
         type=str,
         help="path to joern",
         default="./graph/joern/",
+    )
+
+
+def add_model_group(group):
+
+    group.add_argument(
+        "--gnn_mode",
+        type=str,
+        help="mode of the program: node, graph",
+        default="node",
+    )
+    group.add_argument(
+        "--in_feats",
+        type=int,
+        help="number of input features",
+        default=772,
+    )
+    group.add_argument(
+        "--n_hidden",
+        type=int,
+        help="number of hidden features",
+        default=64,
+    )
+    group.add_argument(
+        "--n_layers",
+        type=int,
+        help="number of layers",
+        default=3,
+    )
+    group.add_argument(
+        "--num_head",
+        type=int,
+        help="number of heads",
+        default=8,
+    )
+    group.add_argument(
+        "--dropout",
+        type=float,
+        help="dropout rate",
+        default=0.2,
+    )
+    group.add_argument(
+        "--lora_r",
+        type=int,
+        help="lora rank",
+        default=4,
+    )
+    group.add_argument(
+        "--lora_alpha",
+        type=int,
+        help="lora alpha",
+        default=32,
+    )
+    group.add_argument(
+        "--lora_dropout",
+        type=float,
+        help="lora dropout",
+        default=0.1,
+    )
+    group.add_argument(
+        "--lora_target_modules",
+        type=str,
+        help="lora target modules",
+        default=None,
     )
 
 
@@ -215,7 +282,6 @@ def add_training_group(group):
         help="name of the run for wandb",
         default="testing",
     )
-    group.add_argument("--longlora", action="store_true", help="Train with LongLoRA")
     group.add_argument(
         "--use_accelerate",
         action="store_true",
