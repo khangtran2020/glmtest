@@ -108,14 +108,13 @@ def validate(args, loader, model, device):
         num_item = 0
 
         with tqdm(total=len(loader), position=0, leave=True, ncols=80) as pbar:
-            for step, batch in enumerate(tqdm(loader, position=0, leave=True)):
+            for step, batch in enumerate(loader):
                 batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
                 num_item += batch_size
 
                 # Process each sample in the batch as a micro-batch.
                 for i in range(batch_size):
-                    # global_step += 1
                     batch_input = batch["input"].copy()
                     if "token_type_ids" in batch_input:
                         batch_input.pop("token_type_ids")
@@ -149,7 +148,7 @@ def validate(args, loader, model, device):
                     batch_loss += loss.item()
 
                 val_loss += batch_loss
-                pbar.update()
+                pbar.update(1)
 
         val_loss /= num_item
         return val_loss
