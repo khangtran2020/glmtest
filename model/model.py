@@ -235,12 +235,12 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 graph_embeds
             )
 
-        if self.debug and (self.rank >= 0):
-            print("=" * 100 + f"Rank {self.rank} - Step {step}" + "\n\n")
-            print(
-                f"After take graph embedding, size of inputs_embeds: {inputs_embeds.size()}"
-            )
-            print("\n\n" + "=" * 100)
+        # if self.debug and (self.rank >= 0):
+        #     print("=" * 100 + f"Rank {self.rank} - Step {step}" + "\n\n")
+        #     print(
+        #         f"After take graph embedding, size of inputs_embeds: {inputs_embeds.size()}"
+        #     )
+        #     print("\n\n" + "=" * 100)
 
         # if self.debug:
         #     print("After take graph embedding")
