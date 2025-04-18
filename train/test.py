@@ -128,7 +128,7 @@ def validate(args, loader, model, device):
                     if key in graph.keys():
                         graph[key] = graph[key].to(device)
 
-                graph_mask = batch["graph_mask"][i]
+                graph_mask = batch["graph_mask"][i].to(device)
 
                 if "graph" in args.baseline_prompt:
                     graph_token_index = torch.where(
