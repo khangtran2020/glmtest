@@ -201,8 +201,8 @@ def train_single_gpu(
                         "labels": batch_input["labels"][i].to(device),
                     }
 
-                    if args.debug:
-                        console.log(f"Micro input: {micro_input}")
+                    # if args.debug:
+                    #     console.log(f"Micro input: {micro_input}")
 
                     graph = batch["graph"][i]
                     for key in model.gnn.type_of_graph:
@@ -464,16 +464,16 @@ def train_multi_gpu_ringattn(
                         "labels": batch_input["labels"][i].to(device),
                     }
 
-                    if args.debug:
-                        console.log("Logging nvidia-smi with micro_input")
-                        # run_nvidia_smi(console=console)
-                        console.log(
-                            "=" * 100
-                            + "\n" * 2
-                            + f"Micro input at rank {rank} | step {global_step}: {[micro_input[key].size() for key in micro_input]}"
-                            + "\n" * 2
-                            + "=" * 100
-                        )
+                    # if args.debug:
+                    #     console.log("Logging nvidia-smi with micro_input")
+                    #     # run_nvidia_smi(console=console)
+                    #     console.log(
+                    #         "=" * 100
+                    #         + "\n" * 2
+                    #         + f"Micro input at rank {rank} | step {global_step}: {[micro_input[key].size() for key in micro_input]}"
+                    #         + "\n" * 2
+                    #         + "=" * 100
+                    #     )
 
                     graph = batch["graph"][i]
                     for key in model.gnn.type_of_graph:
@@ -757,8 +757,8 @@ def train_single_gpu_accelerate(
                         "labels": batch_input["labels"][i].to(device),
                     }
 
-                    if args.debug:
-                        console.log(f"Micro input: {micro_input}")
+                    # if args.debug:
+                    #     console.log(f"Micro input: {micro_input}")
 
                     graph = batch["graph"][i]
                     for key in model.gnn.type_of_graph:
@@ -1092,14 +1092,14 @@ def train_multi_gpu_accelerate(
                         "labels": batch_input["labels"][i].to(device),
                     }
 
-                    if args.debug and accelerator.is_main_process:
-                        console.log(
-                            "=" * 100
-                            + "\n" * 2
-                            + f"Micro input at step {global_step}: {[micro_input[key].size() for key in micro_input]}"
-                            + "\n" * 2
-                            + "=" * 100
-                        )
+                    # if args.debug and accelerator.is_main_process:
+                    #     console.log(
+                    #         "=" * 100
+                    #         + "\n" * 2
+                    #         + f"Micro input at step {global_step}: {[micro_input[key].size() for key in micro_input]}"
+                    #         + "\n" * 2
+                    #         + "=" * 100
+                    #     )
 
                     graph = batch["graph"][i]
                     for key in model.gnn.type_of_graph:
