@@ -1,5 +1,6 @@
 import os
 import torch
+from tqdm import tqdm
 from torch.utils.data import DataLoader
 from data.loader import GLMFDataset, collate_fn
 from model.model import GLMFModelForCausalLM
@@ -106,7 +107,7 @@ def validate(args, loader, model, device):
         val_loss = 0.0
         num_item = 0
 
-        for step, batch in enumerate(loader):
+        for step, batch in enumerate(tqdm(loader)):
             batch_loss = 0.0
             batch_size = batch["input"]["input_ids"].size(0)
             num_item += batch_size
