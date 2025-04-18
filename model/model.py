@@ -181,13 +181,13 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         step: int = 0,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
-        if self.debug and (self.rank >= 0):
-            print("=" * 100 + f"Rank {self.rank} - Step {step}" + "\n\n")
-            print(
-                f"Before take graph embedding, size of inputs_embeds: {input_ids.size()}"
-            )
-            print("\n\n" + "=" * 100)
-            # run_nvidia_smi(console=None)
+        # if self.debug and (self.rank >= 0):
+        #     print("=" * 100 + f"Rank {self.rank} - Step {step}" + "\n\n")
+        #     print(
+        #         f"Before take graph embedding, size of inputs_embeds: {input_ids.size()}"
+        #     )
+        #     print("\n\n" + "=" * 100)
+        # run_nvidia_smi(console=None)
 
         output_attentions = (
             output_attentions
