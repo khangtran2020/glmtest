@@ -817,6 +817,8 @@ def train_single_gpu_accelerate(
     accelerator.wait_for_everyone()
     unwrapped_model = accelerator.unwrap_model(model)
     final_model_path = f"{args.output_dir}/{args.name}"
+    console.log(f"Saving final model to {final_model_path}...")
+
     if not os.path.exists(final_model_path):
         os.makedirs(final_model_path, exist_ok=True)
 
@@ -825,8 +827,9 @@ def train_single_gpu_accelerate(
         is_main_process=accelerator.is_main_process,
         save_function=accelerator.save,
     )
-
     tokenizer.save_pretrained(final_model_path)
+
+    console.log(f"Final model saved to {final_model_path}")
     if wandb.run is not None:
         model_artifact = wandb.Artifact(
             name=f"model-{wandb.run.id}",
