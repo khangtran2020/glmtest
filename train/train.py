@@ -816,7 +816,7 @@ def train_single_gpu_accelerate(
 
     accelerator.wait_for_everyone()
     unwrapped_model = accelerator.unwrap_model(model)
-    final_model_path = f"{args.output_dir}/{args.name}"
+    final_model_path = os.path.join(args.output_dir, args.name)
     console.log(f"Saving final model to {final_model_path}...")
 
     if not os.path.exists(final_model_path):
