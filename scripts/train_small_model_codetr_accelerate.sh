@@ -1,14 +1,17 @@
+export CUDA_VISIBLE_DEVICES=0
+
 accelerate launch main.py --mode train \
     --seed 42 \
     --data_path Dataset \
     --data testgeneval \
     --baseline_prompt code_tr \
-    --llm_model "Qwen/CodeQwen1.5-7B-Chat" \
+    --llm_model "HuggingFaceTB/SmolLM2-135M-Instruct" \
     --max_seq_len 16384 \
     --batch_size 1 \
-    --gradient_accumulation_steps 16 \
+    --gradient_accumulation_steps 1 \
+    --save_steps 1 \
     --num_gpu 1 \
-    --output_dir "./results/models/" \
+    --output_dir "./results/models/testing_small_code_tr_accelerate" \
     --overwrite_output_dir \
     --do_train \
     --do_eval \
@@ -18,4 +21,5 @@ accelerate launch main.py --mode train \
     --dtype bfloat16 \
     --debug \
     --use_lora \
-    --longlora 
+    --use_accelerate \
+    --do_test
