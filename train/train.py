@@ -569,6 +569,10 @@ def train_single_gpu_accelerate(
         project_dir=args.log_dir,
     )
 
+    final_model_path = os.path.join(args.output_dir, args.name)
+    console.log(f"Saving final model to {final_model_path}...")
+    if not os.path.exists(final_model_path):
+        os.makedirs(final_model_path, exist_ok=True)
     # Initialize W&B run if main process
     accelerator.init_trackers(
         project_name="GLMFuzz",
@@ -779,8 +783,9 @@ def train_single_gpu_accelerate(
                     )
 
                 if accelerator.sync_gradients and global_step % args.save_steps == 0:
-                    checkpoint_dir = (
-                        f"{args.output_dir}/{args.name}-checkpoint-{global_step}"
+                    checkpoint_dir = os.path.join(
+                        final_model_path,
+                        f"checkpoint-{global_step}",
                     )
                     accelerator.save_state(checkpoint_dir)
                     if accelerator.is_main_process:
@@ -816,11 +821,6 @@ def train_single_gpu_accelerate(
 
     accelerator.wait_for_everyone()
     unwrapped_model = accelerator.unwrap_model(model)
-    final_model_path = os.path.join(args.output_dir, args.name)
-    console.log(f"Saving final model to {final_model_path}...")
-
-    if not os.path.exists(final_model_path):
-        os.makedirs(final_model_path, exist_ok=True)
 
     unwrapped_model.save_pretrained(
         final_model_path,
