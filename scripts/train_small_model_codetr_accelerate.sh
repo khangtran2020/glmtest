@@ -11,7 +11,8 @@ accelerate launch main.py --mode train \
     --gradient_accumulation_steps 1 \
     --save_steps 1 \
     --num_gpu 1 \
-    --output_dir "./results/models/testing_small_code_tr_accelerate" \
+    --name "testing_small_code_tr_accelerate" \
+    --output_dir "./results/models/" \
     --overwrite_output_dir \
     --do_train \
     --do_eval \

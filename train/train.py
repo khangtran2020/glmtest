@@ -817,8 +817,14 @@ def train_single_gpu_accelerate(
     accelerator.wait_for_everyone()
     unwrapped_model = accelerator.unwrap_model(model)
     final_model_path = f"{args.output_dir}/{args.name}"
+    if not os.path.exists(final_model_path):
+        os.makedirs(final_model_path, exist_ok=True)
 
-    unwrapped_model.save_pretrained(final_model_path)
+    unwrapped_model.save_pretrained(
+        final_model_path,
+        is_main_process=accelerator.is_main_process,
+        save_function=accelerator.save,
+    )
 
     tokenizer.save_pretrained(final_model_path)
     if wandb.run is not None:
