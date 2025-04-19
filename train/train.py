@@ -559,24 +559,23 @@ def train_single_gpu_accelerate(
     )
 
     # Initialize W&B run if main process
-    if accelerator.is_main_process:
-        accelerator.init_trackers(
-            project_name="GLMFuzz",
-            config={
-                "model_name": args.llm_model,
-                "dataset": args.data,
-                "learning_rate": args.learning_rate,
-                "batch_size": args.batch_size,
-                "gradient_accumulation_steps": args.gradient_accumulation_steps,
-                "effective_batch_size": args.batch_size
-                * args.gradient_accumulation_steps
-                * accelerator.num_processes,
-                "max_steps": args.num_train_epochs,
-                "mixed_precision": mixed_precision,
-                "seed": args.seed,
-            },
-            init_kwargs={"wandb": {"name": args.name}},
-        )
+    accelerator.init_trackers(
+        project_name="GLMFuzz",
+        config={
+            "model_name": args.llm_model,
+            "dataset": args.data,
+            "learning_rate": args.learning_rate,
+            "batch_size": args.batch_size,
+            "gradient_accumulation_steps": args.gradient_accumulation_steps,
+            "effective_batch_size": args.batch_size
+            * args.gradient_accumulation_steps
+            * accelerator.num_processes,
+            "max_steps": args.num_train_epochs,
+            "mixed_precision": mixed_precision,
+            "seed": args.seed,
+        },
+        init_kwargs={"wandb": {"name": args.name}},
+    )
 
     device = accelerator.device
     accelerator.print(f"Using {accelerator.num_processes} devices")
@@ -610,16 +609,23 @@ def train_single_gpu_accelerate(
         llm_model=args.llm_model,
         use_lora=args.use_lora,
         dtype=args.dtype,
-        device_map="auto",
+        mode=args.gnn_mode,
+        in_feats=args.in_feats,
+        n_hidden=args.n_hidden,
+        n_layers=args.n_layers,
+        n_heads=args.n_heads,
+        dropout=args.dropout,
+        lora_r=args.lora_r,
+        lora_alpha=args.lora_alpha,
+        lora_dropout=args.lora_dropout,
+        lora_target_modules=args.lora_target_modules,
+        device_map="cuda" if torch.cuda.is_available() else "cpu",
     )
 
     if config.model_type not in ["llama", "qwen2"]:
         raise ValueError(
             f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2'."
         )
-
-    if args.debug:
-        console.log(f"Model config initialized: {config}")
 
     model = GLMFModelForCausalLM(
         config=config,
@@ -629,9 +635,6 @@ def train_single_gpu_accelerate(
         rank=rank,
     )
     model.llm_model.gradient_checkpointing_enable()
-
-    if args.debug:
-        console.log(f"Model initialized with config: {config}")
 
     model.config.graph_token_id = [
         tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
@@ -674,8 +677,7 @@ def train_single_gpu_accelerate(
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),  # Shows percentage
     ) as progress:
 
-        if accelerator.is_main_process:
-            train_task = progress.add_task("Training...", total=args.num_train_epochs)
+        train_task = progress.add_task("Training...", total=args.num_train_epochs)
 
         for epoch in range(args.num_train_epochs):
             model.train()
@@ -719,8 +721,6 @@ def train_single_gpu_accelerate(
                         graph_token_index = torch.where(
                             micro_input["input_ids"] == model.config.graph_token_id[1]
                         )[1].tolist()
-                        # if args.debug:
-                        #     console.log(f"Graph token id: {graph_token_index}")
                     else:
                         graph_token_index = None
 
@@ -744,16 +744,15 @@ def train_single_gpu_accelerate(
                     batch_loss += loss.item()
 
                 avg_batch_loss = batch_loss / batch_size
-                if accelerator.is_main_process:
-                    progress.update(
-                        train_epoch_task,
-                        advance=1,
-                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f}",
-                    )
+                progress.update(
+                    train_epoch_task,
+                    advance=1,
+                    description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f}",
+                )
                 epoch_loss += avg_batch_loss * batch_size
                 num_items += batch_size
 
-                if global_step % args.logging_steps == 0:
+                if (global_step % args.logging_steps == 0) and (args.debug == False):
                     current_lr = lr_scheduler.get_last_lr()[0]
                     if accelerator.is_main_process:
                         accelerator.log(
@@ -780,7 +779,7 @@ def train_single_gpu_accelerate(
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
 
-                if global_step % args.validating_steps == 0:
+                if (global_step % args.validating_steps == 0) and (args.debug == False):
                     val_loss = validate(
                         args=args, loader=va_loader, model=model, device=device
                     )
@@ -789,12 +788,17 @@ def train_single_gpu_accelerate(
                         f"Validation loss: {val_loss:.4f} at step {global_step}"
                     )
 
+                if args.debug:
+                    break
+
             progress.remove_task(train_epoch_task)
             progress.update(
                 train_task,
                 advance=1,
                 description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
             )
+            if args.debug:
+                break
 
     if model.config.use_lora == True:
         model.llm_model = model.llm_model.merge_and_unload()
@@ -809,18 +813,15 @@ def train_single_gpu_accelerate(
         save_function=accelerator.save,
     )
 
-    if accelerator.is_main_process:
-        tokenizer.save_pretrained(final_model_path)
-
-        # Log final model to W&B
-        if wandb.run is not None:
-            model_artifact = wandb.Artifact(
-                name=f"model-{wandb.run.id}",
-                type="model",
-                description=f"Final model checkpoint",
-            )
-            model_artifact.add_dir(final_model_path)
-            wandb.log_artifact(model_artifact)
+    tokenizer.save_pretrained(final_model_path)
+    if wandb.run is not None:
+        model_artifact = wandb.Artifact(
+            name=f"model-{wandb.run.id}",
+            type="model",
+            description=f"Final model checkpoint",
+        )
+        model_artifact.add_dir(final_model_path)
+        wandb.log_artifact(model_artifact)
 
     # End W&B run
     accelerator.end_training()
@@ -904,7 +905,17 @@ def train_multi_gpu_accelerate(
         llm_model=args.llm_model,
         use_lora=args.use_lora,
         dtype=args.dtype,
-        device_map="auto",
+        mode=args.gnn_mode,
+        in_feats=args.in_feats,
+        n_hidden=args.n_hidden,
+        n_layers=args.n_layers,
+        n_heads=args.n_heads,
+        dropout=args.dropout,
+        lora_r=args.lora_r,
+        lora_alpha=args.lora_alpha,
+        lora_dropout=args.lora_dropout,
+        lora_target_modules=args.lora_target_modules,
+        device_map="cuda" if torch.cuda.is_available() else "cpu",
     )
 
     setattr(config, "use_cache", False)
@@ -934,11 +945,11 @@ def train_multi_gpu_accelerate(
     if args.model_debug:
         return
 
-    if args.debug:
-        console.log("Model & tokenizer loaded")
-        console.log(
-            f"Special tokens added to tokenizer and model: {model.config.graph_token_id}"
-        )
+    # if args.debug:
+    #     console.log("Model & tokenizer loaded")
+    #     console.log(
+    #         f"Special tokens added to tokenizer and model: {model.config.graph_token_id}"
+    #     )
 
     optimizer = AdamW(
         filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
@@ -952,16 +963,17 @@ def train_multi_gpu_accelerate(
     device = accelerator.device
     model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
 
-    accelerator.print(f"***** Running training *****")
-    accelerator.print(f"  Num examples = {len(tr_dataset)}")
-    accelerator.print(f"  Instantaneous batch size per device = {args.batch_size}")
-    accelerator.print(
-        f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}"
-    )
-    accelerator.print(f"  Total train batch size = {args.batch_size}")
-    accelerator.print(
-        f"  Total optimization steps = {args.num_train_epochs * len(tr_loader)}"
-    )
+    if accelerator.is_main_process:
+        accelerator.print(f"***** Running training *****")
+        accelerator.print(f"  Num examples = {len(tr_dataset)}")
+        accelerator.print(f"  Instantaneous batch size per device = {args.batch_size}")
+        accelerator.print(
+            f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}"
+        )
+        accelerator.print(f"  Total train batch size = {args.batch_size}")
+        accelerator.print(
+            f"  Total optimization steps = {args.num_train_epochs * len(tr_loader)}"
+        )
 
     global_step = 0
 
@@ -1006,15 +1018,6 @@ def train_multi_gpu_accelerate(
                         "labels": batch_input["labels"][i].to(device),
                     }
 
-                    # if args.debug and accelerator.is_main_process:
-                    #     console.log(
-                    #         "=" * 100
-                    #         + "\n" * 2
-                    #         + f"Micro input at step {global_step}: {[micro_input[key].size() for key in micro_input]}"
-                    #         + "\n" * 2
-                    #         + "=" * 100
-                    #     )
-
                     graph = batch["graph"][i]
                     for key in model.gnn.type_of_graph:
                         if key in graph.keys():
@@ -1026,8 +1029,6 @@ def train_multi_gpu_accelerate(
                         graph_token_index = torch.where(
                             micro_input["input_ids"] == model.config.graph_token_id[1]
                         )[1].tolist()
-                        # if args.debug and accelerator.is_main_process:
-                        #     console.log(f"Graph token id: {graph_token_index}")
                     else:
                         graph_token_index = None
 
@@ -1051,6 +1052,9 @@ def train_multi_gpu_accelerate(
 
                     batch_loss += loss.detach().float()
 
+                if args.debug:
+                    break
+
                 avg_batch_loss = batch_loss / batch_size
                 if accelerator.is_main_process:
                     progress.update(
@@ -1062,8 +1066,10 @@ def train_multi_gpu_accelerate(
                 num_items += batch_size
 
                 if (
-                    global_step % args.logging_steps == 0
-                ) and accelerator.is_main_process:
+                    (global_step % args.logging_steps == 0)
+                    and accelerator.is_main_process
+                    and (args.debug == False)
+                ):
                     current_lr = lr_scheduler.get_last_lr()[0]
                     if accelerator.is_main_process:
                         accelerator.log(
@@ -1096,8 +1102,9 @@ def train_multi_gpu_accelerate(
                     torch.cuda.empty_cache()
 
                 if (
-                    global_step % args.validating_steps == 0
+                    (global_step % args.validating_steps == 0)
                     and accelerator.is_main_process
+                    and (args.debug == False)
                 ):
 
                     val_loss = validate(
@@ -1107,6 +1114,9 @@ def train_multi_gpu_accelerate(
                     console.log(
                         f"Validation loss: {val_loss:.4f} at step {global_step}"
                     )
+
+            if args.debug:
+                break
 
             if accelerator.is_main_process:
                 progress.remove_task(train_epoch_task)

@@ -1,6 +1,5 @@
 import torch
 from data.ossfuzz_data import OSSFuzz
-from data.codamosa_data import Codamosa
 from data.testgeneval_data import TestGenEval
 from graph.joerngraph import JoernGraph
 from transformers import AutoTokenizer, AutoModel
