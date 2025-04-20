@@ -196,7 +196,7 @@ def add_training_group(group):
         help="train the model",
     )
     group.add_argument(
-        "--do_test  ",
+        "--do_test",
         action="store_true",
         help="train the model",
     )
