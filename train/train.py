@@ -845,7 +845,7 @@ def train_single_gpu_accelerate(
             type="model",
             description=f"Final model checkpoint",
         )
-        model_artifact.add_dir(final_model_path)
+        model_artifact.add_dir(os.path.join(save_path, "antifact"))
         wandb.log_artifact(model_artifact)
 
     # End W&B run
@@ -1173,7 +1173,7 @@ def train_multi_gpu_accelerate(
                 type="model",
                 description=f"Final model checkpoint",
             )
-            model_artifact.add_dir(final_model_path)
+            model_artifact.add_dir(os.path.join(save_path, "antifact"))
             wandb.log_artifact(model_artifact)
 
     # End W&B run
