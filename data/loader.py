@@ -119,17 +119,39 @@ class GLMFDataset(Dataset):
 
 
 def collate_fn(batch) -> dict:
-    print(batch)
-    collated_input = {}
-    for key in batch[0]["input"]:
-        # Stack the tensors corresponding to the same key across the batch
-        collated_input[key] = torch.stack([sample["input"][key] for sample in batch])
-    collated = {
-        "input": collated_input,
-        # "attention_mask": torch.stack([x["attention_mask"] for x in batch]),
-        # "labels": torch.stack([x["labels"] for x in batch]),
-        "graph_mask": torch.stack([x["graph_mask"] for x in batch]),
-        # Leave the graph as a list of dictionaries (or process as needed for your GNN)
-        "graph": [x["graph"] for x in batch],
-    }
-    return collated
+
+    # check if batch is tuple
+    if not isinstance(batch[0], tuple):
+        # print(batch)
+        collated_input = {}
+        for key in batch[0]["input"]:
+            # Stack the tensors corresponding to the same key across the batch
+            collated_input[key] = torch.stack(
+                [sample["input"][key] for sample in batch]
+            )
+        collated = {
+            "input": collated_input,
+            # "attention_mask": torch.stack([x["attention_mask"] for x in batch]),
+            # "labels": torch.stack([x["labels"] for x in batch]),
+            "graph_mask": torch.stack([x["graph_mask"] for x in batch]),
+            # Leave the graph as a list of dictionaries (or process as needed for your GNN)
+            "graph": [x["graph"] for x in batch],
+        }
+        return collated
+    else:
+        uuid, batch = batch
+        collated_input = {}
+        for key in batch[0]["input"]:
+            # Stack the tensors corresponding to the same key across the batch
+            collated_input[key] = torch.stack(
+                [sample["input"][key] for sample in batch]
+            )
+        collated = {
+            "input": collated_input,
+            # "attention_mask": torch.stack([x["attention_mask"] for x in batch]),
+            # "labels": torch.stack([x["labels"] for x in batch]),
+            "graph_mask": torch.stack([x["graph_mask"] for x in batch]),
+            # Leave the graph as a list of dictionaries (or process as needed for your GNN)
+            "graph": [x["graph"] for x in batch],
+        }
+        return collated
