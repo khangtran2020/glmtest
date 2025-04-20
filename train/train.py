@@ -30,6 +30,7 @@ def train(
     dataset: GLMFDataset,
     console: Console,
     device: torch.device,
+    model: GLMFModelForCausalLM,
     collate_fn: callable = collate_fn,
     rank: int = 0,
 ):
@@ -40,6 +41,7 @@ def train(
                 args=args,
                 dataset=dataset,
                 console=console,
+                model=model,
                 collate_fn=collate_fn,
                 rank=-1,
             )
@@ -49,6 +51,7 @@ def train(
                 args=args,
                 dataset=dataset,
                 console=console,
+                model=model,
                 collate_fn=collate_fn,
                 rank=-1,
             )
@@ -557,6 +560,7 @@ def train_single_gpu_accelerate(
     dataset: GLMFDataset,
     console: Console,
     collate_fn: callable = collate_fn,
+    model: GLMFModelForCausalLM = None,
     rank: int = 0,
     mixed_precision: str = "bf16",
 ):
@@ -620,35 +624,35 @@ def train_single_gpu_accelerate(
         console.log(f"Valid data: {len(va_dataset)} data points")
 
     tokenizer = dataset.llm_tokenizer
-    config = GLMFModelConfig(
-        llm_model=args.llm_model,
-        use_lora=args.use_lora,
-        dtype=args.dtype,
-        mode=args.gnn_mode,
-        in_feats=args.in_feats,
-        n_hidden=args.n_hidden,
-        n_layers=args.n_layers,
-        num_head=args.num_head,
-        dropout=args.dropout,
-        lora_r=args.lora_r,
-        lora_alpha=args.lora_alpha,
-        lora_dropout=args.lora_dropout,
-        lora_target_modules=args.lora_target_modules,
-        device_map="cuda" if torch.cuda.is_available() else "cpu",
-    )
+    # config = GLMFModelConfig(
+    #     llm_model=args.llm_model,
+    #     use_lora=args.use_lora,
+    #     dtype=args.dtype,
+    #     mode=args.gnn_mode,
+    #     in_feats=args.in_feats,
+    #     n_hidden=args.n_hidden,
+    #     n_layers=args.n_layers,
+    #     num_head=args.num_head,
+    #     dropout=args.dropout,
+    #     lora_r=args.lora_r,
+    #     lora_alpha=args.lora_alpha,
+    #     lora_dropout=args.lora_dropout,
+    #     lora_target_modules=args.lora_target_modules,
+    #     device_map="cuda" if torch.cuda.is_available() else "cpu",
+    # )
 
-    if config.model_type not in ["llama", "qwen2"]:
-        raise ValueError(
-            f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2'."
-        )
+    # if config.model_type not in ["llama", "qwen2"]:
+    #     raise ValueError(
+    #         f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2'."
+    #     )
 
-    model = GLMFModelForCausalLM(
-        config=config,
-        tokenizer=tokenizer,
-        baseline_prompt=args.baseline_prompt,
-        debug=args.debug,
-        rank=rank,
-    )
+    # model = GLMFModelForCausalLM(
+    #     config=config,
+    #     tokenizer=tokenizer,
+    #     baseline_prompt=args.baseline_prompt,
+    #     debug=args.debug,
+    #     rank=rank,
+    # )
     model.llm_model.gradient_checkpointing_enable()
 
     model.config.graph_token_id = [
@@ -822,14 +826,16 @@ def train_single_gpu_accelerate(
     accelerator.wait_for_everyone()
     unwrapped_model = accelerator.unwrap_model(model)
 
-    final_model_path = os.path.join(save_path, "final_model")
+    final_model_path = os.path.join(save_path, "final_model.pt")
     console.log(f"Saving final model to {final_model_path}...")
 
-    unwrapped_model.save_pretrained(
-        final_model_path,
-        is_main_process=accelerator.is_main_process,
-        save_function=accelerator.save,
-    )
+    # unwrapped_model.save_pretrained(
+    #     final_model_path,
+    #     is_main_process=accelerator.is_main_process,
+    #     save_function=accelerator.save,
+    # )
+
+    torch.save(unwrapped_model.state_dict(), final_model_path)
     tokenizer.save_pretrained(final_model_path)
 
     console.log(f"Final model saved to {final_model_path}")
@@ -851,6 +857,7 @@ def train_multi_gpu_accelerate(
     dataset: GLMFDataset,
     console: Console,
     collate_fn: callable = collate_fn,
+    model: GLMFModelForCausalLM = None,
     rank: int = 0,
     mixed_precision: str = "bf16",
 ):
@@ -920,40 +927,31 @@ def train_multi_gpu_accelerate(
         console.log(f"Valid data: {len(va_dataset)} data points")
 
     tokenizer = dataset.llm_tokenizer
-    config = GLMFModelConfig(
-        llm_model=args.llm_model,
-        use_lora=args.use_lora,
-        dtype=args.dtype,
-        mode=args.gnn_mode,
-        in_feats=args.in_feats,
-        n_hidden=args.n_hidden,
-        n_layers=args.n_layers,
-        num_head=args.num_head,
-        dropout=args.dropout,
-        lora_r=args.lora_r,
-        lora_alpha=args.lora_alpha,
-        lora_dropout=args.lora_dropout,
-        lora_target_modules=args.lora_target_modules,
-        device_map="cuda" if torch.cuda.is_available() else "cpu",
-    )
+    # config = GLMFModelConfig(
+    #     llm_model=args.llm_model,
+    #     use_lora=args.use_lora,
+    #     dtype=args.dtype,
+    #     mode=args.gnn_mode,
+    #     in_feats=args.in_feats,
+    #     n_hidden=args.n_hidden,
+    #     n_layers=args.n_layers,
+    #     num_head=args.num_head,
+    #     dropout=args.dropout,
+    #     lora_r=args.lora_r,
+    #     lora_alpha=args.lora_alpha,
+    #     lora_dropout=args.lora_dropout,
+    #     lora_target_modules=args.lora_target_modules,
+    #     device_map="cuda" if torch.cuda.is_available() else "cpu",
+    # )
 
-    setattr(config, "use_cache", False)
-    if config.model_type not in ["llama", "qwen2"]:
-        raise ValueError(
-            f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2'."
-        )
+    # setattr(config, "use_cache", False)
+    # if config.model_type not in ["llama", "qwen2"]:
+    #     raise ValueError(
+    #         f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2'."
+    #     )
 
-    patch_model(model_type=config.model_type, mode="ring")
+    patch_model(model_type=model.config.model_type, mode="ring")
     console.log("Model patched with ring attention")
-
-    model = GLMFModelForCausalLM(
-        config=config,
-        baseline_prompt=args.baseline_prompt,
-        tokenizer=tokenizer,
-        multi_gpu=True,
-        debug=args.debug,
-        rank=rank,
-    )
 
     model.gradient_checkpointing_enable()
     model.config.graph_token_id = [

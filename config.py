@@ -125,6 +125,9 @@ def add_model_group(group):
         help="lora target modules",
         default=None,
     )
+    group.add_argument(
+        "--model_weight_path", type=str, help="path to the model weight", default=None
+    )
 
 
 def add_training_group(group):

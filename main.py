@@ -9,7 +9,8 @@ from graph.utils import get_graph
 from train.train import train
 from train.test import test
 import torch.distributed as dist
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM
+from model.model import GLMFModelConfig, GLMFModelForCausalLM
 
 # typing
 from argparse import Namespace
@@ -59,14 +60,51 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
         dataset.train_test_split()
 
     if args.mode == "train":
+
+        config = GLMFModelConfig(
+            llm_model=args.llm_model,
+            use_lora=args.use_lora,
+            dtype=args.dtype,
+            mode=args.gnn_mode,
+            in_feats=args.in_feats,
+            n_hidden=args.n_hidden,
+            n_layers=args.n_layers,
+            num_head=args.num_head,
+            dropout=args.dropout,
+            lora_r=args.lora_r,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            lora_target_modules=args.lora_target_modules,
+            device_map="cuda" if torch.cuda.is_available() else "cpu",
+        )
+
+        if config.model_type not in ["llama", "qwen2"]:
+            raise ValueError(
+                f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2'."
+            )
+
+        model = GLMFModelForCausalLM(
+            config=config,
+            tokenizer=dataset.llm_tokenizer,
+            baseline_prompt=args.baseline_prompt,
+            debug=args.debug,
+            rank=rank,
+        )
+
         train(args=args, dataset=dataset, console=console, device=device, rank=rank)
         if args.do_test:
-            model = AutoModelForCausalLM.from_pretrained(args.output_dir)
+            # model = AutoModelForCausalLM.from_pretrained(args.output_dir)
+            model_path = os.path.join(args.output_dir, args.name)
+            model_path = os.path.join(model_path, "final_model.pt")
+            model.load_state_dict(torch.load(model_path))
             test(args=args, data=dataset.test_data, model=model, console=console)
 
     elif args.mode == "test":
         # load model
-        model = AutoModelForCausalLM.from_pretrained(args.model_dir)
+        assert (
+            args.model_weight_path is not None
+        ), "Model directory must be specified for testing."
+        model.load_state_dict(torch.load(args.model_weight_path))
         test(args=args, data=dataset.test_data, model=model, console=console)
 
 
