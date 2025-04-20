@@ -119,6 +119,7 @@ class GLMFDataset(Dataset):
 
 
 def collate_fn(batch) -> dict:
+    print(batch)
     collated_input = {}
     for key in batch[0]["input"]:
         # Stack the tensors corresponding to the same key across the batch
