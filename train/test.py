@@ -15,13 +15,19 @@ from rich.console import Console
 
 def test(
     args: Namespace,
-    data: GLMFDataset,
+    dataset: GLMFDataset,
     model: GLMFModelForCausalLM,
     console: Console,
     collate_fn: callable = collate_fn,
 ):
-    data.testing = True
-    loader = DataLoader(data, batch_size=1, shuffle=False, collate_fn=collate_fn)
+    te_dataset = GLMFDataset(
+        data=dataset.train_data,
+        tokenizer=dataset.llm_tokenizer,
+        max_seq_length=args.max_seq_length,
+        debug=args.debug,
+        testing=True,
+    )
+    loader = DataLoader(te_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
     console.log(f"Test data: {len(loader)} data points")
     console.log("Testing...")
 

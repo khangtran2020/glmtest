@@ -13,6 +13,7 @@ class GLMFDataset(Dataset):
         max_seq_length: int = 12000,
         baseline_prompt: str = "code",
         debug: bool = False,
+        testing: bool = False,
     ):
         self.data = data
         self.tokenizer = tokenizer
@@ -20,7 +21,7 @@ class GLMFDataset(Dataset):
         self.max_seq_length = max_seq_length
         self.graph_token_id = self.tokenizer.convert_tokens_to_ids([GRAPH_PAD_TOKEN])[0]
         self.debug = debug
-        self.testing = False
+        self.testing = testing
 
     def __len__(self):
         return len(self.data)

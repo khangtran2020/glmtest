@@ -104,7 +104,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             model_path = os.path.join(args.output_dir, args.name)
             model_path = os.path.join(model_path, "final_model.pt")
             model.load_state_dict(torch.load(model_path))
-            test(args=args, data=dataset.test_data, model=model, console=console)
+            test(args=args, dataset=dataset, model=model, console=console)
 
     elif args.mode == "test":
         # load model
@@ -112,7 +112,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             args.model_weight_path is not None
         ), "Model directory must be specified for testing."
         model.load_state_dict(torch.load(args.model_weight_path))
-        test(args=args, data=dataset.test_data, model=model, console=console)
+        test(args=args, dataset=dataset.test_data, model=model, console=console)
 
 
 if __name__ == "__main__":
