@@ -1168,6 +1168,7 @@ def train_multi_gpu_accelerate(
 
         # Log final model to W&B
         if wandb.run is not None:
+            os.makedirs(os.path.join(save_path, "antifact"), exist_ok=True)
             model_artifact = wandb.Artifact(
                 name=f"model-{wandb.run.id}",
                 type="model",
