@@ -91,7 +91,14 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             rank=rank,
         )
 
-        train(args=args, dataset=dataset, console=console, device=device, rank=rank)
+        train(
+            args=args,
+            dataset=dataset,
+            console=console,
+            model=model,
+            device=device,
+            rank=rank,
+        )
         if args.do_test:
             # model = AutoModelForCausalLM.from_pretrained(args.output_dir)
             model_path = os.path.join(args.output_dir, args.name)
