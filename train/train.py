@@ -839,7 +839,9 @@ def train_single_gpu_accelerate(
     tokenizer.save_pretrained(final_tokenizer_path)
 
     console.log(f"Final model saved to {final_model_path}")
+    # Log final model to W&B
     if wandb.run is not None:
+        os.makedirs(os.path.join(save_path, "antifact"), exist_ok=True)
         model_artifact = wandb.Artifact(
             name=f"model-{wandb.run.id}",
             type="model",
