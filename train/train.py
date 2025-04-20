@@ -834,9 +834,9 @@ def train_single_gpu_accelerate(
     #     is_main_process=accelerator.is_main_process,
     #     save_function=accelerator.save,
     # )
-
-    torch.save(unwrapped_model.state_dict(), save_path)
-    tokenizer.save_pretrained(final_model_path)
+    final_tokenizer_path = os.path.join(save_path, "tokenizer")
+    torch.save(unwrapped_model.state_dict(), final_model_path)
+    tokenizer.save_pretrained(final_tokenizer_path)
 
     console.log(f"Final model saved to {final_model_path}")
     if wandb.run is not None:
@@ -888,7 +888,7 @@ def train_multi_gpu_accelerate(
             },
             init_kwargs={"wandb": {"name": args.name}},
         )
-
+    save_path = os.path.join(args.output_dir, args.name)
     accelerator.print(f"Distributed type: {accelerator.distributed_type}")
     accelerator.print(f"Number of processes: {accelerator.num_processes}")
     accelerator.print(f"Mixed precision: {mixed_precision}")
@@ -1107,8 +1107,9 @@ def train_multi_gpu_accelerate(
                     and accelerator.is_main_process
                 ):
                     accelerator.wait_for_everyone()
-                    checkpoint_dir = (
-                        f"{args.output_dir}/{args.name}-checkpoint-{global_step}"
+                    checkpoint_dir = os.path.join(
+                        save_path,
+                        f"checkpoint-{global_step}",
                     )
                     accelerator.save_state(checkpoint_dir)
                     if accelerator.is_main_process:
@@ -1149,16 +1150,21 @@ def train_multi_gpu_accelerate(
     if unwrapped_model.config.use_lora == True:
         unwrapped_model.llm_model = unwrapped_model.llm_model.merge_and_unload()
 
-    final_model_path = f"{args.output_dir}/{args.name}"
-
-    unwrapped_model.save_pretrained(
-        final_model_path,
-        is_main_process=accelerator.is_main_process,
-        save_function=accelerator.save,
-    )
-
     if accelerator.is_main_process:
-        tokenizer.save_pretrained(final_model_path)
+
+        final_model_path = os.path.join(save_path, "final_model.pt")
+        console.log(f"Saving final model to {final_model_path}...")
+
+        # unwrapped_model.save_pretrained(
+        #     final_model_path,
+        #     is_main_process=accelerator.is_main_process,
+        #     save_function=accelerator.save,
+        # )
+        final_tokenizer_path = os.path.join(save_path, "tokenizer")
+        torch.save(unwrapped_model.state_dict(), final_model_path)
+        tokenizer.save_pretrained(final_tokenizer_path)
+
+        console.log(f"Final model saved to {final_model_path}")
 
         # Log final model to W&B
         if wandb.run is not None:
