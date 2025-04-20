@@ -835,7 +835,7 @@ def train_single_gpu_accelerate(
     #     save_function=accelerator.save,
     # )
 
-    torch.save(unwrapped_model.state_dict(), final_model_path)
+    torch.save(unwrapped_model.state_dict(), save_path)
     tokenizer.save_pretrained(final_model_path)
 
     console.log(f"Final model saved to {final_model_path}")
