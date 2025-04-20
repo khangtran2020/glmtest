@@ -1167,15 +1167,15 @@ def train_multi_gpu_accelerate(
         console.log(f"Final model saved to {final_model_path}")
 
         # Log final model to W&B
-        if wandb.run is not None:
-            os.makedirs(os.path.join(save_path, "antifact"), exist_ok=True)
-            model_artifact = wandb.Artifact(
-                name=f"model-{wandb.run.id}",
-                type="model",
-                description=f"Final model checkpoint",
-            )
-            model_artifact.add_dir(os.path.join(save_path, "antifact"))
-            wandb.log_artifact(model_artifact)
+        # if wandb.run is not None:
+        #     os.makedirs(os.path.join(save_path, "antifact"), exist_ok=True)
+        #     model_artifact = wandb.Artifact(
+        #         name=f"model-{wandb.run.id}",
+        #         type="model",
+        #         description=f"Final model checkpoint",
+        #     )
+        #     model_artifact.add_dir(os.path.join(save_path, "antifact"))
+        #     wandb.log_artifact(model_artifact)
 
     # End W&B run
     accelerator.end_training()
