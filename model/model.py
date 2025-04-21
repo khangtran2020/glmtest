@@ -201,7 +201,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
     def __init__(
         self,
         config: GLMFModelConfig,
-        rank: int,
+        rank: int = 0,
         tokenizer: PreTrainedTokenizer = None,
         baseline_prompt: str = None,
         multi_gpu: bool = False,
