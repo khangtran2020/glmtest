@@ -125,6 +125,7 @@ class GLMFModelConfig(PretrainedConfig):
         # Composite models don't have a default config, use their decoder config as a fallback for default values
         # If no known pattern is matched, then `default_config = None` -> check against the global generation defaults
         try:
+            print("Using lora is set to", self.use_lora)
             default_config = self.__class__(
                 llm_model=self.llm_model,
                 mode=self.mode,
