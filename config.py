@@ -237,7 +237,7 @@ def add_training_group(group):
         "--max_new_tokens",
         type=float,
         help="max new tokens to generate",
-        default=1024,
+        default=512,
     )
     group.add_argument(
         "--max_grad_norm",

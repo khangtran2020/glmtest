@@ -826,7 +826,7 @@ def train_single_gpu_accelerate(
     accelerator.wait_for_everyone()
     unwrapped_model = accelerator.unwrap_model(model)
 
-    final_model_path = os.path.join(save_path, "final_model.pt")
+    final_model_path = os.path.join(save_path, "final_model")
     console.log(f"Saving final model to {final_model_path}...")
 
     # unwrapped_model.save_pretrained(
@@ -835,7 +835,7 @@ def train_single_gpu_accelerate(
     #     save_function=accelerator.save,
     # )
     final_tokenizer_path = os.path.join(save_path, "tokenizer")
-    torch.save(unwrapped_model.state_dict(), final_model_path)
+    unwrapped_model.save_pretrained(final_model_path)
     tokenizer.save_pretrained(final_tokenizer_path)
 
     console.log(f"Final model saved to {final_model_path}")
@@ -1163,7 +1163,7 @@ def train_multi_gpu_accelerate(
         #     save_function=accelerator.save,
         # )
         final_tokenizer_path = os.path.join(save_path, "tokenizer")
-        torch.save(unwrapped_model.state_dict(), final_model_path)
+        unwrapped_model.save_pretrained(final_model_path)
         tokenizer.save_pretrained(final_tokenizer_path)
 
         console.log(f"Final model saved to {final_model_path}")

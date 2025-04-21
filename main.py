@@ -100,10 +100,10 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             rank=rank,
         )
         if args.do_test:
-            # model = AutoModelForCausalLM.from_pretrained(args.output_dir)
+
             model_path = os.path.join(args.output_dir, args.name)
-            model_path = os.path.join(model_path, "final_model.pt")
-            model.load_state_dict(torch.load(model_path))
+            model_path = os.path.join(model_path, "final_model")
+            model = AutoModelForCausalLM.from_pretrained(model_path)
             test(args=args, dataset=dataset, model=model, console=console)
 
     elif args.mode == "test":
@@ -111,7 +111,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
         assert (
             args.model_weight_path is not None
         ), "Model directory must be specified for testing."
-        model.load_state_dict(torch.load(args.model_weight_path))
+        model = AutoModelForCausalLM.from_pretrained(args.model_weight_path)
         test(args=args, dataset=dataset, model=model, console=console)
 
 
