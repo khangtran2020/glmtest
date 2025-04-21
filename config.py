@@ -234,7 +234,7 @@ def add_training_group(group):
         default=16384,
     )
     group.add_argument(
-        "--model_new_tokens",
+        "--max_new_tokens",
         type=float,
         help="max new tokens to generate",
         default=1024,
