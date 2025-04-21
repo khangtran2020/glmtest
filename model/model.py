@@ -47,11 +47,12 @@ class GLMFModelConfig(PretrainedConfig):
         config = AutoConfig.from_pretrained(llm_model).to_dict()
         if llm_model is None:
             # print("1")
-            raise ValueError("`llm_model` must be provided to XCodeConfig")
+            raise ValueError("`llm_model` must be provided to GLMFModelConfig.")
 
         config = AutoConfig.from_pretrained(llm_model).to_dict()
         super().__init__(**config, **kwargs)
 
+        self.llm_model = llm_model
         self.model_name = config["_name_or_path"]
         self.mode = mode
         self.hidden_size = config["hidden_size"]
@@ -101,7 +102,7 @@ class GLMFModelConfig(PretrainedConfig):
         # Composite models don't have a default config, use their decoder config as a fallback for default values
         # If no known pattern is matched, then `default_config = None` -> check against the global generation defaults
         try:
-            default_config = self
+            default_config = self.__class__(**self.to_diff_dict())
         except ValueError:
             decoder_config = self.get_text_config(decoder=True)
             if decoder_config is not self:
