@@ -54,6 +54,10 @@ class GLMFModelConfig(PretrainedConfig):
             raise ValueError("`llm_model` must be provided to GLMFModelConfig.")
 
         config = AutoConfig.from_pretrained(llm_model).to_dict()
+
+        if "_attn_implementation_autoset" in kwargs:
+            config.pop("_attn_implementation_autoset", None)
+
         super().__init__(**config, **kwargs)
 
         self.llm_model = llm_model
