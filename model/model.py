@@ -206,6 +206,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         baseline_prompt: str = None,
         multi_gpu: bool = False,
         debug: bool = False,
+        training: bool = False,
     ):
 
         super().__init__(config)
@@ -214,6 +215,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         self.multi_gpu = multi_gpu
         self.debug = debug
         self.rank = rank
+        self.training = training
 
         self.gnn = MultiGAT(
             config.mode,
@@ -242,7 +244,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 device_map=config.device_map,
             )
 
-        self.llm_model.resize_token_embeddings(len(tokenizer))
+        if self.training:
+            self.llm_model.resize_token_embeddings(len(tokenizer))
 
         # LoRA init
         if config.use_lora:
