@@ -293,6 +293,7 @@ def train_single_gpu(
 
     if model.config.use_lora == True:
         model.llm_model = model.llm_model.merge_and_unload()
+        model.config.use_lora = False
 
     model.save_pretrained(args.output_dir)
     tokenizer.save_pretrained(args.output_dir)
@@ -550,6 +551,7 @@ def train_multi_gpu_ringattn(
     if rank == 0:
         if model.config.use_lora == True:
             model.llm_model = model.llm_model.merge_and_unload()
+            model.config.use_lora = False
 
         model.save_pretrained(args.output_dir)
         tokenizer.save_pretrained(args.output_dir)
