@@ -104,8 +104,9 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
 
             model_path = os.path.join(args.output_dir, args.name)
             model_path = os.path.join(model_path, "final_model")
-            config.use_lora = False
-            model = GLMFModelForCausalLM.from_pretrained(model_path)
+            config = GLMFModelConfig.from_pretrained(model_path)
+            config.vocab_size = dataset.llm_tokenizer.vocab_size
+            model = GLMFModelForCausalLM.from_pretrained(model_path, config=config)
             test(args=args, dataset=dataset, model=model, console=console)
 
     elif args.mode == "test":
@@ -113,7 +114,9 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
         assert (
             args.model_weight_path is not None
         ), "Model directory must be specified for testing."
-        config.use_lora = False
+        config = GLMFModelConfig.from_pretrained(model_path)
+        config.vocab_size = dataset.llm_tokenizer.vocab_size
+        model = GLMFModelForCausalLM.from_pretrained(model_path, config=config)
         model = GLMFModelForCausalLM.from_pretrained(args.model_weight_path)
         test(args=args, dataset=dataset, model=model, console=console)
 
