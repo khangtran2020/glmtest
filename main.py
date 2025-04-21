@@ -104,7 +104,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
 
             model_path = os.path.join(args.output_dir, args.name)
             model_path = os.path.join(model_path, "final_model")
-            model = AutoModelForCausalLM.from_pretrained(model_path)
+            model = GLMFModelForCausalLM.from_pretrained(model_path)
             test(args=args, dataset=dataset, model=model, console=console)
 
     elif args.mode == "test":
@@ -112,7 +112,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
         assert (
             args.model_weight_path is not None
         ), "Model directory must be specified for testing."
-        model = AutoModelForCausalLM.from_pretrained(args.model_weight_path)
+        model = GLMFModelForCausalLM.from_pretrained(args.model_weight_path)
         test(args=args, dataset=dataset, model=model, console=console)
 
 
