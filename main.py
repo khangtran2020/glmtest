@@ -89,6 +89,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             baseline_prompt=args.baseline_prompt,
             debug=args.debug,
             rank=rank,
+            training=True,
         )
 
         train(
