@@ -68,9 +68,17 @@ class GLMFModelConfig(PretrainedConfig):
         super().__init__(**config, **kwargs)
 
         self.llm_model = llm_model
-        self.model_name = config["_name_or_path"]
+        self.model_name = (
+            config["_name_or_path"]
+            if "_name_or_path" in config.keys()
+            else kwargs["_name_or_path"]
+        )
         self.mode = mode
-        self.hidden_size = config["hidden_size"]
+        self.hidden_size = (
+            config["hidden_size"]
+            if "hidden_size" in config.keys()
+            else kwargs["hidden_size"]
+        )
         self.in_feats = in_feats
         self.n_hidden = n_hidden
         self.n_layers = n_layers
