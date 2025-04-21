@@ -27,6 +27,7 @@ class GLMFDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
+
         if self.testing == False:
             sample = self.data[idx]
             graph = sample["graph"]
@@ -76,11 +77,13 @@ class GLMFDataset(Dataset):
             ):
                 raise ValueError("Input must contain graph token")
 
-            return uuid, {
+            batch = {
                 "input": tokenized,
                 "graph": graph,  # Should be a dictionary of graph structures
                 "graph_mask": torch.tensor(graph_mask, dtype=torch.float),
             }
+            print(uuid, batch)
+            return (uuid, batch)
 
     def tokenize(self, prompt: str, add_eos_token: bool = True) -> dict:
 
@@ -139,6 +142,7 @@ def collate_fn(batch) -> dict:
         }
         return collated
     else:
+        print(batch)
         uuid, batch = batch
         collated_input = {}
         for key in batch[0]["input"]:
