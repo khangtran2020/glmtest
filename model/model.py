@@ -11,6 +11,8 @@ from transformers.generation.utils import GenerationMixin
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.cache_utils import Cache
 import torch.distributed as dist
+from transformers.models.auto.configuration_auto import CONFIG_MAPPING
+from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING
 
 # from utils.prompter import Prompter
 from model.gnn import MultiGAT
@@ -22,6 +24,8 @@ from typing import Callable, List, Optional, Tuple, Union, Dict, Any
 
 
 class GLMFModelConfig(PretrainedConfig):
+
+    model_type = "glmf"
 
     def __init__(
         self,
@@ -441,3 +445,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             return_dict=return_dict,
             cache_position=cache_position,
         )
+
+
+CONFIG_MAPPING.register(key="glmf", value=GLMFModelConfig)
+MODEL_FOR_CAUSAL_LM_MAPPING.register(key=GLMFModelConfig, value=GLMFModelForCausalLM)
