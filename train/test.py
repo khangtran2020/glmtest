@@ -45,51 +45,49 @@ def test(
             for step, batch_data in enumerate(te_dataset):
 
                 uuid, batch = batch_data
-                batch_size = batch["input"]["input_ids"].size(0)
+                # batch_size = batch["input"]["input_ids"].size(0)
 
                 # Process each sample in the batch as a micro-batch.
-                for i in range(batch_size):
-                    batch_input = batch["input"].copy()
-                    if "token_type_ids" in batch_input:
-                        batch_input.pop("token_type_ids")
-                    micro_input = {
-                        "input_ids": batch_input["input_ids"][i].to(model.device),
-                        "attention_mask": batch_input["attention_mask"][i].to(
-                            model.device
-                        ),
-                        "labels": batch_input["labels"][i].to(model.device),
-                    }
+                # for i in range(batch_size):
+                batch_input = batch["input"].copy()
+                if "token_type_ids" in batch_input:
+                    batch_input.pop("token_type_ids")
+                micro_input = {
+                    "input_ids": batch_input["input_ids"].to(model.device),
+                    "attention_mask": batch_input["attention_mask"].to(model.device),
+                    "labels": None,
+                }
 
-                    graph = batch["graph"][i]
-                    for key in model.gnn.type_of_graph:
-                        if key in graph.keys():
-                            graph[key] = graph[key].to(model.device)
+                graph = batch["graph"]
+                for key in model.gnn.type_of_graph:
+                    if key in graph.keys():
+                        graph[key] = graph[key].to(model.device)
 
-                    graph_mask = batch["graph_mask"][i].to(model.device)
+                graph_mask = batch["graph_mask"].to(model.device)
 
-                    if "graph" in args.baseline_prompt:
-                        graph_token_index = torch.where(
-                            micro_input["input_ids"] == model.config.graph_token_id[1]
-                        )[1].tolist()
-                        if args.debug:
-                            console.log(f"Graph token id: {graph_token_index}")
+                if "graph" in args.baseline_prompt:
+                    graph_token_index = torch.where(
+                        micro_input["input_ids"] == model.config.graph_token_id[1]
+                    )[1].tolist()
+                    if args.debug:
+                        console.log(f"Graph token id: {graph_token_index}")
 
-                        outputs = model.generate(
-                            inputs=micro_input["input_ids"],
-                            graph=graph,
-                            graph_mask=graph_mask,
-                            graph_token_index=graph_token_index,
-                            max_new_tokens=args.max_new_tokens,
-                        )
-                    else:
-                        graph_token_index = None
-                        outputs = model.generate(
-                            inputs=micro_input["input_ids"],
-                            graph_token_index=graph_token_index,
-                            max_new_tokens=args.max_new_tokens,
-                        )
+                    outputs = model.generate(
+                        inputs=micro_input["input_ids"],
+                        graph=graph,
+                        graph_mask=graph_mask,
+                        graph_token_index=graph_token_index,
+                        max_new_tokens=args.max_new_tokens,
+                    )
+                else:
+                    graph_token_index = None
+                    outputs = model.generate(
+                        inputs=micro_input["input_ids"],
+                        graph_token_index=graph_token_index,
+                        max_new_tokens=args.max_new_tokens,
+                    )
 
-                    generated_text.append({uuid: outputs})
+                generated_text.append({uuid: outputs})
 
                 progress.update(
                     test_task,
