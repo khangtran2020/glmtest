@@ -58,9 +58,12 @@ class GLMFModelConfig(PretrainedConfig):
         # if "_attn_implementation_autoset" in kwargs:
         #     config.pop("_attn_implementation_autoset", None)
 
-        for key in kwargs:
-            if key in config.keys():
-                config.pop(key, None)
+        # for key in kwargs:
+        #     if key in config.keys():
+        #         config.pop(key, None)
+
+        for key in list(kwargs):
+            config.pop(key, None)
 
         super().__init__(**config, **kwargs)
 
