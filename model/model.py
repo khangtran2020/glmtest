@@ -62,8 +62,8 @@ class GLMFModelConfig(PretrainedConfig):
         #     if key in config.keys():
         #         config.pop(key, None)
 
-        for key in list(kwargs):
-            config.pop(key, None)
+        for key in list(config):
+            kwargs.pop(key, None)
 
         super().__init__(**config, **kwargs)
 
@@ -125,7 +125,7 @@ class GLMFModelConfig(PretrainedConfig):
         # Composite models don't have a default config, use their decoder config as a fallback for default values
         # If no known pattern is matched, then `default_config = None` -> check against the global generation defaults
         try:
-            print("Using lora is set to", self.use_lora)
+            # print("Using lora is set to", self.use_lora)
             default_config = self.__class__(
                 llm_model=self.llm_model,
                 mode=self.mode,
