@@ -85,7 +85,6 @@ def test(
                         inputs=micro_input["input_ids"],
                         graph_token_index=graph_token_index,
                         max_new_tokens=args.max_new_tokens,
-                        generation_config=model.config,
                     )
 
                 generated_text.append({uuid: outputs})
