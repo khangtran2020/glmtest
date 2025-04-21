@@ -112,7 +112,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             args.model_weight_path is not None
         ), "Model directory must be specified for testing."
         model.load_state_dict(torch.load(args.model_weight_path))
-        test(args=args, dataset=dataset.test_data, model=model, console=console)
+        test(args=args, dataset=dataset, model=model, console=console)
 
 
 if __name__ == "__main__":

@@ -21,14 +21,14 @@ def test(
     collate_fn: callable = collate_fn,
 ):
     te_dataset = GLMFDataset(
-        data=dataset.train_data,
+        data=dataset.test_data,
         tokenizer=dataset.llm_tokenizer,
         max_seq_length=args.max_seq_length,
         debug=args.debug,
         testing=True,
     )
-    loader = DataLoader(te_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
-    console.log(f"Test data: {len(loader)} data points")
+    # loader = DataLoader(te_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
+    console.log(f"Test data: {len(te_dataset)} data points")
     console.log("Testing...")
 
     with Progress(
@@ -39,10 +39,10 @@ def test(
         BarColumn(),  # Displays a progress bar
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),  # Shows percentage
     ) as progress:
-        test_task = progress.add_task("Testing...", total=len(loader))
+        test_task = progress.add_task("Testing...", total=len(te_dataset))
         with torch.no_grad():
             generated_text = []
-            for step, batch_data in enumerate(loader):
+            for step, batch_data in enumerate(te_dataset):
 
                 uuid, batch = batch_data
                 batch_size = batch["input"]["input_ids"].size(0)
@@ -94,7 +94,7 @@ def test(
                 progress.update(
                     test_task,
                     advance=1,
-                    description=f"Testing... {step}/{len(loader)}",
+                    description=f"Testing... {step}/{len(te_dataset)}",
                 )
     console.log("Testing finished.")
     save_dir = os.path.join(args.gen_dir, f"{args.name}.jsonl")

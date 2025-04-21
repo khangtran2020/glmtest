@@ -82,7 +82,7 @@ class GLMFDataset(Dataset):
                 "graph": graph,  # Should be a dictionary of graph structures
                 "graph_mask": torch.tensor(graph_mask, dtype=torch.float),
             }
-            print(uuid, batch)
+            # print(uuid, batch)
             return (uuid, batch)
 
     def tokenize(self, prompt: str, add_eos_token: bool = True) -> dict:
