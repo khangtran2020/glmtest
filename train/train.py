@@ -824,6 +824,7 @@ def train_single_gpu_accelerate(
 
     if model.config.use_lora == True:
         model.llm_model = model.llm_model.merge_and_unload()
+        model.config.use_lora = False
 
     accelerator.wait_for_everyone()
     unwrapped_model = accelerator.unwrap_model(model)
@@ -1152,6 +1153,7 @@ def train_multi_gpu_accelerate(
 
     if unwrapped_model.config.use_lora == True:
         unwrapped_model.llm_model = unwrapped_model.llm_model.merge_and_unload()
+        unwrapped_model.config.use_lora = False
 
     if accelerator.is_main_process:
 
