@@ -102,7 +102,23 @@ class GLMFModelConfig(PretrainedConfig):
         # Composite models don't have a default config, use their decoder config as a fallback for default values
         # If no known pattern is matched, then `default_config = None` -> check against the global generation defaults
         try:
-            default_config = self.__class__(**self.to_diff_dict())
+            default_config = self.__class__(
+                llm_model=self.llm_model,
+                mode=self.mode,
+                in_feats=self.in_feats,
+                n_hidden=self.n_hidden,
+                n_layers=self.n_layers,
+                num_head=self.num_head,
+                dropout=self.dropout,
+                dtype=self.dtype,
+                device_map=self.device_map,
+                use_lora=self.use_lora,
+                lora_r=self.lora_r,
+                lora_alpha=self.lora_alpha,
+                lora_dropout=self.lora_dropout,
+                lora_target_modules=self.lora_target_modules,
+                debug=self.debug,
+            )
         except ValueError:
             decoder_config = self.get_text_config(decoder=True)
             if decoder_config is not self:
