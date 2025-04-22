@@ -62,8 +62,8 @@ class GLMFModelConfig(PretrainedConfig):
         #     if key in config.keys():
         #         config.pop(key, None)
 
-        for key in list(config):
-            kwargs.pop(key, None)
+        for key in list(kwargs):
+            config.pop(key, None)
 
         super().__init__(**config, **kwargs)
 
