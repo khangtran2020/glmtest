@@ -105,8 +105,9 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             model_path = os.path.join(args.output_dir, args.name)
             model_path = os.path.join(model_path, "final_model")
             config = GLMFModelConfig.from_pretrained(model_path)
-            config.vocab_size = dataset.llm_tokenizer.vocab_size
-            console.log("Config vocab size:", config.vocab_size)
+            console.log(f"Config: {config}")
+            # config.vocab_size = dataset.llm_tokenizer.vocab_size
+            # console.log("Config vocab size:", config.vocab_size)
             model = GLMFModelForCausalLM.from_pretrained(model_path, config=config)
             test(args=args, dataset=dataset, model=model, console=console)
 
