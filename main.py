@@ -104,7 +104,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
 
             model_path = os.path.join(args.output_dir, args.name)
             model_path = os.path.join(model_path, "final_model")
-            config = GLMFModelConfig.from_pretrained(model_path)
+            config = AutoModelForCausalLM.from_pretrained(model_path, device_map="auto")
             console.log(f"Config loaded from: {model_path}\n {config}")
             # config.vocab_size = dataset.llm_tokenizer.vocab_size
             # console.log("Config vocab size:", config.vocab_size)
@@ -116,7 +116,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
         assert (
             args.model_weight_path is not None
         ), "Model directory must be specified for testing."
-        config = GLMFModelConfig.from_pretrained(model_path)
+        config = GLMFModelConfig.from_pretrained(model_path, device_map="auto")
         config.vocab_size = dataset.llm_tokenizer.vocab_size
         model = GLMFModelForCausalLM.from_pretrained(model_path, config=config)
         model = GLMFModelForCausalLM.from_pretrained(args.model_weight_path)
