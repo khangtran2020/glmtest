@@ -833,6 +833,8 @@ def train_single_gpu_accelerate(
     console.log(f"Saving final model to {final_model_path}...")
     final_tokenizer_path = os.path.join(save_path, "tokenizer")
 
+    console.log(f"Config: {unwrapped_model.config}")
+
     unwrapped_model.save_pretrained(
         final_model_path,
         is_main_process=accelerator.is_main_process,
