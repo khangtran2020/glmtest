@@ -108,7 +108,9 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             console.log(f"Config loaded from: {model_path}\n {config}")
             # config.vocab_size = dataset.llm_tokenizer.vocab_size
             # console.log("Config vocab size:", config.vocab_size)
-            model = GLMFModelForCausalLM.from_pretrained(model_path, config=config)
+            model = GLMFModelForCausalLM.from_pretrained(
+                pretrained_model_name_or_path=model_path, device_map="auto"
+            )
             test(args=args, dataset=dataset, model=model, console=console)
 
     elif args.mode == "test":
@@ -119,7 +121,10 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
         config = GLMFModelConfig.from_pretrained(model_path, device_map="auto")
         config.vocab_size = dataset.llm_tokenizer.vocab_size
         model = GLMFModelForCausalLM.from_pretrained(model_path, config=config)
-        model = GLMFModelForCausalLM.from_pretrained(args.model_weight_path)
+        # model = GLMFModelForCausalLM.from_pretrained(args.model_weight_path)
+        model = GLMFModelForCausalLM.from_pretrained(
+            pretrained_model_name_or_path=args.model_weight_path, device_map="auto"
+        )
         test(args=args, dataset=dataset, model=model, console=console)
 
 

@@ -831,7 +831,7 @@ def train_single_gpu_accelerate(
 
     final_model_path = os.path.join(save_path, "final_model")
     console.log(f"Saving final model to {final_model_path}...")
-    final_tokenizer_path = os.path.join(save_path, "tokenizer")
+    # final_tokenizer_path = os.path.join(save_path, "tokenizer")
 
     # console.log(f"Config: {unwrapped_model.config}")
 
@@ -840,7 +840,7 @@ def train_single_gpu_accelerate(
         is_main_process=accelerator.is_main_process,
         save_function=accelerator.save,
     )
-    tokenizer.save_pretrained(final_tokenizer_path)
+    tokenizer.save_pretrained(final_model_path)
 
     console.log(f"Final model saved to {final_model_path}")
     # Log final model to W&B
@@ -1161,14 +1161,14 @@ def train_multi_gpu_accelerate(
 
         final_model_path = os.path.join(save_path, "final_model.pt")
         console.log(f"Saving final model to {final_model_path}...")
-        final_tokenizer_path = os.path.join(save_path, "tokenizer")
+        # final_tokenizer_path = os.path.join(save_path, "tokenizer")
 
         unwrapped_model.save_pretrained(
             final_model_path,
             is_main_process=accelerator.is_main_process,
             save_function=accelerator.save,
         )
-        tokenizer.save_pretrained(final_tokenizer_path)
+        tokenizer.save_pretrained(final_model_path)
 
         console.log(f"Final model saved to {final_model_path}")
 
