@@ -248,6 +248,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if self.training:
             self.llm_model.resize_token_embeddings(len(tokenizer))
             self.config.vocab_size = len(tokenizer)
+        else:
+            self.llm_model.resize_token_embeddings(self.config.vocab_size)
 
         # LoRA init
         if config.use_lora:
@@ -469,6 +471,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             return_dict=return_dict,
             cache_position=cache_position,
         )
+
+    # def from_pre
 
 
 CONFIG_MAPPING.register(key="glmf", value=GLMFModelConfig)
