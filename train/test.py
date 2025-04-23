@@ -59,14 +59,14 @@ def test(
                     "labels": None,
                 }
 
-                graph = batch["graph"]
-                for key in model.gnn.type_of_graph:
-                    if key in graph.keys():
-                        graph[key] = graph[key].to(model.device)
-
-                graph_mask = batch["graph_mask"].to(model.device)
-
                 if "graph" in args.baseline_prompt:
+                    graph = batch["graph"]
+                    for key in model.gnn.type_of_graph:
+                        if key in graph.keys():
+                            graph[key] = graph[key].to(model.device)
+
+                    graph_mask = batch["graph_mask"].to(model.device)
+
                     graph_token_index = torch.where(
                         micro_input["input_ids"] == model.config.graph_token_id[1]
                     )[1].tolist()
