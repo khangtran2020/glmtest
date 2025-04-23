@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import torch
 from tqdm import tqdm
 from torch.utils.data import DataLoader
@@ -43,7 +44,7 @@ def test(
         with torch.no_grad():
             generated_text = []
             for step, batch_data in enumerate(te_dataset):
-
+                start_time = time.time()
                 uuid, batch = batch_data
                 # batch_size = batch["input"]["input_ids"].size(0)
 
@@ -88,11 +89,12 @@ def test(
                     )
 
                 generated_text.append({uuid: outputs})
-
+                end_time = time.time()
+                process_time = end_time - start_time
                 progress.update(
                     test_task,
                     advance=1,
-                    description=f"Testing... {step}/{len(te_dataset)}",
+                    description=f"Testing... {step}/{len(te_dataset)} - {process_time:.2f}s for 1 sample",
                 )
     console.log("Testing finished.")
     save_dir = os.path.join(args.gen_dir, f"{args.name}.jsonl")
