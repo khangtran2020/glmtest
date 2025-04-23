@@ -836,11 +836,11 @@ def train_single_gpu_accelerate(
         )
         move_model_to_device(unwrapped_model, device_to_save)
 
-    for p in unwrapped_model.parameters():
-        console.log(f"Parameter device: {p.device}")
-        if p.device.type == "meta":
-            console.log("Model has meta parameters. Converting to CPU.")
-            # break
+    # for p in unwrapped_model.parameters():
+    #     console.log(f"Parameter device: {p.device}")
+    #     if p.device.type == "meta":
+    #         console.log("Model has meta parameters. Converting to CPU.")
+    # break
 
     final_model_path = os.path.join(save_path, "final_model")
     console.log(f"Saving final model to {final_model_path}...")
@@ -848,10 +848,15 @@ def train_single_gpu_accelerate(
 
     # console.log(f"Config: {unwrapped_model.config}")
 
-    unwrapped_model.save_pretrained(
-        final_model_path,
-        is_main_process=accelerator.is_main_process,
-        save_function=accelerator.save,
+    # unwrapped_model.save_pretrained(
+    #     final_model_path,
+    #     is_main_process=accelerator.is_main_process,
+    #     save_function=accelerator.save,
+    # )
+
+    torch.save(
+        unwrapped_model.state_dict(),
+        os.path.join(final_model_path, "model_weight.pt"),
     )
     tokenizer.save_pretrained(final_model_path)
 
@@ -1185,19 +1190,22 @@ def train_multi_gpu_accelerate(
             )
             move_model_to_device(unwrapped_model, device_to_save)
 
-        for p in unwrapped_model.parameters():
-            console.log(f"Parameter device: {p.device}")
-            if p.device.type == "meta":
-                console.log("Model has meta parameters. Converting to CPU.")
-                # break
+        # for p in unwrapped_model.parameters():
+        #     console.log(f"Parameter device: {p.device}")
+        #     if p.device.type == "meta":
+        #         console.log("Model has meta parameters. Converting to CPU.")
+        # break
 
-        unwrapped_model.save_pretrained(
-            final_model_path,
-            is_main_process=accelerator.is_main_process,
-            save_function=accelerator.save,
+        # unwrapped_model.save_pretrained(
+        #     final_model_path,
+        #     is_main_process=accelerator.is_main_process,
+        #     save_function=accelerator.save,
+        # )
+        torch.save(
+            unwrapped_model.state_dict(),
+            os.path.join(final_model_path, "model_weight.pt"),
         )
         tokenizer.save_pretrained(final_model_path)
-
         console.log(f"Final model saved to {final_model_path}")
 
         # Log final model to W&B

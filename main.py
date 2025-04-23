@@ -104,13 +104,16 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
 
             model_path = os.path.join(args.output_dir, args.name)
             model_path = os.path.join(model_path, "final_model")
+            model.load_state_dict(
+                torch.load(os.path.joint(model_path, "model_weight.pt"))
+            )
             # config = AutoModelForCausalLM.from_pretrained(model_path, device_map="cuda")
             # console.log(f"Config loaded from: {model_path}\n {config}")
             # config.vocab_size = dataset.llm_tokenizer.vocab_size
             # console.log("Config vocab size:", config.vocab_size)
-            model = GLMFModelForCausalLM.from_pretrained(
-                pretrained_model_name_or_path=model_path, device_map="cpu"
-            )
+            # model = GLMFModelForCausalLM.from_pretrained(
+            #     pretrained_model_name_or_path=model_path, device_map="cpu"
+            # )
             test(args=args, dataset=dataset, model=model, console=console)
 
     elif args.mode == "test":
@@ -122,9 +125,40 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
         # config.vocab_size = dataset.llm_tokenizer.vocab_size
         # model = GLMFModelForCausalLM.from_pretrained(model_path, config=config)
         # model = GLMFModelForCausalLM.from_pretrained(args.model_weight_path)
-        model = GLMFModelForCausalLM.from_pretrained(
-            pretrained_model_name_or_path=args.model_weight_path, device_map="cpu"
+        # model = GLMFModelForCausalLM.from_pretrained(
+        #     pretrained_model_name_or_path=args.model_weight_path, device_map="cpu"
+        # )
+        config = GLMFModelConfig(
+            llm_model=args.llm_model,
+            use_lora=args.use_lora,
+            dtype=args.dtype,
+            mode=args.gnn_mode,
+            in_feats=args.in_feats,
+            n_hidden=args.n_hidden,
+            n_layers=args.n_layers,
+            num_head=args.num_head,
+            dropout=args.dropout,
+            lora_r=args.lora_r,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            lora_target_modules=args.lora_target_modules,
+            device_map="cuda" if torch.cuda.is_available() else "cpu",
         )
+
+        if config.model_type not in ["llama", "qwen2"]:
+            raise ValueError(
+                f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2'."
+            )
+
+        model = GLMFModelForCausalLM(
+            config=config,
+            tokenizer=dataset.llm_tokenizer,
+            baseline_prompt=args.baseline_prompt,
+            debug=args.debug,
+            rank=rank,
+            training=True,
+        )
+        model.load_state_dict(torch.load(os.path.joint(model_path, "model_weight.pt")))
         test(args=args, dataset=dataset, model=model, console=console)
 
 
