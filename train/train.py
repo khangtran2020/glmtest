@@ -1177,6 +1177,14 @@ def train_multi_gpu_accelerate(
                 device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
             )
 
+        for p in unwrapped_model.parameters():
+            console.log(f"Parameter device: {p.device}")
+            if p.device.type == "meta":
+                console.log("Model has meta parameters. Converting to CPU.")
+                p = p.to("cpu")
+                console.log(f"Parameter device after conversion: {p.device}")
+                # break
+
         unwrapped_model.save_pretrained(
             final_model_path,
             is_main_process=accelerator.is_main_process,
