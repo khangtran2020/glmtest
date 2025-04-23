@@ -174,3 +174,15 @@ def run_nvidia_smi(console: Console):
             console.log("An exception occurred:", e)
         else:
             print("An exception occurred:", e)
+
+
+def move_model_to_device(model, device):
+    for name, param in model.named_parameters(recurse=True):
+        if param.device.type == "meta":
+            param = torch.nn.Parameter(torch.empty_like(param, device=device))
+            setattr(model, name, param)
+    for name, buffer in model.named_buffers(recurse=True):
+        if buffer.device.type == "meta":
+            buffer = torch.empty_like(buffer, device=device)
+            setattr(model, name, buffer)
+    return model

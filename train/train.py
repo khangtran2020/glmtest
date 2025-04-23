@@ -17,7 +17,7 @@ from accelerate import Accelerator
 from torch.optim import AdamW
 from transformers.trainer_utils import seed_worker
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
-from train.utils import patch_model
+from train.utils import patch_model, move_model_to_device
 from train.test import validate
 
 
@@ -831,17 +831,15 @@ def train_single_gpu_accelerate(
     unwrapped_model = accelerator.unwrap_model(model)
 
     if any(p.device.type == "meta" for p in unwrapped_model.parameters()):
-        unwrapped_model = Module.to_empty(
-            unwrapped_model,
-            device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        device_to_save = (
+            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         )
+        move_model_to_device(unwrapped_model, device_to_save)
 
     for p in unwrapped_model.parameters():
         console.log(f"Parameter device: {p.device}")
         if p.device.type == "meta":
             console.log("Model has meta parameters. Converting to CPU.")
-            p = p.to("cpu")
-            console.log(f"Parameter device after conversion: {p.device}")
             # break
 
     final_model_path = os.path.join(save_path, "final_model")
@@ -1180,17 +1178,17 @@ def train_multi_gpu_accelerate(
             unwrapped_model.config.use_lora = False
 
         if any(p.device.type == "meta" for p in unwrapped_model.parameters()):
-            unwrapped_model = Module.to_empty(
-                unwrapped_model,
-                device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+            device_to_save = (
+                torch.device("cuda")
+                if torch.cuda.is_available()
+                else torch.device("cpu")
             )
+            move_model_to_device(unwrapped_model, device_to_save)
 
         for p in unwrapped_model.parameters():
             console.log(f"Parameter device: {p.device}")
             if p.device.type == "meta":
                 console.log("Model has meta parameters. Converting to CPU.")
-                p = p.to("cpu")
-                console.log(f"Parameter device after conversion: {p.device}")
                 # break
 
         unwrapped_model.save_pretrained(
