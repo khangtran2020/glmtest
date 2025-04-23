@@ -1,6 +1,7 @@
 import os
 import torch
 import wandb
+from torch.nn import Module
 from torch.utils.data import DataLoader
 from utils.constant import (
     GRAPH_START_TOKEN,
@@ -829,6 +830,12 @@ def train_single_gpu_accelerate(
     accelerator.wait_for_everyone()
     unwrapped_model = accelerator.unwrap_model(model)
 
+    if any(p.device.type == "meta" for p in unwrapped_model.parameters()):
+        unwrapped_model = Module.to_empty(
+            unwrapped_model,
+            device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        )
+
     final_model_path = os.path.join(save_path, "final_model")
     console.log(f"Saving final model to {final_model_path}...")
     # final_tokenizer_path = os.path.join(save_path, "tokenizer")
@@ -1151,17 +1158,24 @@ def train_multi_gpu_accelerate(
                 )
 
     accelerator.wait_for_everyone()
-    unwrapped_model = accelerator.unwrap_model(model)
-
-    if unwrapped_model.config.use_lora == True:
-        unwrapped_model.llm_model = unwrapped_model.llm_model.merge_and_unload()
-        unwrapped_model.config.use_lora = False
 
     if accelerator.is_main_process:
 
         final_model_path = os.path.join(save_path, "final_model.pt")
         console.log(f"Saving final model to {final_model_path}...")
         # final_tokenizer_path = os.path.join(save_path, "tokenizer")
+
+        unwrapped_model = accelerator.unwrap_model(model)
+
+        if unwrapped_model.config.use_lora == True:
+            unwrapped_model.llm_model = unwrapped_model.llm_model.merge_and_unload()
+            unwrapped_model.config.use_lora = False
+
+        if any(p.device.type == "meta" for p in unwrapped_model.parameters()):
+            unwrapped_model = Module.to_empty(
+                unwrapped_model,
+                device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+            )
 
         unwrapped_model.save_pretrained(
             final_model_path,
