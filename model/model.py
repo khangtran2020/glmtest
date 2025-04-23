@@ -11,8 +11,6 @@ from transformers.generation.utils import GenerationMixin
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.cache_utils import Cache
 import torch.distributed as dist
-from transformers.generation.utils import Cache
-from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.models.auto.configuration_auto import CONFIG_MAPPING
 from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING
 
@@ -200,7 +198,6 @@ class GLMFModel(PreTrainedModel):
 class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
     config_class = GLMFModelConfig
-    supports_cache_format = ["legacy", "cache"]
 
     def __init__(
         self,
@@ -365,34 +362,14 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 step=step,
             )
         else:
-            if self.training:
-                return self.llm_model(
-                    input_ids=None,
-                    inputs_embeds=inputs_embeds,
-                    position_ids=position_ids,
-                    attention_mask=attention_mask,
-                    use_cache=False,
-                    labels=labels,
-                )
-            else:
-                if isinstance(past_key_values, Cache):
-                    past_key_values = (
-                        past_key_values.to_legacy_cache()
-                    )  # <- convert to tuple
-                outputs = self.llm_model(
-                    input_ids=None,
-                    inputs_embeds=inputs_embeds,
-                    position_ids=position_ids,
-                    attention_mask=attention_mask,
-                    use_cache=use_cache,
-                    past_key_values=past_key_values,
-                    labels=labels,
-                )
-                if use_cache and isinstance(outputs.past_key_values, tuple):
-                    outputs.past_key_values = Cache.from_legacy_cache(
-                        outputs.past_key_values
-                    )
-                return outputs
+            return self.llm_model(
+                input_ids=None,
+                inputs_embeds=inputs_embeds,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                use_cache=False,
+                labels=labels,
+            )
 
     def prepare_inputs_for_generation(
         self,
@@ -402,9 +379,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         inputs_embeds=None,
         **kwargs,
     ):
-        # if isinstance(past_key_values, Cache):
-        #     past_key_values = past_key_values.to_legacy_cache()
-
         return self.llm_model.prepare_inputs_for_generation(
             input_ids, past_key_values, attention_mask, inputs_embeds, **kwargs
         )
