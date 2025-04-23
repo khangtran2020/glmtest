@@ -526,7 +526,7 @@ class Data(object):
                         for key in graph_dict.keys():
                             graph_dict[key] = self.sampling_neighbor(
                                 graph=graph_dict[key],
-                                mask=mask[mask_key],
+                                mask=active_node,
                                 n_hops=self.n_hops,
                             )
 
