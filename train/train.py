@@ -836,6 +836,14 @@ def train_single_gpu_accelerate(
             device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         )
 
+    for p in unwrapped_model.parameters():
+        console.log(f"Parameter device: {p.device}")
+        if p.device.type == "meta":
+            console.log("Model has meta parameters. Converting to CPU.")
+            p = p.to("cpu")
+            console.log(f"Parameter device after conversion: {p.device}")
+            # break
+
     final_model_path = os.path.join(save_path, "final_model")
     console.log(f"Saving final model to {final_model_path}...")
     # final_tokenizer_path = os.path.join(save_path, "tokenizer")
