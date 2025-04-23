@@ -109,7 +109,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             # config.vocab_size = dataset.llm_tokenizer.vocab_size
             # console.log("Config vocab size:", config.vocab_size)
             model = GLMFModelForCausalLM.from_pretrained(
-                pretrained_model_name_or_path=model_path, device_map="cuda"
+                pretrained_model_name_or_path=model_path, device_map="cpu"
             )
             test(args=args, dataset=dataset, model=model, console=console)
 
@@ -123,7 +123,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
         # model = GLMFModelForCausalLM.from_pretrained(model_path, config=config)
         # model = GLMFModelForCausalLM.from_pretrained(args.model_weight_path)
         model = GLMFModelForCausalLM.from_pretrained(
-            pretrained_model_name_or_path=args.model_weight_path, device_map="cuda"
+            pretrained_model_name_or_path=args.model_weight_path, device_map="cpu"
         )
         test(args=args, dataset=dataset, model=model, console=console)
 
