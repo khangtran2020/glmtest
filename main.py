@@ -105,7 +105,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             model_path = os.path.join(args.output_dir, args.name)
             model_path = os.path.join(model_path, "final_model")
             model.load_state_dict(
-                torch.load(os.path.joint(model_path, "model_weight.pt"))
+                torch.load(os.path.join(model_path, "model_weight.pt"))
             )
             # config = AutoModelForCausalLM.from_pretrained(model_path, device_map="cuda")
             # console.log(f"Config loaded from: {model_path}\n {config}")
@@ -158,7 +158,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             rank=rank,
             training=True,
         )
-        model.load_state_dict(torch.load(os.path.joint(model_path, "model_weight.pt")))
+        model.load_state_dict(torch.load(os.path.join(model_path, "model_weight.pt")))
         test(args=args, dataset=dataset, model=model, console=console)
 
 
