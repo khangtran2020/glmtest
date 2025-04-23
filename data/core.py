@@ -17,7 +17,7 @@ from sklearn.preprocessing import LabelEncoder
 from copy import deepcopy
 
 # typing
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Any
 
 PYNGUIN_TEMPLATE = """docker run --rm -v {}:/input:ro -v {}:/output -v {}:/package:ro {} \
     --module-name {} --coverage_metrics BRANCH --maximum_search_time {} --report-dir /output --project_path /input --output-path /output --output_variables TargetModule,CoverageTimeline --assertion-generation NONE"""
@@ -664,7 +664,7 @@ class Data(object):
         return ast.unparse(tree)
 
     def train_test_split(
-        self, val_split: float = 0.1, test_split: float = 0.15
+        self, val_split: Any[float, int] = 0.1, test_split: Any[float, int] = 0.15
     ) -> None:
         """
         Split the data into training, validation and test sets
@@ -672,8 +672,12 @@ class Data(object):
         assert self.processed_data is not None
         data = deepcopy(self.processed_data)
         np.random.shuffle(data)
-        num_val = int(val_split * len(data))
-        num_test = int(test_split * len(data))
+        num_val = (
+            int(val_split * len(data)) if isinstance(val_split, float) else val_split
+        )
+        num_test = (
+            int(test_split * len(data)) if isinstance(test_split, float) else test_split
+        )
         val_data = data[:num_val]
         test_data = data[num_val : num_val + num_test]
         train_data = data[num_val + num_test :]

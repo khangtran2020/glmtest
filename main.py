@@ -57,7 +57,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
 
     if not args.model_debug:
         dataset.prepare_data()
-        dataset.train_test_split()
+        dataset.train_test_split(val_split=1000, test_split=200)
 
     if args.mode == "train":
 
