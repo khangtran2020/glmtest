@@ -43,6 +43,7 @@ def test(
         test_task = progress.add_task("Testing...", total=len(te_dataset))
         with torch.no_grad():
             generated_text = []
+            time_list = []
             for step, batch_data in enumerate(te_dataset):
                 start_time = time.time()
                 uuid, batch = batch_data
@@ -91,10 +92,12 @@ def test(
                 generated_text.append({uuid: outputs})
                 end_time = time.time()
                 process_time = end_time - start_time
+                time_list.append(process_time)
+                avg_time = sum(time_list) / len(time_list)
                 progress.update(
                     test_task,
                     advance=1,
-                    description=f"Testing... {step}/{len(te_dataset)} - {process_time:.2f}s for 1 sample",
+                    description=f"Testing... {step}/{len(te_dataset)} - {avg_time:.2f}s for 1 sample",
                 )
     console.log("Testing finished.")
     save_dir = os.path.join(args.gen_dir, f"{args.name}.jsonl")
