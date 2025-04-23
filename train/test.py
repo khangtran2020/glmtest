@@ -80,6 +80,8 @@ def test(
                         graph_mask=graph_mask,
                         graph_token_index=graph_token_index,
                         max_new_tokens=args.max_new_tokens,
+                        do_sample=False,
+                        use_cache=True,
                     )
                 else:
                     graph_token_index = None
@@ -87,6 +89,8 @@ def test(
                         inputs=micro_input["input_ids"],
                         graph_token_index=graph_token_index,
                         max_new_tokens=args.max_new_tokens,
+                        do_sample=False,
+                        use_cache=True,
                     )
 
                 generated_text.append({uuid: outputs})
