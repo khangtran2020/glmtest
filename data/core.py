@@ -693,7 +693,7 @@ class Data(object):
         return ast.unparse(tree)
 
     def train_test_split(
-        self, val_split: Any[float, int] = 0.1, test_split: Any[float, int] = 0.15
+        self, val_split: Union[float, int] = 0.1, test_split: Union[float, int] = 0.15
     ) -> None:
         """
         Split the data into training, validation and test sets
