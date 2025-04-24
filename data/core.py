@@ -477,33 +477,47 @@ class Data(object):
             processed_prompt = True
 
         with self.logger.status("[green]Preparing data...[/green]"):
+
             self.processed_data = []
+
             if processed_prompt == False:
                 prompts = {}
+
             num_tokens = []
 
-            graph_stats = {}
-            for key in GRAPH_KEYS:
-                graph_stats[key] = {
-                    "num_nodes": [],
-                    "num_edges": [],
-                    "in_degrees": [],
-                    "out_degrees": [],
-                }
+            if "graph" in self.baseline_prompt:
+                graph_stats = {}
+                for key in GRAPH_KEYS:
+                    graph_stats[key] = {
+                        "num_nodes": [],
+                        "num_edges": [],
+                        "in_degrees": [],
+                        "out_degrees": [],
+                    }
 
             for uuid, dat in self.data.items():
                 with open(dat["code_path"], "r") as file:
                     src_code = file.read()
-                graph = self.read_graph(dat)
 
-                gstats = self.get_graph_stats(graph)
-                for key in gstats.keys():
-                    graph_stats[key]["num_nodes"].append(gstats[key]["num_nodes"])
-                    graph_stats[key]["num_edges"].append(gstats[key]["num_edges"])
-                    graph_stats[key]["in_degrees"].append(gstats[key]["in_degrees"])
-                    graph_stats[key]["out_degrees"].append(gstats[key]["out_degrees"])
+                if "graph" in self.baseline_prompt:
+                    graph = self.read_graph(dat)
+                    mask = torch.load(dat["graph"]["mask_path"], weights_only=True)
 
-                mask = torch.load(dat["graph"]["mask_path"], weights_only=True)
+                    graph_dict = {
+                        key: graph[key]
+                        for key in graph.keys()
+                        if isinstance(graph[key], dgl.DGLGraph)
+                    }
+
+                    gstats = self.get_graph_stats(graph_dict)
+                    for key in gstats.keys():
+                        graph_stats[key]["num_nodes"].append(gstats[key]["num_nodes"])
+                        graph_stats[key]["num_edges"].append(gstats[key]["num_edges"])
+                        graph_stats[key]["in_degrees"].append(gstats[key]["in_degrees"])
+                        graph_stats[key]["out_degrees"].append(
+                            gstats[key]["out_degrees"]
+                        )
+
                 for testcase in dat["test_cases"].keys():
                     test_code = dat["test_cases"][testcase]["test_case"]
                     test_code = self.add_fuzz_tags(test_code)
@@ -535,13 +549,7 @@ class Data(object):
                     num_token = len(self.llm_tokenizer.tokenize(full_text))
                     num_tokens.append(num_token)
 
-                    graph_dict = {
-                        key: graph[key]
-                        for key in graph.keys()
-                        if isinstance(graph[key], dgl.DGLGraph)
-                    }
-
-                    if self.graph_sampling:
+                    if self.graph_sampling and ("graph" in self.baseline_prompt):
                         for key in graph_dict.keys():
                             graph_dict[key] = self.sampling_neighbor(
                                 graph=graph_dict[key],
@@ -583,14 +591,17 @@ class Data(object):
             f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_tokens)}"
         )
 
-        for key in graph_stats.keys():
-            for skey in graph_stats[key].keys():
-                quartiles = np.quantile(graph_stats[key][skey], [0, 0.25, 0.5, 0.75, 1])
-                max_num = max(graph_stats[key][skey])
-                min_num = min(graph_stats[key][skey])
-                self.logger.log(
-                    f"Statistics of {key} - {skey}: {quartiles}, max: {max_num}, min: {min_num}, num_data: {len(graph_stats[key][skey])}"
-                )
+        if "graph" in self.baseline_prompt:
+            for key in graph_stats.keys():
+                for skey in graph_stats[key].keys():
+                    quartiles = np.quantile(
+                        graph_stats[key][skey], [0, 0.25, 0.5, 0.75, 1]
+                    )
+                    max_num = max(graph_stats[key][skey])
+                    min_num = min(graph_stats[key][skey])
+                    self.logger.log(
+                        f"Statistics of {key} - {skey}: {quartiles}, max: {max_num}, min: {min_num}, num_data: {len(graph_stats[key][skey])}"
+                    )
 
     def read_graph(self, data: dict) -> dict:
 
