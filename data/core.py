@@ -499,9 +499,10 @@ class Data(object):
                 with open(dat["code_path"], "r") as file:
                     src_code = file.read()
 
+                mask = torch.load(dat["graph"]["mask_path"], weights_only=True)
+
                 if "graph" in self.baseline_prompt:
                     graph = self.read_graph(dat)
-                    mask = torch.load(dat["graph"]["mask_path"], weights_only=True)
 
                     graph_dict = {
                         key: graph[key]
