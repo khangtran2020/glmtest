@@ -224,20 +224,23 @@ def train_single_gpu(
                     # if args.debug:
                     #     console.log(f"Micro input: {micro_input}")
 
-                    graph = batch["graph"][i]
-                    for key in model.gnn.type_of_graph:
-                        if key in graph.keys():
-                            graph[key] = graph[key].to(device)
-
-                    graph_mask = batch["graph_mask"][i].to(device)
-
                     if "graph" in args.baseline_prompt:
+                        graph = batch["graph"][i]
+
+                        for key in model.gnn.type_of_graph:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to(device)
+
+                        graph_mask = batch["graph_mask"][i].to(device)
+
                         graph_token_index = torch.where(
                             micro_input["input_ids"] == model.config.graph_token_id[1]
                         )[1].tolist()
                         # if args.debug:
                         #     console.log(f"Graph token id: {graph_token_index}")
                     else:
+                        graph_mask = None
+                        graph = None
                         graph_token_index = None
 
                     outputs = model(
@@ -474,20 +477,23 @@ def train_multi_gpu_ringattn(
                     #         + "=" * 100
                     #     )
 
-                    graph = batch["graph"][i]
-                    for key in model.gnn.type_of_graph:
-                        if key in graph.keys():
-                            graph[key] = graph[key].to(device)
-
-                    graph_mask = batch["graph_mask"][i].to(device)
-
                     if "graph" in args.baseline_prompt:
+
+                        graph = batch["graph"][i]
+                        for key in model.gnn.type_of_graph:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to(device)
+
+                        graph_mask = batch["graph_mask"][i].to(device)
+
                         graph_token_index = torch.where(
                             micro_input["input_ids"] == model.config.graph_token_id[1]
                         )[1].tolist()
                         # if (args.debug) and (rank == 0):
                         #     console.log(f"Graph token id: {graph_token_index}")
                     else:
+                        graph_mask = None
+                        graph = None
                         graph_token_index = None
 
                     outputs = model(
@@ -732,18 +738,19 @@ def train_single_gpu_accelerate(
                     # if args.debug:
                     #     console.log(f"Micro input: {micro_input}")
 
-                    graph = batch["graph"][i]
-                    for key in model.gnn.type_of_graph:
-                        if key in graph.keys():
-                            graph[key] = graph[key].to(device)
-
-                    graph_mask = batch["graph_mask"][i].to(device)
-
                     if "graph" in args.baseline_prompt:
+                        graph = batch["graph"][i]
+                        for key in model.gnn.type_of_graph:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to(device)
+
+                        graph_mask = batch["graph_mask"][i].to(device)
                         graph_token_index = torch.where(
                             micro_input["input_ids"] == model.config.graph_token_id[1]
                         )[1].tolist()
                     else:
+                        graph = None
+                        graph_mask = None
                         graph_token_index = None
 
                     with accelerator.accumulate(model):
@@ -1059,18 +1066,19 @@ def train_multi_gpu_accelerate(
                         "labels": batch_input["labels"][i].to(device),
                     }
 
-                    graph = batch["graph"][i]
-                    for key in model.gnn.type_of_graph:
-                        if key in graph.keys():
-                            graph[key] = graph[key].to(device)
-
-                    graph_mask = batch["graph_mask"][i].to(device)
-
                     if "graph" in args.baseline_prompt:
+                        graph = batch["graph"][i]
+                        for key in model.gnn.type_of_graph:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to(device)
+
+                        graph_mask = batch["graph_mask"][i].to(device)
                         graph_token_index = torch.where(
                             micro_input["input_ids"] == model.config.graph_token_id[1]
                         )[1].tolist()
                     else:
+                        graph = None
+                        graph_mask = None
                         graph_token_index = None
 
                     with accelerator.accumulate(model):
