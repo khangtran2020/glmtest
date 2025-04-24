@@ -15,6 +15,7 @@ from utils.utils import run_command, get_index_by_value
 from utils.code_analyzer import analyze_code, remove_method_from_class
 from sklearn.preprocessing import LabelEncoder
 from copy import deepcopy
+from model.gnn import GRAPH_KEYS
 
 # typing
 from typing import List, Union, Dict, Any
@@ -480,10 +481,28 @@ class Data(object):
             if processed_prompt == False:
                 prompts = {}
             num_tokens = []
+
+            graph_stats = {}
+            for key in GRAPH_KEYS:
+                graph_stats[key] = {
+                    "num_nodes": [],
+                    "num_edges": [],
+                    "in_degrees": [],
+                    "out_degrees": [],
+                }
+
             for uuid, dat in self.data.items():
                 with open(dat["code_path"], "r") as file:
                     src_code = file.read()
                 graph = self.read_graph(dat)
+
+                gstats = self.get_graph_stats(graph)
+                for key in gstats.keys():
+                    graph_stats[key]["num_nodes"].append(gstats[key]["num_nodes"])
+                    graph_stats[key]["num_edges"].append(gstats[key]["num_edges"])
+                    graph_stats[key]["in_degrees"].append(gstats[key]["in_degrees"])
+                    graph_stats[key]["out_degrees"].append(gstats[key]["out_degrees"])
+
                 mask = torch.load(dat["graph"]["mask_path"], weights_only=True)
                 for testcase in dat["test_cases"].keys():
                     test_code = dat["test_cases"][testcase]["test_case"]
@@ -556,12 +575,22 @@ class Data(object):
             pass
             # self.logger.log(f"Sample prompt: {full_text}")
             # self.logger.log(f"Branch line: {branch_line}")
+
         quartiles = np.quantile(num_tokens, [0, 0.25, 0.5, 0.75, 1])
         max_num_tokens = max(num_tokens)
         min_num_tokens = min(num_tokens)
         self.logger.log(
             f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_tokens)}"
         )
+
+        for key in graph_stats.keys():
+            for skey in graph_stats[key].keys():
+                quartiles = np.quantile(graph_stats[key][skey], [0, 0.25, 0.5, 0.75, 1])
+                max_num = max(graph_stats[key][skey])
+                min_num = min(graph_stats[key][skey])
+                self.logger.log(
+                    f"Statistics of {key} - {skey}: {quartiles}, max: {max_num}, min: {min_num}, num_data: {len(graph_stats[key][skey])}"
+                )
 
     def read_graph(self, data: dict) -> dict:
 
@@ -805,3 +834,23 @@ class Data(object):
                 nodes = sub_graph.nodes()
                 sub_graph = dgl.sampling.sample_neighbors(sub_graph, nodes, fanout=-1)
         return sub_graph
+
+    def get_graph_stats(self, graph_dict: Dict[str, dgl.DGLGraph]) -> dict:
+        """
+        Get the statistics of the graph
+        """
+        stats = {}
+        for key in graph_dict.keys():
+            graph = graph_dict[key]
+            num_nodes = graph.num_nodes()
+            num_edges = graph.num_edges()
+            in_degrees = graph.in_degrees().float().mean().item()
+            out_degrees = graph.out_degrees().float().mean().item()
+
+            stats[key] = {
+                "num_nodes": num_nodes,
+                "num_edges": num_edges,
+                "in_degrees": in_degrees,
+                "out_degrees": out_degrees,
+            }
+        return stats

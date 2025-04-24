@@ -3,6 +3,16 @@ import dgl.nn.pytorch as dglnn
 import torch.nn
 from torch import nn
 
+GRAPH_KEYS = [
+    "ARGUMENT",
+    "RECEIVER",
+    "CALL",
+    "REACHING_DEF",
+    "CDG",
+    "CFG",
+    "AST",
+]
+
 
 class MultiGAT(nn.Module):
     def __init__(
