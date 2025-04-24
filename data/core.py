@@ -563,7 +563,9 @@ class Data(object):
                         "prompt": prompt,
                         "response": response,
                         "full_text": full_text,
-                        "graph": graph_dict,
+                        "graph": (
+                            graph_dict if "graph" in self.baseline_prompt else None
+                        ),
                         "mask": mask[mask_key],
                     }
                     prompts[f"{uuid}_{testcase}"] = {
