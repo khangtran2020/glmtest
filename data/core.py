@@ -844,12 +844,13 @@ class Data(object):
         Sample the neighbors of the graph
         """
         sub_graph: dgl.DGLGraph = None
+        print(f"Sampling neighbors of the graph with {n_hops} hops, mask size: {mask}")
         for i in range(n_hops):
             if sub_graph is None:
-                sub_graph = dgl.sampling.sample_neighbors(graph, mask, fanout=3)
+                sub_graph = dgl.sampling.sample_neighbors(graph, mask, fanout=-1)
             else:
                 nodes = sub_graph.nodes()
-                sub_graph = dgl.sampling.sample_neighbors(sub_graph, nodes, fanout=3)
+                sub_graph = dgl.sampling.sample_neighbors(sub_graph, nodes, fanout=1)
 
         print(
             f"Original graph: {graph.num_nodes()}, sampled graph: {sub_graph.num_nodes()}"
