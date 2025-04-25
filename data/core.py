@@ -500,7 +500,7 @@ class Data(object):
                     src_code = file.read()
 
                 mask = torch.load(dat["graph"]["mask_path"], weights_only=True)
-                assert mask.size(0) == len(dat["test_cases"])
+                assert len(mask) == len(dat["test_cases"])
 
                 if "graph" in self.baseline_prompt:
                     graph = self.read_graph(dat)
