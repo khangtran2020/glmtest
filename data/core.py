@@ -500,6 +500,7 @@ class Data(object):
                     src_code = file.read()
 
                 mask = torch.load(dat["graph"]["mask_path"], weights_only=True)
+                assert mask.size(0) == len(dat["test_cases"])
 
                 if "graph" in self.baseline_prompt:
                     graph = self.read_graph(dat)
@@ -526,6 +527,7 @@ class Data(object):
                         continue
                     mask_key = int(testcase.split("_")[-1])
                     branch = mask[mask_key]
+                    print(f"Test case: {testcase}, branch: {branch.sum()}")
                     branch_line = dat["test_cases"][testcase]["branch"]
                     active_node = get_index_by_value(a=branch, val=1)
                     # self.logger.log("Preparing prompts for {}...".format(testcase))
