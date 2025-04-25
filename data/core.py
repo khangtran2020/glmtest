@@ -842,22 +842,23 @@ class Data(object):
         self, graph: dgl.DGLGraph, mask: torch.Tensor, n_hops: int = 2
     ) -> dgl.DGLGraph:
         """
-        Sample the neighbors of the graph
+        Sample the neighbors of the graph starting from a mask over multiple hops.
         """
-        sub_graph: dgl.DGLGraph = None
-        # print(f"Sampling neighbors of the graph with {n_hops} hops, mask size: {mask}")
-        for i in range(n_hops):
-            if sub_graph is None:
-                sub_graph = dgl.sampling.sample_neighbors(graph, mask, fanout=-1)
-            else:
-                nodes = sub_graph.nodes()
-                sub_graph = dgl.sampling.sample_neighbors(sub_graph, nodes, fanout=1)
+        seeds = mask
+        blocks = []
+        for _ in range(n_hops):
+            block = dgl.sampling.sample_neighbors(graph, seeds, fanout=-1)
+            blocks.append(block)
+            seeds = block.nodes()
 
-        print(
-            f"Original graph: {graph.num_nodes()}, sampled graph: {sub_graph.num_nodes()}"
+        final_subgraph = dgl.node_subgraph(
+            graph, torch.unique(torch.cat([b.nodes() for b in blocks]))
         )
 
-        return sub_graph
+        print(
+            f"Original graph: {graph.num_nodes()}, sampled graph: {final_subgraph.num_nodes()}"
+        )
+        return final_subgraph
 
     def get_graph_stats(self, graph_dict: Dict[str, dgl.DGLGraph]) -> dict:
         """
