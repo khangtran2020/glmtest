@@ -846,9 +846,9 @@ class Data(object):
         Sample the neighbors of the graph starting from a mask over multiple hops.
         """
 
-        nx_graph = graph.to_networkx().to_undirected()
-        radius = nx.radius(nx_graph)
-        print("Radius of the graph:", radius)
+        # nx_graph = graph.to_networkx().to_undirected()
+        # radius = nx.radius(nx_graph)
+        # print("Radius of the graph:", radius)
 
         seeds = mask
         blocks = []
@@ -856,7 +856,7 @@ class Data(object):
             f"Sampling neighbors for {seeds.size()} nodes, from graph with {graph.num_nodes()} nodes"
         )
         for _ in range(n_hops):
-            block = dgl.sampling.sample_neighbors(graph, seeds, fanout=1)
+            block = dgl.sampling.sample_neighbors(graph, seeds.long(), fanout=1)
             blocks.append(block)
             seeds = block.nodes()
             print(f"Sampling {seeds.size()} nodes, compared to {mask.size()} nodes")
