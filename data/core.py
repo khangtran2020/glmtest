@@ -527,7 +527,9 @@ class Data(object):
                         continue
                     mask_key = int(testcase.split("_")[-1])
                     branch = mask[mask_key]
-                    print(f"Test case: {testcase}, branch: {branch.sum()}")
+                    print(
+                        f"Test case: {testcase}, branch: {branch.size()}, branch_sum: {branch.sum()}"
+                    )
                     branch_line = dat["test_cases"][testcase]["branch"]
                     active_node = get_index_by_value(a=branch, val=1)
                     # self.logger.log("Preparing prompts for {}...".format(testcase))
