@@ -847,7 +847,7 @@ class Data(object):
         seeds = mask
         blocks = []
         for _ in range(n_hops):
-            block = dgl.sampling.sample_neighbors(graph, seeds, fanout=-1)
+            block = dgl.sampling.sample_neighbors(graph, seeds, fanout=1)
             blocks.append(block)
             seeds = block.nodes()
 
