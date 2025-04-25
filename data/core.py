@@ -846,11 +846,7 @@ class Data(object):
         sub_graph: dgl.DGLGraph = None
         for i in range(n_hops):
             if sub_graph is None:
-                nodes = torch.nonzero(mask, as_tuple=False).squeeze(1)
-                print(
-                    f"Sampling neighbors for {mask.unique(return_counts=True)} nodes, mask: {mask.size()}"
-                )
-                sub_graph = dgl.sampling.sample_neighbors(graph, nodes, fanout=3)
+                sub_graph = dgl.sampling.sample_neighbors(graph, mask, fanout=3)
             else:
                 nodes = sub_graph.nodes()
                 sub_graph = dgl.sampling.sample_neighbors(sub_graph, nodes, fanout=3)
