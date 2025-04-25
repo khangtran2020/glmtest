@@ -843,10 +843,10 @@ class Data(object):
         for i in range(n_hops):
             if sub_graph is None:
                 nodes = torch.nonzero(mask, as_tuple=False).squeeze(1)
-                sub_graph = dgl.sampling.sample_neighbors(graph, nodes, fanout=-1)
+                sub_graph = dgl.sampling.sample_neighbors(graph, nodes, fanout=3)
             else:
                 nodes = sub_graph.nodes()
-                sub_graph = dgl.sampling.sample_neighbors(sub_graph, nodes, fanout=-1)
+                sub_graph = dgl.sampling.sample_neighbors(sub_graph, nodes, fanout=3)
 
         print(
             f"Original graph: {graph.num_nodes()}, sampled graph: {sub_graph.num_nodes()}"
