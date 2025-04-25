@@ -850,7 +850,7 @@ class Data(object):
         # radius = nx.radius(nx_graph)
         # print("Radius of the graph:", radius)
 
-        seeds = mask[0]
+        seeds = torch.Tensor([10])
         blocks = []
         print(
             f"Sampling neighbors for {seeds.size()} nodes, from graph with {graph.num_nodes()} nodes"
