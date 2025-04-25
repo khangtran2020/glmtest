@@ -532,6 +532,7 @@ class Data(object):
                     )
                     branch_line = dat["test_cases"][testcase]["branch"]
                     active_node = get_index_by_value(a=branch, val=1)
+                    self.logger.log("Active node: {}".format(active_node))
                     # self.logger.log("Preparing prompts for {}...".format(testcase))
                     if processed_prompt == False:
                         result = self.get_prompt(
@@ -844,7 +845,7 @@ class Data(object):
         Sample the neighbors of the graph
         """
         sub_graph: dgl.DGLGraph = None
-        print(f"Sampling neighbors of the graph with {n_hops} hops, mask size: {mask}")
+        # print(f"Sampling neighbors of the graph with {n_hops} hops, mask size: {mask}")
         for i in range(n_hops):
             if sub_graph is None:
                 sub_graph = dgl.sampling.sample_neighbors(graph, mask, fanout=-1)
