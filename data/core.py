@@ -847,6 +847,11 @@ class Data(object):
             else:
                 nodes = sub_graph.nodes()
                 sub_graph = dgl.sampling.sample_neighbors(sub_graph, nodes, fanout=-1)
+
+        print(
+            f"Original graph: {graph.num_nodes()}, sampled graph: {sub_graph.num_nodes()}"
+        )
+
         return sub_graph
 
     def get_graph_stats(self, graph_dict: Dict[str, dgl.DGLGraph]) -> dict:

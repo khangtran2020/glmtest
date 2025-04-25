@@ -4,7 +4,7 @@ accelerate launch main.py --mode train \
     --seed 42 \
     --data_path Dataset \
     --data testgeneval \
-    --baseline_prompt code_tr \
+    --baseline_prompt graph \
     --llm_model "HuggingFaceTB/SmolLM2-135M-Instruct" \
     --max_seq_len 16384 \
     --batch_size 1 \
@@ -23,4 +23,5 @@ accelerate launch main.py --mode train \
     --debug \
     --use_lora \
     --use_accelerate \
+    --graph_sampling \
     --do_test
