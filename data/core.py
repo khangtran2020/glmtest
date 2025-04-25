@@ -532,7 +532,7 @@ class Data(object):
                     )
                     branch_line = dat["test_cases"][testcase]["branch"]
                     active_node = get_index_by_value(a=branch, val=1)
-                    self.logger.log("Active node: {}".format(active_node))
+                    self.logger.log("Active node: {}".format(branch.size()))
                     # self.logger.log("Preparing prompts for {}...".format(testcase))
                     if processed_prompt == False:
                         result = self.get_prompt(
