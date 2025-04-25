@@ -5,6 +5,7 @@ import json
 import torch
 import numpy as np
 import pandas as pd
+import networkx as nx
 from tqdm import tqdm
 from rich.progress import Progress
 from rich.console import Console
@@ -844,6 +845,11 @@ class Data(object):
         """
         Sample the neighbors of the graph starting from a mask over multiple hops.
         """
+
+        nx_graph = graph.to_networkx().to_undirected()
+        radius = nx.radius(nx_graph)
+        print("Radius of the graph:", radius)
+
         seeds = mask
         blocks = []
         print(
