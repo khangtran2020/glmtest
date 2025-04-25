@@ -846,28 +846,17 @@ class Data(object):
         Sample the neighbors of the graph starting from a mask over multiple hops.
         """
 
-        # nx_graph = graph.to_networkx().to_undirected()
-        # radius = nx.radius(nx_graph)
-        # print("Radius of the graph:", radius)
-
-        seeds = torch.Tensor([10])
+        seeds = mask
         blocks = []
-        print(
-            f"Sampling neighbors for {seeds.size()} nodes, from graph with {graph.num_nodes()} nodes"
-        )
+
         for _ in range(n_hops):
             block = dgl.sampling.sample_neighbors(graph, seeds.long(), fanout=1)
             blocks.append(block)
             seeds = block.nodes()
-            print(f"Sampling {seeds.size()} nodes, compared to {mask.size()} nodes")
 
         final_subgraph = dgl.node_subgraph(
             graph, torch.unique(torch.cat([b.nodes() for b in blocks]))
         )
-
-        # print(
-        #     f"Original graph: {graph.num_nodes()}, sampled graph: {final_subgraph.num_nodes()}"
-        # )
         return final_subgraph
 
     def get_graph_stats(self, graph_dict: Dict[str, dgl.DGLGraph]) -> dict:
