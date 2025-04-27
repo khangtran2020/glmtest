@@ -878,6 +878,9 @@ def train_single_gpu_accelerate(
 
     final_model_path = os.path.join(save_path, "final_model")
     console.log(f"Saving final model to {final_model_path}...")
+
+    if not os.path.exists(final_model_path):
+        os.makedirs(final_model_path, exist_ok=True)
     # final_tokenizer_path = os.path.join(save_path, "tokenizer")
 
     # console.log(f"Config: {unwrapped_model.config}")
@@ -1222,9 +1225,11 @@ def train_multi_gpu_accelerate(
 
     if accelerator.is_main_process:
 
-        final_model_path = os.path.join(save_path, "final_model.pt")
+        final_model_path = os.path.join(save_path, "final_model")
         console.log(f"Saving final model to {final_model_path}...")
-        # final_tokenizer_path = os.path.join(save_path, "tokenizer")
+
+        if not os.path.exists(final_model_path):
+            os.makedirs(final_model_path, exist_ok=True)
 
         unwrapped_model = accelerator.unwrap_model(model)
 
