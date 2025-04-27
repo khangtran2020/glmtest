@@ -30,7 +30,7 @@ class GLMFModelConfig(PretrainedConfig):
     def __init__(
         self,
         llm_model: Optional[str] = None,
-        mode: str = "node",
+        mode: str = "branch",
         in_feats: int = 772,
         n_hidden: int = 512,
         n_layers: int = 4,

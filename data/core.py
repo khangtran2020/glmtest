@@ -678,12 +678,16 @@ class Data(object):
         mask: torch.Tensor,
         branch: List,
         tokenizer: PreTrainedTokenizer,
+        gnn_mode: str = "graph",
     ):
 
         # self.logger.log(
         #     f"Preparing prompts with baseline_prompt: {self.baseline_prompt}"
         # )
-        graph_pad = "<|graph_pad|>" * mask.size(0)
+        if gnn_mode == "graph":
+            graph_pad = "<|graph_pad|>"
+        else:
+            graph_pad = "<|graph_pad|>" * mask.size(0)
         if self.baseline_prompt == "code":
             code_line = self.generate_code_line(branch)
             text = PROMPT_CODE.format(src_code, code_line)

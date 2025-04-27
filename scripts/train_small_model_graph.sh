@@ -1,5 +1,6 @@
 CUDA_VISIBLE_DEVICES=0 python main.py --mode train \
     --seed 42 \
+    --name "small_model_graph" \
     --data_path Dataset \
     --data testgeneval \
     --baseline_prompt graph \
@@ -14,9 +15,10 @@ CUDA_VISIBLE_DEVICES=0 python main.py --mode train \
     --do_eval \
     --learning_rate 5e-5 \
     --max_grad_norm 1.0 \
-    --num_train_epochs 1 \
+    --num_train_epochs 3 \
     --dtype bfloat16 \
     --debug \
     --use_lora \
-    --validating_steps 10 \
+    --save_steps 1000 \
+    --validating_steps 1000 \
     --do_test
