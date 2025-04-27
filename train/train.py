@@ -52,7 +52,7 @@ def train(
                 mixed_precision=mixed_precision,
                 model=model,
                 collate_fn=collate_fn,
-                rank=-1,
+                # rank=-1,
             )
         else:
             console.log("Training on multi GPU with mode: train_multi_gpu_accelerate")
@@ -67,7 +67,7 @@ def train(
                 mixed_precision=mixed_precision,
                 model=model,
                 collate_fn=collate_fn,
-                rank=-1,
+                # rank=-1,
             )
     # else:
     #     if args.num_gpu == 1:
