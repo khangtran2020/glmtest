@@ -210,7 +210,9 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             rank=rank,
             training=True,
         )
-        model.load_state_dict(torch.load(os.path.join(model_path, "model_weight.pt")))
+        model.load_state_dict(
+            torch.load(os.path.join(args.model_weight_path, "model_weight.pt"))
+        )
         console.log(f"Model is loaded to device: {model.device}")
         test(args=args, dataset=dataset, model=model, console=console)
 
