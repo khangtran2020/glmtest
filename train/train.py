@@ -34,7 +34,7 @@ def train(
     optimizer: torch.optim.Optimizer,
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
     continue_training: bool = False,
-    start_epoch: int = 0,
+    start_step: int = 0,
     mixed_precision: str = "bf16",
     collate_fn: callable = collate_fn,
 ):
@@ -45,6 +45,11 @@ def train(
                 args=args,
                 dataset=dataset,
                 console=console,
+                optimizer=optimizer,
+                lr_scheduler=lr_scheduler,
+                continue_training=continue_training,
+                start_step=start_step,
+                mixed_precision=mixed_precision,
                 model=model,
                 collate_fn=collate_fn,
                 rank=-1,
@@ -55,6 +60,11 @@ def train(
                 args=args,
                 dataset=dataset,
                 console=console,
+                optimizer=optimizer,
+                lr_scheduler=lr_scheduler,
+                continue_training=continue_training,
+                start_step=start_step,
+                mixed_precision=mixed_precision,
                 model=model,
                 collate_fn=collate_fn,
                 rank=-1,
@@ -575,7 +585,7 @@ def train_single_gpu_accelerate(
     optimizer: torch.optim.Optimizer,
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
     continue_training: bool = False,
-    start_epoch: int = 0,
+    start_step: int = 0,
     collate_fn: callable = collate_fn,
     mixed_precision: str = "bf16",
 ):
@@ -715,7 +725,7 @@ def train_single_gpu_accelerate(
         for epoch in range(args.num_train_epochs):
             model.train()
 
-            if ((continue_training == True) and (global_step > start_epoch)) or (
+            if ((continue_training == True) and (global_step > start_step)) or (
                 continue_training == False
             ):
                 train_epoch_task = progress.add_task(
@@ -727,7 +737,7 @@ def train_single_gpu_accelerate(
 
             for step, batch in enumerate(tr_loader):
 
-                if (continue_training == True) and (global_step <= start_epoch):
+                if (continue_training == True) and (global_step <= start_step):
                     global_step += args.batch_size
                     continue
 
@@ -834,7 +844,7 @@ def train_single_gpu_accelerate(
                 if args.debug:
                     break
 
-            if ((continue_training == True) and (global_step > start_epoch)) or (
+            if ((continue_training == True) and (global_step > start_step)) or (
                 continue_training == False
             ):
                 progress.remove_task(train_epoch_task)
@@ -908,7 +918,7 @@ def train_multi_gpu_accelerate(
     optimizer: torch.optim.Optimizer,
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
     continue_training: bool = False,
-    start_epoch: int = 0,
+    start_step: int = 0,
     collate_fn: callable = collate_fn,
     mixed_precision: str = "bf16",
 ):
@@ -1061,7 +1071,7 @@ def train_multi_gpu_accelerate(
             model.train()
 
             if accelerator.is_main_process:
-                if ((continue_training == True) and (global_step > start_epoch)) or (
+                if ((continue_training == True) and (global_step > start_step)) or (
                     continue_training == False
                 ):
                     train_epoch_task = progress.add_task(
@@ -1074,7 +1084,7 @@ def train_multi_gpu_accelerate(
 
             for step, batch in enumerate(tr_loader):
 
-                if (continue_training == True) and (global_step <= start_epoch):
+                if (continue_training == True) and (global_step <= start_step):
                     global_step += args.batch_size
                     continue
 
@@ -1198,7 +1208,7 @@ def train_multi_gpu_accelerate(
                 break
 
             if accelerator.is_main_process:
-                if ((continue_training == True) and (global_step > start_epoch)) or (
+                if ((continue_training == True) and (global_step > start_step)) or (
                     continue_training == False
                 ):
                     progress.remove_task(train_epoch_task)
