@@ -30,6 +30,7 @@ def test(
         debug=args.debug,
         testing=True,
     )
+    tokenizer = dataset.llm_tokenizer
     # past_key_values = SinkCache(window_length=256, num_sink_tokens=4)
     # loader = DataLoader(te_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
     console.log(f"Test data: {len(te_dataset)} data points")
@@ -74,8 +75,8 @@ def test(
                     graph_token_index = torch.where(
                         micro_input["input_ids"] == model.config.graph_token_id[1]
                     )[1].tolist()
-                    if args.debug:
-                        console.log(f"Graph token id: {graph_token_index}")
+                    # if args.debug:
+                    #     console.log(f"Graph token id: {graph_token_index}")
 
                     outputs = model.generate(
                         inputs=micro_input["input_ids"],
@@ -96,9 +97,7 @@ def test(
                         use_cache=True,
                     )
 
-                out_text = model.llm_tokenizer.batch_decode(
-                    outputs, skip_special_tokens=True
-                )[0]
+                out_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
                 generated_text.append({uuid: out_text})
                 end_time = time.time()
                 process_time = end_time - start_time
