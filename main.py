@@ -6,10 +6,9 @@ from utils.console import console
 from utils.utils import print_args, seed_everything
 from data.utils import get_dataset
 from graph.utils import get_graph
-from train.train import train
+from train.train import train, GLMFModelForCausalLM, GLMFModelConfig
 from train.test import test
 import torch.distributed as dist
-from model.model import GLMFModelConfig, GLMFModelForCausalLM
 from train.utils import load_checkpoint
 from utils.constant import (
     GRAPH_START_TOKEN,
