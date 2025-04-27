@@ -9,8 +9,16 @@ from graph.utils import get_graph
 from train.train import train
 from train.test import test
 import torch.distributed as dist
-from transformers import AutoModelForCausalLM
 from model.model import GLMFModelConfig, GLMFModelForCausalLM
+from train.utils import load_checkpoint
+from utils.constant import (
+    GRAPH_START_TOKEN,
+    GRAPH_PAD_TOKEN,
+    GRAPH_END_TOKEN,
+)
+
+from transformers import get_scheduler
+from torch.optim import AdamW
 
 # typing
 from argparse import Namespace
@@ -92,14 +100,55 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             training=True,
         )
 
+        model.llm_model.gradient_checkpointing_enable()
+
+        model.config.graph_token_id = [
+            dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
+            dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
+            dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
+        ]
+        if args.model_debug:
+            return
+
+        if args.debug:
+            console.log("Model & tokenizer loaded")
+            console.log(
+                f"Special tokens added to tokenizer and model: {model.config.graph_token_id}"
+            )
+
+        optimizer = AdamW(
+            filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
+        )
+        lr_scheduler = get_scheduler(
+            name="cosine",
+            optimizer=optimizer,
+            num_warmup_steps=100,
+            num_training_steps=args.num_train_epochs,
+        )
+
+        if args.continue_training:
+            assert (
+                args.checkpoint_path is not None
+            ), "Checkpoint path must be specified."
+            check_point = load_checkpoint(path=args.checkpoint_path)
+
+            model.load_state_dict(check_point["model_state_dict"])
+            optimizer.load_state_dict(check_point["optimizer_state_dict"])
+            lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
+            start_step = check_point["epoch"]
+
         train(
             args=args,
             dataset=dataset,
             console=console,
             model=model,
-            device=device,
-            rank=rank,
+            optimizer=optimizer,
+            lr_scheduler=lr_scheduler,
+            continue_training=args.continue_training,
+            start_step=start_step,
+            mixed_precision="bf16",
         )
+
         if args.do_test:
 
             model_path = os.path.join(args.output_dir, args.name)

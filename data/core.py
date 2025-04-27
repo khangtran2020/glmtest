@@ -492,8 +492,11 @@ class Data(object):
                     graph_stats[key] = {
                         "num_nodes": [],
                         "num_edges": [],
-                        "in_degrees": [],
-                        "out_degrees": [],
+                        "in_max_degrees": [],
+                        "out_max_degrees": [],
+                        "in_min_degrees": [],
+                        "out_min_degrees": [],
+                        "num_components": [],
                     }
 
             for uuid, dat in self.data.items():
@@ -516,9 +519,20 @@ class Data(object):
                     for key in gstats.keys():
                         graph_stats[key]["num_nodes"].append(gstats[key]["num_nodes"])
                         graph_stats[key]["num_edges"].append(gstats[key]["num_edges"])
-                        graph_stats[key]["in_degrees"].append(gstats[key]["in_degrees"])
-                        graph_stats[key]["out_degrees"].append(
-                            gstats[key]["out_degrees"]
+                        graph_stats[key]["in_max_degrees"].append(
+                            gstats[key]["in_max_degrees"]
+                        )
+                        graph_stats[key]["out_max_degrees"].append(
+                            gstats[key]["out_max_degrees"]
+                        )
+                        graph_stats[key]["in_min_degrees"].append(
+                            gstats[key]["in_min_degrees"]
+                        )
+                        graph_stats[key]["out_min_degrees"].append(
+                            gstats[key]["out_min_degrees"]
+                        )
+                        graph_stats[key]["num_components"].append(
+                            gstats[key]["num_components"]
                         )
 
                 for testcase in dat["test_cases"].keys():
@@ -602,6 +616,7 @@ class Data(object):
 
         if "graph" in self.baseline_prompt:
             for key in graph_stats.keys():
+                self.logger.log(f"============= For graph {key}: =============")
                 for skey in graph_stats[key].keys():
                     quartiles = np.quantile(
                         graph_stats[key][skey], [0, 0.25, 0.5, 0.75, 1]
@@ -609,7 +624,7 @@ class Data(object):
                     max_num = max(graph_stats[key][skey])
                     min_num = min(graph_stats[key][skey])
                     self.logger.log(
-                        f"Statistics of {key} - {skey}: {quartiles}, max: {max_num}, min: {min_num}, num_data: {len(graph_stats[key][skey])}"
+                        f"Statistics of {skey}: {quartiles}, max: {max_num}, min: {min_num}, num_data: {len(graph_stats[key][skey])}"
                     )
 
     def read_graph(self, data: dict) -> dict:
@@ -868,13 +883,21 @@ class Data(object):
             graph = graph_dict[key]
             num_nodes = graph.num_nodes()
             num_edges = graph.num_edges()
-            in_degrees = graph.in_degrees().float().mean().item()
-            out_degrees = graph.out_degrees().float().mean().item()
+            in_max_degrees = graph.in_degrees().float().max().item()
+            out_max_degrees = graph.out_degrees().float().max().item()
+            in_min_degrees = graph.in_degrees().float().max().item()
+            out_min_degrees = graph.out_degrees().float().max().item()
+
+            nx_graph = graph.to_networkx().to_undirected()
+            num_components = nx.number_connected_components(nx_graph)
 
             stats[key] = {
                 "num_nodes": num_nodes,
                 "num_edges": num_edges,
-                "in_degrees": in_degrees,
-                "out_degrees": out_degrees,
+                "in_max_degrees": in_max_degrees,
+                "out_max_degrees": out_max_degrees,
+                "in_min_degrees": in_min_degrees,
+                "out_min_degrees": out_min_degrees,
+                "num_components": num_components,
             }
         return stats

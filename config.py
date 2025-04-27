@@ -128,6 +128,14 @@ def add_model_group(group):
     group.add_argument(
         "--model_weight_path", type=str, help="path to the model weight", default=None
     )
+    group.add_argument(
+        "--checkpoint_path", type=str, help="path to the checkpoint", default=None
+    )
+    group.add_argument(
+        "--continue_training",
+        action="store_true",
+        help="continue training from checkpoint",
+    )
 
 
 def add_training_group(group):
