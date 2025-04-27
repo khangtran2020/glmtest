@@ -6,7 +6,8 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 from data.loader import GLMFDataset, collate_fn
 from model.model import GLMFModelForCausalLM
-from transformers import SinkCache
+
+# from transformers import SinkCache
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 
 
@@ -29,7 +30,7 @@ def test(
         debug=args.debug,
         testing=True,
     )
-    past_key_values = SinkCache(window_length=256, num_sink_tokens=4)
+    # past_key_values = SinkCache(window_length=256, num_sink_tokens=4)
     # loader = DataLoader(te_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
     console.log(f"Test data: {len(te_dataset)} data points")
     console.log("Testing...")
@@ -83,7 +84,7 @@ def test(
                         graph_token_index=graph_token_index,
                         max_new_tokens=args.max_new_tokens,
                         do_sample=False,
-                        past_key_values=past_key_values,
+                        use_cache=True,
                     )
                 else:
                     graph_token_index = None
@@ -92,7 +93,7 @@ def test(
                         graph_token_index=graph_token_index,
                         max_new_tokens=args.max_new_tokens,
                         do_sample=False,
-                        past_key_values=past_key_values,
+                        use_cache=True,
                     )
 
                 out_text = model.llm_tokenizer.batch_decode(
