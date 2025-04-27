@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import time
 import torch
 from tqdm import tqdm
@@ -46,7 +47,7 @@ def test(
     ) as progress:
         test_task = progress.add_task("Testing...", total=len(te_dataset))
         with torch.no_grad():
-            generated_text = []
+            generated_text = {}
             time_list = []
             for step, batch_data in enumerate(te_dataset):
                 start_time = time.time()
@@ -98,7 +99,7 @@ def test(
                     )
 
                 out_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
-                generated_text.append({uuid: out_text})
+                generated_text[uuid] = out_text
                 end_time = time.time()
                 process_time = end_time - start_time
                 time_list.append(process_time)
@@ -112,10 +113,10 @@ def test(
     save_dir = os.path.join(args.gen_dir, f"{args.name}.jsonl")
     with console.status("Saving results..."):
         # save generated text to jsonl file
-        with open(save_dir, "w") as f:
-            for item in generated_text:
-                for key, value in item.items():
-                    f.write(f"{key}: {value}\n")
+        with open(save_dir, "w", encoding="utf-8") as f:
+            # save as json file
+            json.dump(generated_text, f, ensure_ascii=False, indent=4)
+
     console.log(f"Results saved to {save_dir}")
 
 
