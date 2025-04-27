@@ -110,7 +110,7 @@ def test(
                     description=f"Testing... {step}/{len(te_dataset)} - {avg_time:.2f}s for 1 sample",
                 )
     console.log("Testing finished.")
-    save_dir = os.path.join(args.gen_dir, f"{args.name}.jsonl")
+    save_dir = os.path.join(args.gen_dir, f"{args.name}.json")
     with console.status("Saving results..."):
         # save generated text to jsonl file
         with open(save_dir, "w", encoding="utf-8") as f:
