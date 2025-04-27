@@ -136,6 +136,9 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
             start_step = check_point["epoch"]
 
+        else:
+            start_step = 0
+
         train(
             args=args,
             dataset=dataset,
