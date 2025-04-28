@@ -24,6 +24,7 @@ def test(
     console: Console,
     collate_fn: callable = collate_fn,
 ):
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     te_dataset = GLMFDataset(
         data=dataset.test_data,
         tokenizer=dataset.llm_tokenizer,
@@ -60,8 +61,8 @@ def test(
                 if "token_type_ids" in batch_input:
                     batch_input.pop("token_type_ids")
                 micro_input = {
-                    "input_ids": batch_input["input_ids"].to(model.device),
-                    "attention_mask": batch_input["attention_mask"].to(model.device),
+                    "input_ids": batch_input["input_ids"].to(device),
+                    "attention_mask": batch_input["attention_mask"].to(device),
                     "labels": None,
                 }
 
@@ -69,9 +70,9 @@ def test(
                     graph = batch["graph"]
                     for key in model.gnn.type_of_graph:
                         if key in graph.keys():
-                            graph[key] = graph[key].to(model.device)
+                            graph[key] = graph[key].to(device)
 
-                    graph_mask = batch["graph_mask"].to(model.device)
+                    graph_mask = batch["graph_mask"].to(device)
 
                     graph_token_index = torch.where(
                         micro_input["input_ids"] == model.config.graph_token_id[1]
