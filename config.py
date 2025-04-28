@@ -68,8 +68,8 @@ def add_model_group(group):
     group.add_argument(
         "--gnn_mode",
         type=str,
-        help="mode of the program: branch, graph",
-        default="branch",
+        help="mode of the program: node, graph",
+        default="node",
     )
     group.add_argument(
         "--in_feats",

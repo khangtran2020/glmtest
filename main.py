@@ -194,7 +194,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             lora_alpha=args.lora_alpha,
             lora_dropout=args.lora_dropout,
             lora_target_modules=args.lora_target_modules,
-            device_map="cuda" if torch.cuda.is_available() else "cpu",
+            device_map="cuda",
         )
 
         if config.model_type not in ["llama", "qwen2"]:
