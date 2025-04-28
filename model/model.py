@@ -331,7 +331,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 == inputs_embeds[
                     0, graph_token_index[0] : (graph_token_index[-1] + 1), :
                 ].shape
-            ), "Shape mismatch in assignment!"
+            ), f"Shape mismatch in assignment: graph embedding shape {graph_embeds.shape}, input embedding shape: {inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :].shape}!"
 
             # if self.debug:
             #     print(
