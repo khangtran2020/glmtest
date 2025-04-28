@@ -210,6 +210,13 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             rank=rank,
             training=False,
         )
+
+        model.config.graph_token_id = [
+            dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
+            dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
+            dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
+        ]
+
         model.load_state_dict(
             torch.load(os.path.join(args.model_weight_path, "model_weight.pt"))
         )
