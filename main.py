@@ -208,7 +208,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             baseline_prompt=args.baseline_prompt,
             debug=args.debug,
             rank=rank,
-            training=True,
+            training=False,
         )
         model.load_state_dict(
             torch.load(os.path.join(args.model_weight_path, "model_weight.pt"))
