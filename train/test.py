@@ -25,6 +25,7 @@ def test(
     collate_fn: callable = collate_fn,
 ):
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.to(device)
     console.log("Testing on device ... :", device)
     te_dataset = GLMFDataset(
         data=dataset.test_data,
