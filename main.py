@@ -182,7 +182,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
         # )
         config = GLMFModelConfig(
             llm_model=args.llm_model,
-            use_lora=args.use_lora,
+            use_lora=False,
             dtype=args.dtype,
             mode=args.gnn_mode,
             in_feats=args.in_feats,
