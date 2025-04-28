@@ -12,7 +12,7 @@ accelerate launch main.py --mode train \
     --save_steps 1000 \
     --validating_steps 1000 \
     --num_gpu 1 \
-    --name "testing_small_graph_accelerate" \
+    --name "testing_small_graph_graph_accelerate" \
     --output_dir "./results/models/" \
     --overwrite_output_dir \
     --do_train \
@@ -23,6 +23,7 @@ accelerate launch main.py --mode train \
     --num_train_epochs 3 \
     --dtype bfloat16 \
     --use_lora \
+    --gnn_mode "graph" \
     --use_accelerate \
     --graph_sampling \
     --do_test

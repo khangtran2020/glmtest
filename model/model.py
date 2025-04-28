@@ -249,7 +249,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             self.llm_model.resize_token_embeddings(len(tokenizer))
             self.config.vocab_size = len(tokenizer)
         else:
-            self.llm_model.resize_token_embeddings(self.config.vocab_size)
+            self.llm_model.resize_token_embeddings(len(tokenizer))
 
         # LoRA init
         if config.use_lora:
