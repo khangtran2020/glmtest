@@ -9,7 +9,7 @@ from data.utils import get_dataset
 from graph.utils import get_graph
 from train.train import train, GLMFModelForCausalLM, GLMFModelConfig
 from train.test import test
-import torch.distributed as dist
+from accelerate.utils import broadcast_object_list
 from train.utils import load_checkpoint
 from utils.constant import (
     GRAPH_START_TOKEN,
@@ -104,8 +104,10 @@ def main() -> None:
         args = None
 
         # broadcast the args and dataset to all processes
-    dataset = accelerator.broadcast_object(dataset, src_rank=0)
-    args = accelerator.broadcast_object(args, src_rank=0)
+    # dataset = accelerator.send
+    # # (dataset, src_rank=0)
+    dataset = broadcast_object_list(object_list=dataset, from_process=0)
+    args = broadcast_object_list(object_list=args, from_process=0)
     console.log(f"Broadcasted args and dataset to all processes.")
 
     if torch.cuda.is_available():

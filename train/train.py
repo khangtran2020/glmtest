@@ -3,7 +3,7 @@ import torch
 import wandb
 from torch.utils.data import DataLoader
 from data.loader import GLMFDataset, collate_fn
-from model.model import GLMFModelForCausalLM, GLMFModelConfig
+from model.model import GLMFModelForCausalLM
 from accelerate import Accelerator
 from transformers.trainer_utils import seed_worker
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
