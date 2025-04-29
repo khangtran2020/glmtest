@@ -1,7 +1,7 @@
 import os
 import torch
 import warnings
-import accelerate
+from accelerate import Accelerator
 from config import parse_args
 from utils.console import console
 from utils.utils import print_args, seed_everything
@@ -27,70 +27,139 @@ from rich.console import Console
 warnings.filterwarnings("ignore")
 
 
-def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> None:
-    console.log("Running on device:", device)
+def main() -> None:
 
-    graph = get_graph(
-        args=args,
-        graph_type=args.graph_type,
-        logger=logger,
+    args = parse_args()
+
+    accelerator = Accelerator(
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
+        mixed_precision=args.dtype,
+        log_with="wandb",
+        project_dir=args.log_dir,
     )
-    dataset = get_dataset(
-        data_name=args.data,
-        data_path=args.data_path,
-        logger=console,
-        feat_model=args.feat_model,
-        llm_model=args.llm_model,
-        max_pynguin_run_time=args.max_pynguin_run_time,
-        docker_image=args.docker_image,
-        num_cpu=args.num_cpu,
-        graph=graph,
-        data_max_length=args.model_max_length,
-        baseline_prompt=args.baseline_prompt,
-        debug=args.debug,
-        mode=args.mode,
-        graph_sampling=args.graph_sampling,
-        n_hops=args.n_layers,
-    )
-    if dataset is None:
-        logger.log("Dataset not found, exiting...")
-        return
 
-    if args.mode == "data":
-        if args.do_crawl:
-            dataset.crawl()
-        if args.do_process_raw:
-            dataset.process_raw()
-        return
+    # Initialize args, logger, model and dataset:
+    if accelerator.is_main_process:
+        console.log("Processing data and initializing model in main process...")
 
-    if not args.model_debug:
-        dataset.prepare_data()
-        console.log("Data prepared, starting splitting...")
-        dataset.train_test_split(val_split=1000, test_split=200)
+        # Initialize the argument parser
+        print_args(args=args)
+        seed_everything(args.seed)
 
-    if args.mode == "train":
+        if os.path.exists(args.output_dir) == False:
+            os.makedirs(args.output_dir)
+        if os.path.exists(args.log_dir) == False:
+            os.makedirs(args.log_dir)
+        if os.path.exists(args.gen_dir) == False:
+            os.makedirs(args.gen_dir)
 
-        config = GLMFModelConfig(
+        if args.model_dir is None:
+            args.model_dir = args.output_dir
+
+        if "WORLD_SIZE" in os.environ and int(os.environ["WORLD_SIZE"]) > 1:
+            args.num_gpu = int(os.environ["WORLD_SIZE"])
+        else:
+            args.num_gpu = torch.cuda.device_count()
+
+        # Initializing the dataset
+        graph = get_graph(
+            args=args,
+            graph_type=args.graph_type,
+            logger=console,
+        )
+        dataset = get_dataset(
+            data_name=args.data,
+            data_path=args.data_path,
+            logger=console,
+            feat_model=args.feat_model,
             llm_model=args.llm_model,
-            use_lora=args.use_lora,
-            dtype=args.dtype,
-            mode=args.gnn_mode,
-            in_feats=args.in_feats,
-            n_hidden=args.n_hidden,
-            n_layers=args.n_layers,
-            num_head=args.num_head,
-            dropout=args.dropout,
-            lora_r=args.lora_r,
-            lora_alpha=args.lora_alpha,
-            lora_dropout=args.lora_dropout,
-            lora_target_modules=args.lora_target_modules,
-            device_map="cuda" if torch.cuda.is_available() else "cpu",
+            max_pynguin_run_time=args.max_pynguin_run_time,
+            docker_image=args.docker_image,
+            num_cpu=args.num_cpu,
+            graph=graph,
+            data_max_length=args.model_max_length,
+            baseline_prompt=args.baseline_prompt,
+            debug=args.debug,
+            mode=args.mode,
+            graph_sampling=args.graph_sampling,
+            n_hops=args.n_layers,
+        )
+        if dataset is None:
+            console.log("Dataset not found, exiting...")
+            return
+
+        if args.mode == "data":
+            if args.do_crawl:
+                dataset.crawl()
+            if args.do_process_raw:
+                dataset.process_raw()
+            return
+
+        if not args.model_debug:
+            dataset.prepare_data()
+            dataset.train_test_split(val_split=1000, test_split=200)
+
+    else:
+        dataset = None
+        args = None
+
+        # broadcast the args and dataset to all processes
+    dataset = accelerator.broadcast_object(dataset, src_rank=0)
+    args = accelerator.broadcast_object(args, src_rank=0)
+    console.log(f"Broadcasted args and dataset to all processes.")
+
+    if torch.cuda.is_available():
+        # Check if distributed training is enabled (this is the case when using Accelerate or torchrun with multi-node)
+        if "WORLD_SIZE" in os.environ and int(os.environ["WORLD_SIZE"]) > 1:
+            rank = int(os.environ.get("RANK", 0))
+            local_rank = int(
+                os.environ.get("LOCAL_RANK", rank % torch.cuda.device_count())
+            )
+            world_size = int(os.environ["WORLD_SIZE"])
+            device = torch.device("cuda", local_rank)
+            console.log(
+                f"Distributed training: rank {rank}/{world_size}, using device {device}."
+            )
+        else:
+            # Fallback for single-node training, single or multi GPU.
+            n_gpus = torch.cuda.device_count()
+            if n_gpus > 1:
+                console.log(f"Using {n_gpus} GPUs on a single node.")
+                # device = torch.device("cuda:0")
+                rank = int(os.environ.get("RANK", 0))
+                device = torch.device("cuda", rank)
+            else:
+                console.log("Using 1 GPU.")
+                device = torch.device("cuda:0")
+                rank = 0
+    else:
+        console.log("No GPUs available, using CPU instead.")
+        device = torch.device("cpu")
+        rank = -1
+
+    config = GLMFModelConfig(
+        llm_model=args.llm_model,
+        use_lora=args.use_lora,
+        dtype=args.dtype,
+        mode=args.gnn_mode,
+        in_feats=args.in_feats,
+        n_hidden=args.n_hidden,
+        n_layers=args.n_layers,
+        num_head=args.num_head,
+        dropout=args.dropout,
+        lora_r=args.lora_r,
+        lora_alpha=args.lora_alpha,
+        lora_dropout=args.lora_dropout,
+        lora_target_modules=args.lora_target_modules,
+        device_map="cuda" if torch.cuda.is_available() else "cpu",
+    )
+
+    if config.model_type not in ["llama", "qwen2"]:
+        raise ValueError(
+            f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2'."
         )
 
-        if config.model_type not in ["llama", "qwen2"]:
-            raise ValueError(
-                f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2'."
-            )
+    if args.mode == "train":
 
         model = GLMFModelForCausalLM(
             config=config,
@@ -100,9 +169,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
             rank=rank,
             training=True,
         )
-
         model.llm_model.gradient_checkpointing_enable()
-
         model.config.graph_token_id = [
             dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
             dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
@@ -227,52 +294,4 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    print_args(args=args)
-    seed_everything(args.seed)
-
-    # Device and Distributed Training Setup
-    if torch.cuda.is_available():
-        # Check if distributed training is enabled (this is the case when using Accelerate or torchrun with multi-node)
-        if "WORLD_SIZE" in os.environ and int(os.environ["WORLD_SIZE"]) > 1:
-            # Initialize distributed group using the environment variables set by Accelerate
-            dist.init_process_group(backend="nccl", init_method="env://")
-            rank = int(os.environ.get("RANK", 0))
-            # LOCAL_RANK is typically set by Accelerate and indicates the GPU device on the local machine
-            local_rank = int(
-                os.environ.get("LOCAL_RANK", rank % torch.cuda.device_count())
-            )
-            world_size = int(os.environ["WORLD_SIZE"])
-            device = torch.device("cuda", local_rank)
-            console.log(
-                f"Distributed training: rank {rank}/{world_size}, using device {device}."
-            )
-            args.num_gpu = world_size  # Total GPUs across nodes
-        else:
-            # Fallback for single-node training, single or multi GPU.
-            n_gpus = torch.cuda.device_count()
-            if n_gpus > 1:
-                console.log(f"Using {n_gpus} GPUs on a single node.")
-                device = torch.device("cuda:0")
-                rank = 0
-                args.num_gpu = n_gpus
-            else:
-                console.log("Using 1 GPU.")
-                device = torch.device("cuda:0")
-                rank = 0
-    else:
-        console.log("No GPUs available, using CPU instead.")
-        device = torch.device("cpu")
-        rank = -1
-
-    if os.path.exists(args.output_dir) == False:
-        os.makedirs(args.output_dir)
-    if os.path.exists(args.log_dir) == False:
-        os.makedirs(args.log_dir)
-    if os.path.exists(args.gen_dir) == False:
-        os.makedirs(args.gen_dir)
-
-    if args.model_dir is None:
-        args.model_dir = args.output_dir
-
-    main(args=args, logger=console, device=device, rank=rank)
+    main()

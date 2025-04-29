@@ -21,7 +21,7 @@ accelerate launch --num_processes 2 main.py --mode train \
 
 export CUDA_VISIBLE_DEVICES=0
 
-accelerate launch  --num_processes 2  main.py --mode train \
+accelerate launch --num_processes 2  main.py --mode train \
     --seed 42 \
     --data_path Dataset \
     --data testgeneval \
@@ -29,7 +29,7 @@ accelerate launch  --num_processes 2  main.py --mode train \
     --llm_model "HuggingFaceTB/SmolLM2-135M-Instruct" \
     --max_seq_len 32768 \
     --batch_size 1 \
-    --gradient_accumulation_steps 4 \
+    --gradient_accumulation_steps 16 \
     --save_steps 1000 \
     --validating_steps 1000 \
     --num_gpu 2 \

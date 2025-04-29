@@ -262,8 +262,8 @@ def add_training_group(group):
     group.add_argument(
         "--dtype",
         type=str,
-        help="model and data type, float32/bfloat16",
-        default="bfloat16",
+        help="model and data type",
+        default="bf16",
     )
     group.add_argument(
         "--resume_from_checkpoint",

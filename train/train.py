@@ -15,16 +15,6 @@ from train.test import validate
 from argparse import Namespace
 from rich.console import Console
 
-# args=args,
-# dataset=dataset,
-# console=console,
-# model=model,
-# optimizer=optimizer,
-# lr_scheduler=lr_scheduler,
-# continue_training=args.continue_training,
-# start_epoch=start_epoch,
-# mixed_precision="bf16",
-
 
 def train(
     args: Namespace,
@@ -309,12 +299,6 @@ def train_single_gpu_accelerate(
         )
         move_model_to_device(unwrapped_model, device_to_save)
 
-    # for p in unwrapped_model.parameters():
-    #     console.log(f"Parameter device: {p.device}")
-    #     if p.device.type == "meta":
-    #         console.log("Model has meta parameters. Converting to CPU.")
-    # break
-
     final_model_path = os.path.join(save_path, "final_model")
     console.log(f"Saving final model to {final_model_path}...")
 
@@ -430,56 +414,8 @@ def train_multi_gpu_accelerate(
         console.log(f"Valid data: {len(va_dataset)} data points")
 
     tokenizer = dataset.llm_tokenizer
-    # config = GLMFModelConfig(
-    #     llm_model=args.llm_model,
-    #     use_lora=args.use_lora,
-    #     dtype=args.dtype,
-    #     mode=args.gnn_mode,
-    #     in_feats=args.in_feats,
-    #     n_hidden=args.n_hidden,
-    #     n_layers=args.n_layers,
-    #     num_head=args.num_head,
-    #     dropout=args.dropout,
-    #     lora_r=args.lora_r,
-    #     lora_alpha=args.lora_alpha,
-    #     lora_dropout=args.lora_dropout,
-    #     lora_target_modules=args.lora_target_modules,
-    #     device_map="cuda" if torch.cuda.is_available() else "cpu",
-    # )
-
-    # setattr(config, "use_cache", False)
-    # if config.model_type not in ["llama", "qwen2"]:
-    #     raise ValueError(
-    #         f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2'."
-    #     )
-
     patch_model(model_type=model.config.model_type, mode="ring")
     console.log("Model patched with ring attention")
-
-    # model.gradient_checkpointing_enable()
-    # model.config.graph_token_id = [
-    #     tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
-    #     tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
-    #     tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
-    # ]
-    # if args.model_debug:
-    #     return
-
-    # if args.debug:
-    #     console.log("Model & tokenizer loaded")
-    #     console.log(
-    #         f"Special tokens added to tokenizer and model: {model.config.graph_token_id}"
-    #     )
-
-    # optimizer = AdamW(
-    #     filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
-    # )
-    # lr_scheduler = get_scheduler(
-    #     name="cosine",
-    #     optimizer=optimizer,
-    #     num_warmup_steps=100,
-    #     num_training_steps=args.num_train_epochs,
-    # )
     device = accelerator.device
     model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
 

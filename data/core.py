@@ -759,6 +759,9 @@ class Data(object):
         """
         Split the data into training, validation and test sets
         """
+        self.logger.log(
+            "[green]Splitting the data into training, validation and test sets...[/green]"
+        )
         assert self.processed_data is not None
         data = deepcopy(self.processed_data)
         np.random.shuffle(data)
