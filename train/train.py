@@ -418,6 +418,7 @@ def train_multi_gpu_accelerate(
     patch_model(model_type=model.config.model_type, mode="ring")
     console.log("Model patched with ring attention")
     device = accelerator.device
+    config = model.config
     model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
 
     if accelerator.is_main_process:
@@ -492,7 +493,7 @@ def train_multi_gpu_accelerate(
 
                         graph_mask = batch["graph_mask"][i].to(device)
                         graph_token_index = torch.where(
-                            micro_input["input_ids"] == model.config.graph_token_id[1]
+                            micro_input["input_ids"] == config.graph_token_id[1]
                         )[1].tolist()
                     else:
                         graph = None
