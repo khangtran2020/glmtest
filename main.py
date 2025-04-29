@@ -100,8 +100,8 @@ def main() -> None:
             dataset.train_test_split(val_split=1000, test_split=200)
 
     else:
-        dataset = None
-        args = None
+        dataset = [None]
+        args = [None]
 
         # broadcast the args and dataset to all processes
     # dataset = accelerator.send
