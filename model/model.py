@@ -320,10 +320,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             assert graph_mask is not None
             assert graph_token_index is not None
 
-            print(
-                f"Device of graph_mask: {graph_mask.device}",
-            )
-
             graph_embeds = self.gnn(graph, graph_mask)
             graph_embeds = graph_embeds.to(inputs_embeds.device)
             assert (

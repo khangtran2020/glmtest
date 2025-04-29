@@ -614,7 +614,7 @@ class Data(object):
             f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_tokens)}"
         )
 
-        if "graph" in self.baseline_prompt:
+        if "graph" in self.baseline_prompt and self.debug:
             for key in graph_stats.keys():
                 self.logger.log(f"============= For graph {key}: =============")
                 for skey in graph_stats[key].keys():
