@@ -21,7 +21,7 @@ accelerate launch main.py --mode train \
     --learning_rate 5e-5 \
     --max_grad_norm 1.0 \
     --num_train_epochs 3 \
-    --dtype bfloat16 \
+    --dtype bf16 \
     --use_lora \
     --gnn_mode "graph" \
     --use_accelerate \

@@ -4,9 +4,8 @@ import json
 import time
 import torch
 from tqdm import tqdm
-from torch.utils.data import DataLoader
 from data.loader import GLMFDataset, collate_fn
-from model.model import GLMFModelForCausalLM
+from model.model import GLMFModelForCausalLM, GLMFModelConfig
 
 # from transformers import SinkCache
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
@@ -22,8 +21,11 @@ def test(
     dataset: GLMFDataset,
     model: GLMFModelForCausalLM,
     console: Console,
+    config: GLMFModelConfig = None,
     collate_fn: callable = collate_fn,
 ):
+    if config is None:
+        config = model.config
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device)
     console.log("Testing on device ... :", device)
@@ -77,7 +79,7 @@ def test(
                     graph_mask = batch["graph_mask"].to(device)
 
                     graph_token_index = torch.where(
-                        micro_input["input_ids"] == model.config.graph_token_id[1]
+                        micro_input["input_ids"] == config.graph_token_id[1]
                     )[1].tolist()
                     # if args.debug:
                     #     console.log(f"Graph token id: {graph_token_index}")
@@ -123,8 +125,10 @@ def test(
     console.log(f"Results saved to {save_dir}")
 
 
-def validate(args, loader, model, device):
+def validate(args, loader, model, config, device):
     model.eval()
+    if config is None:
+        config = model.config
     with torch.no_grad():
 
         val_loss = 0.0
@@ -168,8 +172,7 @@ def validate(args, loader, model, device):
 
                         if "graph" in args.baseline_prompt:
                             graph_token_index = torch.where(
-                                micro_input["input_ids"]
-                                == model.config.graph_token_id[1]
+                                micro_input["input_ids"] == config.graph_token_id[1]
                             )[1].tolist()
                         else:
                             graph_token_index = None

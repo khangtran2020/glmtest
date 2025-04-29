@@ -570,14 +570,14 @@ def train_multi_gpu_accelerate(
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
 
-                if (
-                    (global_step % args.validating_steps == 0)
-                    and accelerator.is_main_process
-                    and (args.debug == False)
-                ):
+                if (global_step % args.validating_steps == 0) and (args.debug == False):
 
                     val_loss = validate(
-                        args=args, loader=va_loader, model=model, device=device
+                        args=args,
+                        loader=va_loader,
+                        model=model,
+                        device=device,
+                        config=config,
                     )
                     wandb.log({"val_loss": val_loss})
                     console.log(
