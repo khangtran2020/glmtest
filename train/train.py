@@ -579,10 +579,12 @@ def train_multi_gpu_accelerate(
                         device=device,
                         config=config,
                     )
-                    wandb.log({"val_loss": val_loss})
-                    console.log(
-                        f"Validation loss: {val_loss:.4f} at step {global_step}"
-                    )
+
+                    if accelerator.is_main_process:
+                        wandb.log({"val_loss": val_loss})
+                        console.log(
+                            f"Validation loss: {val_loss:.4f} at step {global_step}"
+                        )
 
             if args.debug:
                 break
