@@ -763,18 +763,22 @@ class Data(object):
             "[green]Splitting the data into training, validation and test sets...[/green]"
         )
         assert self.processed_data is not None
-        data = deepcopy(self.processed_data)
+        # data = deepcopy(self.processed_data)
         # np.random.shuffle(data)
         num_val = (
-            int(val_split * len(data)) if isinstance(val_split, float) else val_split
+            int(val_split * len(self.processed_data))
+            if isinstance(val_split, float)
+            else val_split
         )
         num_test = (
-            int(test_split * len(data)) if isinstance(test_split, float) else test_split
+            int(test_split * len(self.processed_data))
+            if isinstance(test_split, float)
+            else test_split
         )
         self.logger.log(f"Number of validation data: {num_val}, test data: {num_test}")
-        val_data = data[:num_val]
-        test_data = data[num_val : num_val + num_test]
-        train_data = data[num_val + num_test :]
+        val_data = self.processed_data[:num_val]
+        test_data = self.processed_data[num_val : num_val + num_test]
+        train_data = self.processed_data[num_val + num_test :]
         self.train_data = train_data
         self.val_data = val_data
         self.test_data = test_data
