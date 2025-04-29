@@ -3,6 +3,7 @@ import sys
 import json
 import time
 import torch
+from model.gnn import GRAPH_KEYS
 from tqdm import tqdm
 from data.loader import GLMFDataset, collate_fn
 from model.model import GLMFModelForCausalLM, GLMFModelConfig
@@ -72,7 +73,7 @@ def test(
 
                 if "graph" in args.baseline_prompt:
                     graph = batch["graph"]
-                    for key in model.gnn.type_of_graph:
+                    for key in GRAPH_KEYS:
                         if key in graph.keys():
                             graph[key] = graph[key].to(device)
 
@@ -164,7 +165,7 @@ def validate(args, loader, model, config, device):
                         }
 
                         graph = batch["graph"][i]
-                        for key in model.gnn.type_of_graph:
+                        for key in GRAPH_KEYS:
                             if key in graph.keys():
                                 graph[key] = graph[key].to(device)
 
