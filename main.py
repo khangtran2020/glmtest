@@ -39,75 +39,75 @@ def main() -> None:
     )
 
     # Initialize args, logger, model and dataset:
-    if accelerator.is_main_process:
-        console.log("Processing data and initializing model in main process...")
+    # if accelerator.is_main_process:
+    console.log("Processing data and initializing model in main process...")
 
-        # Initialize the argument parser
-        print_args(args=args)
-        seed_everything(args.seed)
+    # Initialize the argument parser
+    print_args(args=args)
+    seed_everything(args.seed)
 
-        if os.path.exists(args.output_dir) == False:
-            os.makedirs(args.output_dir)
-        if os.path.exists(args.log_dir) == False:
-            os.makedirs(args.log_dir)
-        if os.path.exists(args.gen_dir) == False:
-            os.makedirs(args.gen_dir)
+    if os.path.exists(args.output_dir) == False:
+        os.makedirs(args.output_dir)
+    if os.path.exists(args.log_dir) == False:
+        os.makedirs(args.log_dir)
+    if os.path.exists(args.gen_dir) == False:
+        os.makedirs(args.gen_dir)
 
-        if args.model_dir is None:
-            args.model_dir = args.output_dir
+    if args.model_dir is None:
+        args.model_dir = args.output_dir
 
-        if "WORLD_SIZE" in os.environ and int(os.environ["WORLD_SIZE"]) > 1:
-            args.num_gpu = int(os.environ["WORLD_SIZE"])
-        else:
-            args.num_gpu = torch.cuda.device_count()
-
-        # Initializing the dataset
-        graph = get_graph(
-            args=args,
-            graph_type=args.graph_type,
-            logger=console,
-        )
-        dataset = get_dataset(
-            data_name=args.data,
-            data_path=args.data_path,
-            logger=console,
-            feat_model=args.feat_model,
-            llm_model=args.llm_model,
-            max_pynguin_run_time=args.max_pynguin_run_time,
-            docker_image=args.docker_image,
-            num_cpu=args.num_cpu,
-            graph=graph,
-            data_max_length=args.model_max_length,
-            baseline_prompt=args.baseline_prompt,
-            debug=args.debug,
-            mode=args.mode,
-            graph_sampling=args.graph_sampling,
-            n_hops=args.n_layers,
-        )
-        if dataset is None:
-            console.log("Dataset not found, exiting...")
-            return
-
-        if args.mode == "data":
-            if args.do_crawl:
-                dataset.crawl()
-            if args.do_process_raw:
-                dataset.process_raw()
-            return
-
-        if not args.model_debug:
-            dataset.prepare_data()
-            dataset.train_test_split(val_split=1000, test_split=200)
-
+    if "WORLD_SIZE" in os.environ and int(os.environ["WORLD_SIZE"]) > 1:
+        args.num_gpu = int(os.environ["WORLD_SIZE"])
     else:
-        dataset = [None]
-        args = [None]
+        args.num_gpu = torch.cuda.device_count()
 
-        # broadcast the args and dataset to all processes
+    # Initializing the dataset
+    graph = get_graph(
+        args=args,
+        graph_type=args.graph_type,
+        logger=console,
+    )
+    dataset = get_dataset(
+        data_name=args.data,
+        data_path=args.data_path,
+        logger=console,
+        feat_model=args.feat_model,
+        llm_model=args.llm_model,
+        max_pynguin_run_time=args.max_pynguin_run_time,
+        docker_image=args.docker_image,
+        num_cpu=args.num_cpu,
+        graph=graph,
+        data_max_length=args.model_max_length,
+        baseline_prompt=args.baseline_prompt,
+        debug=args.debug,
+        mode=args.mode,
+        graph_sampling=args.graph_sampling,
+        n_hops=args.n_layers,
+    )
+    if dataset is None:
+        console.log("Dataset not found, exiting...")
+        return
+
+    if args.mode == "data":
+        if args.do_crawl:
+            dataset.crawl()
+        if args.do_process_raw:
+            dataset.process_raw()
+        return
+
+    if not args.model_debug:
+        dataset.prepare_data()
+        dataset.train_test_split(val_split=1000, test_split=200)
+
+    # else:
+    #     dataset = [None]
+    #     args = [None]
+
+    # broadcast the args and dataset to all processes
     # dataset = accelerator.send
-    # # (dataset, src_rank=0)
-    dataset = broadcast_object_list(object_list=dataset, from_process=0)
-    args = broadcast_object_list(object_list=args, from_process=0)
+    # # # (dataset, src_rank=0)
+    # dataset = broadcast_object_list(object_list=dataset, from_process=0)
+    # args = broadcast_object_list(object_list=args, from_process=0)
     console.log(f"Broadcasted args and dataset to all processes.")
 
     if torch.cuda.is_available():
