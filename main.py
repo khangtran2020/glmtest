@@ -1,6 +1,7 @@
 import os
 import torch
 import warnings
+import accelerate
 from config import parse_args
 from utils.console import console
 from utils.utils import print_args, seed_everything
@@ -64,6 +65,7 @@ def main(args: Namespace, logger: Console, device: torch.device, rank: int) -> N
 
     if not args.model_debug:
         dataset.prepare_data()
+        console.log("Data prepared, starting splitting...")
         dataset.train_test_split(val_split=1000, test_split=200)
 
     if args.mode == "train":

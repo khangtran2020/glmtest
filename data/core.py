@@ -465,6 +465,21 @@ class Data(object):
         """
         assert self.data is not None
 
+        processed_data = False
+        processed_data_path = os.path.join(
+            self.data_path, f"processed_data_{self.baseline_prompt}.pt"
+        )
+        if os.path.exists(processed_data_path):
+            self.processed_data = torch.load(processed_data_path)
+            processed_data = True
+        else:
+            self.processed_data = []
+
+        if processed_data:
+            self.logger.log("[green]Data is already processed![/green]")
+            self.logger.log(f"Size of data data: {len(self.processed_data)}")
+            return
+
         processed_prompt = False
         prompt_path = os.path.join(
             self.data_path, f"processed_prompt_{self.baseline_prompt}.json"
@@ -600,8 +615,13 @@ class Data(object):
             "w",
         ) as file:
             json.dump(prompts, file, indent=4)
+
+        torch.save(self.processed_data, processed_data_path)
         self.logger.log("[green]Data is ready![/green]")
         self.logger.log(f"Size of data data: {len(self.processed_data)}")
+        self.logger.log(
+            f"Saved processed data to {processed_data_path} and prompts to {prompt_path}"
+        )
         if self.debug:
             pass
             # self.logger.log(f"Sample prompt: {full_text}")
@@ -613,6 +633,8 @@ class Data(object):
         self.logger.log(
             f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_tokens)}"
         )
+
+        # save processed data
 
         if "graph" in self.baseline_prompt and self.debug:
             for key in graph_stats.keys():
