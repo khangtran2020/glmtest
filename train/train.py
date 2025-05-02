@@ -419,7 +419,7 @@ def train_multi_gpu_accelerate(
     console.log("Model patched with ring attention")
     device = accelerator.device
     config = model.config
-    model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
+    model, optimizer,tr_loader, va_loader, lr_scheduler = accelerator.prepare(model, optimizer,tr_loader, va_loader, lr_scheduler)
 
     if accelerator.is_main_process:
         accelerator.print(f"***** Running training *****")
@@ -521,7 +521,7 @@ def train_multi_gpu_accelerate(
                     batch_loss += loss.detach().float()
 
                 if args.debug:
-                    break
+                    pass
 
                 avg_batch_loss = batch_loss / batch_size
                 if accelerator.is_main_process:
@@ -555,7 +555,6 @@ def train_multi_gpu_accelerate(
                 if (
                     accelerator.sync_gradients
                     and (global_step % args.save_steps == 0)
-                    and accelerator.is_main_process
                 ):
                     accelerator.wait_for_everyone()
                     checkpoint_dir = os.path.join(
@@ -570,8 +569,7 @@ def train_multi_gpu_accelerate(
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
 
-                if (global_step % args.validating_steps == 0) and (args.debug == False):
-
+                if (global_step % args.validating_steps == 0):
                     val_loss = validate(
                         args=args,
                         loader=va_loader,
@@ -580,7 +578,7 @@ def train_multi_gpu_accelerate(
                         config=config,
                     )
 
-                    if accelerator.is_main_process:
+                    if accelerator.is_main_process: 
                         wandb.log({"val_loss": val_loss})
                         console.log(
                             f"Validation loss: {val_loss:.4f} at step {global_step}"
