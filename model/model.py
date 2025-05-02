@@ -278,7 +278,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         past_key_values: Optional[Union[Cache, List[torch.FloatTensor]]] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
         labels: Optional[torch.LongTensor] = None,
-        use_cache: Optional[bool] = False,
+        use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -304,6 +304,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             if output_hidden_states is not None
             else self.config.output_hidden_states
         )
+
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+        
         return_dict = (
             return_dict if return_dict is not None else self.config.use_return_dict
         )
@@ -316,7 +319,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if inputs_embeds is None:
             inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
 
-        if (graph is not None) and ("graph" in self.baseline_prompt):
+        if (past_key_values is None) and (graph is not None) and ("graph" in self.baseline_prompt):
             assert graph_mask is not None
             assert graph_token_index is not None
 
@@ -357,7 +360,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 inputs_embeds=inputs_embeds,
                 position_ids=position_ids,
                 attention_mask=attention_mask,
-                use_cache=False,
+                use_cache=use_cache,
                 labels=labels,
                 step=step,
             )
@@ -367,7 +370,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 inputs_embeds=inputs_embeds,
                 position_ids=position_ids,
                 attention_mask=attention_mask,
-                use_cache=False,
+                use_cache=use_cache,
                 labels=labels,
             )
 
@@ -379,13 +382,31 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         inputs_embeds=None,
         **kwargs,
     ):
-        return self.llm_model.prepare_inputs_for_generation(
+        # return self.llm_model.prepare_inputs_for_generation(
+        #     input_ids, past_key_values, attention_mask, inputs_embeds, **kwargs
+        # )
+        inputs = self.llm_model.prepare_inputs_for_generation(
             input_ids, past_key_values, attention_mask, inputs_embeds, **kwargs
         )
+        # carry your graph inputs through each generation step
+        for key in ("graph", "graph_mask", "graph_token_index"):
+            if key in kwargs:
+                inputs[key] = kwargs[key]
+        return inputs
 
     @staticmethod
     def _reorder_cache(self, past_key_values, beam_idx):
-        return self.llm_model._reorder_cache(past_key_values, beam_idx)
+        # return self.llm_model._reorder_cache(past_key_values, beam_idx)
+        if hasattr(past_key_values, "reorder_cache"):
+            # For newer transformers versions with Cache object
+            return past_key_values.reorder_cache(beam_idx)
+        else:
+            # For older transformers versions with list of tensors
+            return tuple(
+                tuple(past_state.index_select(0, beam_idx.to(past_state.device))
+                     for past_state in layer_past)
+                for layer_past in past_key_values
+            )
 
     def save_pretrained(
         self,

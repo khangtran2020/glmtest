@@ -23,11 +23,15 @@ from torch.optim import AdamW
 # typing
 from argparse import Namespace
 from rich.console import Console
+from datetime import timedelta
+from torch.distributed import init_process_group
 
 warnings.filterwarnings("ignore")
 
 
 def main() -> None:
+    # timeout_long_ncll = timedelta(seconds=90000)  # 100 minutes
+    # init_process_group("nccl", timeout=timeout_long_ncll)
 
     args = parse_args()
 
@@ -167,6 +171,7 @@ def main() -> None:
             config=config,
             tokenizer=dataset.llm_tokenizer,
             baseline_prompt=args.baseline_prompt,
+            multi_gpu = True if args.num_gpu > 1 else False,
             debug=args.debug,
             rank=rank,
             training=True,

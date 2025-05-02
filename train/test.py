@@ -125,6 +125,132 @@ def test(
 
     console.log(f"Results saved to {save_dir}")
 
+    
+
+def testCache(
+    args: Namespace,
+    dataset: GLMFDataset,
+    model: GLMFModelForCausalLM,
+    console: Console,
+    collate_fn: callable = collate_fn,
+):
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.to(device)
+    console.log("Testing on device ... :", device)
+    te_dataset = GLMFDataset(
+        data=dataset.test_data,
+        tokenizer=dataset.llm_tokenizer,
+        max_seq_length=args.max_seq_length,
+        debug=args.debug,
+        testing=True,
+    )
+    tokenizer = dataset.llm_tokenizer
+    # past_key_values = SinkCache(window_length=256, num_sink_tokens=4)
+    # loader = DataLoader(te_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
+    save_dir = os.path.join(args.gen_dir, f"{args.name}.json")
+    if os.path.exists(save_dir):
+        console.log(f"Resuming from {save_dir}")
+        with open(save_dir, "r", encoding="utf-8") as f:
+            generated_text = json.load(f)
+    else:
+        generated_text = {}
+
+    console.log(save_dir)
+
+    pending = [(uid, batch) for uid, batch in te_dataset if uid not in generated_text]
+    console.log(f"{len(pending)} / {len(te_dataset)} samples to test")
+
+    # console.log(f"Test data: {len(te_dataset)} data points")
+    # console.log("Testing...")
+
+    with Progress(
+        SpinnerColumn(),  # Shows a spinner
+        TextColumn(
+            "[progress.description]{task.description}"
+        ),  # Displays additional info
+        BarColumn(),  # Displays a progress bar
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),  # Shows percentage
+    ) as progress:
+        test_task = progress.add_task("Testing...", total=len(pending))
+        with torch.no_grad():
+            # generated_text = {}
+            # time_list = []
+            for step, (uuid, batch) in enumerate(pending):
+                start_time = time.time()
+                # uuid, batch = batch_data
+                # batch_size = batch["input"]["input_ids"].size(0)
+
+                # Process each sample in the batch as a micro-batch.
+                # for i in range(batch_size):
+                batch_input = batch["input"].copy()
+                if "token_type_ids" in batch_input:
+                    batch_input.pop("token_type_ids")
+                micro_input = {
+                    "input_ids": batch_input["input_ids"].to(device),
+                    "attention_mask": batch_input["attention_mask"].to(device),
+                    "labels": None,
+                }
+
+                if "graph" in args.baseline_prompt:
+                    graph = batch["graph"]
+                    for key in model.gnn.type_of_graph:
+                        if key in graph.keys():
+                            graph[key] = graph[key].to(device)
+
+                    graph_mask = batch["graph_mask"].to(device)
+
+                    graph_token_index = torch.where(
+                        micro_input["input_ids"] == model.config.graph_token_id[1]
+                    )[1].tolist()
+                    # if args.debug:
+                    #     console.log(f"Graph token id: {graph_token_index}")
+
+                    outputs = model.generate(
+                        inputs=micro_input["input_ids"],
+                        graph=graph,
+                        graph_mask=graph_mask,
+                        graph_token_index=graph_token_index,
+                        max_new_tokens=args.max_new_tokens,
+                        do_sample=False,
+                        use_cache=True,
+                    )
+                else:
+                    graph_token_index = None
+                    outputs = model.generate(
+                        inputs=micro_input["input_ids"],
+                        graph_token_index=graph_token_index,
+                        max_new_tokens=args.max_new_tokens,
+                        do_sample=False,
+                        use_cache=True,
+                    )
+
+                out_text = tokenizer.batch_decode(outputs, skip_special_tokens=False)[0]
+                generated_text[uuid] = out_text
+                
+                
+                if step % 2 == 0 or step == len(pending) - 1:
+                    with open(save_dir, "w", encoding="utf-8") as f:
+                        json.dump(generated_text, f, ensure_ascii=False, indent=4)
+                
+                elapsed = time.time() - start_time
+                progress.update(
+                    test_task,
+                    advance=1,
+                    description=f"Testing {step+1}/{len(pending)} — {elapsed:.2f}s",
+                )
+                
+    console.log("Testing finished.")
+    save_dir = os.path.join(args.gen_dir, f"{args.name}.json")
+    with console.status("Saving results..."):
+        # save generated text to jsonl file
+        with open(save_dir, "w", encoding="utf-8") as f:
+            # save as json file
+            json.dump(generated_text, f, ensure_ascii=False, indent=4)
+
+    console.log(f"Results saved to {save_dir}")
+
+
+    
 
 def validate(args, loader, model, config, device):
     model.eval()
