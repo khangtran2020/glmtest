@@ -27,6 +27,7 @@ class TestGenEval(Data):
         debug: bool = False,
         baseline_prompt: str = "code",
         graph_sampling: bool = False,
+        max_tokens: int = 512,
         **kwargs,
     ) -> None:
         self.name = "TestGenEval"
@@ -42,6 +43,7 @@ class TestGenEval(Data):
             debug=debug,
             baseline_prompt=baseline_prompt,
             graph_sampling=graph_sampling,
+            max_tokens=max_tokens,
             **kwargs,
         )
         self.data_path = os.path.join(path, self.name)

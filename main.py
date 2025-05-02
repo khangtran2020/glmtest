@@ -87,6 +87,7 @@ def main() -> None:
         mode=args.mode,
         graph_sampling=args.graph_sampling,
         n_hops=args.n_layers,
+        max_tokens=args.max_seq_len,
     )
     if dataset is None:
         console.log("Dataset not found, exiting...")
@@ -171,7 +172,7 @@ def main() -> None:
             config=config,
             tokenizer=dataset.llm_tokenizer,
             baseline_prompt=args.baseline_prompt,
-            multi_gpu = True if args.num_gpu > 1 else False,
+            multi_gpu=True if args.num_gpu > 1 else False,
             debug=args.debug,
             rank=rank,
             training=True,

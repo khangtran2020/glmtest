@@ -123,6 +123,7 @@ class Data(object):
         debug: bool = False,
         baseline_prompt: str = "code",
         graph_sampling: bool = False,
+        max_tokens: int = 4096,
         n_hops: int = 2,
     ) -> None:
         self.name = name  # name of the data
@@ -138,6 +139,7 @@ class Data(object):
         self.baseline_prompt = baseline_prompt
         self.graph_sampling = graph_sampling
         self.n_hops = n_hops
+        self.max_tokens = max_tokens
 
     def crawl(self) -> None:
         """
@@ -740,6 +742,10 @@ class Data(object):
             ],
             tokenize=False,
         )
+
+        if len(task_prompt) > self.max_tokens:
+            task_prompt = task_prompt[: self.max_tokens]
+
         return text, response, task_prompt
 
     def add_fuzz_tags(self, code: str, tag: str = "fuzz") -> str:

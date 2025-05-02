@@ -31,6 +31,7 @@ def get_dataset(
     debug: bool = False,
     mode: str = "train",
     graph_sampling: bool = False,
+    max_tokens: int = 512,
     **kwargs,
 ) -> Data:
 
@@ -79,6 +80,7 @@ def get_dataset(
             debug=debug,
             graph_sampling=graph_sampling,
             n_hops=kwargs.get("n_hops", 1),
+            max_tokens=max_tokens,
         )
     elif data_name == "testgeneval":
         logger.log("Using TestGeneval dataset")
@@ -92,6 +94,7 @@ def get_dataset(
             baseline_prompt=baseline_prompt,
             debug=debug,
             graph_sampling=graph_sampling,
+            max_tokens=max_tokens,
             n_hops=kwargs.get("n_hops", 1),
         )
     else:
