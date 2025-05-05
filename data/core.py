@@ -516,6 +516,7 @@ class Data(object):
                         "num_components": [],
                     }
 
+            num_discarded = 0
             for uuid, dat in self.data.items():
                 with open(dat["code_path"], "r") as file:
                     src_code = file.read()
@@ -575,6 +576,7 @@ class Data(object):
                             branch=branch_line,
                         )
                         if result is None:
+                            num_discarded += 1
                             continue
                         prompt, response, full_text = result
                     else:
@@ -620,7 +622,9 @@ class Data(object):
 
         torch.save(self.processed_data, processed_data_path)
         self.logger.log("[green]Data is ready![/green]")
-        self.logger.log(f"Size of data data: {len(self.processed_data)}")
+        self.logger.log(
+            f"Size of processed data: {len(self.processed_data)}, num_discarded: {num_discarded}"
+        )
         self.logger.log(
             f"Saved processed data to {processed_data_path} and prompts to {prompt_path}"
         )

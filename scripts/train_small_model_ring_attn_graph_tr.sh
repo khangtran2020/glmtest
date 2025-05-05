@@ -27,7 +27,7 @@ accelerate launch --num_processes 2  main.py --mode train \
     --data testgeneval \
     --baseline_prompt graph_tr \
     --llm_model "HuggingFaceTB/SmolLM2-135M-Instruct" \
-    --max_seq_len 32768 \
+    --max_seq_len 8192 \
     --batch_size 1 \
     --gradient_accumulation_steps 16 \
     --save_steps 1000 \
