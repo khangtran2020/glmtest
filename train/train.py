@@ -8,7 +8,7 @@ from model.model import GLMFModelForCausalLM, GLMFModelConfig
 from accelerate import Accelerator
 from transformers.trainer_utils import seed_worker
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
-from train.utils import patch_model, move_model_to_device
+from train.utils import patch_model, move_model_to_device, save_checkpoint
 from train.test import validate
 
 
@@ -137,6 +137,7 @@ def train_single_gpu_accelerate(
     # Prepare everything with accelerator
     model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
     global_step = 0
+    previous_checkpoint_step = -1
     # Zero gradients initially.
     if continue_training == False:
         optimizer.zero_grad()
@@ -250,11 +251,30 @@ def train_single_gpu_accelerate(
                     )
 
                 if accelerator.sync_gradients and global_step % args.save_steps == 0:
+                    if previous_checkpoint_step != -1:
+                        old_dir = os.path.join(
+                            save_path,
+                            f"current_checkpoint",
+                        )
+                        new_dir = os.path.join(
+                            save_path,
+                            f"checkpoint-{previous_checkpoint_step}",
+                        )
+                        os.rename(old_dir, new_dir)
                     checkpoint_dir = os.path.join(
                         save_path,
-                        f"checkpoint-{global_step}",
+                        f"current_checkpoint",
                     )
-                    accelerator.save_state(checkpoint_dir)
+                    previous_checkpoint_step = global_step
+                    save_checkpoint(
+                        model=model,
+                        path=checkpoint_dir,
+                        optimizer=optimizer,
+                        scheduler=lr_scheduler,
+                        global_step=global_step,
+                        seed=args.seed,
+                    )
+                    # accelerator.save_state(checkpoint_dir)
                     if accelerator.is_main_process:
                         accelerator.print(f"Saving checkpoint to {checkpoint_dir}")
 
@@ -419,7 +439,9 @@ def train_multi_gpu_accelerate(
     console.log("Model patched with ring attention")
     device = accelerator.device
     config = model.config
-    model, optimizer,tr_loader, va_loader, lr_scheduler = accelerator.prepare(model, optimizer,tr_loader, va_loader, lr_scheduler)
+    model, optimizer, tr_loader, va_loader, lr_scheduler = accelerator.prepare(
+        model, optimizer, tr_loader, va_loader, lr_scheduler
+    )
 
     if accelerator.is_main_process:
         accelerator.print(f"***** Running training *****")
@@ -434,6 +456,7 @@ def train_multi_gpu_accelerate(
         )
 
     global_step = 0
+    previous_checkpoint_step = -1
 
     with Progress(
         SpinnerColumn(),  # Shows a spinner
@@ -552,24 +575,49 @@ def train_multi_gpu_accelerate(
                         f"Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}"
                     )
 
-                if (
-                    accelerator.sync_gradients
-                    and (global_step % args.save_steps == 0)
-                ):
+                if accelerator.sync_gradients and (global_step % args.save_steps == 0):
                     accelerator.wait_for_everyone()
+                    if (previous_checkpoint_step != -1) and (
+                        accelerator.is_main_process
+                    ):
+                        old_dir = os.path.join(
+                            save_path,
+                            f"current_checkpoint",
+                        )
+                        new_dir = os.path.join(
+                            save_path,
+                            f"checkpoint-{previous_checkpoint_step}",
+                        )
+                        os.rename(old_dir, new_dir)
+
+                    checkpoint_dir = os.path.join(
+                        save_path,
+                        f"current_checkpoint",
+                    )
+                    previous_checkpoint_step = global_step
                     checkpoint_dir = os.path.join(
                         save_path,
                         f"checkpoint-{global_step}",
                     )
-                    accelerator.save_state(checkpoint_dir)
+                    unwrapped_model = accelerator.unwrap_model(model)
+                    save_checkpoint(
+                        model=unwrapped_model,
+                        path=checkpoint_dir,
+                        optimizer=optimizer,
+                        scheduler=lr_scheduler,
+                        global_step=global_step,
+                        seed=args.seed,
+                    )
+                    # accelerator.save_state(checkpoint_dir)
                     if accelerator.is_main_process:
                         accelerator.print(f"Saving checkpoint to {checkpoint_dir}")
+                    del unwrapped_model
 
                 del outputs, loss, micro_input, graph, graph_mask  # Free memory
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
 
-                if (global_step % args.validating_steps == 0):
+                if global_step % args.validating_steps == 0:
                     val_loss = validate(
                         args=args,
                         loader=va_loader,
@@ -578,7 +626,7 @@ def train_multi_gpu_accelerate(
                         config=config,
                     )
 
-                    if accelerator.is_main_process: 
+                    if accelerator.is_main_process:
                         wandb.log({"val_loss": val_loss})
                         console.log(
                             f"Validation loss: {val_loss:.4f} at step {global_step}"

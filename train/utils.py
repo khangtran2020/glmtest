@@ -204,6 +204,8 @@ def save_checkpoint(
     if not os.path.exists(path):
         os.makedirs(path)
 
+    save_name = os.path.join(path, f"checkpoint-{global_step}.pt")
+
     checkpoint = {
         "seed": seed,
         "global_step": global_step,
@@ -213,7 +215,7 @@ def save_checkpoint(
     }
 
     # save checkpoint
-    torch.save(checkpoint, path)
+    torch.save(checkpoint, save_name)
 
 
 def load_checkpoint(
