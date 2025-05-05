@@ -743,6 +743,14 @@ class Data(object):
             tokenize=False,
         )
 
+        task_prompt_input = tokenizer.apply_chat_template(
+            [{"role": "user", "content": text}],
+            tokenize=False,
+        )
+
+        if len(task_prompt_input) >= self.max_tokens:
+            return None
+
         if len(task_prompt) > self.max_tokens:
             task_prompt = task_prompt[: self.max_tokens]
 
