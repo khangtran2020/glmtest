@@ -81,13 +81,13 @@ def main() -> None:
         docker_image=args.docker_image,
         num_cpu=args.num_cpu,
         graph=graph,
-        data_max_length=args.max_seq_len,
+        data_max_length=args.max_seq_length,
         baseline_prompt=args.baseline_prompt,
         debug=args.debug,
         mode=args.mode,
         graph_sampling=args.graph_sampling,
         n_hops=args.n_layers,
-        max_tokens=args.max_seq_len,
+        max_tokens=args.max_seq_length,
     )
     if dataset is None:
         console.log("Dataset not found, exiting...")
