@@ -3,6 +3,7 @@ import torch
 import wandb
 from model.gnn import GRAPH_KEYS
 from torch.utils.data import DataLoader
+from data.core import Data
 from data.loader import GLMFDataset, collate_fn
 from model.model import GLMFModelForCausalLM, GLMFModelConfig
 from accelerate import Accelerator
@@ -63,7 +64,7 @@ def train(
 
 def train_single_gpu_accelerate(
     args: Namespace,
-    dataset: GLMFDataset,
+    dataset: Data,
     console: Console,
     model: GLMFModelForCausalLM,
     optimizer: torch.optim.Optimizer,
@@ -359,7 +360,7 @@ def train_single_gpu_accelerate(
 
 def train_multi_gpu_accelerate(
     args: Namespace,
-    dataset: GLMFDataset,
+    dataset: Data,
     console: Console,
     model: GLMFModelForCausalLM,
     optimizer: torch.optim.Optimizer,

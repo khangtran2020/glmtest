@@ -90,6 +90,8 @@ class GLMFDataset(Dataset):
         result = self.tokenizer(
             prompt,
             return_tensors="pt",
+            truncation=True,
+            max_length=self.max_seq_length,
         )
 
         if result["input_ids"][0, -1] != self.tokenizer.eos_token_id and add_eos_token:

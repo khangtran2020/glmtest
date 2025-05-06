@@ -559,6 +559,7 @@ class Data(object):
                     test_code = dat["test_cases"][testcase]["test_case"]
                     test_code = self.add_fuzz_tags(test_code)
                     if test_code == "N/A":
+                        num_discarded += 1
                         continue
                     mask_key = int(testcase.split("_")[-1])
                     branch = mask[mask_key]
@@ -587,6 +588,7 @@ class Data(object):
                         prompt, response, full_text = result
                     else:
                         if f"{uuid}_{testcase}" not in prompts.keys():
+                            num_discarded += 1
                             continue
                         prompt = prompts[f"{uuid}_{testcase}"]["prompt"]
                         response = prompts[f"{uuid}_{testcase}"]["response"]
@@ -758,11 +760,11 @@ class Data(object):
             tokenize=False,
         )
 
-        # if len(task_prompt_input) >= self.max_tokens:
-        #     self.logger.log(
-        #         f"[red]Task prompt is too long: {len(task_prompt_input)} > {self.max_tokens}[/red]"
-        #     )
-        #     return None
+        if len(self.llm_tokenizer.tokenize(task_prompt_input)) >= self.max_tokens:
+            self.logger.log(
+                f"[red]Task prompt is too long: {len(self.llm_tokenizer.tokenize(task_prompt_input))} > {self.max_tokens}[/red]"
+            )
+            return None
 
         # if len(task_prompt) > self.max_tokens:
         #     task_prompt = task_prompt[: self.max_tokens]
