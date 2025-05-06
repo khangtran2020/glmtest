@@ -32,6 +32,7 @@ class OSSFuzz(Data):
         baseline_prompt: str = "code",
         graph_sampling: bool = False,
         max_tokens: int = 512,
+        gnn_mode: str = "node",
         **kwargs,
     ) -> None:
         if docker_image is None:
@@ -65,6 +66,7 @@ class OSSFuzz(Data):
             baseline_prompt=baseline_prompt,
             graph_sampling=graph_sampling,
             max_tokens=max_tokens,
+            gnn_mode=gnn_mode,
             **kwargs,
         )
 

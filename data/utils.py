@@ -32,6 +32,7 @@ def get_dataset(
     mode: str = "train",
     graph_sampling: bool = False,
     max_tokens: int = 512,
+    gnn_mode: str = "node",
     **kwargs,
 ) -> Data:
 

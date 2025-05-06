@@ -125,6 +125,7 @@ class Data(object):
         graph_sampling: bool = False,
         max_tokens: int = 4096,
         n_hops: int = 2,
+        gnn_mode: str = "node",
     ) -> None:
         self.name = name  # name of the data
         self.path = path  # path of the raw data
@@ -140,6 +141,7 @@ class Data(object):
         self.graph_sampling = graph_sampling
         self.n_hops = n_hops
         self.max_tokens = max_tokens
+        self.gnn_mode = gnn_mode
 
     def crawl(self) -> None:
         """
@@ -574,6 +576,7 @@ class Data(object):
                             mask=active_node,
                             tokenizer=self.llm_tokenizer,
                             branch=branch_line,
+                            gnn_mode=self.gnn_mode,
                         )
                         if result is None:
                             num_discarded += 1
