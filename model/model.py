@@ -306,7 +306,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         )
 
         use_cache = use_cache if use_cache is not None else self.config.use_cache
-        
+
         return_dict = (
             return_dict if return_dict is not None else self.config.use_return_dict
         )
@@ -319,7 +319,11 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if inputs_embeds is None:
             inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
 
-        if (past_key_values is None) and (graph is not None) and ("graph" in self.baseline_prompt):
+        if (
+            (past_key_values is None)
+            and (graph is not None)
+            and ("graph" in self.baseline_prompt)
+        ):
             assert graph_mask is not None
             assert graph_token_index is not None
 
@@ -330,7 +334,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 == inputs_embeds[
                     0, graph_token_index[0] : (graph_token_index[-1] + 1), :
                 ].shape
-            ), f"Shape mismatch in assignment: graph embedding shape {graph_embeds.shape}, input embedding shape: {inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :].shape}!"
+            ), f"Shape mismatch in assignment: graph embedding shape {graph_embeds.shape}, input embedding shape: {inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :].shape}, graph_token_index: {graph_token_index}!"
 
             # if self.debug:
             #     print(
@@ -403,8 +407,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         else:
             # For older transformers versions with list of tensors
             return tuple(
-                tuple(past_state.index_select(0, beam_idx.to(past_state.device))
-                     for past_state in layer_past)
+                tuple(
+                    past_state.index_select(0, beam_idx.to(past_state.device))
+                    for past_state in layer_past
+                )
                 for layer_past in past_key_values
             )
 
