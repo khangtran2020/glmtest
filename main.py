@@ -161,10 +161,10 @@ def main() -> None:
         device_map="cuda" if torch.cuda.is_available() else "cpu",
     )
 
-    if config.model_type not in ["llama", "qwen2"]:
-        raise ValueError(
-            f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2'."
-        )
+    # if config.model_type not in ["llama", "qwen2"]:
+    #     raise ValueError(
+    #         f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2'."
+    #     )
 
     if args.mode == "train":
 
