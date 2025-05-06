@@ -9,7 +9,7 @@ n_node=${SLURM_JOB_NUM_NODES:-1}
 echo "MASTER_ADDR="$MASTER_ADDR
 echo "JobID: $SLURM_JOB_ID | Full list: $worker_list"
 
-model_max_length=32768
+max_seq_len=32768
 rope_theta=3580165449
 
 torchrun --nnodes=$n_node --nproc_per_node=4 --master_port=25001 \
@@ -20,7 +20,7 @@ torchrun --nnodes=$n_node --nproc_per_node=4 --master_port=25001 \
     --data testgeneval \
     --baseline_prompt graph \
     --llm_model "Qwen/CodeQwen1.5-7B-Chat" \
-    --max_seq_len 16384 \
+    --max_seq_len $max_seq_len \
     --batch_size 1 \
     --gradient_accumulation_steps 16 \
     --num_gpu 1 \
@@ -31,7 +31,6 @@ torchrun --nnodes=$n_node --nproc_per_node=4 --master_port=25001 \
     --learning_rate 5e-5 \
     --max_grad_norm 1.0 \
     --num_train_epochs 1 \
-    --model_max_length $model_max_length \
     --rope_theta $rope_theta \
     --dtype bfloat16 \
     --debug \

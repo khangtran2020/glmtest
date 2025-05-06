@@ -27,11 +27,11 @@ accelerate launch --num_processes 2  main.py --mode train \
     --data testgeneval \
     --baseline_prompt graph_tr \
     --llm_model "HuggingFaceTB/SmolLM2-135M-Instruct" \
-    --max_seq_len 8192 \
+    --max_seq_len 32768 \
     --batch_size 1 \
     --gradient_accumulation_steps 16 \
-    --save_steps 1000 \
-    --validating_steps 1000 \
+    --save_steps 10000 \
+    --validating_steps 10000 \
     --num_gpu 2 \
     --name "testing_small_graph_tr_accelerate" \
     --output_dir "./results/models/" \

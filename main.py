@@ -81,7 +81,7 @@ def main() -> None:
         docker_image=args.docker_image,
         num_cpu=args.num_cpu,
         graph=graph,
-        data_max_length=args.model_max_length,
+        data_max_length=args.max_seq_len,
         baseline_prompt=args.baseline_prompt,
         debug=args.debug,
         mode=args.mode,
