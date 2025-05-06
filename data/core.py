@@ -758,14 +758,14 @@ class Data(object):
             tokenize=False,
         )
 
-        if len(task_prompt_input) >= self.max_tokens:
-            self.logger.log(
-                f"[red]Task prompt is too long: {len(task_prompt_input)} > {self.max_tokens}[/red]"
-            )
-            return None
+        # if len(task_prompt_input) >= self.max_tokens:
+        #     self.logger.log(
+        #         f"[red]Task prompt is too long: {len(task_prompt_input)} > {self.max_tokens}[/red]"
+        #     )
+        #     return None
 
-        if len(task_prompt) > self.max_tokens:
-            task_prompt = task_prompt[: self.max_tokens]
+        # if len(task_prompt) > self.max_tokens:
+        #     task_prompt = task_prompt[: self.max_tokens]
 
         return text, response, task_prompt
 
