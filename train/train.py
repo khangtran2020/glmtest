@@ -114,7 +114,7 @@ def train_single_gpu_accelerate(
     if args.model_debug == False:
         if args.debug:
             tr_dataset = GLMFDataset(
-                data=dataset.train_data[620:],
+                data=dataset.train_data[621:],
                 tokenizer=dataset.llm_tokenizer,
                 max_seq_length=args.max_seq_length,
                 debug=args.debug,
