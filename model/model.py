@@ -338,14 +338,14 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             graph_embeds = graph_embeds.to(inputs_embeds.device)
             if self.debug:
                 print(
-                    f"Rank {self.rank} inputs_embeds at step {step}: graph embedding shape - {graph_embeds.shape}, input embedding shape -{inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :].shape}, graph_token_index - {graph_token_index}!"
+                    f"Rank {self.rank} inputs_embeds at step {step}: graph embedding shape - {graph_embeds.shape}, input embedding shape -{inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :].shape}, graph_token_index - {graph_token_index.size()}!"
                 )
             assert (
                 graph_embeds.shape
                 == inputs_embeds[
                     0, graph_token_index[0] : (graph_token_index[-1] + 1), :
                 ].shape
-            ), f"Shape mismatch in assignment: graph embedding shape {graph_embeds.shape}, input embedding shape: {inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :].shape}, graph_token_index: {graph_token_index}!"
+            ), f"Shape mismatch in assignment: graph embedding shape {graph_embeds.shape}, input embedding shape: {inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :].shape}, graph_token_index: {graph_token_index.size()}!"
             # if self.debug:
             #     print(
             #         "Printing the size of inputs_embeds, and graph_embeds",
