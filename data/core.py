@@ -486,7 +486,8 @@ class Data(object):
 
         processed_prompt = False
         prompt_path = os.path.join(
-            self.data_path, f"processed_prompt_{self.baseline_prompt}.json"
+            self.data_path,
+            f"processed_prompt_{self.baseline_prompt}_{self.max_tokens}.json",
         )
         if os.path.exists(prompt_path):
             with open(

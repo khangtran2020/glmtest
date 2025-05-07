@@ -21,19 +21,19 @@ accelerate launch --num_processes 2 main.py --mode train \
 
 export CUDA_VISIBLE_DEVICES=0
 
-accelerate launch --num_processes 2  main.py --mode train \
+accelerate launch --num_processes 1  main.py --mode train \
     --seed 42 \
     --data_path Dataset \
     --data testgeneval \
     --baseline_prompt graph_tr \
-    --llm_model "HuggingFaceTB/SmolLM2-135M-Instruct" \
+    --llm_model "Qwen/Qwen2.5-Coder-1.5B" \
     --max_seq_len 32768 \
     --batch_size 1 \
     --gradient_accumulation_steps 16 \
     --save_steps 10000 \
     --validating_steps 10000 \
-    --num_gpu 2 \
-    --name "testing_small_graph_tr_accelerate" \
+    --num_gpu 1 \
+    --name "testing_qwen15_7_graph_tr_accelerate" \
     --output_dir "./results/models/" \
     --overwrite_output_dir \
     --do_train \
