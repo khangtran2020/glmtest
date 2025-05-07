@@ -191,8 +191,9 @@ def train_single_gpu_accelerate(
                         "labels": batch_input["labels"][i].to(device),
                     }
 
-                    # if args.debug:
-                    #     console.log(f"Micro input: {micro_input}")
+                    if args.debug:
+                        log_info = f"Length of input_ids - {len(micro_input['input_ids'])}, attention_mask - {len(micro_input['attention_mask'])}, labels - {len(micro_input['labels'])}"
+                        console.log(f"Step {global_step}: {log_info}")
 
                     if "graph" in args.baseline_prompt:
                         graph = batch["graph"][i]
@@ -297,8 +298,8 @@ def train_single_gpu_accelerate(
                         f"Validation loss: {val_loss:.4f} at step {global_step}"
                     )
 
-                if args.debug:
-                    break
+                # if args.debug:
+                #     break
 
             if ((continue_training == True) and (global_step > start_step)) or (
                 continue_training == False
@@ -310,8 +311,8 @@ def train_single_gpu_accelerate(
                     description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
                 )
 
-            if args.debug:
-                break
+            # if args.debug:
+            #     break
 
     if model.config.use_lora == True:
         model.llm_model = model.llm_model.merge_and_unload()
@@ -514,6 +515,10 @@ def train_multi_gpu_accelerate(
                         "labels": batch_input["labels"][i].to(device),
                     }
 
+                    if args.debug & accelerator.is_main_process:
+                        log_info = f"Length of input_ids - {len(micro_input['input_ids'])}, attention_mask - {len(micro_input['attention_mask'])}, labels - {len(micro_input['labels'])}"
+                        console.log(f"Step {global_step}: {log_info}")
+
                     if "graph" in args.baseline_prompt:
                         graph = batch["graph"][i]
                         for key in GRAPH_KEYS:
@@ -549,8 +554,8 @@ def train_multi_gpu_accelerate(
 
                     batch_loss += loss.detach().float()
 
-                if args.debug:
-                    pass
+                # if args.debug:
+                #     pass
 
                 avg_batch_loss = batch_loss / batch_size
                 if accelerator.is_main_process:
@@ -642,8 +647,8 @@ def train_multi_gpu_accelerate(
                             f"Validation loss: {val_loss:.4f} at step {global_step}"
                         )
 
-            if args.debug:
-                break
+            # if args.debug:
+            #     break
 
             if accelerator.is_main_process:
                 if ((continue_training == True) and (global_step > start_step)) or (

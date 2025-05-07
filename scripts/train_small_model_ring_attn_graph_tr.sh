@@ -21,7 +21,7 @@ accelerate launch --num_processes 2 main.py --mode train \
 
 export CUDA_VISIBLE_DEVICES=0
 
-accelerate launch --num_processes 1  main.py --mode train \
+accelerate launch --debug --num_processes 4  main.py --mode train \
     --seed 42 \
     --data_path Dataset \
     --data testgeneval \
@@ -32,8 +32,8 @@ accelerate launch --num_processes 1  main.py --mode train \
     --gradient_accumulation_steps 16 \
     --save_steps 10000 \
     --validating_steps 10000 \
-    --num_gpu 1 \
-    --name "testing_qwen15_7_graph_tr_accelerate" \
+    --num_gpu 4 \
+    --name "testing_qwen25_15_graph_tr_accelerate" \
     --output_dir "./results/models/" \
     --overwrite_output_dir \
     --do_train \
