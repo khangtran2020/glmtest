@@ -20,6 +20,7 @@ from train.utils import extract_local
 from peft import get_peft_model, LoraConfig, TaskType
 
 # typing
+from accelerate import Accelerator
 from typing import Callable, List, Optional, Tuple, Union, Dict, Any
 
 
@@ -284,6 +285,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
         step: int = 0,
+        accelerator: Optional[Accelerator] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
         # if self.debug and (self.rank >= 0):
@@ -371,6 +373,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         #     print("After take graph embedding")
         #     run_nvidia_smi(console=None)
         # print(inputs_embeds.size())
+        accelerator.wait_for_everyone()
         if self.multi_gpu:
             return self.forward_llm(
                 input_ids=None,
@@ -380,6 +383,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 use_cache=use_cache,
                 labels=labels,
                 step=step,
+                accelerator=accelerator,
             )
         else:
             return self.llm_model(
@@ -475,6 +479,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
         step: int = 0,
+        accelerator: Optional[Accelerator] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
         seq_len = inputs_embeds.shape[-2]
@@ -498,6 +503,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         position_ids = extract_local(
             position_ids, rank, num_processes, position_ids.device
         )
+        accelerator.wait_for_everyone()
 
         return self.llm_model(
             input_ids=input_ids,
