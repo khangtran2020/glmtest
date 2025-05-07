@@ -2,12 +2,14 @@ import os
 import re
 import ast
 import torch
+import psutil
 import shlex
 import pickle
 import random
 import requests
 import subprocess
 import numpy as np
+from rich.console import Console
 from typing import Dict, List
 from utils.console import log_table
 
@@ -160,3 +162,12 @@ def handle_location_out(out_str: str) -> List[dict]:
             stack = []
             data.append(new_data)
     return data
+
+
+def log_ram_usage():
+    proc = psutil.Process(os.getpid())
+    """Log current RSS memory in megabytes."""
+    rss_bytes = proc.memory_info().rss
+    rss_mb = rss_bytes / 1024**2
+    # console.log(f"[Step {step}] RAM usage: {rss_mb:.1f} MB")
+    return rss_mb

@@ -11,6 +11,7 @@ from transformers.trainer_utils import seed_worker
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from train.utils import patch_model, move_model_to_device, save_checkpoint
 from train.test import validate
+from utils.utils import log_ram_usage
 
 
 # typing
@@ -228,10 +229,11 @@ def train_single_gpu_accelerate(
                     batch_loss += loss.item()
 
                 avg_batch_loss = batch_loss / batch_size
+                ram_usage = log_ram_usage()
                 progress.update(
                     train_epoch_task,
                     advance=1,
-                    description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f}",
+                    description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB",
                 )
                 epoch_loss += avg_batch_loss * batch_size
                 num_items += batch_size
@@ -549,10 +551,11 @@ def train_multi_gpu_accelerate(
 
                 avg_batch_loss = batch_loss / batch_size
                 if accelerator.is_main_process:
+                    ram_usage = log_ram_usage()
                     progress.update(
                         train_epoch_task,
                         advance=1,
-                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f}",
+                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB",
                     )
                 epoch_loss += avg_batch_loss * batch_size
                 num_items += batch_size
