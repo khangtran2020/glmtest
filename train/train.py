@@ -560,7 +560,13 @@ def train_multi_gpu_accelerate(
                         )
 
                         if args.debug & accelerator.is_main_process:
-                            console.log(f"Step {global_step}: completed forward pass")
+                            console.log(
+                                "=" * 10
+                                + "\n"
+                                + f"Step {global_step}: completed forward pass"
+                                + "\n"
+                                + "=" * 10
+                            )
 
                         loss = outputs.loss
                         accelerator.backward(loss)
