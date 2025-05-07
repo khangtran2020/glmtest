@@ -1,6 +1,7 @@
 import os
 import torch
 import wandb
+import traceback
 from model.gnn import GRAPH_KEYS
 from torch.utils.data import DataLoader
 from data.core import Data
@@ -553,15 +554,20 @@ def train_multi_gpu_accelerate(
                         console.log(f"Step {global_step}: processed data")
 
                     with accelerator.accumulate(model):
-
-                        outputs = model(
-                            **micro_input,
-                            graph=graph,
-                            graph_mask=graph_mask,
-                            graph_token_index=graph_token_index,
-                            step=global_step,
-                            accelerator=accelerator,
-                        )
+                        try:
+                            outputs = model(
+                                **micro_input,
+                                graph=graph,
+                                graph_mask=graph_mask,
+                                graph_token_index=graph_token_index,
+                                step=global_step,
+                                accelerator=accelerator,
+                            )
+                        except Exception as e:
+                            console.log(
+                                "Uncaught exception:\n" + traceback.format_exc()
+                            )
+                            raise
                         accelerator.wait_for_everyone()
 
                         if args.debug & accelerator.is_main_process:
