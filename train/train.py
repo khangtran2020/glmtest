@@ -521,6 +521,7 @@ def train_multi_gpu_accelerate(
                 # Process each sample in the batch as a micro-batch.
                 for i in range(batch_size):
 
+                    accelerator.wait_for_everyone()
                     batch_input = batch["input"].copy()
                     if "token_type_ids" in batch_input:
                         batch_input.pop("token_type_ids")
@@ -531,6 +532,7 @@ def train_multi_gpu_accelerate(
                         "labels": batch_input["labels"][i].to(device),
                     }
 
+                    accelerator.wait_for_everyone()
                     if "graph" in args.baseline_prompt:
                         graph = batch["graph"][i]
                         for key in GRAPH_KEYS:
@@ -546,11 +548,12 @@ def train_multi_gpu_accelerate(
                         graph_mask = None
                         graph_token_index = None
 
+                    accelerator.wait_for_everyone()
                     if args.debug & accelerator.is_main_process:
                         console.log(f"Step {global_step}: processed data")
 
                     with accelerator.accumulate(model):
-                        accelerator.wait_for_everyone()
+
                         outputs = model(
                             **micro_input,
                             graph=graph,
@@ -558,6 +561,7 @@ def train_multi_gpu_accelerate(
                             graph_token_index=graph_token_index,
                             step=global_step,
                         )
+                        accelerator.wait_for_everyone()
 
                         if args.debug & accelerator.is_main_process:
                             console.log(

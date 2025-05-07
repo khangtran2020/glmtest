@@ -319,6 +319,11 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if inputs_embeds is None:
             inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
 
+        if self.debug:
+            print(
+                f"Rank {self.rank} inputs_embeds at step {step}: {inputs_embeds.size()}, device: {inputs_embeds.device}"
+            )
+
         if (
             (past_key_values is None)
             and (graph is not None)
@@ -329,13 +334,16 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
             graph_embeds = self.gnn(graph, graph_mask)
             graph_embeds = graph_embeds.to(inputs_embeds.device)
+            if self.debug:
+                print(
+                    f"Rank {self.rank} inputs_embeds at step {step}: graph embedding shape - {graph_embeds.shape}, input embedding shape -{inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :].shape}, graph_token_index - {graph_token_index}!"
+                )
             assert (
                 graph_embeds.shape
                 == inputs_embeds[
                     0, graph_token_index[0] : (graph_token_index[-1] + 1), :
                 ].shape
             ), f"Shape mismatch in assignment: graph embedding shape {graph_embeds.shape}, input embedding shape: {inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :].shape}, graph_token_index: {graph_token_index}!"
-
             # if self.debug:
             #     print(
             #         "Printing the size of inputs_embeds, and graph_embeds",
@@ -346,6 +354,11 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :] = (
                 graph_embeds
             )
+
+            if self.debug:
+                print(
+                    f"Rank {self.rank} inputs_embeds at step {step}: Done extracting graph embedding"
+                )
 
         # if self.debug and (self.rank >= 0):
         #     print("=" * 100 + f"Rank {self.rank} - Step {step}" + "\n\n")
