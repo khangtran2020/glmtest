@@ -515,10 +515,6 @@ def train_multi_gpu_accelerate(
                         "labels": batch_input["labels"][i].to(device),
                     }
 
-                    if args.debug & accelerator.is_main_process:
-                        log_info = f"Length of input_ids - {micro_input['input_ids'].size()}, attention_mask - {micro_input['attention_mask'].size()}, labels - {micro_input['labels'].size()}"
-                        console.log(f"Step {global_step}: {log_info}")
-
                     if "graph" in args.baseline_prompt:
                         graph = batch["graph"][i]
                         for key in GRAPH_KEYS:
@@ -534,6 +530,9 @@ def train_multi_gpu_accelerate(
                         graph_mask = None
                         graph_token_index = None
 
+                    if args.debug & accelerator.is_main_process:
+                        console.log(f"Step {global_step}: processed data")
+
                     with accelerator.accumulate(model):
                         outputs = model(
                             **micro_input,
@@ -543,15 +542,34 @@ def train_multi_gpu_accelerate(
                             step=global_step,
                         )
 
+                        if args.debug & accelerator.is_main_process:
+                            console.log(f"Step {global_step}: completed forward pass")
+
                         loss = outputs.loss
                         accelerator.backward(loss)
+                        if args.debug & accelerator.is_main_process:
+                            console.log(f"Step {global_step}: completed backward pass")
 
                         if accelerator.sync_gradients:
                             accelerator.wait_for_everyone()
+                            if args.debug & accelerator.is_main_process:
+                                console.log(
+                                    f"Step {global_step}: Everyone waited for gradients"
+                                )
                             accelerator.clip_grad_norm_(model.parameters(), 1.0)
+                            if args.debug & accelerator.is_main_process:
+                                console.log(f"Step {global_step}: Clipped gradients")
                             optimizer.step()
+                            if args.debug & accelerator.is_main_process:
+                                console.log(
+                                    f"Step {global_step}: Updated model parameters"
+                                )
                             lr_scheduler.step()
+                            if args.debug & accelerator.is_main_process:
+                                console.log(f"Step {global_step}: Updated scheduler")
                             optimizer.zero_grad()
+                            if args.debug & accelerator.is_main_process:
+                                console.log(f"Step {global_step}: Updated scheduler")
 
                     batch_loss += loss.detach().float()
 
