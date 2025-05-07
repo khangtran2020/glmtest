@@ -534,6 +534,7 @@ def train_multi_gpu_accelerate(
                         console.log(f"Step {global_step}: processed data")
 
                     with accelerator.accumulate(model):
+                        accelerator.wait_for_everyone()
                         outputs = model(
                             **micro_input,
                             graph=graph,
