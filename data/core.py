@@ -471,7 +471,8 @@ class Data(object):
 
         processed_data = False
         processed_data_path = os.path.join(
-            self.data_path, f"processed_data_{self.baseline_prompt}.pt"
+            self.data_path,
+            f"processed_data_{self.baseline_prompt}_{self.max_tokens}.pt",
         )
         if os.path.exists(processed_data_path):
             self.processed_data = torch.load(processed_data_path)
