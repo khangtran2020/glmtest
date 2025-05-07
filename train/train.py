@@ -417,12 +417,20 @@ def train_multi_gpu_accelerate(
     accelerator.print(f"Mixed precision: {mixed_precision}")
 
     if args.model_debug == False:
-        tr_dataset = GLMFDataset(
-            data=dataset.train_data,
-            tokenizer=dataset.llm_tokenizer,
-            max_seq_length=args.max_seq_length,
-            debug=args.debug,
-        )
+        if args.debug:
+            tr_dataset = GLMFDataset(
+                data=dataset.train_data[600:],
+                tokenizer=dataset.llm_tokenizer,
+                max_seq_length=args.max_seq_length,
+                debug=args.debug,
+            )
+        else:
+            tr_dataset = GLMFDataset(
+                data=dataset.train_data,
+                tokenizer=dataset.llm_tokenizer,
+                max_seq_length=args.max_seq_length,
+                debug=args.debug,
+            )
         va_dataset = GLMFDataset(
             data=dataset.val_data,
             tokenizer=dataset.llm_tokenizer,
