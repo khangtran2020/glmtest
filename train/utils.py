@@ -202,7 +202,7 @@ def save_checkpoint(
     seed: int,
 ):
     if not os.path.exists(path):
-        os.makedirs(path)
+        os.makedirs(path, exist_ok=True)
 
     save_name = os.path.join(path, f"checkpoint-{global_step}.pt")
 
