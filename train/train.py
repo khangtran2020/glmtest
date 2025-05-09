@@ -593,6 +593,27 @@ def train_multi_gpu_accelerate(
                             accelerator.clip_grad_norm_(model.parameters(), 1.0)
                             if args.debug & accelerator.is_main_process:
                                 console.log(f"Step {global_step}: Clipped gradients")
+
+                                console.log("=" * 100)
+                                console.log(
+                                    f"Step {global_step} - rank {model.rank}: Checking unused parameters"
+                                )
+                                found = False
+                                for name, param in model.named_parameters():
+                                    if param.grad is None:
+                                        if found == False:
+                                            console.log(
+                                                f"Step {global_step} - rank {model.rank}: Found unused parameters:"
+                                            )
+                                            found = True
+                                        console.log(f"{name}")
+                                if found == False:
+                                    console.log(
+                                        f"Step {global_step} - rank {model.rank}: No unused parameters found"
+                                    )
+                                console.log("=" * 100)
+                                console.log("\n" * 5)
+
                             optimizer.step()
                             if args.debug & accelerator.is_main_process:
                                 console.log(
