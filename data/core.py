@@ -771,7 +771,10 @@ class Data(object):
         # if len(task_prompt) > self.max_tokens:
         #     task_prompt = task_prompt[: self.max_tokens]
 
-        return text, response, task_prompt
+        assert task_prompt_input in task_prompt
+        task_prompt_input = task_prompt.replace(task_prompt_input, "")
+
+        return task_prompt_input, response, task_prompt
 
     def add_fuzz_tags(self, code: str, tag: str = "fuzz") -> str:
         try:
