@@ -600,7 +600,7 @@ def train_multi_gpu_accelerate(
                                 )
                                 found = False
                                 for name, param in model.named_parameters():
-                                    if param.grad is None:
+                                    if param.grad is None and param.requires_grad:
                                         if found == False:
                                             console.log(
                                                 f"Step {global_step} - rank {local_rank}: Found unused parameters:"
