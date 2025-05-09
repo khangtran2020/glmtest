@@ -392,7 +392,7 @@ def train_multi_gpu_accelerate(
         project_dir=args.log_dir,
     )
 
-    # rank = accelerator.process_index
+    local_rank = model.rank
 
     if accelerator.is_main_process:
         accelerator.init_trackers(
@@ -596,20 +596,20 @@ def train_multi_gpu_accelerate(
 
                                 console.log("=" * 100)
                                 console.log(
-                                    f"Step {global_step} - rank {model.rank}: Checking unused parameters"
+                                    f"Step {global_step} - rank {local_rank}: Checking unused parameters"
                                 )
                                 found = False
                                 for name, param in model.named_parameters():
                                     if param.grad is None:
                                         if found == False:
                                             console.log(
-                                                f"Step {global_step} - rank {model.rank}: Found unused parameters:"
+                                                f"Step {global_step} - rank {local_rank}: Found unused parameters:"
                                             )
                                             found = True
                                         console.log(f"{name}")
                                 if found == False:
                                     console.log(
-                                        f"Step {global_step} - rank {model.rank}: No unused parameters found"
+                                        f"Step {global_step} - rank {local_rank}: No unused parameters found"
                                     )
                                 console.log("=" * 100)
                                 console.log("\n" * 5)
