@@ -536,6 +536,10 @@ def train_multi_gpu_accelerate(
                     accelerator.wait_for_everyone()
                     if "graph" in args.baseline_prompt:
                         if args.debug:
+                            console.log("=" * 10 + "\n")
+                            console.log(
+                                f"Step {global_step}: Graph found in batch, checking keys..."
+                            )
                             check_graph_exist_dict = {}
                             for key in GRAPH_KEYS:
                                 check_graph_exist_dict[key] = False
@@ -552,8 +556,8 @@ def train_multi_gpu_accelerate(
                                     console.log(
                                         f"[red]Step {global_step}: Graph {key} not found in batch !!!!"
                                     )
-                                    console.log(f"=" * 10 + "\n")
-
+                            console.log("Done checking graph keys")
+                            console.log(f"=" * 10 + "\n")
                         graph_mask = batch["graph_mask"][i].to(device)
                         graph_token_index = torch.where(
                             micro_input["input_ids"] == config.graph_token_id[1]
