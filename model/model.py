@@ -373,7 +373,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         #     print("After take graph embedding")
         #     run_nvidia_smi(console=None)
         # print(inputs_embeds.size())
-        accelerator.wait_for_everyone()
+        if accelerator is not None:
+            accelerator.wait_for_everyone()
         if self.multi_gpu:
             return self.forward_llm(
                 input_ids=None,
@@ -503,7 +504,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         position_ids = extract_local(
             position_ids, rank, num_processes, position_ids.device
         )
-        accelerator.wait_for_everyone()
+        if accelerator is not None:
+            accelerator.wait_for_everyone()
 
         return self.llm_model(
             input_ids=input_ids,
