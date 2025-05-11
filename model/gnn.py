@@ -102,8 +102,12 @@ class MultiGAT(nn.Module):
 
     def forward(self, graph_dict: dict, mask: torch.Tensor):
         i = 0
+        existing_key = None
+        list_of_missing_keys = []
         for key in self.type_of_graph:
             if key in graph_dict:
+                if existing_key is None:
+                    existing_key = key
                 if key == "ARGUMENT":
                     if i == 0:
                         h_overall = self.model_argument.graph_forward(
@@ -209,7 +213,135 @@ class MultiGAT(nn.Module):
                         )
                         h_overall = h_overall + h
                     i += 1
-        h_overall = h_overall / i
+            else:
+                list_of_missing_keys.append(key)
+
+        for key in list_of_missing_keys:
+            if key == "ARGUMENT":
+                if i == 0:
+                    h_overall = (
+                        self.model_argument.graph_forward(
+                            g=graph_dict[existing_key],
+                            x=graph_dict[existing_key].ndata["feat"],
+                            mask=mask,
+                        )
+                        * 0
+                    )
+                else:
+                    h = self.model_argument.graph_forward(
+                        g=graph_dict[existing_key],
+                        x=graph_dict[existing_key].ndata["feat"],
+                        mask=mask,
+                    )
+                    h_overall = h_overall + h * 0
+                # i += 1
+            elif key == "RECEIVER":
+                if i == 0:
+                    h_overall = (
+                        self.model_receiver.graph_forward(
+                            g=graph_dict[existing_key],
+                            x=graph_dict[existing_key].ndata["feat"],
+                            mask=mask,
+                        )
+                        * 0
+                    )
+                else:
+                    h = self.model_receiver.graph_forward(
+                        g=graph_dict[existing_key],
+                        x=graph_dict[existing_key].ndata["feat"],
+                        mask=mask,
+                    )
+                    h_overall = h_overall + h * 0
+                # i += 1
+            elif key == "CALL":
+                if i == 0:
+                    h_overall = (
+                        self.model_call.graph_forward(
+                            g=graph_dict[existing_key],
+                            x=graph_dict[existing_key].ndata["feat"],
+                            mask=mask,
+                        )
+                        * 0
+                    )
+                else:
+                    h = self.model_call.graph_forward(
+                        g=graph_dict[existing_key],
+                        x=graph_dict[existing_key].ndata["feat"],
+                        mask=mask,
+                    )
+                    h_overall = h_overall + h * 0
+                # i += 1
+            elif key == "REACHING_DEF":
+                if i == 0:
+                    h_overall = self.model_reaching_def.graph_forward(
+                        g=graph_dict[existing_key],
+                        x=graph_dict[existing_key].ndata["feat"],
+                        mask=mask,
+                    )
+                else:
+                    h = self.model_reaching_def.graph_forward(
+                        g=graph_dict[existing_key],
+                        x=graph_dict[existing_key].ndata["feat"],
+                        mask=mask,
+                    )
+                    h_overall = h_overall + h * 0
+                # i += 1
+            elif key == "CDG":
+                if i == 0:
+                    h_overall = (
+                        self.model_cdg.graph_forward(
+                            g=graph_dict[existing_key],
+                            x=graph_dict[existing_key].ndata["feat"],
+                            mask=mask,
+                        )
+                        * 0
+                    )
+                else:
+                    h = self.model_cdg.graph_forward(
+                        g=graph_dict[existing_key],
+                        x=graph_dict[existing_key].ndata["feat"],
+                        mask=mask,
+                    )
+                    h_overall = h_overall + h * 0
+                # i += 1
+            elif key == "CFG":
+                if i == 0:
+                    h_overall = (
+                        self.model_cfg.graph_forward(
+                            g=graph_dict[existing_key],
+                            x=graph_dict[existing_key].ndata["feat"],
+                            mask=mask,
+                        )
+                        * 0
+                    )
+                else:
+                    h = self.model_cfg.graph_forward(
+                        g=graph_dict[existing_key],
+                        x=graph_dict[existing_key].ndata["feat"],
+                        mask=mask,
+                    )
+                    h_overall = h_overall + h * 0
+                # i += 1
+            elif key == "AST":
+                if i == 0:
+                    h_overall = (
+                        self.model_ast.graph_forward(
+                            g=graph_dict[existing_key],
+                            x=graph_dict[existing_key].ndata["feat"],
+                            mask=mask,
+                        )
+                        * 0
+                    )
+                else:
+                    h = self.model_ast.graph_forward(
+                        g=graph_dict[existing_key],
+                        x=graph_dict[existing_key].ndata["feat"],
+                        mask=mask,
+                    )
+                    h_overall = h_overall + h * 0
+                # i += 1
+
+        h_overall = h_overall / (i + 1e-12)
         # h_overall = self.classification_layer(h_overall)
         # h_overall = self.last_activation(h_overall)
         return h_overall

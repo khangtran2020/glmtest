@@ -531,11 +531,26 @@ class Data(object):
                 if "graph" in self.baseline_prompt:
                     graph = self.read_graph(dat)
 
-                    graph_dict = {
-                        key: graph[key]
-                        for key in graph.keys()
-                        if isinstance(graph[key], dgl.DGLGraph)
-                    }
+                    check_graph_exist_dict = {}
+                    graph_dict = {}
+                    for key in GRAPH_KEYS:
+                        check_graph_exist_dict[key] = False
+
+                    for key in graph.keys():
+                        if isinstance(graph[key], dgl.DGLGraph):
+                            graph_dict[key] = graph[key]
+                            check_graph_exist_dict[key] = True
+
+                    exist_atleast_one = False
+                    for key in check_graph_exist_dict.keys():
+                        if check_graph_exist_dict[key] == True:
+                            exist_atleast_one = True
+                            break
+
+                    if not exist_atleast_one:
+                        self.logger.log(f"[red]Graph is not generated for {uuid}[/red]")
+                        num_discarded += len(dat["test_cases"])
+                        continue
 
                     gstats = self.get_graph_stats(graph_dict)
                     for key in gstats.keys():
