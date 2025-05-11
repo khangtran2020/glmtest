@@ -72,6 +72,12 @@ def add_model_group(group):
         default="node",
     )
     group.add_argument(
+        "--model_name",
+        type=str,
+        help="name of the LLM",
+        default="qwen2_5-1_5b",
+    )
+    group.add_argument(
         "--in_feats",
         type=int,
         help="number of input features",

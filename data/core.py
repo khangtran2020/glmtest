@@ -116,6 +116,7 @@ class Data(object):
         logger: Console,
         graph: Graph,
         num_cpu: int,
+        model_name: str,
         feat_model: PreTrainedModel = None,
         feat_tokenizer: PreTrainedTokenizer = None,
         llm_tokenizer: PreTrainedTokenizer = None,
@@ -133,6 +134,7 @@ class Data(object):
         self.graph = graph
         self.num_cpu = num_cpu
         self.debug = debug
+        self.model_name = model_name
         self.feat_model = feat_model
         self.feat_tokenizer = feat_tokenizer
         self.llm_tokenizer = llm_tokenizer
@@ -472,7 +474,7 @@ class Data(object):
         processed_data = False
         processed_data_path = os.path.join(
             self.data_path,
-            f"processed_data_{self.baseline_prompt}_{self.max_tokens}.pt",
+            f"processed_data_{self.baseline_prompt}_{self.max_tokens}_{self.model_name}.pt",
         )
         if os.path.exists(processed_data_path):
             self.processed_data = torch.load(processed_data_path)
@@ -488,7 +490,7 @@ class Data(object):
         processed_prompt = False
         prompt_path = os.path.join(
             self.data_path,
-            f"processed_prompt_{self.baseline_prompt}_{self.max_tokens}.json",
+            f"processed_prompt_{self.baseline_prompt}_{self.max_tokens}_{self.model_name}.json",
         )
         if os.path.exists(prompt_path):
             with open(
