@@ -33,6 +33,7 @@ accelerate launch --debug --num_processes 4  main.py --mode train \
     --save_steps 10000 \
     --validating_steps 10000 \
     --num_gpu 4 \
+    --model_name "qwen2_5-1_5b"\
     --name "testing_qwen25_15_graph_tr_accelerate" \
     --output_dir "./results/models/" \
     --overwrite_output_dir \
