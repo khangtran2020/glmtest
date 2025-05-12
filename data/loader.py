@@ -71,9 +71,8 @@ class GLMFDataset(Dataset):
             tokenized = self.tokenize(prompt)
             input_ids = tokenized["input_ids"]
 
-            if (
-                self.baseline_prompt in ["graph", "graph_tr"]
-                and self.graph_token_id not in input_ids
+            if (self.baseline_prompt in ["graph", "graph_tr"]) and (
+                self.graph_token_id not in input_ids
             ):
                 raise ValueError("Input must contain graph token")
 
