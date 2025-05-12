@@ -125,7 +125,6 @@ def test(
 
     console.log(f"Results saved to {save_dir}")
 
-    
 
 def testCache(
     args: Namespace,
@@ -226,19 +225,18 @@ def testCache(
 
                 out_text = tokenizer.batch_decode(outputs, skip_special_tokens=False)[0]
                 generated_text[uuid] = out_text
-                
-                
+
                 if step % 2 == 0 or step == len(pending) - 1:
                     with open(save_dir, "w", encoding="utf-8") as f:
                         json.dump(generated_text, f, ensure_ascii=False, indent=4)
-                
+
                 elapsed = time.time() - start_time
                 progress.update(
                     test_task,
                     advance=1,
                     description=f"Testing {step+1}/{len(pending)} — {elapsed:.2f}s",
                 )
-                
+
     console.log("Testing finished.")
     save_dir = os.path.join(args.gen_dir, f"{args.name}.json")
     with console.status("Saving results..."):
@@ -249,8 +247,6 @@ def testCache(
 
     console.log(f"Results saved to {save_dir}")
 
-
-    
 
 def validate(args, loader, model, config, device):
     model.eval()

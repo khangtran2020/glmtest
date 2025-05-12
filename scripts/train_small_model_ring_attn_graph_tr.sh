@@ -27,11 +27,11 @@ accelerate launch --debug --num_processes 4  main.py --mode train \
     --data testgeneval \
     --baseline_prompt graph_tr \
     --llm_model "Qwen/Qwen2.5-Coder-1.5B" \
-    --max_seq_len 32768 \
+    --max_seq_len 16384 \
     --batch_size 1 \
     --gradient_accumulation_steps 16 \
-    --save_steps 10000 \
-    --validating_steps 10000 \
+    --save_steps 1000 \
+    --validating_steps 2000 \
     --num_gpu 4 \
     --model_name "qwen2_5-1_5b"\
     --name "testing_qwen25_15_graph_tr_accelerate" \
@@ -47,4 +47,5 @@ accelerate launch --debug --num_processes 4  main.py --mode train \
     --use_lora \
     --use_accelerate \
     --graph_sampling \
-    --do_test
+    --do_test \
+    --debug
