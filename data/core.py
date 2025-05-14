@@ -472,44 +472,38 @@ class Data(object):
         assert self.data is not None
 
         processed_data = False
-        processed_data_path = os.path.join(
+        processed_data_file_path = os.path.join(
             self.data_path,
-            f"processed_data_{self.baseline_prompt}_{self.max_tokens}_{self.model_name}.pt",
+            f"{self.baseline_prompt}_{self.max_tokens}_{self.model_name}",
+            "processed_data.json",
         )
-        if os.path.exists(processed_data_path):
-            self.processed_data = torch.load(processed_data_path)
+        if os.path.exists(processed_data_file_path):
+            with open(
+                processed_data_file_path,
+                "r",
+            ) as file:
+                self.processed_data = json.load(file)
             processed_data = True
         else:
-            self.processed_data = []
+            processed_data_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.max_tokens}_{self.model_name}",
+            )
+            os.makedirs(processed_data_path, exist_ok=True)
 
         if processed_data:
             self.logger.log("[green]Data is already processed![/green]")
             self.logger.log(f"Size of data data: {len(self.processed_data)}")
             return
 
-        processed_prompt = False
-        prompt_path = os.path.join(
-            self.data_path,
-            f"processed_prompt_{self.baseline_prompt}_{self.max_tokens}_{self.model_name}.json",
-        )
-        if os.path.exists(prompt_path):
-            with open(
-                prompt_path,
-                "r",
-            ) as file:
-                prompts = json.load(file)
-            processed_prompt = True
-
         with self.logger.status("[green]Preparing data...[/green]"):
 
-            self.processed_data = []
-
-            if processed_prompt == False:
-                prompts = {}
+            self.processed_data = {}
+            prompts = {}
 
             num_tokens = []
 
-            if "graph" in self.baseline_prompt:
+            if ("graph" in self.baseline_prompt) and self.debug:
                 graph_stats = {}
                 for key in GRAPH_KEYS:
                     graph_stats[key] = {
@@ -523,6 +517,7 @@ class Data(object):
                     }
 
             num_discarded = 0
+
             for uuid, dat in self.data.items():
                 with open(dat["code_path"], "r") as file:
                     src_code = file.read()
@@ -554,25 +549,38 @@ class Data(object):
                         num_discarded += len(dat["test_cases"])
                         continue
 
-                    gstats = self.get_graph_stats(graph_dict)
-                    for key in gstats.keys():
-                        graph_stats[key]["num_nodes"].append(gstats[key]["num_nodes"])
-                        graph_stats[key]["num_edges"].append(gstats[key]["num_edges"])
-                        graph_stats[key]["in_max_degrees"].append(
-                            gstats[key]["in_max_degrees"]
-                        )
-                        graph_stats[key]["out_max_degrees"].append(
-                            gstats[key]["out_max_degrees"]
-                        )
-                        graph_stats[key]["in_min_degrees"].append(
-                            gstats[key]["in_min_degrees"]
-                        )
-                        graph_stats[key]["out_min_degrees"].append(
-                            gstats[key]["out_min_degrees"]
-                        )
-                        graph_stats[key]["num_components"].append(
-                            gstats[key]["num_components"]
-                        )
+                    if self.graph_sampling and ("graph" in self.baseline_prompt):
+                        for key in graph_dict.keys():
+                            graph_dict[key] = self.sampling_neighbor(
+                                graph=graph_dict[key],
+                                mask=active_node,
+                                n_hops=self.n_hops,
+                            )
+
+                    if self.debug:
+                        gstats = self.get_graph_stats(graph_dict)
+                        for key in gstats.keys():
+                            graph_stats[key]["num_nodes"].append(
+                                gstats[key]["num_nodes"]
+                            )
+                            graph_stats[key]["num_edges"].append(
+                                gstats[key]["num_edges"]
+                            )
+                            graph_stats[key]["in_max_degrees"].append(
+                                gstats[key]["in_max_degrees"]
+                            )
+                            graph_stats[key]["out_max_degrees"].append(
+                                gstats[key]["out_max_degrees"]
+                            )
+                            graph_stats[key]["in_min_degrees"].append(
+                                gstats[key]["in_min_degrees"]
+                            )
+                            graph_stats[key]["out_min_degrees"].append(
+                                gstats[key]["out_min_degrees"]
+                            )
+                            graph_stats[key]["num_components"].append(
+                                gstats[key]["num_components"]
+                            )
 
                 for testcase in dat["test_cases"].keys():
                     test_code = dat["test_cases"][testcase]["test_case"]
@@ -582,9 +590,6 @@ class Data(object):
                         continue
                     mask_key = int(testcase.split("_")[-1])
                     branch = mask[mask_key]
-                    # print(
-                    #     f"Test case: {testcase}, branch: {branch.size()}, branch_sum: {branch.sum()}"
-                    # )
                     branch_line = dat["test_cases"][testcase]["branch"]
                     active_node = get_index_by_value(a=branch[0], val=1)
                     if active_node.size(0) == 0:
@@ -592,37 +597,29 @@ class Data(object):
                             f"Active node empty at uuid: {uuid} testcase: {testcase}"
                         )
                     # self.logger.log("Preparing prompts for {}...".format(testcase))
-                    if processed_prompt == False:
-                        result = self.get_prompt(
-                            src_code=src_code,
-                            testcase_out=test_code,
-                            mask=active_node,
-                            tokenizer=self.llm_tokenizer,
-                            branch=branch_line,
-                            gnn_mode=self.gnn_mode,
-                        )
-                        if result is None:
-                            num_discarded += 1
-                            continue
-                        prompt, response, full_text = result
-                    else:
-                        if f"{uuid}_{testcase}" not in prompts.keys():
-                            num_discarded += 1
-                            continue
-                        prompt = prompts[f"{uuid}_{testcase}"]["prompt"]
-                        response = prompts[f"{uuid}_{testcase}"]["response"]
-                        full_text = prompts[f"{uuid}_{testcase}"]["full_text"]
+                    result = self.get_prompt(
+                        src_code=src_code,
+                        testcase_out=test_code,
+                        mask=active_node,
+                        tokenizer=self.llm_tokenizer,
+                        branch=branch_line,
+                        gnn_mode=self.gnn_mode,
+                    )
+                    if result is None:
+                        num_discarded += 1
+                        continue
+                    prompt, response, full_text = result
 
                     num_token = len(self.llm_tokenizer.tokenize(full_text))
                     num_tokens.append(num_token)
 
-                    if self.graph_sampling and ("graph" in self.baseline_prompt):
-                        for key in graph_dict.keys():
-                            graph_dict[key] = self.sampling_neighbor(
-                                graph=graph_dict[key],
-                                mask=active_node,
-                                n_hops=self.n_hops,
-                            )
+                    # if self.graph_sampling and ("graph" in self.baseline_prompt):
+                    #     for key in graph_dict.keys():
+                    #         graph_dict[key] = self.sampling_neighbor(
+                    #             graph=graph_dict[key],
+                    #             mask=active_node,
+                    #             n_hops=self.n_hops,
+                    #         )
 
                     data = {
                         "uuid": f"{uuid}_{testcase}",
@@ -634,26 +631,22 @@ class Data(object):
                         ),
                         "mask": mask[mask_key],
                     }
-                    prompts[f"{uuid}_{testcase}"] = {
-                        "prompt": prompt,
-                        "response": response,
-                        "full_text": full_text,
-                    }
-                    self.processed_data.append(data)
 
-        with open(
-            os.path.join(prompt_path),
-            "w",
-        ) as file:
-            json.dump(prompts, file, indent=4)
+                    data_name = f"{uuid}_testcase_{testcase}.pt"
+                    data_path = os.path.join(processed_data_path, data_name)
+                    torch.save(data, data_path)
+                    self.logger.log(
+                        f"Data is saved to {data_path} for uuid - {uuid}, testcase - {testcase}"
+                    )
 
-        torch.save(self.processed_data, processed_data_path)
+                    self.processed_data[f"{uuid}_testcase_{testcase}"] = data_path
+
+        with open(processed_data_file_path, "w") as file:
+            json.dump(self.processed_data, file, indent=4)
+
         self.logger.log("[green]Data is ready![/green]")
         self.logger.log(
             f"Size of processed data: {len(self.processed_data)}, num_discarded: {num_discarded}"
-        )
-        self.logger.log(
-            f"Saved processed data to {processed_data_path} and prompts to {prompt_path}"
         )
         if self.debug:
             pass

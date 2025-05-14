@@ -22,14 +22,17 @@ class GLMFDataset(Dataset):
         self.graph_token_id = self.tokenizer.convert_tokens_to_ids([GRAPH_PAD_TOKEN])[0]
         self.debug = debug
         self.testing = testing
+        self.index_to_key_dict = dict(zip(range(len(self.data)), self.data.keys()))
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
 
+        data_path = self.data[self.index_to_key_dict[idx]]
+        sample = torch.load(data_path)
+
         if self.testing == False:
-            sample = self.data[idx]
             graph = sample["graph"]
             full_text = sample["full_text"]
             graph_mask = sample["mask"]
@@ -61,7 +64,6 @@ class GLMFDataset(Dataset):
                 "graph_mask": torch.tensor(graph_mask, dtype=torch.float),
             }
         else:
-            sample = self.data[idx]
             graph = sample["graph"]
             prompt = sample["prompt"]
             graph_mask = sample["mask"]
