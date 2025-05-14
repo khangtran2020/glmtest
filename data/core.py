@@ -549,14 +549,6 @@ class Data(object):
                         num_discarded += len(dat["test_cases"])
                         continue
 
-                    if self.graph_sampling and ("graph" in self.baseline_prompt):
-                        for key in graph_dict.keys():
-                            graph_dict[key] = self.sampling_neighbor(
-                                graph=graph_dict[key],
-                                mask=active_node,
-                                n_hops=self.n_hops,
-                            )
-
                     if self.debug:
                         gstats = self.get_graph_stats(graph_dict)
                         for key in gstats.keys():
@@ -613,13 +605,13 @@ class Data(object):
                     num_token = len(self.llm_tokenizer.tokenize(full_text))
                     num_tokens.append(num_token)
 
-                    # if self.graph_sampling and ("graph" in self.baseline_prompt):
-                    #     for key in graph_dict.keys():
-                    #         graph_dict[key] = self.sampling_neighbor(
-                    #             graph=graph_dict[key],
-                    #             mask=active_node,
-                    #             n_hops=self.n_hops,
-                    #         )
+                    if self.graph_sampling and ("graph" in self.baseline_prompt):
+                        for key in graph_dict.keys():
+                            graph_dict[key] = self.sampling_neighbor(
+                                graph=graph_dict[key],
+                                mask=active_node,
+                                n_hops=self.n_hops,
+                            )
 
                     data = {
                         "uuid": f"{uuid}_{testcase}",
