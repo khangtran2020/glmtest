@@ -40,7 +40,14 @@ class GLMFDataset(Dataset):
         graph = torch.load(graph_path)
         active_node = torch.Tensor(sample["active_node"])
         graph_mask = torch.Tensor(sample["mask"])
-        graph = sampling_neighbor(graph=graph, mask=active_node, n_hops=self.n_hops)
+        # graph = sampling_neighbor(graph=graph, mask=active_node, n_hops=self.n_hops)
+
+        for key in graph.keys():
+            graph[key] = self.sampling_neighbor(
+                graph=graph[key],
+                mask=active_node,
+                n_hops=self.n_hops,
+            )
 
         if self.testing == False:
             graph = sample["graph"]
