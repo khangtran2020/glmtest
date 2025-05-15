@@ -195,7 +195,7 @@ def train_single_gpu_accelerate(
                     }
 
                     if args.debug:
-                        log_info = f"Length of input_ids - {len(micro_input['input_ids'])}, attention_mask - {len(micro_input['attention_mask'])}, labels - {len(micro_input['labels'])}"
+                        log_info = f"Length of input_ids - {micro_input['input_ids'].size()}, attention_mask - {micro_input['attention_mask'].size()}, labels - {micro_input['labels'].size()}"
                         console.log(f"Step {global_step}: {log_info}")
 
                     if "graph" in args.baseline_prompt:
