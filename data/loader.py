@@ -38,8 +38,8 @@ class GLMFDataset(Dataset):
             sample = json.load(f)
         graph_path = sample["graph_path"]
         graph = torch.load(graph_path)
-        active_node = torch.Tensor(graph["active_node"])
-        graph_mask = torch.Tensor(graph["mask"])
+        active_node = torch.Tensor(sample["active_node"])
+        graph_mask = torch.Tensor(sample["mask"])
         graph = sampling_neighbor(graph=graph, mask=active_node, n_hops=self.n_hops)
 
         if self.testing == False:
