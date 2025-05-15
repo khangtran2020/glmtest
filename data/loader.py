@@ -1,4 +1,6 @@
+import json
 import torch
+from data.utils import sampling_neighbor
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizer
 from typing import List, Dict, Any
@@ -13,6 +15,7 @@ class GLMFDataset(Dataset):
         max_seq_length: int = 12000,
         baseline_prompt: str = "code",
         debug: bool = False,
+        n_hops: int = 2,
         testing: bool = False,
     ):
         self.data = data
@@ -21,6 +24,7 @@ class GLMFDataset(Dataset):
         self.max_seq_length = max_seq_length
         self.graph_token_id = self.tokenizer.convert_tokens_to_ids([GRAPH_PAD_TOKEN])[0]
         self.debug = debug
+        self.n_hops = n_hops
         self.testing = testing
         self.index_to_key_dict = dict(zip(range(len(self.data)), self.data.keys()))
 
@@ -30,12 +34,18 @@ class GLMFDataset(Dataset):
     def __getitem__(self, idx):
 
         data_path = self.data[self.index_to_key_dict[idx]]
-        sample = torch.load(data_path)
+        with open(data_path, "r") as f:
+            sample = json.load(f)
+        graph_path = sample["graph_path"]
+        graph = torch.load(graph_path)
+        active_node = torch.Tensor(graph["active_node"])
+        graph_mask = torch.Tensor(graph["mask"])
+        graph = sampling_neighbor(graph=graph, mask=active_node, n_hops=self.n_hops)
 
         if self.testing == False:
             graph = sample["graph"]
             full_text = sample["full_text"]
-            graph_mask = sample["mask"]
+            # graph_mask = sample["mask"]
 
             # Tokenize text input
             tokenized = self.tokenize(full_text)
@@ -66,7 +76,7 @@ class GLMFDataset(Dataset):
         else:
             graph = sample["graph"]
             prompt = sample["prompt"]
-            graph_mask = sample["mask"]
+            # graph_mask = sample["mask"]
             uuid = sample["uuid"]
 
             # Tokenize text input

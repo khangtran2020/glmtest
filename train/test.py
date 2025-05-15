@@ -35,6 +35,7 @@ def test(
         tokenizer=dataset.llm_tokenizer,
         max_seq_length=args.max_seq_length,
         debug=args.debug,
+        n_hops=dataset.n_hops,
         testing=True,
     )
     tokenizer = dataset.llm_tokenizer

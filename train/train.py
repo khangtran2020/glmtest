@@ -119,6 +119,7 @@ def train_single_gpu_accelerate(
                 tokenizer=dataset.llm_tokenizer,
                 max_seq_length=args.max_seq_length,
                 debug=args.debug,
+                n_hops=dataset.n_hops,
             )
         else:
             tr_dataset = GLMFDataset(
@@ -126,12 +127,14 @@ def train_single_gpu_accelerate(
                 tokenizer=dataset.llm_tokenizer,
                 max_seq_length=args.max_seq_length,
                 debug=args.debug,
+                n_hops=dataset.n_hops,
             )
         va_dataset = GLMFDataset(
             data=dataset.val_data,
             tokenizer=dataset.llm_tokenizer,
             max_seq_length=args.max_seq_length,
             debug=args.debug,
+            n_hops=dataset.n_hops,
         )
         tr_loader = DataLoader(
             tr_dataset, batch_size=1, shuffle=True, collate_fn=collate_fn
@@ -424,6 +427,7 @@ def train_multi_gpu_accelerate(
                 tokenizer=dataset.llm_tokenizer,
                 max_seq_length=args.max_seq_length,
                 debug=args.debug,
+                n_hops=dataset.n_hops,
             )
         else:
             tr_dataset = GLMFDataset(
@@ -431,12 +435,14 @@ def train_multi_gpu_accelerate(
                 tokenizer=dataset.llm_tokenizer,
                 max_seq_length=args.max_seq_length,
                 debug=args.debug,
+                n_hops=dataset.n_hops,
             )
         va_dataset = GLMFDataset(
             data=dataset.val_data,
             tokenizer=dataset.llm_tokenizer,
             max_seq_length=args.max_seq_length,
             debug=args.debug,
+            n_hops=dataset.n_hops,
         )
         dataloader_params = {
             "batch_size": args.batch_size,

@@ -549,6 +549,10 @@ class Data(object):
                         num_discarded += len(dat["test_cases"])
                         continue
 
+                    graph_name = f"{uuid}_graph.pt"
+                    graph_path = os.path.join(processed_data_path, graph_name)
+                    torch.save(graph_dict, graph_path)
+
                     if self.debug:
                         gstats = self.get_graph_stats(graph_dict)
                         for key in gstats.keys():
@@ -588,6 +592,9 @@ class Data(object):
                         self.logger.log(
                             f"Active node empty at uuid: {uuid} testcase: {testcase}"
                         )
+                        num_discarded += 1
+                        continue
+
                     # self.logger.log("Preparing prompts for {}...".format(testcase))
                     result = self.get_prompt(
                         src_code=src_code,
@@ -605,28 +612,29 @@ class Data(object):
                     num_token = len(self.llm_tokenizer.tokenize(full_text))
                     num_tokens.append(num_token)
 
-                    if self.graph_sampling and ("graph" in self.baseline_prompt):
-                        for key in graph_dict.keys():
-                            graph_dict[key] = self.sampling_neighbor(
-                                graph=graph_dict[key],
-                                mask=active_node,
-                                n_hops=self.n_hops,
-                            )
+                    # if self.graph_sampling and ("graph" in self.baseline_prompt):
+                    #     for key in graph_dict.keys():
+                    #         graph_dict[key] = self.sampling_neighbor(
+                    #             graph=graph_dict[key],
+                    #             mask=active_node,
+                    #             n_hops=self.n_hops,
+                    #         )
 
                     data = {
                         "uuid": f"{uuid}_{testcase}",
                         "prompt": prompt,
                         "response": response,
                         "full_text": full_text,
-                        "graph": (
-                            graph_dict if "graph" in self.baseline_prompt else None
-                        ),
-                        "mask": mask[mask_key],
+                        "active_node": active_node.tolist(),
+                        "mask": mask[mask_key].tolist(),
+                        "graph_path": graph_path,
                     }
 
-                    data_name = f"{uuid}_testcase_{testcase}.pt"
+                    data_name = f"{uuid}_testcase_{testcase}.json"
                     data_path = os.path.join(processed_data_path, data_name)
-                    torch.save(data, data_path)
+                    with open(data_path, "w") as file:
+                        json.dump(data, file, indent=4)
+
                     self.logger.log(
                         f"Data is saved to {data_path} for uuid - {uuid}, testcase - {testcase}"
                     )
@@ -923,26 +931,6 @@ class Data(object):
             line = "->".join([str(i) for i in item])
             code_line += line + "\n"
         return code_line
-
-    def sampling_neighbor(
-        self, graph: dgl.DGLGraph, mask: torch.Tensor, n_hops: int = 2
-    ) -> dgl.DGLGraph:
-        """
-        Sample the neighbors of the graph starting from a mask over multiple hops.
-        """
-
-        seeds = mask
-        blocks = []
-
-        for _ in range(n_hops):
-            block = dgl.sampling.sample_neighbors(graph, seeds.long(), fanout=1)
-            blocks.append(block)
-            seeds = block.nodes()
-
-        final_subgraph = dgl.node_subgraph(
-            graph, torch.unique(torch.cat([b.nodes() for b in blocks]))
-        )
-        return final_subgraph
 
     def get_graph_stats(self, graph_dict: Dict[str, dgl.DGLGraph]) -> dict:
         """
