@@ -113,22 +113,13 @@ def train_single_gpu_accelerate(
     accelerator.print(f"Mixed precision: {mixed_precision}")
 
     if args.model_debug == False:
-        if args.debug:
-            tr_dataset = GLMFDataset(
-                data=dataset.train_data[621:],
-                tokenizer=dataset.llm_tokenizer,
-                max_seq_length=args.max_seq_length,
-                debug=args.debug,
-                n_hops=dataset.n_hops,
-            )
-        else:
-            tr_dataset = GLMFDataset(
-                data=dataset.train_data,
-                tokenizer=dataset.llm_tokenizer,
-                max_seq_length=args.max_seq_length,
-                debug=args.debug,
-                n_hops=dataset.n_hops,
-            )
+        tr_dataset = GLMFDataset(
+            data=dataset.train_data,
+            tokenizer=dataset.llm_tokenizer,
+            max_seq_length=args.max_seq_length,
+            debug=args.debug,
+            n_hops=dataset.n_hops,
+        )
         va_dataset = GLMFDataset(
             data=dataset.val_data,
             tokenizer=dataset.llm_tokenizer,
@@ -421,22 +412,13 @@ def train_multi_gpu_accelerate(
     accelerator.print(f"Mixed precision: {mixed_precision}")
 
     if args.model_debug == False:
-        if args.debug:
-            tr_dataset = GLMFDataset(
-                data=dataset.train_data[600:],
-                tokenizer=dataset.llm_tokenizer,
-                max_seq_length=args.max_seq_length,
-                debug=args.debug,
-                n_hops=dataset.n_hops,
-            )
-        else:
-            tr_dataset = GLMFDataset(
-                data=dataset.train_data,
-                tokenizer=dataset.llm_tokenizer,
-                max_seq_length=args.max_seq_length,
-                debug=args.debug,
-                n_hops=dataset.n_hops,
-            )
+        tr_dataset = GLMFDataset(
+            data=dataset.train_data,
+            tokenizer=dataset.llm_tokenizer,
+            max_seq_length=args.max_seq_length,
+            debug=args.debug,
+            n_hops=dataset.n_hops,
+        )
         va_dataset = GLMFDataset(
             data=dataset.val_data,
             tokenizer=dataset.llm_tokenizer,
