@@ -43,7 +43,7 @@ class GLMFDataset(Dataset):
         # graph = sampling_neighbor(graph=graph, mask=active_node, n_hops=self.n_hops)
 
         for key in graph.keys():
-            graph[key] = self.sampling_neighbor(
+            graph[key] = sampling_neighbor(
                 graph=graph[key],
                 mask=active_node,
                 n_hops=self.n_hops,
