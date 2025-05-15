@@ -50,7 +50,7 @@ class GLMFDataset(Dataset):
             )
 
         if self.testing == False:
-            graph = sample["graph"]
+            # graph = sample["graph"]
             full_text = sample["full_text"]
             # graph_mask = sample["mask"]
 
@@ -81,7 +81,7 @@ class GLMFDataset(Dataset):
                 "graph_mask": torch.tensor(graph_mask, dtype=torch.float),
             }
         else:
-            graph = sample["graph"]
+            # graph = sample["graph"]
             prompt = sample["prompt"]
             # graph_mask = sample["mask"]
             uuid = sample["uuid"]
