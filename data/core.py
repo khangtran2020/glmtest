@@ -820,9 +820,25 @@ class Data(object):
             else test_split
         )
         self.logger.log(f"Number of validation data: {num_val}, test data: {num_test}")
-        val_data = self.processed_data[:num_val]
-        test_data = self.processed_data[num_val : num_val + num_test]
-        train_data = self.processed_data[num_val + num_test :]
+        keys_list = list(self.processed_data.keys())
+        np.random.shuffle(keys_list)
+
+        test_keys = keys_list[num_val : num_val + num_test]
+        val_keys = keys_list[:num_val]
+        train_keys = keys_list[num_val + num_test :]
+
+        # val_data = self.processed_data[:num_val]
+        # test_data = self.processed_data[num_val : num_val + num_test]
+        # train_data = self.processed_data[num_val + num_test :]
+        train_data = {}
+        val_data = {}
+        test_data = {}
+        for key in train_keys:
+            train_data[key] = self.processed_data[key]
+        for key in val_keys:
+            val_data[key] = self.processed_data[key]
+        for key in test_keys:
+            test_data[key] = self.processed_data[key]
         self.train_data = train_data
         self.val_data = val_data
         self.test_data = test_data
