@@ -19,6 +19,7 @@ from utils.constant import (
 
 from transformers import get_scheduler
 from torch.optim import AdamW
+from utils.utils import log_ram_usage
 
 # typing
 from argparse import Namespace
@@ -35,12 +36,12 @@ def main() -> None:
 
     args = parse_args()
 
-    accelerator = Accelerator(
-        gradient_accumulation_steps=args.gradient_accumulation_steps,
-        mixed_precision=args.dtype,
-        log_with="wandb",
-        project_dir=args.log_dir,
-    )
+    # accelerator = Accelerator(
+    #     gradient_accumulation_steps=args.gradient_accumulation_steps,
+    #     mixed_precision=args.dtype,
+    #     log_with="wandb",
+    #     project_dir=args.log_dir,
+    # )
 
     # Initialize args, logger, model and dataset:
     # if accelerator.is_main_process:
@@ -93,6 +94,9 @@ def main() -> None:
     if dataset is None:
         console.log("Dataset not found, exiting...")
         return
+
+    ram_usage = log_ram_usage()
+    console.log(f"Dataset loaded - RAM usage: {ram_usage:.2f} MB")
 
     if args.mode == "data":
         if args.do_crawl:
