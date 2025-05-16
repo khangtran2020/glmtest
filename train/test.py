@@ -12,6 +12,7 @@ from model.model import GLMFModelForCausalLM, GLMFModelConfig
 # from transformers import SinkCache
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from torch.utils.data import DataLoader
+from accelerate import Accelerator
 
 # typing
 from argparse import Namespace
@@ -256,6 +257,8 @@ def validate(
     model: GLMFModelForCausalLM,
     config: GLMFModelConfig,
     device: torch.device,
+    progress: Progress,
+    accelerator: Accelerator,
 ):
     model.eval()
     if config is None:
@@ -264,6 +267,9 @@ def validate(
 
         val_loss = 0.0
         num_item = 0
+
+        if accelerator.is_main_process:
+            val_task = progress.add_task("Validating...", total=len(loader))
 
         for step, batch in enumerate(loader):
             batch_loss = 0.0
@@ -319,6 +325,13 @@ def validate(
                 )
                 torch.cuda.empty_cache()
                 continue
+
+            if accelerator.is_main_process:
+                progress.update(
+                    val_task,
+                    advance=1,
+                    description=f"Batch {step + 1}/{len(loader)}: loss = {batch_loss/num_item:.4f}",
+                )
 
             val_loss += batch_loss
 
