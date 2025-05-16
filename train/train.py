@@ -28,7 +28,7 @@ def train(
     optimizer: torch.optim.Optimizer,
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
     continue_training: bool = False,
-    start_step: int = 0,
+    start_step: int = -1,
     mixed_precision: str = "bf16",
     collate_fn: callable = collate_fn,
 ):
@@ -72,7 +72,7 @@ def train_single_gpu_accelerate(
     optimizer: torch.optim.Optimizer,
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
     continue_training: bool = False,
-    start_step: int = 0,
+    start_step: int = -1,
     collate_fn: callable = collate_fn,
     mixed_precision: str = "bf16",
 ):
@@ -382,7 +382,7 @@ def train_multi_gpu_accelerate(
     optimizer: torch.optim.Optimizer,
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
     continue_training: bool = False,
-    start_step: int = 0,
+    start_step: int = -1,
     collate_fn: callable = collate_fn,
     mixed_precision: str = "bf16",
 ):
@@ -492,13 +492,13 @@ def train_multi_gpu_accelerate(
             model.train()
 
             if accelerator.is_main_process:
-                if ((continue_training == True) and (global_step > start_step)) or (
-                    continue_training == False
-                ):
-                    train_epoch_task = progress.add_task(
-                        f"Epoch {epoch + 1}/{args.num_train_epochs}",
-                        total=len(tr_loader),
-                    )
+                # if ((continue_training == True) and (global_step > start_step)) or (
+                #     continue_training == False
+                # ):
+                train_epoch_task = progress.add_task(
+                    f"Epoch {epoch + 1}/{args.num_train_epochs}",
+                    total=len(tr_loader),
+                )
 
             epoch_loss = 0.0
             num_items = 0.0
@@ -507,6 +507,15 @@ def train_multi_gpu_accelerate(
 
                 if (continue_training == True) and (global_step <= start_step):
                     global_step += args.batch_size
+                    ram_usage = log_ram_usage()
+                    console.log(
+                        f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
+                    )
+                    progress.update(
+                        train_epoch_task,
+                        advance=1,
+                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB",
+                    )
                     continue
 
                 global_step += args.batch_size
