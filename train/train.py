@@ -1,4 +1,5 @@
 import os
+import gc
 import torch
 import wandb
 import traceback
@@ -648,6 +649,15 @@ def train_multi_gpu_accelerate(
                                 console.log(f"Step {global_step}: Updated scheduler")
 
                     batch_loss += loss.detach().float()
+                    if "graph" in args.baseline_prompt:
+                        for key in GRAPH_KEYS:
+                            if key in graph.keys():
+                                graph[key] = graph[key].detach().to("cpu")
+                                graph.pop(key, None)
+                        del graph_mask, graph
+                    del outputs, loss, micro_input
+                    gc.collect()
+                    torch.cuda.empty_cache()
 
                 # if args.debug:
                 #     pass
@@ -719,9 +729,9 @@ def train_multi_gpu_accelerate(
                         accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
                     del unwrapped_model
 
-                del outputs, loss, micro_input, graph, graph_mask  # Free memory
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
+                # del outputs, loss, micro_input, graph, graph_mask  # Free memory
+                # if torch.cuda.is_available():
+                #     torch.cuda.empty_cache()
 
                 if global_step % args.validating_steps == 0:
                     accelerator.wait_for_everyone()
