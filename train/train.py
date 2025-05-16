@@ -475,6 +475,7 @@ def train_multi_gpu_accelerate(
         ),  # Displays additional info
         BarColumn(),  # Displays a progress bar
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),  # Shows percentage
+        transient=True,
     ) as progress:
 
         if accelerator.is_main_process:
@@ -732,6 +733,7 @@ def train_multi_gpu_accelerate(
                 if ((continue_training == True) and (global_step > start_step)) or (
                     continue_training == False
                 ):
+                    progress.update(train_epoch_task, advance=1)
                     progress.remove_task(train_epoch_task)
                     progress.update(
                         train_task,
