@@ -707,7 +707,7 @@ def train_multi_gpu_accelerate(
                     )
                     # accelerator.save_state(checkpoint_dir)
                     if accelerator.is_main_process:
-                        accelerator.print(f"Saving checkpoint to {checkpoint_dir}")
+                        accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
                     del unwrapped_model
 
                 del outputs, loss, micro_input, graph, graph_mask  # Free memory
