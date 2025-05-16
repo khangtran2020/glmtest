@@ -309,6 +309,7 @@ def validate(args, loader, model, config, device):
                         )
                         loss = outputs.loss
                         batch_loss += loss.item()
+                        del outputs, loss, micro_input, graph, graph_mask
                 except torch.cuda.OutOfMemoryError as e:
                     tqdm.write(
                         f"OOM in batch {step}: input_dis {micro_input['input_ids'].size()} - graph_mask {graph_mask.size()}"
