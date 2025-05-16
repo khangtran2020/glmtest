@@ -154,6 +154,7 @@ def train_single_gpu_accelerate(
         ),  # Displays additional info
         BarColumn(),  # Displays a progress bar
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),  # Shows percentage
+        transient=True,
     ) as progress:
 
         train_task = progress.add_task("Training...", total=args.num_train_epochs)
