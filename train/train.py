@@ -308,6 +308,7 @@ def train_single_gpu_accelerate(
             if ((continue_training == True) and (global_step > start_step)) or (
                 continue_training == False
             ):
+                progress.update(train_epoch_task, visible=False)
                 progress.remove_task(train_epoch_task)
                 progress.update(
                     train_task,
@@ -734,7 +735,7 @@ def train_multi_gpu_accelerate(
                 if ((continue_training == True) and (global_step > start_step)) or (
                     continue_training == False
                 ):
-                    progress.update(train_epoch_task, advance=1)
+                    progress.update(train_epoch_task, visible=False)
                     progress.remove_task(train_epoch_task)
                     progress.update(
                         train_task,
