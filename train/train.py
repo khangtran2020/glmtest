@@ -295,7 +295,12 @@ def train_single_gpu_accelerate(
 
                 if (global_step % args.validating_steps == 0) and (args.debug == False):
                     val_loss = validate(
-                        args=args, loader=va_loader, model=model, device=device
+                        args=args,
+                        loader=va_loader,
+                        model=model,
+                        device=device,
+                        accelerator=accelerator,
+                        progress=progress,
                     )
                     wandb.log({"val_loss": val_loss})
                     console.log(
@@ -721,6 +726,8 @@ def train_multi_gpu_accelerate(
                         model=model,
                         device=device,
                         config=config,
+                        accelerator=accelerator,
+                        progress=progress,
                     )
                     accelerator.wait_for_everyone()
 
