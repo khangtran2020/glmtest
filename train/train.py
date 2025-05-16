@@ -652,7 +652,7 @@ def train_multi_gpu_accelerate(
                     if "graph" in args.baseline_prompt:
                         for key in GRAPH_KEYS:
                             if key in graph.keys():
-                                graph[key] = graph[key].detach().to("cpu")
+                                graph[key] = graph[key].to("cpu")
                                 graph.pop(key, None)
                         del graph_mask, graph
                     del outputs, loss, micro_input
