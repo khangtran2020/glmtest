@@ -714,6 +714,7 @@ def train_multi_gpu_accelerate(
                     torch.cuda.empty_cache()
 
                 if global_step % args.validating_steps == 0:
+                    accelerator.wait_for_everyone()
                     val_loss = validate(
                         args=args,
                         loader=va_loader,
@@ -721,6 +722,7 @@ def train_multi_gpu_accelerate(
                         device=device,
                         config=config,
                     )
+                    accelerator.wait_for_everyone()
 
                     if accelerator.is_main_process:
                         wandb.log({"val_loss": val_loss})
