@@ -451,9 +451,7 @@ def train_multi_gpu_accelerate(
     console.log("Model patched with ring attention")
     device = accelerator.device
     config = model.config
-    model, optimizer, tr_loader, va_loader, lr_scheduler = accelerator.prepare(
-        model, optimizer, tr_loader, va_loader, lr_scheduler
-    )
+    model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
 
     if accelerator.is_main_process:
         accelerator.print(f"***** Running training *****")
