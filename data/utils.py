@@ -1,3 +1,4 @@
+import dgl
 import torch
 from data.ossfuzz_data import OSSFuzz
 from data.testgeneval_data import TestGenEval
@@ -104,3 +105,24 @@ def get_dataset(
     else:
         logger.log("Dataset not found")
         return None
+
+
+def sampling_neighbor(
+    graph: dgl.DGLGraph, mask: torch.Tensor, n_hops: int = 2
+) -> dgl.DGLGraph:
+    """
+    Sample the neighbors of the graph starting from a mask over multiple hops.
+    """
+
+    seeds = mask
+    blocks = []
+
+    for _ in range(n_hops):
+        block = dgl.sampling.sample_neighbors(graph, seeds.long(), fanout=1)
+        blocks.append(block)
+        seeds = block.nodes()
+
+    final_subgraph = dgl.node_subgraph(
+        graph, torch.unique(torch.cat([b.nodes() for b in blocks]))
+    )
+    return final_subgraph

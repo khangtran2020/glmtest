@@ -1,4 +1,6 @@
+import json
 import torch
+from data.utils import sampling_neighbor
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizer
 from typing import List, Dict, Any
@@ -13,6 +15,7 @@ class GLMFDataset(Dataset):
         max_seq_length: int = 12000,
         baseline_prompt: str = "code",
         debug: bool = False,
+        n_hops: int = 2,
         testing: bool = False,
     ):
         self.data = data
@@ -21,18 +24,35 @@ class GLMFDataset(Dataset):
         self.max_seq_length = max_seq_length
         self.graph_token_id = self.tokenizer.convert_tokens_to_ids([GRAPH_PAD_TOKEN])[0]
         self.debug = debug
+        self.n_hops = n_hops
         self.testing = testing
+        self.index_to_key_dict = dict(zip(range(len(self.data)), self.data.keys()))
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
 
+        data_path = self.data[self.index_to_key_dict[idx]]
+        with open(data_path, "r") as f:
+            sample = json.load(f)
+        graph_path = sample["graph_path"]
+        graph = torch.load(graph_path)
+        active_node = torch.Tensor(sample["active_node"])
+        graph_mask = torch.Tensor(sample["mask"])
+        # graph = sampling_neighbor(graph=graph, mask=active_node, n_hops=self.n_hops)
+
+        for key in graph.keys():
+            graph[key] = sampling_neighbor(
+                graph=graph[key],
+                mask=active_node,
+                n_hops=self.n_hops,
+            )
+
         if self.testing == False:
-            sample = self.data[idx]
-            graph = sample["graph"]
+            # graph = sample["graph"]
             full_text = sample["full_text"]
-            graph_mask = sample["mask"]
+            # graph_mask = sample["mask"]
 
             # Tokenize text input
             tokenized = self.tokenize(full_text)
@@ -61,10 +81,9 @@ class GLMFDataset(Dataset):
                 "graph_mask": torch.tensor(graph_mask, dtype=torch.float),
             }
         else:
-            sample = self.data[idx]
-            graph = sample["graph"]
+            # graph = sample["graph"]
             prompt = sample["prompt"]
-            graph_mask = sample["mask"]
+            # graph_mask = sample["mask"]
             uuid = sample["uuid"]
 
             # Tokenize text input

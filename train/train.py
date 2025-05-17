@@ -1,6 +1,8 @@
 import os
+import gc
 import torch
 import wandb
+import shutil
 import traceback
 from model.gnn import GRAPH_KEYS
 from torch.utils.data import DataLoader
@@ -28,7 +30,7 @@ def train(
     optimizer: torch.optim.Optimizer,
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
     continue_training: bool = False,
-    start_step: int = 0,
+    start_step: int = -1,
     mixed_precision: str = "bf16",
     collate_fn: callable = collate_fn,
 ):
@@ -72,7 +74,7 @@ def train_single_gpu_accelerate(
     optimizer: torch.optim.Optimizer,
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
     continue_training: bool = False,
-    start_step: int = 0,
+    start_step: int = -1,
     collate_fn: callable = collate_fn,
     mixed_precision: str = "bf16",
 ):
@@ -89,6 +91,10 @@ def train_single_gpu_accelerate(
     console.log(f"Model will be saved to {save_path}...")
     if not os.path.exists(save_path):
         os.makedirs(save_path, exist_ok=True)
+    if os.path.exists(save_path):
+        if continue_training == False:
+            shutil.rmtree(save_path)
+            os.makedirs(save_path, exist_ok=True)
     # Initialize W&B run if main process
     accelerator.init_trackers(
         project_name="GLMFuzz",
@@ -113,25 +119,19 @@ def train_single_gpu_accelerate(
     accelerator.print(f"Mixed precision: {mixed_precision}")
 
     if args.model_debug == False:
-        if args.debug:
-            tr_dataset = GLMFDataset(
-                data=dataset.train_data[621:],
-                tokenizer=dataset.llm_tokenizer,
-                max_seq_length=args.max_seq_length,
-                debug=args.debug,
-            )
-        else:
-            tr_dataset = GLMFDataset(
-                data=dataset.train_data,
-                tokenizer=dataset.llm_tokenizer,
-                max_seq_length=args.max_seq_length,
-                debug=args.debug,
-            )
+        tr_dataset = GLMFDataset(
+            data=dataset.train_data,
+            tokenizer=dataset.llm_tokenizer,
+            max_seq_length=args.max_seq_length,
+            debug=args.debug,
+            n_hops=dataset.n_hops,
+        )
         va_dataset = GLMFDataset(
             data=dataset.val_data,
             tokenizer=dataset.llm_tokenizer,
             max_seq_length=args.max_seq_length,
             debug=args.debug,
+            n_hops=dataset.n_hops,
         )
         tr_loader = DataLoader(
             tr_dataset, batch_size=1, shuffle=True, collate_fn=collate_fn
@@ -160,6 +160,7 @@ def train_single_gpu_accelerate(
         ),  # Displays additional info
         BarColumn(),  # Displays a progress bar
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),  # Shows percentage
+        transient=True,
     ) as progress:
 
         train_task = progress.add_task("Training...", total=args.num_train_epochs)
@@ -201,7 +202,7 @@ def train_single_gpu_accelerate(
                     }
 
                     if args.debug:
-                        log_info = f"Length of input_ids - {len(micro_input['input_ids'])}, attention_mask - {len(micro_input['attention_mask'])}, labels - {len(micro_input['labels'])}"
+                        log_info = f"Length of input_ids - {micro_input['input_ids'].size()}, attention_mask - {micro_input['attention_mask'].size()}, labels - {micro_input['labels'].size()}"
                         console.log(f"Step {global_step}: {log_info}")
 
                     if "graph" in args.baseline_prompt:
@@ -300,7 +301,12 @@ def train_single_gpu_accelerate(
 
                 if (global_step % args.validating_steps == 0) and (args.debug == False):
                     val_loss = validate(
-                        args=args, loader=va_loader, model=model, device=device
+                        args=args,
+                        loader=va_loader,
+                        model=model,
+                        device=device,
+                        accelerator=accelerator,
+                        progress=progress,
                     )
                     wandb.log({"val_loss": val_loss})
                     console.log(
@@ -313,6 +319,7 @@ def train_single_gpu_accelerate(
             if ((continue_training == True) and (global_step > start_step)) or (
                 continue_training == False
             ):
+                progress.update(train_epoch_task, visible=False)
                 progress.remove_task(train_epoch_task)
                 progress.update(
                     train_task,
@@ -381,7 +388,7 @@ def train_multi_gpu_accelerate(
     optimizer: torch.optim.Optimizer,
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
     continue_training: bool = False,
-    start_step: int = 0,
+    start_step: int = -1,
     collate_fn: callable = collate_fn,
     mixed_precision: str = "bf16",
 ):
@@ -413,30 +420,28 @@ def train_multi_gpu_accelerate(
             init_kwargs={"wandb": {"name": args.name}},
         )
     save_path = os.path.join(args.output_dir, args.name)
+    if os.path.exists(save_path):
+        if continue_training == False:
+            shutil.rmtree(save_path)
+    os.makedirs(save_path, exist_ok=True)
     accelerator.print(f"Distributed type: {accelerator.distributed_type}")
     accelerator.print(f"Number of processes: {accelerator.num_processes}")
     accelerator.print(f"Mixed precision: {mixed_precision}")
 
     if args.model_debug == False:
-        if args.debug:
-            tr_dataset = GLMFDataset(
-                data=dataset.train_data[600:],
-                tokenizer=dataset.llm_tokenizer,
-                max_seq_length=args.max_seq_length,
-                debug=args.debug,
-            )
-        else:
-            tr_dataset = GLMFDataset(
-                data=dataset.train_data,
-                tokenizer=dataset.llm_tokenizer,
-                max_seq_length=args.max_seq_length,
-                debug=args.debug,
-            )
+        tr_dataset = GLMFDataset(
+            data=dataset.train_data,
+            tokenizer=dataset.llm_tokenizer,
+            max_seq_length=args.max_seq_length,
+            debug=args.debug,
+            n_hops=dataset.n_hops,
+        )
         va_dataset = GLMFDataset(
             data=dataset.val_data,
             tokenizer=dataset.llm_tokenizer,
             max_seq_length=args.max_seq_length,
             debug=args.debug,
+            n_hops=dataset.n_hops,
         )
         dataloader_params = {
             "batch_size": args.batch_size,
@@ -463,9 +468,7 @@ def train_multi_gpu_accelerate(
     console.log("Model patched with ring attention")
     device = accelerator.device
     config = model.config
-    model, optimizer, tr_loader, va_loader, lr_scheduler = accelerator.prepare(
-        model, optimizer, tr_loader, va_loader, lr_scheduler
-    )
+    model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
 
     if accelerator.is_main_process:
         accelerator.print(f"***** Running training *****")
@@ -489,6 +492,7 @@ def train_multi_gpu_accelerate(
         ),  # Displays additional info
         BarColumn(),  # Displays a progress bar
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),  # Shows percentage
+        transient=True,
     ) as progress:
 
         if accelerator.is_main_process:
@@ -498,13 +502,13 @@ def train_multi_gpu_accelerate(
             model.train()
 
             if accelerator.is_main_process:
-                if ((continue_training == True) and (global_step > start_step)) or (
-                    continue_training == False
-                ):
-                    train_epoch_task = progress.add_task(
-                        f"Epoch {epoch + 1}/{args.num_train_epochs}",
-                        total=len(tr_loader),
-                    )
+                # if ((continue_training == True) and (global_step > start_step)) or (
+                #     continue_training == False
+                # ):
+                train_epoch_task = progress.add_task(
+                    f"Epoch {epoch + 1}/{args.num_train_epochs}",
+                    total=len(tr_loader),
+                )
 
             epoch_loss = 0.0
             num_items = 0.0
@@ -513,6 +517,15 @@ def train_multi_gpu_accelerate(
 
                 if (continue_training == True) and (global_step <= start_step):
                     global_step += args.batch_size
+                    ram_usage = log_ram_usage()
+                    console.log(
+                        f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
+                    )
+                    progress.update(
+                        train_epoch_task,
+                        advance=1,
+                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB",
+                    )
                     continue
 
                 global_step += args.batch_size
@@ -645,6 +658,15 @@ def train_multi_gpu_accelerate(
                                 console.log(f"Step {global_step}: Updated scheduler")
 
                     batch_loss += loss.detach().float()
+                    if "graph" in args.baseline_prompt:
+                        for key in GRAPH_KEYS:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to("cpu")
+                                graph.pop(key, None)
+                        del graph_mask, graph
+                    del outputs, loss, micro_input
+                    gc.collect()
+                    torch.cuda.empty_cache()
 
                 # if args.debug:
                 #     pass
@@ -697,19 +719,15 @@ def train_multi_gpu_accelerate(
                         )
                         os.rename(old_dir, new_dir)
 
-                    checkpoint_dir = os.path.join(
+                    checkpoint_dir_new = os.path.join(
                         save_path,
                         f"current_checkpoint",
                     )
                     previous_checkpoint_step = global_step
-                    checkpoint_dir = os.path.join(
-                        save_path,
-                        f"checkpoint-{global_step}",
-                    )
                     unwrapped_model = accelerator.unwrap_model(model)
                     save_checkpoint(
                         model=unwrapped_model,
-                        path=checkpoint_dir,
+                        path=checkpoint_dir_new,
                         optimizer=optimizer,
                         scheduler=lr_scheduler,
                         global_step=global_step,
@@ -717,21 +735,25 @@ def train_multi_gpu_accelerate(
                     )
                     # accelerator.save_state(checkpoint_dir)
                     if accelerator.is_main_process:
-                        accelerator.print(f"Saving checkpoint to {checkpoint_dir}")
+                        accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
                     del unwrapped_model
 
-                del outputs, loss, micro_input, graph, graph_mask  # Free memory
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
+                # del outputs, loss, micro_input, graph, graph_mask  # Free memory
+                # if torch.cuda.is_available():
+                #     torch.cuda.empty_cache()
 
                 if global_step % args.validating_steps == 0:
+                    accelerator.wait_for_everyone()
                     val_loss = validate(
                         args=args,
                         loader=va_loader,
                         model=model,
                         device=device,
                         config=config,
+                        accelerator=accelerator,
+                        progress=progress,
                     )
+                    accelerator.wait_for_everyone()
 
                     if accelerator.is_main_process:
                         wandb.log({"val_loss": val_loss})
@@ -746,6 +768,7 @@ def train_multi_gpu_accelerate(
                 if ((continue_training == True) and (global_step > start_step)) or (
                     continue_training == False
                 ):
+                    progress.update(train_epoch_task, visible=False)
                     progress.remove_task(train_epoch_task)
                     progress.update(
                         train_task,

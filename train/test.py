@@ -1,4 +1,5 @@
 import os
+import gc
 import sys
 import json
 import time
@@ -10,7 +11,8 @@ from model.model import GLMFModelForCausalLM, GLMFModelConfig
 
 # from transformers import SinkCache
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
-
+from torch.utils.data import DataLoader
+from accelerate import Accelerator
 
 # typing
 from argparse import Namespace
@@ -35,6 +37,7 @@ def test(
         tokenizer=dataset.llm_tokenizer,
         max_seq_length=args.max_seq_length,
         debug=args.debug,
+        n_hops=dataset.n_hops,
         testing=True,
     )
     tokenizer = dataset.llm_tokenizer
@@ -248,7 +251,15 @@ def testCache(
     console.log(f"Results saved to {save_dir}")
 
 
-def validate(args, loader, model, config, device):
+def validate(
+    args: Namespace,
+    loader: DataLoader,
+    model: GLMFModelForCausalLM,
+    config: GLMFModelConfig,
+    device: torch.device,
+    progress: Progress,
+    accelerator: Accelerator,
+):
     model.eval()
     if config is None:
         config = model.config
@@ -257,66 +268,72 @@ def validate(args, loader, model, config, device):
         val_loss = 0.0
         num_item = 0
 
-        with tqdm(
-            total=len(loader),
-            position=0,
-            leave=True,
-            ncols=80,
-            dynamic_ncols=True,
-            mininterval=1.0,
-            smoothing=0.1,
-        ) as pbar:
+        if accelerator.is_main_process:
+            val_task = progress.add_task("Validating...", total=len(loader))
 
-            for step, batch in enumerate(loader):
-                batch_loss = 0.0
-                batch_size = batch["input"]["input_ids"].size(0)
-                num_item += batch_size
+        for step, batch in enumerate(loader):
+            batch_loss = 0.0
+            batch_size = batch["input"]["input_ids"].size(0)
+            num_item += batch_size
 
-                # Process each sample in the batch as a micro-batch.
-                try:
-                    for i in range(batch_size):
-                        batch_input = batch["input"].copy()
-                        if "token_type_ids" in batch_input:
-                            batch_input.pop("token_type_ids")
-                        micro_input = {
-                            "input_ids": batch_input["input_ids"][i].to(device),
-                            "attention_mask": batch_input["attention_mask"][i].to(
-                                device
-                            ),
-                            "labels": batch_input["labels"][i].to(device),
-                        }
+            # Process each sample in the batch as a micro-batch.
+            try:
+                for i in range(batch_size):
+                    batch_input = batch["input"].copy()
+                    if "token_type_ids" in batch_input:
+                        batch_input.pop("token_type_ids")
+                    micro_input = {
+                        "input_ids": batch_input["input_ids"][i].to(device),
+                        "attention_mask": batch_input["attention_mask"][i].to(device),
+                        "labels": batch_input["labels"][i].to(device),
+                    }
 
+                    if "graph" in args.baseline_prompt:
                         graph = batch["graph"][i]
                         for key in GRAPH_KEYS:
                             if key in graph.keys():
                                 graph[key] = graph[key].to(device)
 
                         graph_mask = batch["graph_mask"][i].to(device)
+                        graph_token_index = torch.where(
+                            micro_input["input_ids"] == config.graph_token_id[1]
+                        )[1].tolist()
+                    else:
+                        graph_token_index = None
 
-                        if "graph" in args.baseline_prompt:
-                            graph_token_index = torch.where(
-                                micro_input["input_ids"] == config.graph_token_id[1]
-                            )[1].tolist()
-                        else:
-                            graph_token_index = None
-
-                        outputs = model(
-                            **micro_input,
-                            graph=graph,
-                            graph_mask=graph_mask,
-                            graph_token_index=graph_token_index,
-                        )
-                        loss = outputs.loss
-                        batch_loss += loss.item()
-                except torch.cuda.OutOfMemoryError as e:
-                    tqdm.write(
-                        f"OOM in batch {step}: input_dis {micro_input['input_ids'].size()} - graph_mask {graph_mask.size()}"
+                    outputs = model(
+                        **micro_input,
+                        graph=graph,
+                        graph_mask=graph_mask,
+                        graph_token_index=graph_token_index,
                     )
+                    loss = outputs.loss
+                    batch_loss += loss.item()
+                    if "graph" in args.baseline_prompt:
+                        for key in GRAPH_KEYS:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to("cpu")
+                                graph.pop(key, None)
+                        del graph_mask, graph
+                    del outputs, loss, micro_input
+                    gc.collect()
                     torch.cuda.empty_cache()
-                    continue
 
-                val_loss += batch_loss
-                pbar.update(1)
+            except torch.cuda.OutOfMemoryError as e:
+                tqdm.write(
+                    f"OOM in batch {step}: input_dis {micro_input['input_ids'].size()} - graph_mask {graph_mask.size()}"
+                )
+                torch.cuda.empty_cache()
+                continue
+
+            if accelerator.is_main_process:
+                progress.update(
+                    val_task,
+                    advance=1,
+                    description=f"Batch {step + 1}/{len(loader)}: loss = {batch_loss/num_item:.4f}",
+                )
+
+            val_loss += batch_loss
 
         val_loss /= num_item
         return val_loss

@@ -232,18 +232,18 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             self.llm_model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
                 torch_dtype=torch.float16,
-                device_map=config.device_map,
+                device_map=f"cuda:{rank}",
             )
         elif config.dtype == "bfloat16":
             self.llm_model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
                 torch_dtype=torch.bfloat16,
-                device_map=config.device_map,
+                device_map=f"cuda:{rank}",
             )
         else:
             self.llm_model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
-                device_map=config.device_map,
+                device_map=f"cuda:{rank}",
             )
 
         if self.training:
