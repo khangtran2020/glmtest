@@ -2,6 +2,7 @@ import os
 import gc
 import torch
 import wandb
+import shutil
 import traceback
 from model.gnn import GRAPH_KEYS
 from torch.utils.data import DataLoader
@@ -90,6 +91,10 @@ def train_single_gpu_accelerate(
     console.log(f"Model will be saved to {save_path}...")
     if not os.path.exists(save_path):
         os.makedirs(save_path, exist_ok=True)
+    if os.path.exists(save_path):
+        if continue_training == False:
+            shutil.rmtree(save_path)
+            os.makedirs(save_path, exist_ok=True)
     # Initialize W&B run if main process
     accelerator.init_trackers(
         project_name="GLMFuzz",
@@ -415,6 +420,10 @@ def train_multi_gpu_accelerate(
             init_kwargs={"wandb": {"name": args.name}},
         )
     save_path = os.path.join(args.output_dir, args.name)
+    if os.path.exists(save_path):
+        if continue_training == False:
+            shutil.rmtree(save_path)
+    os.makedirs(save_path, exist_ok=True)
     accelerator.print(f"Distributed type: {accelerator.distributed_type}")
     accelerator.print(f"Number of processes: {accelerator.num_processes}")
     accelerator.print(f"Mixed precision: {mixed_precision}")

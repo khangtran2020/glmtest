@@ -839,6 +839,7 @@ class Data(object):
             val_data[key] = self.processed_data[key]
         for key in test_keys:
             test_data[key] = self.processed_data[key]
+
         self.train_data = train_data
         self.val_data = val_data
         self.test_data = test_data
