@@ -8,7 +8,7 @@ from utils.utils import print_args, seed_everything
 from data.utils import get_dataset
 from graph.utils import get_graph
 from train.train import train, GLMFModelForCausalLM, GLMFModelConfig
-from train.test import test
+from train.test import test,testCache
 from accelerate.utils import broadcast_object_list
 from train.utils import load_checkpoint
 from utils.constant import (
@@ -248,7 +248,7 @@ def main() -> None:
             #     pretrained_model_name_or_path=model_path, device_map="cpu"
             # )
             console.log(f"Model is loaded to device: {model.device}")
-            test(args=args, dataset=dataset, model=model, console=console)
+            testCache(args=args, dataset=dataset, model=model, console=console)
 
     elif args.mode == "test":
         # load model
@@ -303,7 +303,7 @@ def main() -> None:
             torch.load(os.path.join(args.model_weight_path, "model_weight.pt"))
         )
         console.log(f"Model is loaded to device: {model.device}")
-        test(args=args, dataset=dataset, model=model, console=console)
+        testCache(args=args, dataset=dataset, model=model, console=console)
 
 
 if __name__ == "__main__":
