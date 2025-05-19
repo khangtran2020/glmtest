@@ -11,6 +11,7 @@ from model.model import GLMFModelForCausalLM, GLMFModelConfig
 
 # from transformers import SinkCache
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
+from train.utils import patch_model, move_model_to_device, save_checkpoint
 from torch.utils.data import DataLoader
 from accelerate import Accelerator
 
@@ -73,7 +74,7 @@ def test(
                     "attention_mask": batch_input["attention_mask"].to(device),
                     "labels": None,
                 }
-
+                #if model.rank==0:
                 if "graph" in args.baseline_prompt:
                     graph = batch["graph"]
                     for key in GRAPH_KEYS:
@@ -95,7 +96,7 @@ def test(
                         graph_token_index=graph_token_index,
                         max_new_tokens=args.max_new_tokens,
                         do_sample=False,
-                        use_cache=True,
+                        use_cache=False,
                     )
                 else:
                     graph_token_index = None
@@ -104,10 +105,13 @@ def test(
                         graph_token_index=graph_token_index,
                         max_new_tokens=args.max_new_tokens,
                         do_sample=False,
-                        use_cache=True,
+                        use_cache=False,
                     )
-
-                out_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+         
+                out_text = tokenizer.batch_decode(outputs[:,micro_input["input_ids"].size(1):], skip_special_tokens=True)[0]
+                if model.rank==0:
+                    print(out_text)
+                # exit()
                 generated_text[uuid] = out_text
                 end_time = time.time()
                 process_time = end_time - start_time
@@ -136,17 +140,51 @@ def testCache(
     console: Console,
     collate_fn: callable = collate_fn,
 ):
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model.to(device)
+    
+    accelerator = Accelerator(
+        # gradient_accumulation_steps=args.gradient_accumulation_steps,
+        # mixed_precision=mixed_precision,
+        # log_with="wandb",
+        # project_dir=args.log_dir,
+    )
+    
+    device = accelerator.device
+    accelerator.print(f"Using {accelerator.num_processes} devices")
+    # accelerator.print(f"Mixed precision: {mixed_precision}")
+    
+    
+    
     console.log("Testing on device ... :", device)
     te_dataset = GLMFDataset(
         data=dataset.test_data,
         tokenizer=dataset.llm_tokenizer,
         max_seq_length=args.max_seq_length,
         debug=args.debug,
+        n_hops=dataset.n_hops,
         testing=True,
     )
     tokenizer = dataset.llm_tokenizer
+
+    ##Remove <|fuzz|> and <|/fuzz|> of the special token
+    removed = ["<|fuzz|>", "<|/fuzz|>"]
+    present = [t for t in removed if t in tokenizer.additional_special_tokens]
+    # 1. filter out from the additional_special_tokens list
+    new_ast = [
+        t for t in tokenizer.additional_special_tokens
+        if t not in present
+    ]
+    # update internal structures
+    tokenizer._additional_special_tokens = new_ast
+    tokenizer.special_tokens_map["additional_special_tokens"] = new_ast
+
+    ###End
+    
+    patch_model(model_type=model.config.model_type, mode="ring")
+    console.log("Model patched with ring attention")
+    device = accelerator.device
+    config = model.config
+    model = accelerator.prepare(model)
+    
     # past_key_values = SinkCache(window_length=256, num_sink_tokens=4)
     # loader = DataLoader(te_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
     save_dir = os.path.join(args.gen_dir, f"{args.name}.json")
@@ -159,7 +197,11 @@ def testCache(
 
     console.log(save_dir)
 
-    pending = [(uid, batch) for uid, batch in te_dataset if uid not in generated_text]
+    pending = []
+    for idx, uid in te_dataset.index_to_key_dict.items():
+        if uid not in generated_text:
+            _, batch = te_dataset[idx]
+            pending.append((uid, batch))
     console.log(f"{len(pending)} / {len(te_dataset)} samples to test")
 
     # console.log(f"Test data: {len(te_dataset)} data points")
@@ -178,6 +220,7 @@ def testCache(
             # generated_text = {}
             # time_list = []
             for step, (uuid, batch) in enumerate(pending):
+                accelerator.wait_for_everyone()
                 start_time = time.time()
                 # uuid, batch = batch_data
                 # batch_size = batch["input"]["input_ids"].size(0)
@@ -193,52 +236,86 @@ def testCache(
                     "labels": None,
                 }
 
+                accelerator.wait_for_everyone()
+                # if "graph" in args.baseline_prompt:
+                #     graph = batch["graph"]
+                #     for key in model.gnn.type_of_graph:
+                #         if key in graph.keys():
+                #             graph[key] = graph[key].to(device)
+
+                #     graph_mask = batch["graph_mask"].to(device)
+
+                #     graph_token_index = torch.where(
+                #         micro_input["input_ids"] == model.config.graph_token_id[1]
+                #     )[1].tolist()
+
                 if "graph" in args.baseline_prompt:
+                    # if args.debug:
+                    #     console.log("=" * 10 + "\n")
+                    #     console.log(
+                    #         f"Step {global_step}: Graph found in batch, checking keys..."
+                    #     )
+                    #     check_graph_exist_dict = {}
+                    #     for key in GRAPH_KEYS:
+                    #         check_graph_exist_dict[key] = False
+                            
                     graph = batch["graph"]
-                    for key in model.gnn.type_of_graph:
+                    for key in GRAPH_KEYS:
                         if key in graph.keys():
                             graph[key] = graph[key].to(device)
-
+                            # if args.debug:
+                            #     check_graph_exist_dict[key] = True
                     graph_mask = batch["graph_mask"].to(device)
-
                     graph_token_index = torch.where(
-                        micro_input["input_ids"] == model.config.graph_token_id[1]
+                        micro_input["input_ids"] == config.graph_token_id[1]
                     )[1].tolist()
+                else:
+                    graph = None
+                    graph_mask = None
+                    graph_token_index = None
                     # if args.debug:
                     #     console.log(f"Graph token id: {graph_token_index}")
 
-                    outputs = model.generate(
+
+                accelerator.wait_for_everyone()
+                
+                if accelerator.is_main_process:
+                    outputs = model.module.generate(
                         inputs=micro_input["input_ids"],
                         graph=graph,
                         graph_mask=graph_mask,
                         graph_token_index=graph_token_index,
                         max_new_tokens=args.max_new_tokens,
                         do_sample=False,
-                        use_cache=True,
+                        use_cache=False,
                     )
-                else:
-                    graph_token_index = None
-                    outputs = model.generate(
-                        inputs=micro_input["input_ids"],
-                        graph_token_index=graph_token_index,
-                        max_new_tokens=args.max_new_tokens,
-                        do_sample=False,
-                        use_cache=True,
+                    # else:
+                    #     graph_token_index = None
+                    #     outputs = model.generate(
+                    #         inputs=micro_input["input_ids"],
+                    #         graph_token_index=graph_token_index,
+                    #         max_new_tokens=args.max_new_tokens,
+                    #         do_sample=False,
+                    #         use_cache=False,
+                    #     )
+    
+                    out_text = tokenizer.batch_decode(outputs[:,micro_input["input_ids"].size(1):], skip_special_tokens=True)[0]
+                    print(out_text)
+                    # exit()
+                    generated_text[uuid] = out_text
+                    del outputs, micro_input, graph, graph_mask
+    
+                    if step % 2 == 0 or step == len(pending) - 1:
+                        with open(save_dir, "w", encoding="utf-8") as f:
+                            json.dump(generated_text, f, ensure_ascii=False, indent=4)
+    
+                    elapsed = time.time() - start_time
+                    progress.update(
+                        test_task,
+                        advance=1,
+                        description=f"Testing {step+1}/{len(pending)} — {elapsed:.2f}s",
                     )
-
-                out_text = tokenizer.batch_decode(outputs, skip_special_tokens=False)[0]
-                generated_text[uuid] = out_text
-
-                if step % 2 == 0 or step == len(pending) - 1:
-                    with open(save_dir, "w", encoding="utf-8") as f:
-                        json.dump(generated_text, f, ensure_ascii=False, indent=4)
-
-                elapsed = time.time() - start_time
-                progress.update(
-                    test_task,
-                    advance=1,
-                    description=f"Testing {step+1}/{len(pending)} — {elapsed:.2f}s",
-                )
+                    accelerator.wait_for_everyone()
 
     console.log("Testing finished.")
     save_dir = os.path.join(args.gen_dir, f"{args.name}.json")

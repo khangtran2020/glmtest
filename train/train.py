@@ -792,13 +792,13 @@ def train_multi_gpu_accelerate(
             unwrapped_model.llm_model = unwrapped_model.llm_model.merge_and_unload()
             unwrapped_model.config.use_lora = False
 
-        if any(p.device.type == "meta" for p in unwrapped_model.parameters()):
-            device_to_save = (
-                torch.device("cuda")
-                if torch.cuda.is_available()
-                else torch.device("cpu")
-            )
-            move_model_to_device(unwrapped_model, device_to_save)
+        # if any(p.device.type == "meta" for p in unwrapped_model.parameters()):
+        #     device_to_save = (
+        #         torch.device("cuda")
+        #         if torch.cuda.is_available()
+        #         else torch.device("cpu")
+        #     )
+        #     move_model_to_device(unwrapped_model, device_to_save)
 
         # for p in unwrapped_model.parameters():
         #     console.log(f"Parameter device: {p.device}")
