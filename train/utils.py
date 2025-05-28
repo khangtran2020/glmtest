@@ -1,4 +1,5 @@
 import os
+import re
 import copy
 import torch
 import subprocess
@@ -227,3 +228,15 @@ def load_checkpoint(
     seed = checkpoint["seed"]
     seed_everything(seed)
     return checkpoint
+
+def extract_code_block(markdown: str) -> Optional[str]:
+    cleaned = re.sub(r"<\|/?fuzz\|>", "", markdown)
+
+    pattern = r"```(?:\w+)?\n([\s\S]*?)```"
+    match = re.search(pattern, cleaned)
+    if match:
+        return match.group(1)
+
+    return cleaned
+
+

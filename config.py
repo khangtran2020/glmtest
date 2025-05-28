@@ -157,6 +157,13 @@ def add_training_group(group):
         help="max sequence length",
         default=12000,
     )
+
+    group.add_argument(
+        "--temp",
+        type=float,
+        help="temperature",
+        default=None,
+    )
     group.add_argument(
         "--batch_size",
         type=int,
@@ -192,6 +199,12 @@ def add_training_group(group):
         default="./results/generated/",
         type=str,
         help="output directory to save model",
+    )
+    group.add_argument(
+        "--gen_file_path",
+        default="None",
+        type=str,
+        help="output file",
     )
     group.add_argument(
         "--model_dir",

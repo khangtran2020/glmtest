@@ -11,7 +11,8 @@ from model.model import GLMFModelForCausalLM, GLMFModelConfig
 
 # from transformers import SinkCache
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
-from train.utils import patch_model, move_model_to_device, save_checkpoint
+from utils.utils import calculate_codebleu
+from train.utils import patch_model, move_model_to_device, save_checkpoint, extract_code_block
 from torch.utils.data import DataLoader
 from accelerate import Accelerator
 
@@ -166,16 +167,16 @@ def testCache(
     tokenizer = dataset.llm_tokenizer
 
     ##Remove <|fuzz|> and <|/fuzz|> of the special token
-    removed = ["<|fuzz|>", "<|/fuzz|>"]
-    present = [t for t in removed if t in tokenizer.additional_special_tokens]
-    # 1. filter out from the additional_special_tokens list
-    new_ast = [
-        t for t in tokenizer.additional_special_tokens
-        if t not in present
-    ]
-    # update internal structures
-    tokenizer._additional_special_tokens = new_ast
-    tokenizer.special_tokens_map["additional_special_tokens"] = new_ast
+    # removed = ["<|fuzz|>", "<|/fuzz|>"]
+    # present = [t for t in removed if t in tokenizer.additional_special_tokens]
+    # # 1. filter out from the additional_special_tokens list
+    # new_ast = [
+    #     t for t in tokenizer.additional_special_tokens
+    #     if t not in present
+    # ]
+    # # update internal structures
+    # tokenizer._additional_special_tokens = new_ast
+    # tokenizer.special_tokens_map["additional_special_tokens"] = new_ast
 
     ###End
     
@@ -280,15 +281,27 @@ def testCache(
                 accelerator.wait_for_everyone()
                 
                 if accelerator.is_main_process:
-                    outputs = model.module.generate(
-                        inputs=micro_input["input_ids"],
-                        graph=graph,
-                        graph_mask=graph_mask,
-                        graph_token_index=graph_token_index,
-                        max_new_tokens=args.max_new_tokens,
-                        do_sample=False,
-                        use_cache=False,
-                    )
+                    if args.temp is not None:
+                        outputs = model.module.generate(
+                            inputs=micro_input["input_ids"],
+                            graph=graph,
+                            graph_mask=graph_mask,
+                            graph_token_index=graph_token_index,
+                            max_new_tokens=args.max_new_tokens,
+                            temperature = args.temp,
+                            do_sample=True,
+                            use_cache=False,
+                        )
+                    else:
+                        outputs = model.module.generate(
+                            inputs=micro_input["input_ids"],
+                            graph=graph,
+                            graph_mask=graph_mask,
+                            graph_token_index=graph_token_index,
+                            max_new_tokens=args.max_new_tokens,
+                            do_sample=False,
+                            use_cache=False,
+                        )
                     # else:
                     #     graph_token_index = None
                     #     outputs = model.generate(
@@ -316,17 +329,60 @@ def testCache(
                         description=f"Testing {step+1}/{len(pending)} — {elapsed:.2f}s",
                     )
                     accelerator.wait_for_everyone()
+    
+    
+    if accelerator.is_main_process:
+        console.log("Testing finished.")
+    # save_dir = os.path.join(args.gen_dir, f"{args.name}.json")
+    # with console.status("Saving results..."):
+    #     # save generated text to jsonl file
+    #     with open(save_dir, "w", encoding="utf-8") as f:
+    #         # save as json file
+    #         json.dump(generated_text, f, ensure_ascii=False, indent=4)
 
-    console.log("Testing finished.")
-    save_dir = os.path.join(args.gen_dir, f"{args.name}.json")
-    with console.status("Saving results..."):
-        # save generated text to jsonl file
-        with open(save_dir, "w", encoding="utf-8") as f:
-            # save as json file
-            json.dump(generated_text, f, ensure_ascii=False, indent=4)
+    # console.log(f"Results saved to {save_dir}")
 
-    console.log(f"Results saved to {save_dir}")
-
+def getMetric(
+    args: Namespace,
+    dataset: GLMFDataset,
+    console: Console,
+    collate_fn: callable = collate_fn,
+):
+    bleu = 0
+    codeBleu = 0
+    data = dataset.test_data
+    with open(args.gen_file_path, 'r', encoding='utf-8') as f:
+        generate_response = json.load(f)
+    
+    i = 0
+    for key in data.keys():
+        if key not in generate_response.keys():
+            #print(f"skip {i}")
+            continue
+        else:
+            i+=1
+            #print(f"not skip {i}")
+            file_path = data[key]
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    ground_truth = json.load(f)
+            except FileNotFoundError:
+                print(f"Error: File not found: {file_path}")
+            except json.JSONDecodeError as e:
+                print(f"Error parsing JSON: {e}")
+            except Exception as e:
+                print(f"An unexpected error occurred: {e}")
+            ref = extract_code_block(ground_truth['response'])
+            pred = extract_code_block(generate_response[key])
+            result = calculate_codebleu(ref, pred)
+            bleu += result['bleu_score']
+            codeBleu += result['codebleu_score']
+    print(i)
+    print(f"Bleu Score: {bleu/i}")
+    print(f"CodeBleu Score: {codeBleu/i}")
+    # print(dataset.test_data)
+    
+    
 
 def validate(
     args: Namespace,
