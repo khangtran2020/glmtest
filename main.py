@@ -8,7 +8,7 @@ from utils.utils import print_args, seed_everything
 from data.utils import get_dataset
 from graph.utils import get_graph
 from train.train import train, GLMFModelForCausalLM, GLMFModelConfig
-from train.test import test,testCache
+from train.test import test,testCache,getMetric
 from accelerate.utils import broadcast_object_list
 from train.utils import load_checkpoint
 from utils.constant import (
@@ -31,11 +31,11 @@ warnings.filterwarnings("ignore")
 
 
 def main() -> None:
-    # timeout_long_ncll = timedelta(seconds=90000)  # 100 minutes
-    # init_process_group("nccl", timeout=timeout_long_ncll)
-
+    
     args = parse_args()
-
+    if args.num_gpu > 1:
+        timeout_long_ncll = timedelta(seconds=90000)  # 100 minutes
+        init_process_group("nccl", timeout=timeout_long_ncll)
     # accelerator = Accelerator(
     #     gradient_accumulation_steps=args.gradient_accumulation_steps,
     #     mixed_precision=args.dtype,
@@ -248,7 +248,7 @@ def main() -> None:
             #     pretrained_model_name_or_path=model_path, device_map="cpu"
             # )
             console.log(f"Model is loaded to device: {model.device}")
-            testCache(args=args, dataset=dataset, model=model, console=console)
+            test(args=args, dataset=dataset, model=model, console=console)
 
     elif args.mode == "test":
         # load model
@@ -303,7 +303,15 @@ def main() -> None:
             torch.load(os.path.join(args.model_weight_path, "model_weight.pt"))
         )
         console.log(f"Model is loaded to device: {model.device}")
-        testCache(args=args, dataset=dataset, model=model, console=console)
+        test(args=args, dataset=dataset, model=model, console=console)
+        
+    elif args.mode == "metric":
+        
+        assert (
+            args.gen_file_path is not None
+        ), "File-path must be specified for metric mode."
+
+        getMetric(args=args, dataset=dataset, console=console)
 
 
 if __name__ == "__main__":
