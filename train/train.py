@@ -483,6 +483,7 @@ def train_multi_gpu_accelerate(
         )
 
     global_step = 0
+    model.train()
     previous_checkpoint_step = -1
 
     with Progress(
@@ -499,7 +500,6 @@ def train_multi_gpu_accelerate(
             train_task = progress.add_task("Training...", total=args.num_train_epochs)
 
         for epoch in range(args.num_train_epochs):
-            model.train()
 
             if accelerator.is_main_process:
                 # if ((continue_training == True) and (global_step > start_step)) or (
@@ -760,6 +760,7 @@ def train_multi_gpu_accelerate(
                         console.log(
                             f"Validation loss: {val_loss:.4f} at step {global_step}"
                         )
+                    model.train()
 
             # if args.debug:
             #     break

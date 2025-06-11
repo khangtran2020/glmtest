@@ -12,7 +12,12 @@ from model.model import GLMFModelForCausalLM, GLMFModelConfig
 # from transformers import SinkCache
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from utils.utils import calculate_codebleu
-from train.utils import patch_model, move_model_to_device, save_checkpoint, extract_code_block
+from train.utils import (
+    patch_model,
+    move_model_to_device,
+    save_checkpoint,
+    extract_code_block,
+)
 from torch.utils.data import DataLoader
 from accelerate import Accelerator
 
@@ -75,7 +80,7 @@ def test(
                     "attention_mask": batch_input["attention_mask"].to(device),
                     "labels": None,
                 }
-                #if model.rank==0:
+                # if model.rank==0:
                 if "graph" in args.baseline_prompt:
                     graph = batch["graph"]
                     for key in GRAPH_KEYS:
@@ -108,9 +113,12 @@ def test(
                         do_sample=False,
                         use_cache=False,
                     )
-         
-                out_text = tokenizer.batch_decode(outputs[:,micro_input["input_ids"].size(1):], skip_special_tokens=True)[0]
-                if model.rank==0:
+
+                out_text = tokenizer.batch_decode(
+                    outputs[:, micro_input["input_ids"].size(1) :],
+                    skip_special_tokens=True,
+                )[0]
+                if model.rank == 0:
                     print(out_text)
                 # exit()
                 generated_text[uuid] = out_text
@@ -141,20 +149,18 @@ def testCache(
     console: Console,
     collate_fn: callable = collate_fn,
 ):
-    
+
     accelerator = Accelerator(
         # gradient_accumulation_steps=args.gradient_accumulation_steps,
         # mixed_precision=mixed_precision,
         # log_with="wandb",
         # project_dir=args.log_dir,
     )
-    
+
     device = accelerator.device
     accelerator.print(f"Using {accelerator.num_processes} devices")
     # accelerator.print(f"Mixed precision: {mixed_precision}")
-    
-    
-    
+
     console.log("Testing on device ... :", device)
     te_dataset = GLMFDataset(
         data=dataset.test_data,
@@ -179,13 +185,13 @@ def testCache(
     # tokenizer.special_tokens_map["additional_special_tokens"] = new_ast
 
     ###End
-    
+
     patch_model(model_type=model.config.model_type, mode="ring")
     console.log("Model patched with ring attention")
     device = accelerator.device
     config = model.config
     model = accelerator.prepare(model)
-    
+
     # past_key_values = SinkCache(window_length=256, num_sink_tokens=4)
     # loader = DataLoader(te_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
     save_dir = os.path.join(args.gen_dir, f"{args.name}.json")
@@ -259,7 +265,7 @@ def testCache(
                     #     check_graph_exist_dict = {}
                     #     for key in GRAPH_KEYS:
                     #         check_graph_exist_dict[key] = False
-                            
+
                     graph = batch["graph"]
                     for key in GRAPH_KEYS:
                         if key in graph.keys():
@@ -277,9 +283,8 @@ def testCache(
                     # if args.debug:
                     #     console.log(f"Graph token id: {graph_token_index}")
 
-
                 accelerator.wait_for_everyone()
-                
+
                 if accelerator.is_main_process:
                     if args.temp is not None:
                         outputs = model.module.generate(
@@ -288,7 +293,7 @@ def testCache(
                             graph_mask=graph_mask,
                             graph_token_index=graph_token_index,
                             max_new_tokens=args.max_new_tokens,
-                            temperature = args.temp,
+                            temperature=args.temp,
                             do_sample=True,
                             use_cache=False,
                         )
@@ -311,17 +316,20 @@ def testCache(
                     #         do_sample=False,
                     #         use_cache=False,
                     #     )
-    
-                    out_text = tokenizer.batch_decode(outputs[:,micro_input["input_ids"].size(1):], skip_special_tokens=True)[0]
+
+                    out_text = tokenizer.batch_decode(
+                        outputs[:, micro_input["input_ids"].size(1) :],
+                        skip_special_tokens=True,
+                    )[0]
                     print(out_text)
                     # exit()
                     generated_text[uuid] = out_text
                     del outputs, micro_input, graph, graph_mask
-    
+
                     if step % 2 == 0 or step == len(pending) - 1:
                         with open(save_dir, "w", encoding="utf-8") as f:
                             json.dump(generated_text, f, ensure_ascii=False, indent=4)
-    
+
                     elapsed = time.time() - start_time
                     progress.update(
                         test_task,
@@ -329,8 +337,7 @@ def testCache(
                         description=f"Testing {step+1}/{len(pending)} — {elapsed:.2f}s",
                     )
                     accelerator.wait_for_everyone()
-    
-    
+
     if accelerator.is_main_process:
         console.log("Testing finished.")
     # save_dir = os.path.join(args.gen_dir, f"{args.name}.json")
@@ -342,6 +349,7 @@ def testCache(
 
     # console.log(f"Results saved to {save_dir}")
 
+
 def getMetric(
     args: Namespace,
     dataset: GLMFDataset,
@@ -351,20 +359,20 @@ def getMetric(
     bleu = 0
     codeBleu = 0
     data = dataset.test_data
-    with open(args.gen_file_path, 'r', encoding='utf-8') as f:
+    with open(args.gen_file_path, "r", encoding="utf-8") as f:
         generate_response = json.load(f)
-    
+
     i = 0
     for key in data.keys():
         if key not in generate_response.keys():
-            #print(f"skip {i}")
+            # print(f"skip {i}")
             continue
         else:
-            i+=1
-            #print(f"not skip {i}")
+            i += 1
+            # print(f"not skip {i}")
             file_path = data[key]
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, "r", encoding="utf-8") as f:
                     ground_truth = json.load(f)
             except FileNotFoundError:
                 print(f"Error: File not found: {file_path}")
@@ -372,17 +380,16 @@ def getMetric(
                 print(f"Error parsing JSON: {e}")
             except Exception as e:
                 print(f"An unexpected error occurred: {e}")
-            ref = extract_code_block(ground_truth['response'])
+            ref = extract_code_block(ground_truth["response"])
             pred = extract_code_block(generate_response[key])
             result = calculate_codebleu(ref, pred)
-            bleu += result['bleu_score']
-            codeBleu += result['codebleu_score']
+            bleu += result["bleu_score"]
+            codeBleu += result["codebleu_score"]
     print(i)
     print(f"Bleu Score: {bleu/i}")
     print(f"CodeBleu Score: {codeBleu/i}")
     # print(dataset.test_data)
-    
-    
+
 
 def validate(
     args: Namespace,
@@ -442,12 +449,19 @@ def validate(
                     )
                     loss = outputs.loss
                     batch_loss += loss.item()
+
+                    for key in micro_input.keys():
+                        micro_input[key] = micro_input[key].to("cpu")
                     if "graph" in args.baseline_prompt:
                         for key in GRAPH_KEYS:
                             if key in graph.keys():
                                 graph[key] = graph[key].to("cpu")
                                 graph.pop(key, None)
+                        graph_mask = graph_mask.to("cpu")
                         del graph_mask, graph
+                    loss = loss.to("cpu")
+                    for key in outputs.keys():
+                        outputs[key] = outputs[key].to("cpu")
                     del outputs, loss, micro_input
                     gc.collect()
                     torch.cuda.empty_cache()
