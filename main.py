@@ -8,7 +8,7 @@ from utils.utils import print_args, seed_everything
 from data.utils import get_dataset
 from graph.utils import get_graph
 from train.train import train, GLMFModelForCausalLM, GLMFModelConfig
-from train.test import test,testCache,getMetric
+from train.test import test, testCache, getMetric
 from accelerate.utils import broadcast_object_list
 from train.utils import load_checkpoint
 from utils.constant import (
@@ -31,7 +31,7 @@ warnings.filterwarnings("ignore")
 
 
 def main() -> None:
-    
+
     args = parse_args()
     if args.num_gpu > 1:
         timeout_long_ncll = timedelta(seconds=90000)  # 100 minutes
@@ -201,7 +201,7 @@ def main() -> None:
             filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
         )
         lr_scheduler = get_scheduler(
-            name="cosine",
+            name="cosine_with_restarts",
             optimizer=optimizer,
             num_warmup_steps=100,
             num_training_steps=args.num_train_epochs,
@@ -304,9 +304,9 @@ def main() -> None:
         )
         console.log(f"Model is loaded to device: {model.device}")
         test(args=args, dataset=dataset, model=model, console=console)
-        
+
     elif args.mode == "metric":
-        
+
         assert (
             args.gen_file_path is not None
         ), "File-path must be specified for metric mode."
