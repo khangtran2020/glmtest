@@ -652,7 +652,9 @@ def train_multi_gpu_accelerate(
                                 )
                             lr_scheduler.step()
                             if args.debug & accelerator.is_main_process:
-                                console.log(f"Step {global_step}: Updated scheduler")
+                                console.log(
+                                    f"Step {global_step}: Updated scheduler - learning rate is: {lr_scheduler.get_last_lr()[0]}"
+                                )
                             optimizer.zero_grad()
                             if args.debug & accelerator.is_main_process:
                                 console.log(f"Step {global_step}: Updated scheduler")
