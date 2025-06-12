@@ -658,11 +658,15 @@ def train_multi_gpu_accelerate(
                                 console.log(f"Step {global_step}: Updated scheduler")
 
                     batch_loss += loss.detach().float()
+
+                    for key in micro_input.keys():
+                        micro_input[key] = micro_input[key].to("cpu")
                     if "graph" in args.baseline_prompt:
                         for key in GRAPH_KEYS:
                             if key in graph.keys():
                                 graph[key] = graph[key].to("cpu")
                                 graph.pop(key, None)
+                        graph_mask = graph_mask.to("cpu")
                         del graph_mask, graph
                     del outputs, loss, micro_input
                     gc.collect()

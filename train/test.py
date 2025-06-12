@@ -460,8 +460,8 @@ def validate(
                         graph_mask = graph_mask.to("cpu")
                         del graph_mask, graph
                     loss = loss.to("cpu")
-                    for key in outputs.keys():
-                        outputs[key] = outputs[key].to("cpu")
+                    # for key in outputs.keys():
+                    #     outputs[key] = outputs[key].to("cpu")
                     del outputs, loss, micro_input
                     gc.collect()
                     torch.cuda.empty_cache()
