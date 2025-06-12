@@ -118,8 +118,8 @@ def test(
                     outputs[:, micro_input["input_ids"].size(1) :],
                     skip_special_tokens=True,
                 )[0]
-                if model.rank == 0:
-                    print(out_text)
+                # if model.rank == 0:
+                #     print(out_text)
                 # exit()
                 generated_text[uuid] = out_text
                 end_time = time.time()

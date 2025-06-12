@@ -35,9 +35,6 @@ warnings.filterwarnings("ignore")
 def main() -> None:
 
     args = parse_args()
-    if args.num_gpu > 1:
-        timeout_long_ncll = timedelta(seconds=90000)  # 100 minutes
-        init_process_group("nccl", timeout=timeout_long_ncll)
     # accelerator = Accelerator(
     #     gradient_accumulation_steps=args.gradient_accumulation_steps,
     #     mixed_precision=args.dtype,
@@ -63,10 +60,10 @@ def main() -> None:
     if args.model_dir is None:
         args.model_dir = args.output_dir
 
-    if "WORLD_SIZE" in os.environ and int(os.environ["WORLD_SIZE"]) > 1:
-        args.num_gpu = int(os.environ["WORLD_SIZE"])
-    else:
-        args.num_gpu = torch.cuda.device_count()
+    # if "WORLD_SIZE" in os.environ and int(os.environ["WORLD_SIZE"]) > 1:
+    #     args.num_gpu = int(os.environ["WORLD_SIZE"])
+    # else:
+    #     args.num_gpu = torch.cuda.device_count()
 
     # Initializing the dataset
     graph = get_graph(
@@ -134,6 +131,7 @@ def main() -> None:
             console.log(
                 f"Distributed training: rank {rank}/{world_size}, using device {device}."
             )
+            args.num_gpu = world_size
         else:
             # Fallback for single-node training, single or multi GPU.
             n_gpus = torch.cuda.device_count()
@@ -142,14 +140,21 @@ def main() -> None:
                 # device = torch.device("cuda:0")
                 rank = int(os.environ.get("RANK", 0))
                 device = torch.device("cuda", rank)
+                args.num_gpu = n_gpus
             else:
                 console.log("Using 1 GPU.")
                 device = torch.device("cuda:0")
                 rank = 0
+                args.num_gpu = 1
     else:
         console.log("No GPUs available, using CPU instead.")
         device = torch.device("cpu")
         rank = -1
+        args.num_gpu = 0
+
+    if args.num_gpu > 1:
+        timeout_long_ncll = timedelta(seconds=90000)  # 100 minutes
+        init_process_group("nccl", timeout=timeout_long_ncll)
 
     config = GLMFModelConfig(
         llm_model=args.llm_model,
@@ -239,20 +244,21 @@ def main() -> None:
 
         if args.do_test:
 
-            model_path = os.path.join(args.output_dir, args.name)
-            model_path = os.path.join(model_path, "final_model")
-            model.load_state_dict(
-                torch.load(os.path.join(model_path, "model_weight.pt"))
-            )
-            # config = AutoModelForCausalLM.from_pretrained(model_path, device_map="cuda")
-            # console.log(f"Config loaded from: {model_path}\n {config}")
-            # config.vocab_size = dataset.llm_tokenizer.vocab_size
-            # console.log("Config vocab size:", config.vocab_size)
-            # model = GLMFModelForCausalLM.from_pretrained(
-            #     pretrained_model_name_or_path=model_path, device_map="cpu"
+            console.log(f"Please run testing separately")
+            # model_path = os.path.join(args.output_dir, args.name)
+            # model_path = os.path.join(model_path, "final_model")
+            # model.load_state_dict(
+            #     torch.load(os.path.join(model_path, "model_weight.pt"))
             # )
-            console.log(f"Model is loaded to device: {model.device}")
-            test(args=args, dataset=dataset, model=model, console=console)
+            # # config = AutoModelForCausalLM.from_pretrained(model_path, device_map="cuda")
+            # # console.log(f"Config loaded from: {model_path}\n {config}")
+            # # config.vocab_size = dataset.llm_tokenizer.vocab_size
+            # # console.log("Config vocab size:", config.vocab_size)
+            # # model = GLMFModelForCausalLM.from_pretrained(
+            # #     pretrained_model_name_or_path=model_path, device_map="cpu"
+            # # )
+            # console.log(f"Model is loaded to device: {model.device}")
+            # test(args=args, dataset=dataset, model=model, console=console)
 
     elif args.mode == "test":
         # load model
