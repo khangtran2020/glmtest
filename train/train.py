@@ -483,6 +483,7 @@ def train_multi_gpu_accelerate(
         )
 
     global_step = 0
+    model.train()
     previous_checkpoint_step = -1
 
     with Progress(
@@ -499,7 +500,6 @@ def train_multi_gpu_accelerate(
             train_task = progress.add_task("Training...", total=args.num_train_epochs)
 
         for epoch in range(args.num_train_epochs):
-            model.train()
 
             if accelerator.is_main_process:
                 # if ((continue_training == True) and (global_step > start_step)) or (
@@ -652,17 +652,23 @@ def train_multi_gpu_accelerate(
                                 )
                             lr_scheduler.step()
                             if args.debug & accelerator.is_main_process:
-                                console.log(f"Step {global_step}: Updated scheduler")
+                                console.log(
+                                    f"Step {global_step}: Updated scheduler - learning rate is: {lr_scheduler.get_last_lr()[0]}"
+                                )
                             optimizer.zero_grad()
                             if args.debug & accelerator.is_main_process:
                                 console.log(f"Step {global_step}: Updated scheduler")
 
                     batch_loss += loss.detach().float()
+
+                    for key in micro_input.keys():
+                        micro_input[key] = micro_input[key].to("cpu")
                     if "graph" in args.baseline_prompt:
                         for key in GRAPH_KEYS:
                             if key in graph.keys():
                                 graph[key] = graph[key].to("cpu")
                                 graph.pop(key, None)
+                        graph_mask = graph_mask.to("cpu")
                         del graph_mask, graph
                     del outputs, loss, micro_input
                     gc.collect()
@@ -760,6 +766,7 @@ def train_multi_gpu_accelerate(
                         console.log(
                             f"Validation loss: {val_loss:.4f} at step {global_step}"
                         )
+                    model.train()
 
             # if args.debug:
             #     break

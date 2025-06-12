@@ -246,7 +246,7 @@ def add_training_group(group):
         "--learning_rate",
         type=float,
         help="learning rate",
-        default=5e-5,
+        default=1e-3,
     )
     group.add_argument(
         "--rope_theta",
