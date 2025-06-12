@@ -17,6 +17,8 @@ from utils.constant import (
     GRAPH_END_TOKEN,
 )
 
+from torch.optim.lr_scheduler import CosineAnnealingLR
+
 from transformers import get_scheduler
 from torch.optim import AdamW
 from utils.utils import log_ram_usage
@@ -200,12 +202,14 @@ def main() -> None:
         optimizer = AdamW(
             filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
         )
-        lr_scheduler = get_scheduler(
-            name="cosine_with_restarts",
-            optimizer=optimizer,
-            num_warmup_steps=100,
-            num_training_steps=args.num_train_epochs,
-        )
+        lr_scheduler = CosineAnnealingLR(optimizer, T_max=100, eta_min=5e-5)
+
+        # get_scheduler(
+        #     name="cosine_with_restarts",
+        #     optimizer=optimizer,
+        #     num_warmup_steps=100,
+        #     num_training_steps=args.num_train_epochs,
+        # )
 
         if args.continue_training:
             assert (
