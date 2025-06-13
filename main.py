@@ -35,15 +35,6 @@ warnings.filterwarnings("ignore")
 def main() -> None:
 
     args = parse_args()
-    # accelerator = Accelerator(
-    #     gradient_accumulation_steps=args.gradient_accumulation_steps,
-    #     mixed_precision=args.dtype,
-    #     log_with="wandb",
-    #     project_dir=args.log_dir,
-    # )
-
-    # Initialize args, logger, model and dataset:
-    # if accelerator.is_main_process:
     console.log("Processing data and initializing model in main process...")
 
     # Initialize the argument parser
@@ -59,11 +50,6 @@ def main() -> None:
 
     if args.model_dir is None:
         args.model_dir = args.output_dir
-
-    # if "WORLD_SIZE" in os.environ and int(os.environ["WORLD_SIZE"]) > 1:
-    #     args.num_gpu = int(os.environ["WORLD_SIZE"])
-    # else:
-    #     args.num_gpu = torch.cuda.device_count()
 
     # Initializing the dataset
     graph = get_graph(
@@ -108,15 +94,6 @@ def main() -> None:
         dataset.prepare_data()
         dataset.train_test_split(val_split=1000, test_split=200)
 
-    # else:
-    #     dataset = [None]
-    #     args = [None]
-
-    # broadcast the args and dataset to all processes
-    # dataset = accelerator.send
-    # # # (dataset, src_rank=0)
-    # dataset = broadcast_object_list(object_list=dataset, from_process=0)
-    # args = broadcast_object_list(object_list=args, from_process=0)
     console.log(f"Broadcasted args and dataset to all processes.")
 
     if torch.cuda.is_available():
@@ -173,11 +150,6 @@ def main() -> None:
         device_map="cuda" if torch.cuda.is_available() else "cpu",
     )
 
-    # if config.model_type not in ["llama", "qwen2"]:
-    #     raise ValueError(
-    #         f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2'."
-    #     )
-
     if args.mode == "train":
 
         model = GLMFModelForCausalLM(
@@ -208,13 +180,6 @@ def main() -> None:
             filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
         )
         lr_scheduler = CosineAnnealingLR(optimizer, T_max=100, eta_min=5e-5)
-
-        # get_scheduler(
-        #     name="cosine_with_restarts",
-        #     optimizer=optimizer,
-        #     num_warmup_steps=100,
-        #     num_training_steps=args.num_train_epochs,
-        # )
 
         if args.continue_training:
             assert (

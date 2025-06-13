@@ -47,6 +47,7 @@ def train(
             start_step=start_step,
             mixed_precision=mixed_precision,
             model=model,
+            max_num_checkpoint=max_num_checkpoint,
             collate_fn=collate_fn,
             # rank=-1,
         )
@@ -62,6 +63,7 @@ def train(
             start_step=start_step,
             mixed_precision=mixed_precision,
             model=model,
+            max_num_checkpoint=max_num_checkpoint,
             collate_fn=collate_fn,
             # rank=-1,
         )

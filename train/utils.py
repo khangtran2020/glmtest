@@ -216,6 +216,7 @@ def save_checkpoint(
             ],
             key=os.path.getctime,
         )
+        print(f"Removing oldest checkpoint: {oldest_checkpoint}")
         shutil.rmtree(oldest_checkpoint)
 
     save_name = os.path.join(path, f"checkpoint-{global_step}.pt")
