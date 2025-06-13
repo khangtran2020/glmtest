@@ -739,6 +739,18 @@ def train_multi_gpu_accelerate(
                         )
                         previous_checkpoint_step = global_step
 
+                        while len(os.listdir(save_path)) >= max_num_checkpoint:
+                            oldest_checkpoint = min(
+                                [
+                                    os.path.join(save_path, f)
+                                    for f in os.listdir(save_path)
+                                    if f.startswith("checkpoint-")
+                                ],
+                                key=os.path.getctime,
+                            )
+                            print(f"Removing oldest checkpoint: {oldest_checkpoint}")
+                            shutil.rmtree(oldest_checkpoint)
+
                         unwrapped_model = accelerator.unwrap_model(model)
                         save_checkpoint(
                             model=unwrapped_model,

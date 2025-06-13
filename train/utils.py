@@ -207,21 +207,6 @@ def save_checkpoint(
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
 
-    print(
-        f"Start checking for max num of checkpoint: {len(os.listdir(path))} - {max_num_checkpoint}"
-    )
-    while len(os.listdir(path)) >= max_num_checkpoint:
-        oldest_checkpoint = min(
-            [
-                os.path.join(path, f)
-                for f in os.listdir(path)
-                if f.startswith("checkpoint-") and f.endswith(".pt")
-            ],
-            key=os.path.getctime,
-        )
-        print(f"Removing oldest checkpoint: {oldest_checkpoint}")
-        shutil.rmtree(oldest_checkpoint)
-
     save_name = os.path.join(path, f"checkpoint-{global_step}.pt")
 
     checkpoint = {
