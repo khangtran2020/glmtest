@@ -207,6 +207,7 @@ def save_checkpoint(
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
 
+    print(f"Start checking for max num of checkpoint")
     while len(os.listdir(path)) >= max_num_checkpoint:
         oldest_checkpoint = min(
             [
