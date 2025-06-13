@@ -180,7 +180,7 @@ def add_training_group(group):
         "--gradient_accumulation_steps",
         type=int,
         help="gradient accumulation steps",
-        default=4,
+        default=16,
     )
     group.add_argument(
         "--num_gpu",

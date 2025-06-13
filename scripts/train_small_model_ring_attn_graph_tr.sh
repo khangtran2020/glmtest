@@ -30,7 +30,7 @@ accelerate launch --debug --num_processes 4  main.py --mode train \
     --max_seq_len 28000 \
     --batch_size 1 \
     --gradient_accumulation_steps 4 \
-    --save_steps 500 \
+    --save_steps 16 \
     --validating_steps 1000 \
     --num_gpu 4 \
     --model_name "qwen2_5-7b"\
