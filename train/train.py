@@ -747,7 +747,7 @@ def train_multi_gpu_accelerate(
                             seed=args.seed,
                         )
                         accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
-                    del unwrapped_model
+                        del unwrapped_model
 
                 # del outputs, loss, micro_input, graph, graph_mask  # Free memory
                 # if torch.cuda.is_available():
