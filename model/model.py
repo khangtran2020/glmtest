@@ -14,6 +14,7 @@ from transformers.cache_utils import Cache
 import torch.distributed as dist
 from transformers.models.auto.configuration_auto import CONFIG_MAPPING
 from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING
+from transformers.loss.loss_utils import fixed_cross_entropy
 
 # from utils.prompter import Prompter
 from model.gnn import MultiGAT
@@ -520,11 +521,23 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         loss = None
         if labels is not None:
-            loss = self.llm_model.loss_function(
-                logits=logits,
-                labels=None,
-                shift_labels=labels,
-                vocab_size=self.config.vocab_size,
+            # loss = self.llm_model.loss_function(
+            #     logits=logits,
+            #     labels=None,
+            #     shift_labels=labels,
+            #     vocab_size=self.config.vocab_size,
+            #     **kwargs,
+            # )
+            # loss = ForCausalLMLoss(logits=logits, shift_labels=shift_labels)
+            logits = logits.float()
+            logits = logits.view(-1, self.config.vocab_size)
+            labels = labels.view(-1)
+            labels = labels.to(logits.device)
+            loss = fixed_cross_entropy(
+                logits,
+                labels,
+                num_items_in_batch=None,
+                ignore_index=ignore_index,
                 **kwargs,
             )
 
