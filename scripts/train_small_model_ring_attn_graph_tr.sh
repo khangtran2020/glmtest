@@ -30,7 +30,7 @@ accelerate launch --debug --num_processes 4  main.py --mode train \
     --max_seq_len 28000 \
     --batch_size 1 \
     --gradient_accumulation_steps 4 \
-    --save_steps 200 \
+    --save_steps 500 \
     --validating_steps 1000 \
     --num_gpu 4 \
     --model_name "qwen2_5-7b"\
@@ -40,15 +40,14 @@ accelerate launch --debug --num_processes 4  main.py --mode train \
     --do_train \
     --do_eval \
     --n_hidden 16 \
-    --learning_rate 5e-5 \
+    --learning_rate 1e-4 \
     --max_grad_norm 1.0 \
-    --num_train_epochs 3 \
+    --num_train_epochs 1 \
     --dtype bf16 \
     --use_lora \
+    --lora_r 32 \
     --use_accelerate \
-    --graph_sampling \
-    --do_test \
-    --debug
+    --graph_sampling
 
 accelerate launch --debug --num_processes 1  main.py --mode train \
     --seed 42 \

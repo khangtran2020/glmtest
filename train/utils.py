@@ -1,6 +1,7 @@
 import os
 import re
 import copy
+import shutil
 import torch
 import subprocess
 import transformers
@@ -200,10 +201,22 @@ def save_checkpoint(
     optimizer: Optimizer,
     scheduler: LRScheduler,
     global_step: int,
+    max_num_checkpoint: int,
     seed: int,
 ):
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
+
+    while len(os.listdir(path)) >= max_num_checkpoint:
+        oldest_checkpoint = min(
+            [
+                os.path.join(path, f)
+                for f in os.listdir(path)
+                if f.startswith("checkpoint-") and f.endswith(".pt")
+            ],
+            key=os.path.getctime,
+        )
+        shutil.rmtree(oldest_checkpoint)
 
     save_name = os.path.join(path, f"checkpoint-{global_step}.pt")
 
@@ -229,6 +242,7 @@ def load_checkpoint(
     seed_everything(seed)
     return checkpoint
 
+
 def extract_code_block(markdown: str) -> Optional[str]:
     cleaned = re.sub(r"<\|/?fuzz\|>", "", markdown)
 
@@ -238,5 +252,3 @@ def extract_code_block(markdown: str) -> Optional[str]:
         return match.group(1)
 
     return cleaned
-
-

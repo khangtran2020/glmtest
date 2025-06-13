@@ -31,6 +31,7 @@ def train(
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
     continue_training: bool = False,
     start_step: int = -1,
+    max_num_checkpoint: int = 5,
     mixed_precision: str = "bf16",
     collate_fn: callable = collate_fn,
 ):
@@ -75,6 +76,7 @@ def train_single_gpu_accelerate(
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
     continue_training: bool = False,
     start_step: int = -1,
+    max_num_checkpoint: int = 5,
     collate_fn: callable = collate_fn,
     mixed_precision: str = "bf16",
 ):
@@ -289,6 +291,7 @@ def train_single_gpu_accelerate(
                         optimizer=optimizer,
                         scheduler=lr_scheduler,
                         global_step=global_step,
+                        max_num_checkpoint=max_num_checkpoint,
                         seed=args.seed,
                     )
                     # accelerator.save_state(checkpoint_dir)
@@ -389,6 +392,7 @@ def train_multi_gpu_accelerate(
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
     continue_training: bool = False,
     start_step: int = -1,
+    max_num_checkpoint: int = 5,
     collate_fn: callable = collate_fn,
     mixed_precision: str = "bf16",
 ):
@@ -737,6 +741,7 @@ def train_multi_gpu_accelerate(
                         optimizer=optimizer,
                         scheduler=lr_scheduler,
                         global_step=global_step,
+                        max_num_checkpoint=max_num_checkpoint,
                         seed=args.seed,
                     )
                     # accelerator.save_state(checkpoint_dir)
