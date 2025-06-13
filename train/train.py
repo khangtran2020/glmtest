@@ -721,6 +721,7 @@ def train_multi_gpu_accelerate(
                     if (previous_checkpoint_step != -1) and (
                         accelerator.is_main_process
                     ):
+
                         old_dir = os.path.join(
                             save_path,
                             f"current_checkpoint",
@@ -731,11 +732,13 @@ def train_multi_gpu_accelerate(
                         )
                         os.rename(old_dir, new_dir)
 
+                    if accelerator.is_main_process:
                         checkpoint_dir_new = os.path.join(
                             save_path,
                             f"current_checkpoint",
                         )
                         previous_checkpoint_step = global_step
+
                         unwrapped_model = accelerator.unwrap_model(model)
                         save_checkpoint(
                             model=unwrapped_model,
