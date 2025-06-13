@@ -1,6 +1,7 @@
 import os
 import gc
 import torch
+from torch import nn
 
 from transformers import AutoModelForCausalLM, AutoConfig
 from transformers.configuration_utils import PretrainedConfig
@@ -288,14 +289,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         accelerator: Optional[Accelerator] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
-        # if self.debug and (self.rank >= 0):
-        #     print("=" * 100 + f"Rank {self.rank} - Step {step}" + "\n\n")
-        #     print(
-        #         f"Before take graph embedding, size of inputs_embeds: {input_ids.size()}"
-        #     )
-        #     print("\n\n" + "=" * 100)
-        # run_nvidia_smi(console=None)
-
         output_attentions = (
             output_attentions
             if output_attentions is not None
@@ -362,17 +355,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     f"Rank {self.rank} inputs_embeds at step {step}: Done extracting graph embedding"
                 )
 
-        # if self.debug and (self.rank >= 0):
-        #     print("=" * 100 + f"Rank {self.rank} - Step {step}" + "\n\n")
-        #     print(
-        #         f"After take graph embedding, size of inputs_embeds: {inputs_embeds.size()}"
-        #     )
-        #     print("\n\n" + "=" * 100)
-
-        # if self.debug:
-        #     print("After take graph embedding")
-        #     run_nvidia_smi(console=None)
-        # print(inputs_embeds.size())
         if accelerator is not None:
             accelerator.wait_for_everyone()
         if self.multi_gpu:
@@ -481,7 +463,13 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         cache_position: Optional[torch.LongTensor] = None,
         step: int = 0,
         accelerator: Optional[Accelerator] = None,
+        logits_to_keep: Union[int, slice] = 0,
+        **kwargs,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
+
+        ignore_index = -100
+        labels = nn.functional.pad(labels, (0, 1), value=ignore_index)
+        labels = labels[..., 1:].contiguous()
 
         seq_len = inputs_embeds.shape[-2]
         rank = self.rank
@@ -507,7 +495,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if accelerator is not None:
             accelerator.wait_for_everyone()
 
-        return self.llm_model(
+        outputs = self.llm_model.model(
             input_ids=input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -519,6 +507,33 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
             cache_position=cache_position,
+        )
+
+        hidden_states = outputs.last_hidden_state
+
+        slice_indices = (
+            slice(-logits_to_keep, None)
+            if isinstance(logits_to_keep, int)
+            else logits_to_keep
+        )
+        logits = self.llm_model.lm_head(hidden_states[:, slice_indices, :])
+
+        loss = None
+        if labels is not None:
+            loss = self.llm_model.loss_function(
+                logits=logits,
+                labels=None,
+                shift_labels=labels,
+                vocab_size=self.config.vocab_size,
+                **kwargs,
+            )
+
+        return CausalLMOutputWithPast(
+            loss=loss,
+            logits=logits,
+            past_key_values=outputs.past_key_values,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
         )
 
     # def from_pre
