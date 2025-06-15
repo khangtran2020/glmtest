@@ -2,6 +2,7 @@ import os
 import gc
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 from transformers import AutoModelForCausalLM, AutoConfig
 from transformers.configuration_utils import PretrainedConfig
@@ -270,6 +271,36 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         torch.cuda.empty_cache()
         self.model_type = config.model_type
 
+    def extract_embedding(
+        self,
+        input_ids: torch.Tensor,
+        graph: Optional[dict],
+        graph_mask: Optional[torch.Tensor],
+        graph_token_index: Optional[torch.LongTensor],
+        inputs_embeds: torch.Tensor = None,
+    ) -> torch.Tensor:
+        if inputs_embeds is None:
+            inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
+
+        if (graph is not None) and ("graph" in self.baseline_prompt):
+            assert graph_mask is not None
+            assert graph_token_index is not None
+
+            graph_embeds = self.gnn(graph, graph_mask)
+            graph_embeds = graph_embeds.to(inputs_embeds.device)
+            assert (
+                graph_embeds.shape
+                == inputs_embeds[
+                    0, graph_token_index[0] : (graph_token_index[-1] + 1), :
+                ].shape
+            ), f"Shape mismatch in assignment: graph embedding shape {graph_embeds.shape}, input embedding shape: {inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :].shape}, graph_token_index: {len(graph_token_index)}!"
+
+            inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :] = (
+                graph_embeds
+            )
+
+        return inputs_embeds
+
     def forward(
         self,
         input_ids: Optional[torch.LongTensor] = None,
@@ -312,49 +343,13 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 "You must specify exactly one of input_ids or inputs_embeds"
             )
 
-        if inputs_embeds is None:
-            inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
-
-        if self.debug:
-            print(
-                f"Rank {self.rank} inputs_embeds at step {step}: {inputs_embeds.size()}, device: {inputs_embeds.device}"
-            )
-
-        if (
-            (past_key_values is None)
-            and (graph is not None)
-            and ("graph" in self.baseline_prompt)
-        ):
-            assert graph_mask is not None
-            assert graph_token_index is not None
-
-            graph_embeds = self.gnn(graph, graph_mask)
-            graph_embeds = graph_embeds.to(inputs_embeds.device)
-            if self.debug:
-                print(
-                    f"Rank {self.rank} inputs_embeds at step {step}: graph embedding shape - {graph_embeds.shape}, input embedding shape -{inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :].shape}, graph_token_index - {len(graph_token_index)}!"
-                )
-            assert (
-                graph_embeds.shape
-                == inputs_embeds[
-                    0, graph_token_index[0] : (graph_token_index[-1] + 1), :
-                ].shape
-            ), f"Shape mismatch in assignment: graph embedding shape {graph_embeds.shape}, input embedding shape: {inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :].shape}, graph_token_index: {len(graph_token_index)}!"
-            # if self.debug:
-            #     print(
-            #         "Printing the size of inputs_embeds, and graph_embeds",
-            #         inputs_embeds.size(),
-            #         graph_embeds.size(),
-            #     )
-
-            inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :] = (
-                graph_embeds
-            )
-
-            if self.debug:
-                print(
-                    f"Rank {self.rank} inputs_embeds at step {step}: Done extracting graph embedding"
-                )
+        inputs_embeds = self.extract_embedding(
+            input_ids=input_ids,
+            graph=graph,
+            inputs_embeds=inputs_embeds,
+            graph_mask=graph_mask,
+            graph_token_index=graph_token_index,
+        )
 
         if accelerator is not None:
             accelerator.wait_for_everyone()
@@ -469,8 +464,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
         ignore_index = -100
-        labels = nn.functional.pad(labels, (0, 1), value=ignore_index)
-        labels = labels[..., 1:].contiguous()
+        if labels is not None:
+            labels = nn.functional.pad(labels, (0, 1), value=ignore_index)
+            labels = labels[..., 1:].contiguous()
 
         seq_len = inputs_embeds.shape[-2]
         rank = self.rank
@@ -548,8 +544,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
-
-    # def from_pre
 
 
 CONFIG_MAPPING.register(key="glmf", value=GLMFModelConfig)

@@ -803,6 +803,7 @@ class Data(object):
         """
         Split the data into training, validation and test sets
         """
+        # TODO: Data splitting from the splitted directory must be implemented
         self.logger.log(
             "[green]Splitting the data into training, validation and test sets...[/green]"
         )

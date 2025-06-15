@@ -64,37 +64,80 @@ def judge_dir(resume_dir):
     return is_checkpoint_dir
 
 
-def patch_model(model_type: str, mode: str = "longlora"):
-    if mode == "longlora":
+# def patch_model(model_type: str):
+#     transformers.modeling_flash_attention_utils._flash_attention_forward = (
+#         ring_flash_attention_forward
+#     )
+
+#     if model_type == "llama":
+#         forward_llama_embed_ori = copy.deepcopy(LlamaRotaryEmbedding.forward)
+
+#         def forward_llama_embed(self, x, seq_len=None):
+#             seq_len = seq_len * dist.get_world_size()
+#             return forward_llama_embed_ori(self, x, seq_len)
+
+#         Qwen2RotaryEmbedding.forward = forward_llama_embed
+
+#     elif model_type == "qwen2":
+
+#         forward_qwen2_embed_ori = copy.deepcopy(Qwen2RotaryEmbedding.forward)
+
+#         def forward_qwen2_embed(self, x, seq_len=None):
+#             seq_len = seq_len * dist.get_world_size()
+#             return forward_qwen2_embed_ori(self, x, seq_len)
+
+#         Qwen2RotaryEmbedding.forward = forward_qwen2_embed
+
+#     else:
+#         raise NotImplementedError(f"Model type {model_type} is not supported.")
+
+
+def patch_model(model_type: str):
+
+    original_methods = {}
+
+    # Store and patch attention
+    original_methods["attention_forward"] = (
+        transformers.modeling_flash_attention_utils._flash_attention_forward
+    )
+    transformers.modeling_flash_attention_utils._flash_attention_forward = (
+        ring_flash_attention_forward
+    )
+
+    if model_type == "llama":
+        original_methods["llama_rope_forward"] = LlamaRotaryEmbedding.forward
+
+        def forward_llama_embed(self, x, seq_len=None):
+            seq_len = seq_len * dist.get_world_size()
+            return original_methods["llama_rope_forward"](self, x, seq_len)
+
+        LlamaRotaryEmbedding.forward = forward_llama_embed
+
+    elif model_type == "qwen2":
+        original_methods["qwen2_rope_forward"] = Qwen2RotaryEmbedding.forward
+
+        def forward_qwen2_embed(self, x, seq_len=None):
+            seq_len = seq_len * dist.get_world_size()
+            return original_methods["qwen2_rope_forward"](self, x, seq_len)
+
+        Qwen2RotaryEmbedding.forward = forward_qwen2_embed
+
+    else:
+        raise NotImplementedError(f"Model type {model_type} is not supported.")
+
+    return original_methods
+
+
+def revert_model_patch(original_methods):
+
+    if "attention_forward" in original_methods:
         transformers.modeling_flash_attention_utils._flash_attention_forward = (
-            longlora_flash_attention_forward
+            original_methods["attention_forward"]
         )
-    elif mode == "ring":
-        transformers.modeling_flash_attention_utils._flash_attention_forward = (
-            ring_flash_attention_forward
-        )
-
-        if model_type == "llama":
-            forward_llama_embed_ori = copy.deepcopy(LlamaRotaryEmbedding.forward)
-
-            def forward_llama_embed(self, x, seq_len=None):
-                seq_len = seq_len * dist.get_world_size()
-                return forward_llama_embed_ori(self, x, seq_len)
-
-            Qwen2RotaryEmbedding.forward = forward_llama_embed
-
-        elif model_type == "qwen2":
-
-            forward_qwen2_embed_ori = copy.deepcopy(Qwen2RotaryEmbedding.forward)
-
-            def forward_qwen2_embed(self, x, seq_len=None):
-                seq_len = seq_len * dist.get_world_size()
-                return forward_qwen2_embed_ori(self, x, seq_len)
-
-            Qwen2RotaryEmbedding.forward = forward_qwen2_embed
-
-        else:
-            raise NotImplementedError(f"Model type {model_type} is not supported.")
+    if "llama_rope_forward" in original_methods:
+        LlamaRotaryEmbedding.forward = original_methods["llama_rope_forward"]
+    if "qwen2_rope_forward" in original_methods:
+        Qwen2RotaryEmbedding.forward = original_methods["qwen2_rope_forward"]
 
 
 def get_index_by_value(a, val):

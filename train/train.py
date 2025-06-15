@@ -470,7 +470,7 @@ def train_multi_gpu_accelerate(
         console.log(f"Valid data: {len(va_dataset)} data points")
 
     tokenizer = dataset.llm_tokenizer
-    patch_model(model_type=model.config.model_type, mode="ring")
+    patch_model(model_type=model.config.model_type)
     console.log("Model patched with ring attention")
     device = accelerator.device
     config = model.config

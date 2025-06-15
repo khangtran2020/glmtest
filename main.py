@@ -8,7 +8,7 @@ from utils.utils import print_args, seed_everything
 from data.utils import get_dataset
 from graph.utils import get_graph
 from train.train import train, GLMFModelForCausalLM, GLMFModelConfig
-from train.test import test, testCache, getMetric
+from train.test import test, testCache, eval_bleu_score
 from accelerate.utils import broadcast_object_list
 from train.utils import load_checkpoint
 from utils.constant import (
@@ -80,8 +80,9 @@ def main() -> None:
         console.log("Dataset not found, exiting...")
         return
 
-    ram_usage = log_ram_usage()
-    console.log(f"Dataset loaded - RAM usage: {ram_usage:.2f} MB")
+    if args.debug:
+        ram_usage = log_ram_usage()
+        console.log(f"Dataset loaded - RAM usage: {ram_usage:.2f} MB")
 
     if args.mode == "data":
         if args.do_crawl:
@@ -133,24 +134,24 @@ def main() -> None:
         timeout_long_ncll = timedelta(seconds=90000)  # 100 minutes
         init_process_group("nccl", timeout=timeout_long_ncll)
 
-    config = GLMFModelConfig(
-        llm_model=args.llm_model,
-        use_lora=args.use_lora,
-        dtype=args.dtype,
-        mode=args.gnn_mode,
-        in_feats=args.in_feats,
-        n_hidden=args.n_hidden,
-        n_layers=args.n_layers,
-        num_head=args.num_head,
-        dropout=args.dropout,
-        lora_r=args.lora_r,
-        lora_alpha=args.lora_alpha,
-        lora_dropout=args.lora_dropout,
-        lora_target_modules=args.lora_target_modules,
-        device_map="cuda" if torch.cuda.is_available() else "cpu",
-    )
-
     if args.mode == "train":
+
+        config = GLMFModelConfig(
+            llm_model=args.llm_model,
+            use_lora=args.use_lora,
+            dtype=args.dtype,
+            mode=args.gnn_mode,
+            in_feats=args.in_feats,
+            n_hidden=args.n_hidden,
+            n_layers=args.n_layers,
+            num_head=args.num_head,
+            dropout=args.dropout,
+            lora_r=args.lora_r,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            lora_target_modules=args.lora_target_modules,
+            device_map="cuda" if torch.cuda.is_available() else "cpu",
+        )
 
         model = GLMFModelForCausalLM(
             config=config,
@@ -230,13 +231,7 @@ def main() -> None:
         assert (
             args.model_weight_path is not None
         ), "Model directory must be specified for testing."
-        # config = GLMFModelConfig.from_pretrained(model_path, device_map="auto")
-        # config.vocab_size = dataset.llm_tokenizer.vocab_size
-        # model = GLMFModelForCausalLM.from_pretrained(model_path, config=config)
-        # model = GLMFModelForCausalLM.from_pretrained(args.model_weight_path)
-        # model = GLMFModelForCausalLM.from_pretrained(
-        #     pretrained_model_name_or_path=args.model_weight_path, device_map="cpu"
-        # )
+
         config = GLMFModelConfig(
             llm_model=args.llm_model,
             use_lora=False,
@@ -254,17 +249,13 @@ def main() -> None:
             device_map="cuda",
         )
 
-        # if config.model_type not in ["llama", "qwen2", "qwen3"]:
-        #     raise ValueError(
-        #         f"Model type {config.model_type} is not supported. Please use 'llama' or 'qwen2', 'qwen3'."
-        #     )
-
         model = GLMFModelForCausalLM(
             config=config,
             tokenizer=dataset.llm_tokenizer,
             baseline_prompt=args.baseline_prompt,
             debug=args.debug,
             rank=rank,
+            multi_gpu=True if args.num_gpu > 1 else False,
             training=False,
         )
 
@@ -281,12 +272,10 @@ def main() -> None:
         test(args=args, dataset=dataset, model=model, console=console)
 
     elif args.mode == "metric":
-
         assert (
             args.gen_file_path is not None
         ), "File-path must be specified for metric mode."
-
-        getMetric(args=args, dataset=dataset, console=console)
+        eval_bleu_score(args=args, dataset=dataset, console=console)
 
 
 if __name__ == "__main__":
