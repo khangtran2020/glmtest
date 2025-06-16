@@ -9,7 +9,6 @@ from rich.progress import Progress
 from data.core import Data
 from graph.core import Graph
 from transformers import PreTrainedModel, PreTrainedTokenizer
-from concurrent.futures import ProcessPoolExecutor, as_completed
 
 KEY_ID = "id"
 NEW_KEY_ID = "uuid"
@@ -91,7 +90,7 @@ class TestGenEval(Data):
         # check if the data has been processeds
         if os.path.exists(os.path.join(self.data_path, "data_processed.json")):
             self.logger.log(
-                "Found data_processed.json file, do not need to process raw data"
+                "Found data_processed jsonl file, do not need to process raw data"
             )
             # load data
             with open(os.path.join(self.data_path, "data_processed.json"), "r") as file:
@@ -102,112 +101,88 @@ class TestGenEval(Data):
         if not process:
             return
 
-        if not os.path.exists(os.path.join(self.data_path, "train.jsonl")):
-            raise FileNotFoundError("train.jsonl not found, please crawl the data")
+        if not os.path.exists(os.path.join(self.data_path, "data.jsonl")):
+            raise FileNotFoundError("data.jsonl not found, please crawl the data")
 
-        if not os.path.exists(os.path.join(self.data_path, "test_project.jsonl")):
-            raise FileNotFoundError(
-                "test_project.jsonl not found, please crawl the data"
-            )
+        with open(os.path.join(self.data_path, "data.jsonl"), "r") as file:
+            raw_data = [json.loads(l) for l in file.readlines()]
 
-        if not os.path.exists(os.path.join(self.data_path, "test_module.jsonl")):
-            raise FileNotFoundError(
-                "test_module.jsonl not found, please crawl the data"
-            )
-
+        raw_data = {task[NEW_KEY_ID]: task for task in raw_data}
         # make projects dir
         code_path = os.path.join(self.data_path, "codes")
         graph_path = os.path.join(self.data_path, "graphs")
-
         if os.path.exists(code_path):
             shutil.rmtree(code_path)
         if os.path.exists(graph_path):
             shutil.rmtree(graph_path)
-
         os.makedirs(code_path)
         os.makedirs(graph_path)
+        data = []
+        repos = []
+        num_module = 0
+        with Progress() as progress:
+            task = progress.add_task("[cyan]Processing...", total=len(raw_data))
+            for i, key in enumerate(raw_data.keys()):
+                dat = {}
+                dat["test_cases"] = {}
+                dat["graph"] = {}
+                dat["uuid"] = key
+                dat["code_path"] = os.path.join(
+                    code_path, f"{raw_data[key][NEW_KEY_ID]}.py"
+                )
+                dat["graph"]["src_graph_path"] = os.path.join(
+                    graph_path, f"{raw_data[key][NEW_KEY_ID]}.json"
+                )
+                dat["graph"]["node_feature_path"] = os.path.join(
+                    graph_path, f"{raw_data[key][NEW_KEY_ID]}.pt"
+                )
+                dat["graph"]["mask_path"] = os.path.join(
+                    graph_path, f"{raw_data[key][NEW_KEY_ID]}_mask.pt"
+                )
+                with open(dat["code_path"], "w") as file:
+                    file.write(raw_data[key]["code_src"])
 
-        data_dict = {}
-        data_name = ["train", "test_project", "test_module"]
-        for data_n in data_name:
-            with open(os.path.join(self.data_path, f"{data_n}.jsonl"), "r") as file:
-                raw_data = [json.loads(l) for l in file.readlines()]
-            raw_data = {task[NEW_KEY_ID]: task for task in raw_data}
-            data = []
-            repos = []
-            num_module = 0
-            with Progress() as progress:
-                task = progress.add_task("[cyan]Processing...", total=len(raw_data))
-                args_list = [
-                    (key, raw_data, code_path, graph_path, NEW_KEY_ID, self)
-                    for key in raw_data.keys()
-                ]
-                with ProcessPoolExecutor() as executor:
-                    futures = {
-                        executor.submit(process_single_sample, args): args[0]
-                        for args in args_list
-                    }
-                    for future in as_completed(futures):
-                        dat, repo = future.result()
-                        data.append(dat)
-                        repos.append(repo)
-                        num_module += 1
-                        progress.update(task, advance=1)
-                        self.logger.log(f"Processed module: {dat['uuid']}")
-            data_dict[data_n] = {dat["uuid"]: dat for dat in data}
-        self.data = data_dict
+                graph = self.graph.extract_graph(
+                    code_path=dat["code_path"],
+                    save_path=dat["graph"]["src_graph_path"],
+                )
+                node_feat = self.get_node_features(graph=graph)
+                all_mask = []
+                idx = 0
+                for i, tkey in enumerate(raw_data[key]["test_cases"].keys()):
+                    if raw_data[key]["branches"][tkey] == []:
+                        continue
+                    if raw_data[key]["test_cases"][tkey] == "":
+                        continue
+                    try:
+                        ast.parse(raw_data[key]["test_cases"][tkey])
+                    except Exception as e:
+                        continue
+                    nkey = f"test_case_{idx}"
+                    dat["test_cases"][nkey] = {}
+                    dat["test_cases"][nkey]["test_case"] = raw_data[key]["test_cases"][
+                        tkey
+                    ]
+                    dat["test_cases"][nkey]["branch"] = raw_data[key]["branches"][tkey]
+                    mask = self.get_mask_tensor(
+                        graph=graph, branch=raw_data[key]["branches"][tkey]
+                    )
+                    all_mask.append(mask)
+                    idx += 1
+                torch.save(all_mask, dat["graph"]["mask_path"])
+                torch.save(node_feat, dat["graph"]["node_feature_path"])
+                data.append(dat)
+                repos.append(raw_data[key]["repo"])
+                num_module += 1
+                progress.update(task, advance=1)
+
+        self.data = {dat["uuid"]: dat for dat in data}
         with open(os.path.join(self.data_path, "data_processed.json"), "w") as f:
             json.dump(self.data, f)
+
+        stat_info = {}
         num_project = len(set(repos))
         self.logger.log("Processed raw data")
         self.logger.log(f"Number of projects: {num_project}")
         self.logger.log(f"Number of modules: {num_module}")
         return
-
-
-def process_single_sample(args):
-    key, raw_data, code_path, graph_path, NEW_KEY_ID, self_obj = args
-    dat = {}
-    dat["test_cases"] = {}
-    dat["graph"] = {}
-    dat["uuid"] = key
-    dat["code_path"] = os.path.join(code_path, f"{raw_data[key][NEW_KEY_ID]}.py")
-    dat["graph"]["src_graph_path"] = os.path.join(
-        graph_path, f"{raw_data[key][NEW_KEY_ID]}.json"
-    )
-    dat["graph"]["node_feature_path"] = os.path.join(
-        graph_path, f"{raw_data[key][NEW_KEY_ID]}.pt"
-    )
-    dat["graph"]["mask_path"] = os.path.join(
-        graph_path, f"{raw_data[key][NEW_KEY_ID]}_mask.pt"
-    )
-    with open(dat["code_path"], "w") as file:
-        file.write(raw_data[key]["code_src"])
-    graph = self_obj.graph.extract_graph(
-        code_path=dat["code_path"],
-        save_path=dat["graph"]["src_graph_path"],
-    )
-    node_feat = self_obj.get_node_features(graph=graph)
-    all_mask = []
-    idx = 0
-    for i, tkey in enumerate(raw_data[key]["test_cases"].keys()):
-        if raw_data[key]["branches"][tkey] == []:
-            continue
-        if raw_data[key]["test_cases"][tkey] == "":
-            continue
-        try:
-            ast.parse(raw_data[key]["test_cases"][tkey])
-        except Exception as e:
-            continue
-        nkey = f"test_case_{idx}"
-        dat["test_cases"][nkey] = {}
-        dat["test_cases"][nkey]["test_case"] = raw_data[key]["test_cases"][tkey]
-        dat["test_cases"][nkey]["branch"] = raw_data[key]["branches"][tkey]
-        mask = self_obj.get_mask_tensor(
-            graph=graph, branch=raw_data[key]["branches"][tkey]
-        )
-        all_mask.append(mask)
-        idx += 1
-    torch.save(all_mask, dat["graph"]["mask_path"])
-    torch.save(node_feat, dat["graph"]["node_feature_path"])
-    return dat, raw_data[key]["repo"]
