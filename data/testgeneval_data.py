@@ -153,6 +153,7 @@ class TestGenEval(Data):
                         repos.append(repo)
                         num_module += 1
                         progress.update(task, advance=1)
+                        self.logger.log(f"Processed module: {dat['uuid']}")
             data_dict[data_n] = {dat["uuid"]: dat for dat in data}
         self.data = data_dict
         with open(os.path.join(self.data_path, "data_processed.json"), "w") as f:
