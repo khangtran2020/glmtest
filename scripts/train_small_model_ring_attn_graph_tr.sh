@@ -49,7 +49,7 @@ accelerate launch --debug --num_processes 4  main.py --mode train \
     --use_accelerate \
     --graph_sampling
 
-accelerate launch --debug --num_processes 1  main.py --mode train \
+accelerate launch --debug --num_processes 1  main.py --mode data \
     --seed 42 \
     --data_path Dataset \
     --data testgeneval \

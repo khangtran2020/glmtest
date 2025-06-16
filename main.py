@@ -1,31 +1,22 @@
 import os
 import torch
 import warnings
-from accelerate import Accelerator
 from config import parse_args
 from utils.console import console
 from utils.utils import print_args, seed_everything
 from data.utils import get_dataset
 from graph.utils import get_graph
 from train.train import train, GLMFModelForCausalLM, GLMFModelConfig
-from train.test import test, testCache, eval_bleu_score
-from accelerate.utils import broadcast_object_list
+from train.test import test, eval_bleu_score
 from train.utils import load_checkpoint
 from utils.constant import (
     GRAPH_START_TOKEN,
     GRAPH_PAD_TOKEN,
     GRAPH_END_TOKEN,
 )
-
 from torch.optim.lr_scheduler import CosineAnnealingLR
-
-from transformers import get_scheduler
 from torch.optim import AdamW
 from utils.utils import log_ram_usage
-
-# typing
-from argparse import Namespace
-from rich.console import Console
 from datetime import timedelta
 from torch.distributed import init_process_group
 
