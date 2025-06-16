@@ -471,7 +471,7 @@ class Data(object):
         """
         assert self.data is not None
 
-        processed_data = False
+        processed_data = None
         processed_data_file_path = os.path.join(
             self.data_path,
             f"{self.baseline_prompt}_{self.max_tokens}_{self.model_name}",
@@ -518,128 +518,136 @@ class Data(object):
 
             num_discarded = 0
 
-            for uuid, dat in self.data.items():
-                with open(dat["code_path"], "r") as file:
-                    src_code = file.read()
+            for data_n in self.data.keys():
 
-                mask = torch.load(dat["graph"]["mask_path"], weights_only=True)
-                assert len(mask) == len(dat["test_cases"])
+                self.processed_data[data_n] = {}
 
-                if "graph" in self.baseline_prompt:
-                    graph = self.read_graph(dat)
+                for uuid, dat in self.data.items():
+                    with open(dat["code_path"], "r") as file:
+                        src_code = file.read()
 
-                    check_graph_exist_dict = {}
-                    graph_dict = {}
-                    for key in GRAPH_KEYS:
-                        check_graph_exist_dict[key] = False
+                    mask = torch.load(dat["graph"]["mask_path"], weights_only=True)
+                    assert len(mask) == len(dat["test_cases"])
 
-                    for key in graph.keys():
-                        if isinstance(graph[key], dgl.DGLGraph):
-                            graph_dict[key] = graph[key]
-                            check_graph_exist_dict[key] = True
+                    if "graph" in self.baseline_prompt:
+                        graph = self.read_graph(dat)
 
-                    exist_atleast_one = False
-                    for key in check_graph_exist_dict.keys():
-                        if check_graph_exist_dict[key] == True:
-                            exist_atleast_one = True
-                            break
+                        check_graph_exist_dict = {}
+                        graph_dict = {}
+                        for key in GRAPH_KEYS:
+                            check_graph_exist_dict[key] = False
 
-                    if not exist_atleast_one:
-                        self.logger.log(f"[red]Graph is not generated for {uuid}[/red]")
-                        num_discarded += len(dat["test_cases"])
-                        continue
+                        for key in graph.keys():
+                            if isinstance(graph[key], dgl.DGLGraph):
+                                graph_dict[key] = graph[key]
+                                check_graph_exist_dict[key] = True
 
-                    graph_name = f"{uuid}_graph.pt"
-                    graph_path = os.path.join(processed_data_path, graph_name)
-                    torch.save(graph_dict, graph_path)
+                        exist_atleast_one = False
+                        for key in check_graph_exist_dict.keys():
+                            if check_graph_exist_dict[key] == True:
+                                exist_atleast_one = True
+                                break
 
-                    if self.debug:
-                        gstats = self.get_graph_stats(graph_dict)
-                        for key in gstats.keys():
-                            graph_stats[key]["num_nodes"].append(
-                                gstats[key]["num_nodes"]
+                        if not exist_atleast_one:
+                            self.logger.log(
+                                f"[red]Graph is not generated for {uuid}[/red]"
                             )
-                            graph_stats[key]["num_edges"].append(
-                                gstats[key]["num_edges"]
-                            )
-                            graph_stats[key]["in_max_degrees"].append(
-                                gstats[key]["in_max_degrees"]
-                            )
-                            graph_stats[key]["out_max_degrees"].append(
-                                gstats[key]["out_max_degrees"]
-                            )
-                            graph_stats[key]["in_min_degrees"].append(
-                                gstats[key]["in_min_degrees"]
-                            )
-                            graph_stats[key]["out_min_degrees"].append(
-                                gstats[key]["out_min_degrees"]
-                            )
-                            graph_stats[key]["num_components"].append(
-                                gstats[key]["num_components"]
-                            )
+                            num_discarded += len(dat["test_cases"])
+                            continue
 
-                for testcase in dat["test_cases"].keys():
-                    test_code = dat["test_cases"][testcase]["test_case"]
-                    test_code = self.add_fuzz_tags(test_code)
-                    if test_code == "N/A":
-                        num_discarded += 1
-                        continue
-                    mask_key = int(testcase.split("_")[-1])
-                    branch = mask[mask_key]
-                    branch_line = dat["test_cases"][testcase]["branch"]
-                    active_node = get_index_by_value(a=branch[0], val=1)
-                    if active_node.size(0) == 0:
-                        self.logger.log(
-                            f"Active node empty at uuid: {uuid} testcase: {testcase}"
+                        graph_name = f"{uuid}_graph.pt"
+                        graph_path = os.path.join(processed_data_path, graph_name)
+                        torch.save(graph_dict, graph_path)
+
+                        if self.debug:
+                            gstats = self.get_graph_stats(graph_dict)
+                            for key in gstats.keys():
+                                graph_stats[key]["num_nodes"].append(
+                                    gstats[key]["num_nodes"]
+                                )
+                                graph_stats[key]["num_edges"].append(
+                                    gstats[key]["num_edges"]
+                                )
+                                graph_stats[key]["in_max_degrees"].append(
+                                    gstats[key]["in_max_degrees"]
+                                )
+                                graph_stats[key]["out_max_degrees"].append(
+                                    gstats[key]["out_max_degrees"]
+                                )
+                                graph_stats[key]["in_min_degrees"].append(
+                                    gstats[key]["in_min_degrees"]
+                                )
+                                graph_stats[key]["out_min_degrees"].append(
+                                    gstats[key]["out_min_degrees"]
+                                )
+                                graph_stats[key]["num_components"].append(
+                                    gstats[key]["num_components"]
+                                )
+
+                    for testcase in dat["test_cases"].keys():
+                        test_code = dat["test_cases"][testcase]["test_case"]
+                        test_code = self.add_fuzz_tags(test_code)
+                        if test_code == "N/A":
+                            num_discarded += 1
+                            continue
+                        mask_key = int(testcase.split("_")[-1])
+                        branch = mask[mask_key]
+                        branch_line = dat["test_cases"][testcase]["branch"]
+                        active_node = get_index_by_value(a=branch[0], val=1)
+                        if active_node.size(0) == 0:
+                            self.logger.log(
+                                f"Active node empty at uuid: {uuid} testcase: {testcase}"
+                            )
+                            num_discarded += 1
+                            continue
+
+                        # self.logger.log("Preparing prompts for {}...".format(testcase))
+                        result = self.get_prompt(
+                            src_code=src_code,
+                            testcase_out=test_code,
+                            mask=active_node,
+                            tokenizer=self.llm_tokenizer,
+                            branch=branch_line,
+                            gnn_mode=self.gnn_mode,
                         )
-                        num_discarded += 1
-                        continue
+                        if result is None:
+                            num_discarded += 1
+                            continue
+                        prompt, response, full_text = result
 
-                    # self.logger.log("Preparing prompts for {}...".format(testcase))
-                    result = self.get_prompt(
-                        src_code=src_code,
-                        testcase_out=test_code,
-                        mask=active_node,
-                        tokenizer=self.llm_tokenizer,
-                        branch=branch_line,
-                        gnn_mode=self.gnn_mode,
-                    )
-                    if result is None:
-                        num_discarded += 1
-                        continue
-                    prompt, response, full_text = result
+                        num_token = len(self.llm_tokenizer.tokenize(full_text))
+                        num_tokens.append(num_token)
 
-                    num_token = len(self.llm_tokenizer.tokenize(full_text))
-                    num_tokens.append(num_token)
+                        # if self.graph_sampling and ("graph" in self.baseline_prompt):
+                        #     for key in graph_dict.keys():
+                        #         graph_dict[key] = self.sampling_neighbor(
+                        #             graph=graph_dict[key],
+                        #             mask=active_node,
+                        #             n_hops=self.n_hops,
+                        #         )
 
-                    # if self.graph_sampling and ("graph" in self.baseline_prompt):
-                    #     for key in graph_dict.keys():
-                    #         graph_dict[key] = self.sampling_neighbor(
-                    #             graph=graph_dict[key],
-                    #             mask=active_node,
-                    #             n_hops=self.n_hops,
-                    #         )
+                        data = {
+                            "uuid": f"{uuid}_{testcase}",
+                            "prompt": prompt,
+                            "response": response,
+                            "full_text": full_text,
+                            "active_node": active_node.tolist(),
+                            "mask": mask[mask_key].tolist(),
+                            "graph_path": graph_path,
+                        }
 
-                    data = {
-                        "uuid": f"{uuid}_{testcase}",
-                        "prompt": prompt,
-                        "response": response,
-                        "full_text": full_text,
-                        "active_node": active_node.tolist(),
-                        "mask": mask[mask_key].tolist(),
-                        "graph_path": graph_path,
-                    }
+                        data_name = f"{uuid}_testcase_{testcase}.json"
+                        data_path = os.path.join(processed_data_path, data_name)
+                        with open(data_path, "w") as file:
+                            json.dump(data, file, indent=4)
 
-                    data_name = f"{uuid}_testcase_{testcase}.json"
-                    data_path = os.path.join(processed_data_path, data_name)
-                    with open(data_path, "w") as file:
-                        json.dump(data, file, indent=4)
+                        self.logger.log(
+                            f"Data is saved to {data_path} for uuid - {uuid}, testcase - {testcase}"
+                        )
 
-                    self.logger.log(
-                        f"Data is saved to {data_path} for uuid - {uuid}, testcase - {testcase}"
-                    )
-
-                    self.processed_data[f"{uuid}_testcase_{testcase}"] = data_path
+                        self.processed_data[data_n][
+                            f"{uuid}_testcase_{testcase}"
+                        ] = data_path
 
         with open(processed_data_file_path, "w") as file:
             json.dump(self.processed_data, file, indent=4)
@@ -850,96 +858,29 @@ class Data(object):
         )
 
     def truncate_code(self, src_code: str, branch: list) -> str:
-
-        code_info = analyze_code(src_code)
-        if code_info is None:
-            return src_code
-
-        imports = ""
-        for imp, pack in code_info["imports"]:
-            packs = ", ".join(pack)
-            if "from" in imp:
-                imports += f"{imp} import {packs}\n"
-            else:
-                imports += f"{imp} {packs}\n"
-
-        func_checked = []
-        class_checked = {}
-
+        set_of_line = []
         for item in branch:
-            for line in item:
+            set_of_line.extend(item)
+        set_of_line = sorted(list(set(set_of_line)))
 
-                found = False
-                # Get the functions containing the line
-                for func in code_info["functions"]:
-                    if (
-                        (func["start_line"] <= line)
-                        and (line <= func["end_line"])
-                        and (func["name"] not in func_checked)
-                    ):
-                        # body += func["code"] + "\n\n"
-                        func_checked.append(func["name"])
-                        found = True
-                if found:
-                    continue
+        code_line = src_code.split("\n")
+        truncated_code = ""
 
-                # Get the class content that contains the line
-                for class_item in code_info["classes"]:
-                    if (class_item["start_line"] <= line) and (
-                        line <= class_item["end_line"]
-                    ):
-                        # print(class_item['name'])
-                        if class_item["name"] not in class_checked.keys():
-                            class_check_info = {"class": True, "method_checked": []}
-                        else:
-                            class_check_info = class_checked[class_item["name"]]
+        for i, line in enumerate(set_of_line):
 
-                        for func in class_item["methods"]:
-                            if (
-                                (func["start_line"] <= line)
-                                and (line <= func["end_line"])
-                                and (
-                                    func["name"]
-                                    not in class_check_info["method_checked"]
-                                )
-                            ):
-                                class_check_info["method_checked"].append(func["name"])
-                                found = True
-                        class_checked[class_item["name"]] = class_check_info
-                if found:
-                    continue
-
-        body = ""
-        for func in code_info["functions"]:
-            if func["name"] in func_checked:
-                body += func["code"] + "\n\n"
-
-        for class_item in code_info["classes"]:
-
-            body += "\n\n"
-
-            if class_item["name"] in class_checked.keys():
-
-                # print(class_item)
-                body += class_item["code"] + "\n\n"
-                # print(body)
-
-                for func in class_item["methods"]:
-                    if (
-                        func["name"]
-                        not in class_checked[class_item["name"]]["method_checked"]
-                    ):
-                        body = remove_method_from_class(
-                            code=body,
-                            class_name=class_item["name"],
-                            method_name=func["name"],
-                        )
-                        if body is None:
-                            return None
-
-        truncated_code = f"{imports}\n{body}"
-        if self.debug:
-            self.logger.log(f"Truncated code: {truncated_code == src_code}")
+            if code_line[line - 1].strip().startswith('"""'):
+                continue
+            if i == 0:
+                truncated_code += code_line[line - 1]
+                truncated_code += "\n"
+            else:
+                if line - 2 not in set_of_line:
+                    indent = len(code_line[line - 1]) - len(
+                        code_line[line - 1].lstrip()
+                    )
+                    truncated_code += " " * indent + "...\n"
+                truncated_code += code_line[line - 1]
+                truncated_code += "\n"
         return truncated_code
 
     def generate_code_line(self, branch):
@@ -977,3 +918,80 @@ class Data(object):
                 "num_components": num_components,
             }
         return stats
+
+    def extract_blocks(self, source_code):
+        """
+        Parse source code and return:
+            - blocks: list of dicts, each representing a code block
+            - line_to_block: dict mapping each line number to the innermost block dict
+
+        Each block dict is:
+            {
+                'type': 'function' or 'class',
+                'name': str,
+                'start': int,              # first line of the header/decorators
+                'end': int,                # last line of block
+                'header_lines': list[str], # header lines (decorators + def/class)
+                'indent': int,             # indentation of header
+                'parent': parent_block or None
+            }
+        """
+        source_lines = source_code.splitlines()
+        tree = ast.parse(source_code)
+        blocks = []
+        line_to_block = {}
+
+        def visit(node, parent):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                # Collect decorators
+                deco_lines = []
+                for deco in getattr(node, "decorator_list", []):
+                    for l in range(deco.lineno, node.lineno):
+                        deco_lines.append(source_lines[l - 1])
+                header_line = source_lines[node.lineno - 1]
+                indent = len(header_line) - len(header_line.lstrip())
+                # End line logic
+                if hasattr(node, "end_lineno"):
+                    block_end = node.end_lineno
+                else:
+                    block_end = node.body[-1].lineno if node.body else node.lineno
+                block = {
+                    "type": "class" if isinstance(node, ast.ClassDef) else "function",
+                    "name": node.name,
+                    "start": deco_lines[0] if deco_lines else node.lineno,
+                    "end": block_end,
+                    "header_lines": deco_lines + [header_line],
+                    "indent": indent,
+                    "parent": parent,
+                }
+                blocks.append(block)
+                # Map all lines in this block to this block as innermost
+                for i in range(node.lineno, block_end + 1):
+                    line_to_block[i] = block
+                # Recurse
+                for child in ast.iter_child_nodes(node):
+                    visit(child, block)
+
+        for node in tree.body:
+            visit(node, None)
+
+        # Sort blocks by start line
+        blocks.sort(key=lambda b: b["start"] if isinstance(b["start"], int) else 1)
+        return blocks, line_to_block
+
+    def extract_imports(self, source_code):
+        """
+        Parse source code and return all top-level import statements as a string
+        (preserving order and original whitespace).
+        """
+        source_lines = source_code.splitlines()
+        tree = ast.parse(source_code)
+        import_lines = []
+        for node in tree.body:
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                # Can handle multi-line imports (with parens/backslashes)
+                start = node.lineno
+                # Try to get end_lineno if available, fallback to start
+                end = getattr(node, "end_lineno", start)
+                import_lines.extend(source_lines[start - 1 : end])
+        return "\n".join(import_lines)

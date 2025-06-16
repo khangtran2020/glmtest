@@ -1,3 +1,4 @@
+import ast
 import dgl
 import torch
 from data.ossfuzz_data import OSSFuzz
