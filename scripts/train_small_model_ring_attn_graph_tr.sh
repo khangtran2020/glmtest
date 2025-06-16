@@ -53,29 +53,11 @@ accelerate launch --debug --num_processes 1  main.py --mode data \
     --seed 42 \
     --data_path Dataset \
     --data testgeneval \
-    --baseline_prompt graph_tr \
-    --llm_model "Qwen/Qwen2.5-Coder-7B" \
-    --max_seq_len 28000 \
-    --batch_size 1 \
-    --gradient_accumulation_steps 16 \
-    --save_steps 1000 \
-    --validating_steps 2000 \
     --num_gpu 1 \
-    --model_name "qwen2_5-7b"\
-    --name "testing_qwen25_7b_graph_tr_accelerate" \
-    --output_dir "./results/models/" \
-    --overwrite_output_dir \
-    --do_train \
-    --do_eval \
-    --n_hidden 16 \
-    --learning_rate 5e-5 \
-    --max_grad_norm 1.0 \
-    --num_train_epochs 3 \
-    --dtype bf16 \
-    --use_lora \
-    --use_accelerate \
-    --graph_sampling \
+    --joern_port 2605 \
     --do_test \
+    --do_crawl \
+    --do_process_raw \
     --debug
 
 
