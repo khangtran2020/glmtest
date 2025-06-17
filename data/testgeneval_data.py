@@ -117,10 +117,11 @@ class TestGenEval(Data):
                 "test_module.jsonl not found, please crawl the data"
             )
 
+        code_path = os.path.join(self.data_path, "codes")
+        graph_path = os.path.join(self.data_path, "graphs")
+
         # make projects dir
         if self.raw_overwrite:
-            code_path = os.path.join(self.data_path, "codes")
-            graph_path = os.path.join(self.data_path, "graphs")
 
             if os.path.exists(code_path):
                 shutil.rmtree(code_path)
