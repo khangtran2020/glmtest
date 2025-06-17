@@ -176,6 +176,33 @@ class TestGenEval(Data):
                         and os.path.exists(dat["graph"]["node_feature_path"])
                         and (not self.raw_overwrite)
                     ):
+                        idx = 0
+                        for i, tkey in enumerate(raw_data[key]["test_cases"].keys()):
+                            if raw_data[key]["branches"][tkey] == []:
+                                continue
+                            if raw_data[key]["test_cases"][tkey] == "":
+                                continue
+                            try:
+                                ast.parse(raw_data[key]["test_cases"][tkey])
+                            except Exception as e:
+                                continue
+                            nkey = f"test_case_{idx}"
+                            dat["test_cases"][nkey] = {}
+                            dat["test_cases"][nkey]["test_case"] = raw_data[key][
+                                "test_cases"
+                            ][tkey]
+                            dat["test_cases"][nkey]["branch"] = raw_data[key][
+                                "branches"
+                            ][tkey]
+                            idx += 1
+                        data.append(dat)
+                        repos.append(raw_data[key]["repo"])
+                        num_module += 1
+                        end_time = time.time()
+                        self.logger.log(
+                            f"Processed module {num_module} in {end_time - start_time:.2f} seconds"
+                        )
+                        progress.update(task, advance=1)
                         continue
 
                     graph = self.graph.extract_graph(
