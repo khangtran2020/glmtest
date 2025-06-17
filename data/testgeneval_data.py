@@ -31,6 +31,7 @@ class TestGenEval(Data):
         graph_sampling: bool = False,
         max_tokens: int = 512,
         gnn_mode: str = "node",
+        raw_overwrite: bool = False,
         **kwargs,
     ) -> None:
         self.name = "TestGenEval"
@@ -54,6 +55,7 @@ class TestGenEval(Data):
         self.data_path = os.path.join(path, self.name)
         self.debug = debug
         self.data = None
+        self.raw_overwrite = raw_overwrite
         if not os.path.exists(self.data_path):
             os.makedirs(self.data_path)
             self.logger.log(
@@ -116,16 +118,17 @@ class TestGenEval(Data):
             )
 
         # make projects dir
-        code_path = os.path.join(self.data_path, "codes")
-        graph_path = os.path.join(self.data_path, "graphs")
+        if self.raw_overwrite:
+            code_path = os.path.join(self.data_path, "codes")
+            graph_path = os.path.join(self.data_path, "graphs")
 
-        if os.path.exists(code_path):
-            shutil.rmtree(code_path)
-        if os.path.exists(graph_path):
-            shutil.rmtree(graph_path)
+            if os.path.exists(code_path):
+                shutil.rmtree(code_path)
+            if os.path.exists(graph_path):
+                shutil.rmtree(graph_path)
 
-        os.makedirs(code_path)
-        os.makedirs(graph_path)
+            os.makedirs(code_path)
+            os.makedirs(graph_path)
 
         data_dict = {}
 
@@ -160,13 +163,26 @@ class TestGenEval(Data):
                     dat["graph"]["mask_path"] = os.path.join(
                         graph_path, f"{raw_data[key][NEW_KEY_ID]}_mask.pt"
                     )
-                    with open(dat["code_path"], "w") as file:
-                        file.write(raw_data[key]["code_src"])
+
+                    if (not os.path.exists(dat["code_path"])) or (
+                        os.path.exists(dat["code_path"]) and self.raw_overwrite
+                    ):
+                        with open(dat["code_path"], "w") as file:
+                            file.write(raw_data[key]["code_src"])
+
+                    if (
+                        os.path.exists(dat["graph"]["mask_path"])
+                        and os.path.exists(dat["graph"]["node_feature_path"])
+                        and (not self.raw_overwrite)
+                    ):
+                        continue
 
                     graph = self.graph.extract_graph(
                         code_path=dat["code_path"],
                         save_path=dat["graph"]["src_graph_path"],
+                        overwrite=self.raw_overwrite,
                     )
+
                     node_feat = self.get_node_features(graph=graph)
                     all_mask = []
                     idx = 0

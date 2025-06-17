@@ -27,10 +27,11 @@ class JoernGraph(Graph):
         # self.logger.log("Import code with result:" + result["stdout"])
         return
 
-    def extract_graph(self, code_path, save_path) -> None:
+    def extract_graph(self, code_path: str, save_path: str, overwrite: bool) -> None:
         self.import_code(code_path, "work")
         graph = self.export_graph_data()
-        self.save_to_json(graph, save_path)
+        if (not os.path.exists(save_path)) or (os.path.exists(save_path) and overwrite):
+            self.save_to_json(graph, save_path)
         return graph
 
     def run_joern_query(self, query: str) -> str:

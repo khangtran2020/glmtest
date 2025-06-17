@@ -49,6 +49,9 @@ def add_data_group(group):
         help="baseline of input prompts",
         default="code",
     )
+    group.add_argument(
+        "--raw_overwrite", action="store_true", help="overwrite the raw data"
+    )
 
 
 def add_joern_group(group):

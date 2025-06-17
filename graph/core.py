@@ -10,7 +10,7 @@ class Graph(object):
     def import_code(self, code_path: str, name: str) -> None:
         return
 
-    def extract_graph(self, code_path: str, save_path: str) -> dict:
+    def extract_graph(self, code_path: str, save_path: str, overwrite: bool) -> dict:
         return {}
 
     def read_graph(self) -> None:

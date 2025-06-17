@@ -34,6 +34,7 @@ class OSSFuzz(Data):
         graph_sampling: bool = False,
         max_tokens: int = 512,
         gnn_mode: str = "node",
+        raw_overwrite: bool = False,
         **kwargs,
     ) -> None:
         if docker_image is None:
@@ -45,6 +46,7 @@ class OSSFuzz(Data):
         self.num_cpu = num_cpu
         self.debug = debug
         self.test_gen_flag = test_gen
+        self.raw_overwrite = raw_overwrite
         # check if data.json exist:
         if not os.path.exists(os.path.join(self.data_path, "data.json")):
             self.data = None

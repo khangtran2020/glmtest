@@ -66,6 +66,7 @@ def main() -> None:
         graph_sampling=args.graph_sampling,
         n_hops=args.n_layers,
         max_tokens=args.max_seq_length,
+        raw_overwrite=args.raw_overwrite,
     )
     if dataset is None:
         console.log("Dataset not found, exiting...")

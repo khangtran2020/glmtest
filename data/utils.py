@@ -35,6 +35,7 @@ def get_dataset(
     mode: str = "train",
     graph_sampling: bool = False,
     max_tokens: int = 512,
+    raw_overwrite: bool = False,
     gnn_mode: str = "node",
     **kwargs,
 ) -> Data:
@@ -86,6 +87,7 @@ def get_dataset(
             graph_sampling=graph_sampling,
             n_hops=kwargs.get("n_hops", 1),
             max_tokens=max_tokens,
+            raw_overwrite=raw_overwrite,
         )
     elif data_name == "testgeneval":
         logger.log("Using TestGeneval dataset")
@@ -102,6 +104,7 @@ def get_dataset(
             graph_sampling=graph_sampling,
             max_tokens=max_tokens,
             n_hops=kwargs.get("n_hops", 1),
+            raw_overwrite=raw_overwrite,
         )
     else:
         logger.log("Dataset not found")
