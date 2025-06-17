@@ -214,11 +214,11 @@ class TestGenEval(Data):
                     data.append(dat)
                     repos.append(raw_data[key]["repo"])
                     num_module += 1
-                    progress.update(task, advance=1)
                     end_time = time.time()
                     self.logger.log(
                         f"Processed module {num_module} in {end_time - start_time:.2f} seconds"
                     )
+                    progress.update(task, advance=1)
 
             data_dict[data_n] = {dat["uuid"]: dat for dat in data}
 
