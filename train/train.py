@@ -619,7 +619,11 @@ def train_multi_gpu_accelerate(
                         loss = outputs.loss
                         accelerator.backward(loss)
 
-                        mean_loss = accelerator.reduce(loss, reduction="mean")
+                        accelerator.print(
+                            f"Rank {accelerator.local_process_index} local loss: {loss.item()}"
+                        )
+
+                        # mean_loss = accelerator.reduce(loss, reduction="mean")
                         if args.debug & accelerator.is_main_process:
                             console.log(f"Step {global_step}: completed backward pass")
 
@@ -667,7 +671,7 @@ def train_multi_gpu_accelerate(
                             if args.debug & accelerator.is_main_process:
                                 console.log(f"Step {global_step}: Updated scheduler")
 
-                    batch_loss += mean_loss.detach().float().item()
+                    batch_loss += loss.detach().float().item()
 
                     for key in micro_input.keys():
                         micro_input[key] = micro_input[key].to("cpu")
