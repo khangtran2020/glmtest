@@ -619,6 +619,8 @@ def train_multi_gpu_accelerate(
                         loss = outputs.loss
                         accelerator.backward(loss)
 
+                        all_losses = accelerator.gather(loss)
+                        accelerator.print(f"Gathered losses: {all_losses}")
                         accelerator.print(
                             f"Rank {accelerator.local_process_index} local loss: {loss.item()}"
                         )
