@@ -783,9 +783,9 @@ class Data(object):
             tokenize=False,
         )
 
-        if len(self.llm_tokenizer.tokenize(task_prompt)) >= self.max_tokens:
+        if len(self.llm_tokenizer.tokenize(task_prompt)) > self.max_tokens:
             self.logger.log(
-                f"[red]Task prompt is too long: {len(self.llm_tokenizer.tokenize(task_prompt_input))} > {self.max_tokens}[/red]"
+                f"[red]Task is too long: {len(self.llm_tokenizer.tokenize(task_prompt))} > {self.max_tokens}[/red]"
             )
             return None
 
