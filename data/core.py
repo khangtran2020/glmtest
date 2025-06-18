@@ -528,7 +528,7 @@ class Data(object):
 
                     mask = torch.load(dat["graph"]["mask_path"], weights_only=True)
                     self.logger.log(
-                        f"Loaded mask for {uuid}: {mask.size()} and {len(dat['test_cases'])}"
+                        f"Loaded mask for {uuid}: {len(mask)} and {len(dat['test_cases'])}"
                     )
                     assert len(mask) == len(dat["test_cases"])
 
