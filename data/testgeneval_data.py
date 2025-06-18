@@ -248,11 +248,13 @@ class TestGenEval(Data):
                         dat["test_cases"][nkey]["branch"] = raw_data[key]["branches"][
                             tkey
                         ]
+
                         mask = self.get_mask_tensor(
                             graph=graph, branch=raw_data[key]["branches"][tkey]
                         )
                         all_mask.append(mask)
                         idx += 1
+                    self.logger.log(f"Generated masks for {key}: {len(all_mask)}")
                     torch.save(all_mask, dat["graph"]["mask_path"])
                     torch.save(node_feat, dat["graph"]["node_feature_path"])
                     data.append(dat)
