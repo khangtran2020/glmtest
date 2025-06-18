@@ -140,12 +140,14 @@ class TestGenEval(Data):
 
             raw_data = {task[NEW_KEY_ID]: task for task in raw_data}
 
-            data = []
             repos = []
             num_module = 0
 
             with Progress() as progress:
                 task = progress.add_task("[cyan]Processing...", total=len(raw_data))
+
+                data = []
+
                 for i, key in enumerate(raw_data.keys()):
                     start_time = time.time()
                     dat = {}
