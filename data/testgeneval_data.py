@@ -133,15 +133,15 @@ class TestGenEval(Data):
 
         data_dict = {}
 
+        repos = []
+        num_module = 0
+
         data_name = ["train", "test_project", "test_module"]
         for data_n in data_name:
             with open(os.path.join(self.data_path, f"{data_n}.jsonl"), "r") as file:
                 raw_data = [json.loads(l) for l in file.readlines()]
 
             raw_data = {task[NEW_KEY_ID]: task for task in raw_data}
-
-            repos = []
-            num_module = 0
 
             with Progress() as progress:
                 task = progress.add_task("[cyan]Processing...", total=len(raw_data))
