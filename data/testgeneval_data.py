@@ -185,14 +185,14 @@ class TestGenEval(Data):
                             if raw_data[key]["test_cases"][tkey] == "":
                                 continue
                             try:
-                                ast.parse(raw_data[key]["test_cases"][tkey])
+                                ast.parse(raw_data[key]["test_cases"][tkey]["code"])
                             except Exception as e:
                                 continue
                             nkey = f"test_case_{idx}"
                             dat["test_cases"][nkey] = {}
                             dat["test_cases"][nkey]["test_case"] = raw_data[key][
                                 "test_cases"
-                            ][tkey]
+                            ][tkey]["code"]
                             dat["test_cases"][nkey]["branch"] = raw_data[key][
                                 "branches"
                             ][tkey]
