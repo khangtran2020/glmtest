@@ -826,35 +826,29 @@ class Data(object):
             if isinstance(val_split, float)
             else val_split
         )
-        num_test = (
-            int(test_split * len(self.processed_data))
-            if isinstance(test_split, float)
-            else test_split
-        )
-        self.logger.log(f"Number of validation data: {num_val}, test data: {num_test}")
-        keys_list = list(self.processed_data.keys())
+        self.logger.log(f"Number of validation data: {num_val}")
+
+        # split train and val
+        keys_list = list(self.processed_data["train"].keys())
         np.random.shuffle(keys_list)
-
-        test_keys = keys_list[num_val : num_val + num_test]
         val_keys = keys_list[:num_val]
-        train_keys = keys_list[num_val + num_test :]
+        train_keys = keys_list[num_val:]
 
-        # val_data = self.processed_data[:num_val]
-        # test_data = self.processed_data[num_val : num_val + num_test]
-        # train_data = self.processed_data[num_val + num_test :]
         train_data = {}
         val_data = {}
-        test_data = {}
+        test_data_by_project = self.processed_data["test_project"]
+        test_data_by_module = self.processed_data["test_module"]
         for key in train_keys:
-            train_data[key] = self.processed_data[key]
+            train_data[key] = self.processed_data["train"][key]
         for key in val_keys:
-            val_data[key] = self.processed_data[key]
-        for key in test_keys:
-            test_data[key] = self.processed_data[key]
+            val_data[key] = self.processed_data["train"][key]
 
         self.train_data = train_data
         self.val_data = val_data
-        self.test_data = test_data
+        self.test_data = {
+            "project": test_data_by_project,
+            "module": test_data_by_module,
+        }
         self.logger.log("[green]Data is split![/green]")
         self.logger.log(
             f"Size of training data: {len(self.train_data)}, Validation data: {len(self.val_data)}, Test data: {len(self.test_data)}"
