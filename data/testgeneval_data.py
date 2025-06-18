@@ -228,7 +228,9 @@ class TestGenEval(Data):
                         overwrite=self.raw_overwrite,
                     )
 
-                    node_feat = self.get_node_features(graph=graph)
+                    if not os.path.exists(dat["graph"]["node_feature_path"]):
+                        node_feat = self.get_node_features(graph=graph)
+
                     all_mask = []
                     idx = 0
                     for i, tkey in enumerate(raw_data[key]["test_cases"].keys()):
