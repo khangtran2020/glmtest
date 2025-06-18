@@ -249,7 +249,10 @@ def validate(
                         graph_token_index=graph_token_index,
                     )
                     loss = outputs.loss
-                    batch_loss += loss.item()
+                    all_losses = accelerator.gather(loss)
+                    all_losses = torch.where(torch.isnan(all_losses), 0.0, all_losses)
+                    total_loss = torch.sum(all_losses)
+                    batch_loss += total_loss.detach().float().item()
 
                     for key in micro_input.keys():
                         micro_input[key] = micro_input[key].to("cpu")
