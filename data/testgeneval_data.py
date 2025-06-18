@@ -182,9 +182,12 @@ class TestGenEval(Data):
                         node_feat = torch.load(dat["graph"]["node_feature_path"])
 
                         # check if size is zero
-                        if len(mask) == 0 or node_feat.size(0) == 0:
+                        if len(mask) == 0:
+                            self.logger.log(f"[red]Mask is empty for {key}[/red]")
+
+                        if node_feat.size(0) == 0:
                             self.logger.log(
-                                f"[red]Mask or node features are empty for {key}[/red]"
+                                f"[red]Node features are empty for {key}[/red]"
                             )
 
                         if (len(mask) != 0) and (node_feat.size(0) != 0):
@@ -231,17 +234,17 @@ class TestGenEval(Data):
                     for i, tkey in enumerate(raw_data[key]["test_cases"].keys()):
                         if raw_data[key]["branches"][tkey] == []:
                             continue
-                        if raw_data[key]["test_cases"][tkey] == "":
+                        if raw_data[key]["test_cases"][tkey]["code"] == "":
                             continue
                         try:
-                            ast.parse(raw_data[key]["test_cases"][tkey])
+                            ast.parse(raw_data[key]["test_cases"][tkey]["code"])
                         except Exception as e:
                             continue
                         nkey = f"test_case_{idx}"
                         dat["test_cases"][nkey] = {}
                         dat["test_cases"][nkey]["test_case"] = raw_data[key][
                             "test_cases"
-                        ][tkey]
+                        ][tkey]["code"]
                         dat["test_cases"][nkey]["branch"] = raw_data[key]["branches"][
                             tkey
                         ]

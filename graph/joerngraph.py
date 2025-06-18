@@ -28,8 +28,12 @@ class JoernGraph(Graph):
         return
 
     def extract_graph(self, code_path: str, save_path: str, overwrite: bool) -> None:
-        self.import_code(code_path, "work")
-        graph = self.export_graph_data()
+        if os.path.exists(save_path):
+            with open(save_path, "r") as f:
+                graph = json.load(f)
+        else:
+            self.import_code(code_path, "work")
+            graph = self.export_graph_data()
         if (not os.path.exists(save_path)) or (os.path.exists(save_path) and overwrite):
             self.save_to_json(graph, save_path)
         return graph
