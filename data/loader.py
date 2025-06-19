@@ -20,6 +20,9 @@ class GLMFDataset(Dataset):
     ):
         self.data = data
         self.tokenizer = tokenizer
+
+        if self.tokenizer.pad_token_id is None:
+            tokenizer.pad_token_id = tokenizer.eos_token_id
         self.baseline_prompt = baseline_prompt
         self.max_seq_length = max_seq_length
         self.graph_token_id = self.tokenizer.convert_tokens_to_ids([GRAPH_PAD_TOKEN])[0]
