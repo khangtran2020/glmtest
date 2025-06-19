@@ -85,10 +85,10 @@ def test(
         with torch.no_grad():
             generated_text = {}
             time_list = []
-            for step, batch_data in enumerate(te_proj_dataset):
+            for idx in range(len(te_proj_dataset)):
                 start_time = time.time()
-                uuid, batch = batch_data
-                console.log(f"Testing {uuid} - {step}/{len(te_proj_dataset)}")
+                uuid, batch = te_proj_dataset[idx]
+                console.log(f"Testing {uuid} - {idx}/{len(te_proj_dataset)}")
                 batch_input = batch["input"].copy()
                 if "token_type_ids" in batch_input:
                     batch_input.pop("token_type_ids")
@@ -163,7 +163,7 @@ def test(
                 progress.update(
                     test_task,
                     advance=1,
-                    description=f"Testing... {step}/{len(te_proj_dataset)} - {avg_time:.2f}s for 1 sample",
+                    description=f"Testing... {idx}/{len(te_proj_dataset)} - {avg_time:.2f}s for 1 sample",
                 )
     console.log("Done Testing Project level finished.")
     save_dir = os.path.join(args.gen_dir, f"{args.name}_proj.json")
@@ -188,9 +188,9 @@ def test(
         with torch.no_grad():
             generated_text = {}
             time_list = []
-            for step, batch_data in enumerate(te_mod_dataset):
+            for idx in range(len(te_mod_dataset)):
                 start_time = time.time()
-                uuid, batch = batch_data
+                uuid, batch = te_mod_dataset[idx]
                 batch_input = batch["input"].copy()
                 if "token_type_ids" in batch_input:
                     batch_input.pop("token_type_ids")
@@ -259,7 +259,7 @@ def test(
                 progress.update(
                     test_task,
                     advance=1,
-                    description=f"Testing... {step}/{len(te_mod_dataset)} - {avg_time:.2f}s for 1 sample",
+                    description=f"Testing... {idx}/{len(te_mod_dataset)} - {avg_time:.2f}s for 1 sample",
                 )
     console.log("Done Testing Module level finished.")
     save_dir = os.path.join(args.gen_dir, f"{args.name}_mod.json")
