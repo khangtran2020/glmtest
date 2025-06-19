@@ -172,7 +172,7 @@ def main() -> None:
         optimizer = AdamW(
             filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
         )
-        lr_scheduler = CosineAnnealingLR(optimizer, T_max=100, eta_min=5e-5)
+        lr_scheduler = CosineAnnealingLR(optimizer, T_max=100, eta_min=5e-8)
 
         if args.continue_training:
             assert (
