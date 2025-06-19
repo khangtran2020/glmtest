@@ -282,7 +282,11 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if inputs_embeds is None:
             inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
 
-        if (graph is not None) and ("graph" in self.baseline_prompt):
+        if (
+            (graph is not None)
+            and ("graph" in self.baseline_prompt)
+            and (inputs_embeds.size(1) > 1)
+        ):
             assert graph_mask is not None
             assert graph_token_index is not None
 
@@ -343,14 +347,13 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 "You must specify exactly one of input_ids or inputs_embeds"
             )
 
-        if inputs_embeds is None:
-            inputs_embeds = self.extract_embedding(
-                input_ids=input_ids,
-                graph=graph,
-                inputs_embeds=inputs_embeds,
-                graph_mask=graph_mask,
-                graph_token_index=graph_token_index,
-            )
+        inputs_embeds = self.extract_embedding(
+            input_ids=input_ids,
+            graph=graph,
+            inputs_embeds=inputs_embeds,
+            graph_mask=graph_mask,
+            graph_token_index=graph_token_index,
+        )
 
         if accelerator is not None:
             accelerator.wait_for_everyone()

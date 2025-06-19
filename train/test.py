@@ -125,7 +125,7 @@ def test(
 
                 if args.num_gpu == 1:
                     outputs = model.generate(
-                        inputs=inputs_embeds,
+                        inputs=micro_input["input_ids"],
                         graph=graph,
                         graph_mask=graph_mask,
                         graph_token_index=graph_token_index,
