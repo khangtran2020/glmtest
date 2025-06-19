@@ -119,12 +119,13 @@ def test(
                     graph_token_index=graph_token_index,
                 )
 
-                console.log(f"Inputs embeds shape: {inputs_embeds.shape}")
-                console.log(f"Graph token index: {graph_token_index.shape}")
+                console.log(
+                    f"Inputs embeds shape: {inputs_embeds.shape} | Graph token index: {graph_token_index.shape}"
+                )
 
                 if args.num_gpu == 1:
                     outputs = model.generate(
-                        inputs=micro_input["input_ids"],
+                        inputs=inputs_embeds,
                         graph=graph,
                         graph_mask=graph_mask,
                         graph_token_index=graph_token_index,
