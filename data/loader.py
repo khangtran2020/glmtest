@@ -35,7 +35,7 @@ class GLMFDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-
+        print(f"########### Loading sample {idx} from dataset")
         data_path = self.data[self.index_to_key_dict[idx]]
         with open(data_path, "r") as f:
             sample = json.load(f)
