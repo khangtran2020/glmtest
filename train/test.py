@@ -120,7 +120,7 @@ def test(
                 )
 
                 console.log(f"Inputs embeds shape: {inputs_embeds.shape}")
-                console.log(f"Graph token index: {graph_token_index}")
+                console.log(f"Graph token index: {graph_token_index.shape}")
 
                 if args.num_gpu == 1:
                     outputs = model.generate(
