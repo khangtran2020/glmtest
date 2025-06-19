@@ -343,13 +343,14 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 "You must specify exactly one of input_ids or inputs_embeds"
             )
 
-        inputs_embeds = self.extract_embedding(
-            input_ids=input_ids,
-            graph=graph,
-            inputs_embeds=inputs_embeds,
-            graph_mask=graph_mask,
-            graph_token_index=graph_token_index,
-        )
+        if inputs_embeds is None:
+            inputs_embeds = self.extract_embedding(
+                input_ids=input_ids,
+                graph=graph,
+                inputs_embeds=inputs_embeds,
+                graph_mask=graph_mask,
+                graph_token_index=graph_token_index,
+            )
 
         if accelerator is not None:
             accelerator.wait_for_everyone()
