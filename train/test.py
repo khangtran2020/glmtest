@@ -119,7 +119,7 @@ def test(
                     graph_token_index=graph_token_index,
                 )
 
-                console.log(
+                print(
                     f"Inputs embeds shape: {inputs_embeds.shape} | Graph token index: {graph_token_index.shape}"
                 )
 
