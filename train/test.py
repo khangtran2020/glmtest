@@ -66,7 +66,7 @@ def test(
     )
     tokenizer = dataset.llm_tokenizer
     console.log(
-        f"Test data: by project -{len(te_proj_dataset)} data points, by module - {len(te_mod_dataset)} data points"
+        f"Test data: by project - {len(te_proj_dataset)} data points, by module - {len(te_mod_dataset)} data points"
     )
     console.log("Testing...")
 
@@ -88,6 +88,7 @@ def test(
             for step, batch_data in enumerate(te_proj_dataset):
                 start_time = time.time()
                 uuid, batch = batch_data
+                console.log(f"Testing {uuid} - {step}/{len(te_proj_dataset)}")
                 batch_input = batch["input"].copy()
                 if "token_type_ids" in batch_input:
                     batch_input.pop("token_type_ids")
