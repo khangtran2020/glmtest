@@ -224,6 +224,8 @@ def test(
                 if args.num_gpu == 1:
                     outputs = model.generate(
                         inputs=micro_input["input_ids"],
+                        attention_mask=micro_input["attention_mask"],
+                        pad_token_id=tokenizer.pad_token_id,
                         graph=graph,
                         graph_mask=graph_mask,
                         graph_token_index=graph_token_index,
