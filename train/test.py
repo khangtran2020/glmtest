@@ -119,8 +119,8 @@ def test(
                     graph_token_index=graph_token_index,
                 )
 
-                print(
-                    f"Inputs embeds shape: {inputs_embeds.shape} | Graph token index: {graph_token_index.shape}"
+                console.log(
+                    f"Inputs embeds shape: {inputs_embeds.shape} | Graph token index: {len(graph_token_index)}"
                 )
 
                 if args.num_gpu == 1:
