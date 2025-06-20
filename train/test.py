@@ -521,11 +521,10 @@ def logits_to_prediction(
     logits: torch.Tensor, temperature: float, top_k: int, top_p: float, do_sample: bool
 ):
 
-    print(f"Using argmax for prediction: {logits.shape} - {logits}")
     # Apply temperature scaling
     if temperature != 0.0:
         logits = logits / temperature
-
+    print(f"Using argmax for prediction: {logits.shape} - {logits}")
     # Apply top-k filtering
     if top_k is not None:
         logits = _top_k_filtering(logits, top_k)
