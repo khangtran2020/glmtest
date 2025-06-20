@@ -374,7 +374,7 @@ def run(args):
 
     # read data: the json file from the input_file
     input_data = []
-    with open(f"../../Datasets/TestGenEval/test_module.jsonl") as f:
+    with open(args.input_file) as f:
         for line in f:
             line = line.strip()
             if not line:
