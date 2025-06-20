@@ -53,6 +53,7 @@ THINK STEP-BY-STEP and provide your response in the following format:
 ```
 """
 
+KEY_TEMPLATE = "{}_{}"
 
 # --- GeminiClient Class (re-defined for this integration) ---
 class GeminiClient:
@@ -327,30 +328,38 @@ def run(args):
     client = init_api(model=args.model, api_key=api_key)
 
     # read data: the json file from the input_file
-    with open(args.input_file) as f:
-        input_data = json.load(f)
+    input_data = []
+    with open(f"../../Datasets/TestGenEval/test_module.jsonl") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            input_data.append(json.loads(line))
 
     result_dict = {}
 
     # process each data point to query:
-    for key, value in input_data.items():
-
-        module = value["code_src"]
-        branch = value["branches"]
-        execution_branch = ""
+    for inputTemp in input_data:
+        uuid = inputTemp["uuid"]
+        module = inputTemp["code_src"]
+        branch = inputTemp["branches"]
         for item in branch:
-            item_str = "->".join(item)
-            execution_branch += f"{item_str}\n"
-
-        prompt = PROMPT_COT.format(module=module, execution_branch=execution_branch)
-        response = query_prompt(
-            prompt=prompt,
-            client=client,
-            model=args.model,
-            temperature=args.temperature,
-            max_tokens=args.max_tokens,
-        )
-        result_dict[key] = response
+            key = KEY_TEMPLATE.format(uuid, item)
+            execution_branch = ""
+            test = branch[item]
+            for t_branch in test:
+                item_str = '->'.join(str(x) for x in t_branch)
+                execution_branch += f"{item_str}\n"
+    
+            prompt = PROMPT_COT.format(module=module, execution_branch=execution_branch)
+            response = query_prompt(
+                prompt=prompt,
+                client=client,
+                model=args.model,
+                temperature=args.temperature,
+                max_tokens=args.max_tokens,
+            )
+            result_dict[key] = response
 
     # write the result_dict to the output file
     with open(args.output_file, "w") as f:
@@ -362,12 +371,12 @@ if __name__ == "__main__":
     parser.add_argument("--input_file", type=str, help="Path to the input file")
     parser.add_argument("--output_file", type=str, help="Path to the output file")
     parser.add_argument(
-        "--model", type=str, default="gpt-3.5-turbo", help="Model to use for generation"
+        "--model", type=str, default="gpt-4.1", help="Model to use for generation"
     )
     parser.add_argument(
         "--temperature", type=float, default=0.7, help="Temperature for generation"
     )
     parser.add_argument(
-        "--max_tokens", type=int, default=200, help="Maximum tokens for generation"
+        "--max_tokens", type=int, default=32000, help="Maximum tokens for generation"
     )
     args = parser.parse_args()
