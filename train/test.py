@@ -530,13 +530,13 @@ def logits_to_prediction(
         logits = _top_k_filtering(logits, top_k)
 
     # Apply top-p (nucleus) filtering
-    if top_p is not None:
-        logits = _top_p_filtering(logits, top_p)
 
-    print(f"Using argmax for prediction: {logits.shape} - {logits}")
+    # print(f"Using argmax for prediction: {logits.shape} - {logits}")
 
     if do_sample:
         probs = F.softmax(logits, dim=-1)
+        if top_p is not None:
+            probs = _top_p_filtering(probs, top_p)
         preds = torch.multinomial(probs, num_samples=1).squeeze(1)
     else:
         preds = torch.argmax(logits, dim=-1)
