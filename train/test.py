@@ -153,7 +153,7 @@ def test(
                     skip_special_tokens=True,
                 )[0]
 
-                console.log(f"Generated text - {uuid}: {out_text}")
+                print(f"Generated text - {uuid}: {out_text}")
 
                 generated_text[uuid] = out_text
                 end_time = time.time()
@@ -251,7 +251,7 @@ def test(
                     skip_special_tokens=True,
                 )[0]
 
-                console.log(f"Generated text - {uuid}: {out_text}")
+                print(f"Generated text - {uuid}: {out_text}")
 
                 generated_text[uuid] = out_text
                 end_time = time.time()
