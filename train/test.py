@@ -126,8 +126,6 @@ def test(
                 if args.num_gpu == 1:
                     outputs = model.generate(
                         inputs=micro_input["input_ids"],
-                        attention_mask=micro_input["attention_mask"],
-                        pad_token_id=tokenizer.pad_token_id,
                         graph=graph,
                         graph_mask=graph_mask,
                         graph_token_index=graph_token_index,
@@ -154,6 +152,8 @@ def test(
                     outputs[:, micro_input["input_ids"].size(1) :],
                     skip_special_tokens=True,
                 )[0]
+
+                console.log(f"Generated text - {uuid}: {out_text}")
 
                 generated_text[uuid] = out_text
                 end_time = time.time()
@@ -224,8 +224,6 @@ def test(
                 if args.num_gpu == 1:
                     outputs = model.generate(
                         inputs=micro_input["input_ids"],
-                        attention_mask=micro_input["attention_mask"],
-                        pad_token_id=tokenizer.pad_token_id,
                         graph=graph,
                         graph_mask=graph_mask,
                         graph_token_index=graph_token_index,
@@ -252,6 +250,8 @@ def test(
                     outputs[:, micro_input["input_ids"].size(1) :],
                     skip_special_tokens=True,
                 )[0]
+
+                console.log(f"Generated text - {uuid}: {out_text}")
 
                 generated_text[uuid] = out_text
                 end_time = time.time()
