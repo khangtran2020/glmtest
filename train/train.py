@@ -465,6 +465,10 @@ def train_multi_gpu_accelerate(
         va_loader = DataLoader(
             va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
         )
+
+        data_point_example = next(iter(tr_loader))
+        if accelerator.is_main_process:
+            console.log(f"Example data point: {data_point_example}")
         console.log("Data prepared:")
         console.log(f"Train data: {len(tr_dataset)} data points")
         console.log(f"Valid data: {len(va_dataset)} data points")
