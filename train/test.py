@@ -520,6 +520,8 @@ def generate(
 def logits_to_prediction(
     logits: torch.Tensor, temperature: float, top_k: int, top_p: float, do_sample: bool
 ):
+
+    print(f"Using argmax for prediction: {logits.shape} - {logits}")
     # Apply temperature scaling
     if temperature != 0.0:
         logits = logits / temperature
@@ -536,7 +538,6 @@ def logits_to_prediction(
         probs = F.softmax(logits, dim=-1)
         preds = torch.multinomial(probs, num_samples=1).squeeze(1)
     else:
-        print(f"Using argmax for prediction: {logits.shape} - {logits}")
         preds = torch.argmax(logits, dim=-1)
 
     return preds
