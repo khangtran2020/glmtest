@@ -536,6 +536,7 @@ def logits_to_prediction(
         probs = F.softmax(logits, dim=-1)
         preds = torch.multinomial(probs, num_samples=1).squeeze(1)
     else:
+        print(f"Using argmax for prediction: {logits.shape} - {logits}")
         preds = torch.argmax(logits, dim=-1)
 
     return preds
