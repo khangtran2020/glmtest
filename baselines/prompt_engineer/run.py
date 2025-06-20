@@ -7,8 +7,8 @@ import anthropic
 import google.generativeai as genai
 import re
 
-from utils.utils import console
-from typing import List, Dict, Any, Optional
+# from utils.utils import console
+from typing import List, Dict, Any, Optional, Union
 
 PROMPT_ZERO_SHOT = """Generate a test case for the following module such that:
 - The test case use the pytest framework and executable.
@@ -350,7 +350,7 @@ def query_prompt(
 
 
 def run(args):
-    console.log(
+    print(
         {
             "input_file": args.input_file,
             "output_file": args.output_file,
@@ -361,7 +361,7 @@ def run(args):
     with open(args.api_file) as f:
         api_dict = json.load(f)
 
-    if model.startswith("o3-mini") or "gpt" in args.model:
+    if args.model.startswith("o3-mini") or "gpt" in args.model:
         api_key = api_dict["gpt"]
     elif "deepseek" in args.model:
         api_key = api_dict["deepseek"]
@@ -390,6 +390,7 @@ def run(args):
         branch = inputTemp["branches"]
         for item in branch:
             key = KEY_TEMPLATE.format(uuid, item)
+            print(f"Key: {key}")
             execution_branch = ""
             test = branch[item]
             for t_branch in test:
@@ -417,6 +418,9 @@ if __name__ == "__main__":
     parser.add_argument("--input_file", type=str, help="Path to the input file")
     parser.add_argument("--output_file", type=str, help="Path to the output file")
     parser.add_argument(
+        "--api_file", type=str, help="API File"
+    )
+    parser.add_argument(
         "--model", type=str, default="o3-mini-2025-01-31", help="Model to use for generation"
     )
     parser.add_argument(
@@ -429,3 +433,4 @@ if __name__ == "__main__":
         "--reasoning", type=str, default="medium", help="Reasoning Effort"
     )
     args = parser.parse_args()
+    run(args)
