@@ -171,7 +171,7 @@ def add_training_group(group):
         "--temp",
         type=float,
         help="temperature",
-        default=None,
+        default=0.01,
     )
     group.add_argument(
         "--top_k",
