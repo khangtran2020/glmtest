@@ -1,10 +1,11 @@
 import os
 import json
 import argparse
-
+import ast
 import openai
 import anthropic
 import google.generativeai as genai
+import re
 
 from utils.utils import console
 from typing import List, Dict, Any, Optional
@@ -55,6 +56,44 @@ THINK STEP-BY-STEP and provide your response in the following format:
 
 KEY_TEMPLATE = "{}_{}"
 
+
+def extract_test_case(raw: Union[str, dict]) -> str:
+    """
+    Given either:
+      - A dict with a 'test_case' key,
+      - A JSON string (possibly wrapped in ```json …``` fences), or
+      - A Python‐literal dict string,
+    this will return the inner multi‐line code.
+    """
+    # 1) If it's already a dict, just pull it out:
+    if isinstance(raw, dict):
+        return raw['test_case']
+
+    # 2) If it's a string, strip any Markdown fences around the JSON:
+    if isinstance(raw, str):
+        # look for ```json … { … } … ```
+        fence = re.compile(r'```(?:json)?\s*([\s\S]*?\{[\s\S]*?\})\s*```', re.MULTILINE)
+        m = fence.search(raw)
+        payload = m.group(1) if m else raw
+
+        # 3) Try JSON first:
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError:
+            # 4) Fallback to Python literal (single‐ or double‐quoted):
+            try:
+                data = ast.literal_eval(payload)
+            except Exception as e:
+                raise ValueError("Could not parse payload as JSON or Python literal") from e
+
+        if 'test_case' not in data:
+            raise KeyError("No 'test_case' key found")
+        return data['test_case']
+
+    raise TypeError(f"Expected str or dict, got {type(raw)}")
+
+
+    
 # --- GeminiClient Class (re-defined for this integration) ---
 class GeminiClient:
     """
@@ -153,7 +192,7 @@ def init_api(model: str, api_key: str):
     Raises:
         ValueError: If an unsupported model is provided.
     """
-    if ("gpt" in model) or ("deepseek" in model):
+    if model.startswith("o3-mini") or ("gpt" in model) or ("deepseek" in model):
         client = openai.OpenAI(api_key=api_key)
     elif "claude" in model:
         client = anthropic.Anthropic(api_key=api_key)
@@ -167,7 +206,7 @@ def init_api(model: str, api_key: str):
 
 # --- Modified query_prompt function ---
 def query_prompt(
-    prompt: str, model: str, max_tokens: int, temperature: float, client: Any
+    prompt: str, model: str, max_tokens: int, temperature: float, client: Any, reasoning: str,
 ) -> Dict[str, Any]:
     """
     Queries the respective LLM API with the given prompt and parameters.
@@ -191,9 +230,10 @@ def query_prompt(
             messages = [{"role": "user", "content": prompt}]
             kwargs = {
                 "model": model,
-                "max_tokens": max_tokens,
+                "max_completion_tokens": max_tokens,
                 "temperature": temperature,
                 "messages": messages,
+                "reasoning_effort": reasoning,
             }
             response = client.chat.completions.create(**kwargs)
 
@@ -207,6 +247,7 @@ def query_prompt(
                     "output_tokens": response.usage.completion_tokens,
                 },
                 "stop_reason": response.choices[0].finish_reason,
+                "extract_content": extract_test_case(response.choices[0].message.content),
             }
 
         elif isinstance(client, anthropic.Anthropic):
@@ -217,6 +258,7 @@ def query_prompt(
                 "max_tokens": max_tokens,  # Anthropic uses max_tokens, not max_output_tokens
                 "temperature": temperature,
                 "messages": messages,
+                "reasoning": reasoning,
             }
             response = client.messages.create(**kwargs)
 
@@ -230,6 +272,7 @@ def query_prompt(
                     "output_tokens": response.usage.output_tokens,
                 },
                 "stop_reason": response.stop_reason,
+                "extract_content": extract_test_case(response.content[0].text),
             }
 
         elif isinstance(client, GeminiClient):
@@ -243,6 +286,7 @@ def query_prompt(
                 model_name=model,
                 max_tokens=max_tokens,  # Mapped to max_output_tokens internally
                 temperature=temperature,
+                reasoning=reasoning,
             )
 
             # Extract details from the raw Gemini response object
@@ -288,6 +332,7 @@ def query_prompt(
                     "output_tokens": output_tokens,
                 },
                 "stop_reason": stop_reason,
+                "extract_content": extract_test_case(generated_content),
             }
 
         else:
@@ -316,7 +361,7 @@ def run(args):
     with open(args.api_file) as f:
         api_dict = json.load(f)
 
-    if "gpt" in args.model:
+    if model.startswith("o3-mini") or "gpt" in args.model:
         api_key = api_dict["gpt"]
     elif "deepseek" in args.model:
         api_key = api_dict["deepseek"]
@@ -358,12 +403,13 @@ def run(args):
                 model=args.model,
                 temperature=args.temperature,
                 max_tokens=args.max_tokens,
+                reasoning=args.reasoning,
             )
             result_dict[key] = response
 
-    # write the result_dict to the output file
-    with open(args.output_file, "w") as f:
-        json.dump(result_dict, f, indent=2)
+            # write the result_dict to the output file
+            with open(args.output_file, "w") as f:
+                json.dump(result_dict, f, indent=2)
 
 
 if __name__ == "__main__":
@@ -371,12 +417,15 @@ if __name__ == "__main__":
     parser.add_argument("--input_file", type=str, help="Path to the input file")
     parser.add_argument("--output_file", type=str, help="Path to the output file")
     parser.add_argument(
-        "--model", type=str, default="gpt-4.1", help="Model to use for generation"
+        "--model", type=str, default="o3-mini-2025-01-31", help="Model to use for generation"
     )
     parser.add_argument(
-        "--temperature", type=float, default=0.7, help="Temperature for generation"
+        "--temperature", type=float, default=1, help="Temperature for generation"
     )
     parser.add_argument(
-        "--max_tokens", type=int, default=32000, help="Maximum tokens for generation"
+        "--max_tokens", type=int, default=4096, help="Maximum tokens for generation"
+    )
+    parser.add_argument(
+        "--reasoning", type=str, default="medium", help="Reasoning Effort"
     )
     args = parser.parse_args()
