@@ -146,6 +146,7 @@ def test(
                         max_new_tokens=args.max_new_tokens,
                         do_sample=False,
                         use_cache=True,
+                        max_seq_len=args.max_seq_length,
                     )
 
                 out_text = tokenizer.batch_decode(
@@ -244,6 +245,7 @@ def test(
                         max_new_tokens=args.max_new_tokens,
                         do_sample=False,
                         use_cache=True,
+                        max_seq_len=args.max_seq_length,
                     )
 
                 out_text = tokenizer.batch_decode(
@@ -423,6 +425,7 @@ def generate(
     max_new_tokens: int,
     do_sample: bool = False,
     use_cache: bool = True,
+    max_seq_len: Optional[int] = None,
 ):
 
     original_attn_dict = patch_model(model_type=model.config.model_type)
@@ -452,7 +455,7 @@ def generate(
         for step in range(max_new_tokens):
 
             # Stop if sequence is too long
-            if current_length >= model.max_seq_len:
+            if current_length >= max_seq_len:
                 break
 
             if step == 0:
