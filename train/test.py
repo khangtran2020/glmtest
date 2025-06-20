@@ -524,10 +524,12 @@ def logits_to_prediction(
     # Apply temperature scaling
     if temperature != 0.0:
         logits = logits / temperature
-    print(f"Using argmax for prediction: {logits.shape} - {logits}")
+
     # Apply top-k filtering
     if top_k is not None:
         logits = _top_k_filtering(logits, top_k)
+
+    print(f"Using argmax for prediction: {logits.shape} - {logits}")
 
     # Apply top-p (nucleus) filtering
     if top_p is not None:
