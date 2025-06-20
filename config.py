@@ -174,6 +174,18 @@ def add_training_group(group):
         default=None,
     )
     group.add_argument(
+        "--top_k",
+        type=int,
+        help="top_k for text generation",
+        default=50,
+    )
+    group.add_argument(
+        "--top_p",
+        type=float,
+        help="top_p for text generation",
+        default=0.95,
+    )
+    group.add_argument(
         "--batch_size",
         type=int,
         help="batch size",
