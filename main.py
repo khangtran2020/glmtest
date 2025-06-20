@@ -258,7 +258,10 @@ def main() -> None:
         ]
 
         model.load_state_dict(
-            torch.load(os.path.join(args.model_weight_path, "model_weight.pt"))
+            torch.load(
+                os.path.join(args.model_weight_path, "model_weight.pt"),
+                map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+            )
         )
         console.log(f"Model is loaded to device: {model.device}")
         test(args=args, dataset=dataset, model=model, console=console)
