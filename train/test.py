@@ -467,7 +467,7 @@ def generate(
             if step == 0:
 
                 outputs = model.forward_llm(
-                    inputs_embeds=inputs_embeds, input_ids=position_ids
+                    inputs_embeds=inputs_embeds, position_ids=position_ids
                 )
                 logits = outputs.logits
                 past_key_values = outputs.past_key_values
