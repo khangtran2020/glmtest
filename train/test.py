@@ -55,6 +55,7 @@ def test(
         debug=args.debug,
         n_hops=dataset.n_hops,
         testing=True,
+        num_gpus=args.num_gpu,
     )
     te_proj_dataset = GLMFDataset(
         data=dataset.test_data["project"],
@@ -63,6 +64,7 @@ def test(
         debug=args.debug,
         n_hops=dataset.n_hops,
         testing=True,
+        num_gpus=args.num_gpu,
     )
     tokenizer = dataset.llm_tokenizer
     console.log(
@@ -427,16 +429,19 @@ def generate(
     use_cache: bool = True,
     max_seq_len: Optional[int] = None,
 ):
-
+    position_ids = (
+        torch.arange(inputs_embeds.shape[1])
+        .unsqueeze(0)
+        .expand(inputs_embeds.shape[0], -1)
+    )
     original_attn_dict = patch_model(model_type=model.config.model_type)
     batch_size = inputs_embeds.shape[0]
     device = inputs_embeds.device
 
     # Keep track of which sequences are finished
     finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
-    generated_tokens = None
-    past_key_values = None
 
+    past_key_values = None
     past_seen_tokens = (
         past_key_values.get_seq_length() if past_key_values is not None else 0
     )
@@ -445,6 +450,7 @@ def generate(
         past_seen_tokens + inputs_embeds.shape[1],
         device=inputs_embeds.device,
     )
+
     generated_ids = inputs_ids.clone()
 
     current_length = inputs_embeds.shape[1]
