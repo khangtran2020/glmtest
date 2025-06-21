@@ -489,7 +489,7 @@ def generate(
                     return torch.cat(reordered_chunks, dim=dim)
 
                 print(
-                    f"Gathering logits for rank {model.rank}: {preds.shape} - {preds}"
+                    f"Gathering logits for rank {model.rank}: {preds.shape} - {preds.device}"
                 )
 
                 gathered_logits = accelerator.gather(preds.squeeze(0)).unsqueeze(0)
