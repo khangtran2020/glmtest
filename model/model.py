@@ -486,16 +486,16 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if labels is not None:
             labels = extract_local(labels, rank, num_processes, labels.device)
 
-        if position_ids is None:
-            seq_len = inputs_embeds.shape[-2]
-            position_ids = (
-                torch.arange(seq_len, device=inputs_embeds.device, dtype=torch.long)
-                .unsqueeze(0)
-                .expand(inputs_embeds.shape[0], -1)
-            )
+        # if position_ids is None:
+        #     seq_len = inputs_embeds.shape[-2]
+        #     position_ids = (
+        #         torch.arange(seq_len, device=inputs_embeds, dtype=torch.long)
+        #         .unsqueeze(0)
+        #         .expand(inputs_embeds.shape[0], -1)
+        #     )
 
         position_ids = extract_local(
-            position_ids, rank, num_processes, position_ids.device
+            position_ids, rank, num_processes, inputs_embeds.device
         )
         if accelerator is not None:
             accelerator.wait_for_everyone()
