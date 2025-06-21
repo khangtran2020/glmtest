@@ -488,6 +488,10 @@ def generate(
                         ]
                     return torch.cat(reordered_chunks, dim=dim)
 
+                print(
+                    f"Gathering logits for rank {model.rank}: {preds.shape} - {preds}"
+                )
+
                 gathered_logits = accelerator.gather(preds.squeeze(0)).unsqueeze(0)
                 pred = undo_extract_local(gathered_logits, accelerator.num_processes)
                 pred = pred[:, current_length - 1 : current_length]
