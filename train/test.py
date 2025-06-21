@@ -466,7 +466,9 @@ def generate(
 
             if step == 0:
 
-                outputs = model.forward_llm(inputs_embeds=inputs_embeds)
+                outputs = model.forward_llm(
+                    inputs_embeds=inputs_embeds, input_ids=position_ids
+                )
                 logits = outputs.logits
                 past_key_values = outputs.past_key_values
 
@@ -501,8 +503,16 @@ def generate(
                 generated_embeddings = model.extract_embedding(
                     input_ids=generated_ids[:, current_length - 1]
                 )
+                position_ids = (
+                    torch.arange(current_length, device=device)
+                    .unsqueeze(0)
+                    .expand(batch_size, -1)
+                )
+
                 outputs = model.llm_model.forward(
-                    inputs_embeds=generated_embeddings, past_key_values=past_key_values
+                    inputs_embeds=generated_embeddings,
+                    past_key_values=past_key_values,
+                    position_ids=position_ids,
                 )
                 logits = outputs.logits
                 past_key_values = outputs.past_key_values
