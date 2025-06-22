@@ -61,9 +61,6 @@ class GLMFDataset(Dataset):
 
             # Tokenize text input
             tokenized = self.tokenize(full_text, num_gpu=self.num_gpus)
-            print("=" * 20 + "\n\n")
-            print(f"Tokenized input: {tokenized['input_ids'].size()}")
-            print("\n\n" + "=" * 20)
 
             tokenized_user_prompt = self.tokenizer(sample["prompt"])
             user_prompt_len = len(tokenized_user_prompt["input_ids"])
@@ -98,11 +95,6 @@ class GLMFDataset(Dataset):
                 pass
             # Tokenize text input
             tokenized = self.tokenize(prompt, num_gpu=self.num_gpus)
-            print("=" * 20 + "\n\n")
-            print(
-                f"Tokenized input testing {self.testing}: {tokenized['input_ids'].size()}"
-            )
-            print("\n\n" + "=" * 20)
             input_ids = tokenized["input_ids"]
 
             if (self.baseline_prompt in ["graph", "graph_tr"]) and (
@@ -128,6 +120,12 @@ class GLMFDataset(Dataset):
             truncation=True,
             max_length=self.max_seq_length,
         )
+
+        print("=" * 20 + "\n")
+        print(
+            f"Tokenized input testing {self.testing}: {result['input_ids'].size()}, num_gpu: {num_gpu}, mod: {result['input_ids'].shape[1] % (num_gpu * 2)}"
+        )
+        print("\n" + "=" * 20)
 
         if num_gpu > 1:
             pad_tensor = (
