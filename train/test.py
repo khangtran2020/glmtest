@@ -520,16 +520,12 @@ def generate(
                     graph_mask=None,
                     graph_token_index=None,
                 )
-                position_ids = (
-                    torch.arange(current_length, device=device)
-                    .unsqueeze(0)
-                    .expand(batch_size, -1)
-                )
+                print(f"Generated embeddings shape: {generated_embeddings.shape}")
 
                 outputs = model.llm_model.forward(
                     inputs_embeds=generated_embeddings,
                     past_key_values=past_key_values,
-                    position_ids=position_ids,
+                    position_ids=None,
                 )
                 logits = outputs.logits
                 past_key_values = outputs.past_key_values
