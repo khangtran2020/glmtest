@@ -98,6 +98,11 @@ class GLMFDataset(Dataset):
                 pass
             # Tokenize text input
             tokenized = self.tokenize(prompt, num_gpu=self.num_gpus)
+            print("=" * 20 + "\n\n")
+            print(
+                f"Tokenized input testing {self.testing}: {tokenized['input_ids'].size()}"
+            )
+            print("\n\n" + "=" * 20)
             input_ids = tokenized["input_ids"]
 
             if (self.baseline_prompt in ["graph", "graph_tr"]) and (
