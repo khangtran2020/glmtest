@@ -467,7 +467,7 @@ def generate(
 
             if step == 0:
 
-                positional_embedding = model.model.rotary_emb(
+                positional_embedding = model.llm_model.model.rotary_emb(
                     inputs_embeds, position_ids
                 )
 
