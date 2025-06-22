@@ -117,20 +117,39 @@ class GLMFDataset(Dataset):
         result = self.tokenizer(
             prompt,
             return_tensors="pt",
-            truncation=False,
+            truncation=True,
             max_length=self.max_seq_length,
         )
 
         if num_gpu > 1:
-            pad_tensor = (
-                torch.tensor(
-                    [self.tokenizer.pad_token_id]
-                    * ((num_gpu * 2) - result["input_ids"].shape[1] % (num_gpu * 2))
+
+            if (
+                result["input_ids"][0, -1] != self.tokenizer.eos_token_id
+                and add_eos_token
+            ):
+                pad_tensor = (
+                    torch.tensor(
+                        [self.tokenizer.pad_token_id]
+                        * (
+                            (num_gpu * 2)
+                            - result["input_ids"].shape[1] % (num_gpu * 2)
+                            - 1
+                        )
+                    )
+                    .unsqueeze(0)
+                    .int()
+                    .to(result["input_ids"].device)
                 )
-                .unsqueeze(0)
-                .int()
-                .to(result["input_ids"].device)
-            )
+            else:
+                pad_tensor = (
+                    torch.tensor(
+                        [self.tokenizer.pad_token_id]
+                        * ((num_gpu * 2) - result["input_ids"].shape[1] % (num_gpu * 2))
+                    )
+                    .unsqueeze(0)
+                    .int()
+                    .to(result["input_ids"].device)
+                )
 
             result["input_ids"] = torch.cat((pad_tensor, result["input_ids"]), dim=1)
 
