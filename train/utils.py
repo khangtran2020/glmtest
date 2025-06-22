@@ -24,6 +24,7 @@ old_flash_attn = _flash_attention_forward
 
 def extract_local(value, rank, world_size, device, dim=1):
     value_chunks = value.chunk(2 * world_size, dim=dim)
+    print(f"rank: {rank}, value_chunks: {value_chunks.size()}, dim: {dim}")
     local_value = torch.cat(
         [value_chunks[rank], value_chunks[2 * world_size - rank - 1]], dim=dim
     )
