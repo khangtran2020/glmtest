@@ -471,7 +471,8 @@ def generate(
                     inputs_embeds=inputs_embeds, position_ids=position_ids
                 )
                 logits = outputs.logits
-                past_key_values = outputs.past_key_values
+                out_past_key_values = outputs.past_key_values
+                print(f"The length of out_past_key_values: {len(out_past_key_values)}")
 
                 # get prediction and manage prediction
                 preds = logits_to_prediction(
