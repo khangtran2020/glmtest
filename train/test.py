@@ -445,6 +445,7 @@ def generate(
     past_seen_tokens = (
         past_key_values.get_seq_length() if past_key_values is not None else 0
     )
+
     cache_position = torch.arange(
         past_seen_tokens,
         past_seen_tokens + inputs_embeds.shape[1],
@@ -596,6 +597,9 @@ def merge_sequence_parallel_cache_optimized(local_cache, accelerator):
     Alternative implementation that's more memory efficient for very long sequences.
     Only gathers when actually needed and can work with chunked processing.
     """
+
+    print(f"Info of local_cache: {local_cache}")
+
     if accelerator.num_processes == 1:
         return local_cache
 
