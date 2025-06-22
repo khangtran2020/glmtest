@@ -515,7 +515,10 @@ def generate(
                     revert_model_patch(original_methods=original_attn_dict)
 
                 generated_embeddings = model.extract_embedding(
-                    input_ids=generated_ids[:, current_length - 1]
+                    input_ids=generated_ids[:, current_length - 1],
+                    graph=None,
+                    graph_mask=None,
+                    graph_token_index=None,
                 )
                 position_ids = (
                     torch.arange(current_length, device=device)
