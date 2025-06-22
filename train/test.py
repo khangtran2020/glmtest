@@ -519,7 +519,7 @@ def generate(
                     graph=None,
                     graph_mask=None,
                     graph_token_index=None,
-                )
+                ).unsqueeze(0)
                 print(f"Generated embeddings shape: {generated_embeddings.shape}")
 
                 outputs = model.llm_model.forward(
