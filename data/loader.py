@@ -131,9 +131,7 @@ class GLMFDataset(Dataset):
                 .int()
                 .to(result["input_ids"].device)
             )
-            # print(
-            #     f"Padding tensor shape: {pad_tensor.shape}, input_ids shape: {result['input_ids'].shape}"
-            # )
+
             result["input_ids"] = torch.cat((pad_tensor, result["input_ids"]), dim=1)
 
             attention_tensor = torch.tensor(
@@ -145,6 +143,8 @@ class GLMFDataset(Dataset):
             result["attention_mask"] = torch.cat(
                 [attention_tensor, result["attention_mask"]], dim=1
             )
+
+        print(f"Input_ids shape: {result['input_ids'].shape}")
 
         if result["input_ids"][0, -1] != self.tokenizer.eos_token_id and add_eos_token:
 
