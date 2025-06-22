@@ -467,6 +467,10 @@ def generate(
 
             if step == 0:
 
+                positional_embedding = model.model.rotary_emb(
+                    inputs_embeds, position_ids
+                )
+
                 outputs = model.forward_llm(
                     inputs_embeds=inputs_embeds, position_ids=position_ids
                 )
@@ -500,7 +504,11 @@ def generate(
 
                 # update past_key_values through undo_extract_local
                 past_key_values = merge_sequence_parallel_cache_optimized(
-                    local_cache=past_key_values, accelerator=accelerator
+                    cache=past_key_values,
+                    local_outcome=out_past_key_values,
+                    cache_position=cache_position,
+                    positional_embedding=positional_embedding,
+                    accelerator=accelerator,
                 )
             else:
                 if step == 1:
@@ -593,7 +601,13 @@ def _top_p_filtering(logits, top_p):
     return logits
 
 
-def merge_sequence_parallel_cache_optimized(local_cache, accelerator):
+def merge_sequence_parallel_cache_optimized(
+    cache: DynamicCache,
+    local_outcome: tuple,
+    cache_position: torch.Tensor,
+    positional_embedding: tuple,
+    accelerator: Accelerator,
+):
     """
     Alternative implementation that's more memory efficient for very long sequences.
     Only gathers when actually needed and can work with chunked processing.
@@ -602,13 +616,10 @@ def merge_sequence_parallel_cache_optimized(local_cache, accelerator):
     # print(f"Info of local_cache: {local_cache}")
 
     if accelerator.num_processes == 1:
-        return local_cache
+        return cache
 
-    merged_layers = []
-
-    for layer_idx in range(local_cache.num_layers):
-        k_local = local_cache.key_cache[layer_idx]  # [B, H, L_local, D]
-        v_local = local_cache.value_cache[layer_idx]
+    for layer_idx in range(len(local_outcome)):
+        k_local, v_local = local_outcome[layer_idx]  # [B, H, L_local, D]
 
         # Use accelerator's built-in gather - this handles the distributed communication
         k_all = accelerator.gather(k_local)  # [B*world_size, H, L_local, D]
@@ -633,10 +644,13 @@ def merge_sequence_parallel_cache_optimized(local_cache, accelerator):
         k_merged = k_merged[0]  # [B, H, L_total, D]
         v_merged = v_merged[0]
 
-        merged_layers.append((k_merged, v_merged))
+        cos, sin = positional_embedding
+        cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
+        key_states, value_states = cache.update(
+            key_states, value_states, layer_idx, cache_kwargs
+        )
 
-    merged_cache = DynamicCache.from_past_key_values(merged_layers)
-    return merged_cache
+    return cache
 
 
 # def testCache(
