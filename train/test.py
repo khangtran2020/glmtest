@@ -605,34 +605,35 @@ def merge_sequence_parallel_cache_optimized(local_cache, accelerator):
 
     merged_layers = []
 
-    for layer_idx in range(local_cache.num_layers):
-        k_local = local_cache.key_cache[layer_idx]  # [B, H, L_local, D]
-        v_local = local_cache.value_cache[layer_idx]
+    with torch.no_grad():
+        for k_local, v_local in local_cache:
+            # k_local = local_cache.key_cache[layer_idx]  # [B, H, L_local, D]
+            # v_local = local_cache.value_cache[layer_idx]
 
-        # Use accelerator's built-in gather - this handles the distributed communication
-        k_all = accelerator.gather(k_local)  # [B*world_size, H, L_local, D]
-        v_all = accelerator.gather(v_local)
+            # Use accelerator's built-in gather - this handles the distributed communication
+            k_all = accelerator.gather(k_local)  # [B*world_size, H, L_local, D]
+            v_all = accelerator.gather(v_local)
 
-        B, H, L_local, D = k_local.shape
-        world_size = accelerator.num_processes
+            B, H, L_local, D = k_local.shape
+            world_size = accelerator.num_processes
 
-        # Reshape to separate the world_size dimension
-        k_all = k_all.view(
-            world_size, B, H, L_local, D
-        )  # [world_size, B, H, L_local, D]
-        v_all = v_all.view(world_size, B, H, L_local, D)
+            # Reshape to separate the world_size dimension
+            k_all = k_all.view(
+                world_size, B, H, L_local, D
+            )  # [world_size, B, H, L_local, D]
+            v_all = v_all.view(world_size, B, H, L_local, D)
 
-        # Concatenate along sequence dimension (dim=3 after reshaping)
-        k_merged = torch.cat(
-            [k_all[i] for i in range(world_size)], dim=3
-        )  # [B, H, L_total, D]
-        v_merged = torch.cat([v_all[i] for i in range(world_size)], dim=3)
+            # Concatenate along sequence dimension (dim=3 after reshaping)
+            k_merged = torch.cat(
+                [k_all[i] for i in range(world_size)], dim=3
+            )  # [B, H, L_total, D]
+            v_merged = torch.cat([v_all[i] for i in range(world_size)], dim=3)
 
-        # Remove the world_size dimension by taking the first element (they should all be identical after concat)
-        k_merged = k_merged[0]  # [B, H, L_total, D]
-        v_merged = v_merged[0]
+            # Remove the world_size dimension by taking the first element (they should all be identical after concat)
+            k_merged = k_merged[0]  # [B, H, L_total, D]
+            v_merged = v_merged[0]
 
-        merged_layers.append((k_merged, v_merged))
+            merged_layers.append((k_merged, v_merged))
 
     merged_cache = DynamicCache.from_past_key_values(merged_layers)
     return merged_cache
