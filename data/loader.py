@@ -117,7 +117,7 @@ class GLMFDataset(Dataset):
         result = self.tokenizer(
             prompt,
             return_tensors="pt",
-            truncation=True,
+            truncation=False,
             max_length=self.max_seq_length,
         )
 
@@ -131,9 +131,9 @@ class GLMFDataset(Dataset):
                 .int()
                 .to(result["input_ids"].device)
             )
-            print(
-                f"Padding tensor shape: {pad_tensor.shape}, input_ids shape: {result['input_ids'].shape}"
-            )
+            # print(
+            #     f"Padding tensor shape: {pad_tensor.shape}, input_ids shape: {result['input_ids'].shape}"
+            # )
             result["input_ids"] = torch.cat((pad_tensor, result["input_ids"]), dim=1)
 
             attention_tensor = torch.tensor(
