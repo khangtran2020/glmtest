@@ -144,8 +144,6 @@ class GLMFDataset(Dataset):
                 [attention_tensor, result["attention_mask"]], dim=1
             )
 
-        print(f"Input_ids shape: {result['input_ids'].shape}")
-
         if result["input_ids"][0, -1] != self.tokenizer.eos_token_id and add_eos_token:
 
             # Create a tensor for the EOS token with shape (1, 1)
@@ -168,6 +166,8 @@ class GLMFDataset(Dataset):
             result["attention_mask"] = torch.cat(
                 [result["attention_mask"], attention_tensor], dim=1
             )
+
+            print(f"Input_ids shape: {result['input_ids'].shape}")
 
         # Use clone() to make a copy of the tensor for labels.
         result["labels"] = result["input_ids"].clone()
