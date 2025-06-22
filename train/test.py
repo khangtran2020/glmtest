@@ -537,12 +537,12 @@ def generate(
                 )
 
             pred = pred.masked_fill(finished, tokenizer.pad_token_id)
-            print(
-                f"Rank {model.rank} - Step {step + 1}/{max_new_tokens} - Pred shape: {pred.shape} - Finished: {generated_ids.shape}"
-            )
-            generated_ids = torch.cat([generated_ids, pred.unsqueeze(1)], dim=1)
+            # print(
+            #     f"Rank {model.rank} - Step {step + 1}/{max_new_tokens} - Pred shape: {pred.shape} - Finished: {generated_ids.shape}"
+            # )
+            generated_ids = torch.cat([generated_ids, pred], dim=1)
 
-            finished = finished | (pred == tokenizer.eos_token_id)
+            finished = finished | (pred[:, -1] == tokenizer.eos_token_id)
             current_length += 1
             if finished.all():
                 break
