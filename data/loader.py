@@ -61,7 +61,9 @@ class GLMFDataset(Dataset):
 
             # Tokenize text input
             tokenized = self.tokenize(full_text, num_gpu=self.num_gpus)
+            print("=" * 20 + "\n\n")
             print(f"Tokenized input: {tokenized['input_ids'].size()}")
+            print("\n\n" + "=" * 20)
 
             tokenized_user_prompt = self.tokenizer(sample["prompt"])
             user_prompt_len = len(tokenized_user_prompt["input_ids"])
