@@ -121,12 +121,6 @@ class GLMFDataset(Dataset):
             max_length=self.max_seq_length,
         )
 
-        print("=" * 20 + "\n")
-        print(
-            f"Tokenized input testing {self.testing}: {result['input_ids'].size()}, num_gpu: {num_gpu}, mod: {result['input_ids'].shape[1] % (num_gpu * 2)}"
-        )
-        print("\n" + "=" * 20)
-
         if num_gpu > 1:
             pad_tensor = (
                 torch.tensor(
@@ -136,6 +130,9 @@ class GLMFDataset(Dataset):
                 .unsqueeze(0)
                 .int()
                 .to(result["input_ids"].device)
+            )
+            print(
+                f"Padding tensor shape: {pad_tensor.shape}, input_ids shape: {result['input_ids'].shape}"
             )
             result["input_ids"] = torch.cat((pad_tensor, result["input_ids"]), dim=1)
 
