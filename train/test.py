@@ -646,9 +646,7 @@ def merge_sequence_parallel_cache_optimized(
 
         cos, sin = positional_embedding
         cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
-        key_states, value_states = cache.update(
-            key_states, value_states, layer_idx, cache_kwargs
-        )
+        _, _ = cache.update(k_merged, v_merged, layer_idx, cache_kwargs)
 
     return cache
 
