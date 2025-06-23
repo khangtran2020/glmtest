@@ -523,6 +523,7 @@ def generate(
 
         for step in range(max_new_tokens):
 
+            print("Generating step:", step)
             # Stop if sequence is too long
             if current_length >= max_seq_len:
                 break
