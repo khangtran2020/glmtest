@@ -571,6 +571,12 @@ def generate(
                     if step == 1:
                         revert_model_patch(original_methods=original_attn_dict)
 
+                    for i in range(len(past_key_values)):
+                        k, v = past_key_values[i]
+                        console.log(
+                            f"[green]At step {step}, past_key_values[{i}] shape[/green]: {k.shape}, {v.shape}"
+                        )
+
                     generated_embeddings = model.extract_embedding(
                         input_ids=generated_ids[:, current_length - 1],
                         graph=None,
@@ -585,16 +591,6 @@ def generate(
                     )
                     logits = outputs.logits
                     past_key_values = outputs.past_key_values
-
-                    print(
-                        f"Rank {model.rank} - Step {step + 1}/{max_new_tokens}: {len(past_key_values)} past_key_values"
-                    )
-
-                    for i in range(len(past_key_values)):
-                        k, v = past_key_values[i]
-                        print(
-                            f"At step {step}, past_key_values[{i}] shape: {k.shape}, {v.shape}"
-                        )
 
                     preds = logits_to_prediction(
                         logits, temperature, top_k, top_p, do_sample
