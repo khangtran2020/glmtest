@@ -502,6 +502,11 @@ def generate(
                 pred = undo_extract_local(gathered_logits, accelerator.num_processes)
                 pred = pred[:, current_length - 1 : current_length]
 
+                key, val = out_past_key_values[0]
+                print(
+                    f"Sample past_key_values for rank {model.rank}: {key.shape} - {val.shape}"
+                )
+
                 # update past_key_values through undo_extract_local
                 past_key_values = merge_sequence_parallel_cache_optimized(
                     cache=past_key_values,
