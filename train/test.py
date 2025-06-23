@@ -165,6 +165,7 @@ def test(
                         max_new_tokens=args.max_new_tokens,
                         do_sample=False,
                         max_seq_len=args.max_seq_length,
+                        console=console,
                     )
 
                     if accelerator.is_main_process:
@@ -299,6 +300,7 @@ def test(
                         max_new_tokens=args.max_new_tokens,
                         do_sample=False,
                         max_seq_len=args.max_seq_length,
+                        console=console,
                     )
 
                     if accelerator.is_main_process:
