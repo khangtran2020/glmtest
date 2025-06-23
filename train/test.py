@@ -489,6 +489,7 @@ def generate(
     tokenizer: PreTrainedTokenizer,
     max_new_tokens: int,
     do_sample: bool = False,
+    console: Console = None,
     max_seq_len: Optional[int] = None,
 ):
     position_ids = (
@@ -523,7 +524,7 @@ def generate(
 
         for step in range(max_new_tokens):
 
-            print("Generating step:", step)
+            console.log(f"[yellow]Generating step: {step}[/yellow]")
             # Stop if sequence is too long
             if current_length >= max_seq_len:
                 break
