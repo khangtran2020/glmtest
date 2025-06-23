@@ -140,7 +140,9 @@ def test(
                         skip_special_tokens=True,
                     )[0]
 
-                    console.log(f"[green]Generated text - {uuid}[/green]: {out_text}")
+                    console.log(
+                        f"[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}"
+                    )
 
                     generated_text[uuid] = out_text
                     end_time = time.time()
@@ -174,7 +176,9 @@ def test(
                             skip_special_tokens=True,
                         )[0]
 
-                        print(f"Generated text - {uuid}: {out_text}")
+                        console.log(
+                            f"[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input["input_ids"].size(1) :].size(1)}[/green]: {out_text}"
+                        )
 
                         generated_text[uuid] = out_text
                         end_time = time.time()
@@ -275,7 +279,10 @@ def test(
                         skip_special_tokens=True,
                     )[0]
 
-                    print(f"Generated text - {uuid}: {out_text}")
+                    # print(f"Generated text - {uuid}: {out_text}")
+                    console.log(
+                        f"[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}"
+                    )
 
                     generated_text[uuid] = out_text
                     end_time = time.time()
@@ -309,7 +316,9 @@ def test(
                             skip_special_tokens=True,
                         )[0]
 
-                        print(f"Generated text - {uuid}: {out_text}")
+                        console.log(
+                            f"[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}"
+                        )
 
                         generated_text[uuid] = out_text
                         end_time = time.time()
