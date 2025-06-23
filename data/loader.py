@@ -37,7 +37,7 @@ class GLMFDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        print(f"########### Loading sample {idx} from dataset")
+        # print(f"########### Loading sample {idx} from dataset")
         data_path = self.data[self.index_to_key_dict[idx]]
         with open(data_path, "r") as f:
             sample = json.load(f)
@@ -186,7 +186,7 @@ class GLMFDataset(Dataset):
                 [result["attention_mask"], attention_tensor], dim=1
             )
 
-            print(f"Input_ids shape: {result['input_ids'].shape}")
+            # print(f"Input_ids shape: {result['input_ids'].shape}")
 
         # Use clone() to make a copy of the tensor for labels.
         result["labels"] = result["input_ids"].clone()
