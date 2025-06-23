@@ -571,12 +571,6 @@ def generate(
                     if step == 1:
                         revert_model_patch(original_methods=original_attn_dict)
 
-                    for i in range(len(past_key_values)):
-                        k, v = past_key_values[i]
-                        console.log(
-                            f"[green]At step {step}, past_key_values[{i}] shape[/green]: {k.shape}, {v.shape}"
-                        )
-
                     generated_embeddings = model.extract_embedding(
                         input_ids=generated_ids[:, current_length - 1],
                         graph=None,
@@ -712,6 +706,8 @@ def merge_sequence_parallel_cache_optimized(
             [k_all[i] for i in range(world_size)], dim=1
         )  # [B, H, L_total, D]
         v_merged = torch.cat([v_all[i] for i in range(world_size)], dim=1)
+        k_merged = k_merged.unsqueeze(0)  # [1, B*world_size, H, L_total, D]
+        v_merged = v_merged.unsqueeze(0)  # [1, B*world_size, H, L_total, D]
 
         cos, sin = positional_embedding
         cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
