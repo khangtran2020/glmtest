@@ -527,9 +527,6 @@ def generate(
             if current_length >= max_seq_len:
                 break
 
-            print(
-                f"Step {step + 1}/{max_new_tokens} - Current length: {current_length}"
-            )
             if step == 0:
 
                 positional_embedding = model.llm_model.model.rotary_emb(
@@ -541,7 +538,7 @@ def generate(
                 )
                 logits = outputs.logits
                 out_past_key_values = outputs.past_key_values
-                print(f"The length of out_past_key_values: {len(out_past_key_values)}")
+                # print(f"The length of out_past_key_values: {len(out_past_key_values)}")
 
                 # get prediction and manage prediction
                 preds = logits_to_prediction(
@@ -559,9 +556,9 @@ def generate(
                         ]
                     return torch.cat(reordered_chunks, dim=dim)
 
-                print(
-                    f"Gathering logits for rank {model.rank}: {preds.shape} - {preds.device}"
-                )
+                # print(
+                #     f"Gathering logits for rank {model.rank}: {preds.shape} - {preds.device}"
+                # )
 
                 gathered_logits = accelerator.gather(preds.squeeze(0)).unsqueeze(0)
                 pred = undo_extract_local(gathered_logits, accelerator.num_processes)
@@ -584,7 +581,7 @@ def generate(
                         graph_mask=None,
                         graph_token_index=None,
                     ).unsqueeze(0)
-                    print(f"Generated embeddings shape: {generated_embeddings.shape}")
+                    # print(f"Generated embeddings shape: {generated_embeddings.shape}")
 
                     outputs = model.llm_model.forward(
                         inputs_embeds=generated_embeddings,
@@ -598,6 +595,18 @@ def generate(
                     preds = logits_to_prediction(
                         logits, temperature, top_k, top_p, do_sample
                     )
+                else:
+                    # clean up everything and prepare for the next step to release RAM
+                    # move to cpu first
+                    inputs_embeds = inputs_embeds.cpu()
+                    position_ids = position_ids.cpu()
+                    logits = logits.cpu()
+                    for key in outputs.keys():
+                        outputs[key] = outputs[key].cpu()
+
+                    del inputs_embeds, position_ids, logits, outputs
+                    gc.collect()
+                    torch.cuda.empty_cache()
 
             if accelerator.is_main_process:
                 pred = pred.masked_fill(finished, tokenizer.pad_token_id)
