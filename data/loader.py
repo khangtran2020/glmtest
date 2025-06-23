@@ -17,6 +17,7 @@ class GLMFDataset(Dataset):
         debug: bool = False,
         n_hops: int = 2,
         testing: bool = False,
+        num_gpus: int = 1,
     ):
         self.data = data
         self.tokenizer = tokenizer
@@ -29,13 +30,14 @@ class GLMFDataset(Dataset):
         self.debug = debug
         self.n_hops = n_hops
         self.testing = testing
+        self.num_gpus = num_gpus
         self.index_to_key_dict = dict(zip(range(len(self.data)), self.data.keys()))
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        print(f"########### Loading sample {idx} from dataset")
+        # print(f"########### Loading sample {idx} from dataset")
         data_path = self.data[self.index_to_key_dict[idx]]
         with open(data_path, "r") as f:
             sample = json.load(f)
@@ -58,7 +60,7 @@ class GLMFDataset(Dataset):
             # graph_mask = sample["mask"]
 
             # Tokenize text input
-            tokenized = self.tokenize(full_text)
+            tokenized = self.tokenize(full_text, num_gpu=self.num_gpus)
 
             tokenized_user_prompt = self.tokenizer(sample["prompt"])
             user_prompt_len = len(tokenized_user_prompt["input_ids"])
@@ -89,8 +91,10 @@ class GLMFDataset(Dataset):
             # graph_mask = sample["mask"]
             uuid = sample["uuid"]
 
+            if self.num_gpus > 1:
+                pass
             # Tokenize text input
-            tokenized = self.tokenize(prompt)
+            tokenized = self.tokenize(prompt, num_gpu=self.num_gpus)
             input_ids = tokenized["input_ids"]
 
             if (self.baseline_prompt in ["graph", "graph_tr"]) and (
@@ -106,7 +110,9 @@ class GLMFDataset(Dataset):
             # print(uuid, batch)
             return (uuid, batch)
 
-    def tokenize(self, prompt: str, add_eos_token: bool = True) -> dict:
+    def tokenize(
+        self, prompt: str, add_eos_token: bool = True, num_gpu: int = 1
+    ) -> dict:
 
         result = self.tokenizer(
             prompt,
@@ -114,6 +120,48 @@ class GLMFDataset(Dataset):
             truncation=True,
             max_length=self.max_seq_length,
         )
+
+        if num_gpu > 1:
+
+            if (
+                result["input_ids"][0, -1] != self.tokenizer.eos_token_id
+                and add_eos_token
+            ):
+                pad_tensor = (
+                    torch.tensor(
+                        [self.tokenizer.pad_token_id]
+                        * (
+                            (num_gpu * 2)
+                            - result["input_ids"].shape[1] % (num_gpu * 2)
+                            - 1
+                        )
+                    )
+                    .unsqueeze(0)
+                    .int()
+                    .to(result["input_ids"].device)
+                )
+            else:
+                pad_tensor = (
+                    torch.tensor(
+                        [self.tokenizer.pad_token_id]
+                        * ((num_gpu * 2) - result["input_ids"].shape[1] % (num_gpu * 2))
+                    )
+                    .unsqueeze(0)
+                    .int()
+                    .to(result["input_ids"].device)
+                )
+
+            result["input_ids"] = torch.cat((pad_tensor, result["input_ids"]), dim=1)
+
+            attention_tensor = torch.tensor(
+                [[1] * pad_tensor.shape[1]],
+                dtype=result["attention_mask"].dtype,
+                device=result["attention_mask"].device,
+            )
+
+            result["attention_mask"] = torch.cat(
+                [attention_tensor, result["attention_mask"]], dim=1
+            )
 
         if result["input_ids"][0, -1] != self.tokenizer.eos_token_id and add_eos_token:
 
@@ -137,6 +185,8 @@ class GLMFDataset(Dataset):
             result["attention_mask"] = torch.cat(
                 [result["attention_mask"], attention_tensor], dim=1
             )
+
+            # print(f"Input_ids shape: {result['input_ids'].shape}")
 
         # Use clone() to make a copy of the tensor for labels.
         result["labels"] = result["input_ids"].clone()

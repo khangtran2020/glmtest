@@ -129,6 +129,7 @@ def train_single_gpu_accelerate(
             max_seq_length=args.max_seq_length,
             debug=args.debug,
             n_hops=dataset.n_hops,
+            num_gpus=args.num_gpu,
         )
         va_dataset = GLMFDataset(
             data=dataset.val_data,
@@ -136,6 +137,7 @@ def train_single_gpu_accelerate(
             max_seq_length=args.max_seq_length,
             debug=args.debug,
             n_hops=dataset.n_hops,
+            num_gpus=args.num_gpu,
         )
         tr_loader = DataLoader(
             tr_dataset, batch_size=1, shuffle=True, collate_fn=collate_fn
@@ -465,6 +467,10 @@ def train_multi_gpu_accelerate(
         va_loader = DataLoader(
             va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
         )
+
+        data_point_example = next(iter(tr_loader))
+        if accelerator.is_main_process:
+            console.log(f"Example data point: {data_point_example}")
         console.log("Data prepared:")
         console.log(f"Train data: {len(tr_dataset)} data points")
         console.log(f"Valid data: {len(va_dataset)} data points")
@@ -586,6 +592,12 @@ def train_multi_gpu_accelerate(
                         graph_mask = None
                         graph_token_index = None
 
+                    position_ids = (
+                        torch.arange(micro_input["input_ids"].shape[1])
+                        .unsqueeze(0)
+                        .expand(micro_input["input_ids"].shape[0], -1)
+                    )
+
                     accelerator.wait_for_everyone()
                     if args.debug & accelerator.is_main_process:
                         console.log(f"Step {global_step}: processed data")
@@ -594,6 +606,7 @@ def train_multi_gpu_accelerate(
                         try:
                             outputs = model(
                                 **micro_input,
+                                position_ids=position_ids.to(device),
                                 graph=graph,
                                 graph_mask=graph_mask,
                                 graph_token_index=graph_token_index,

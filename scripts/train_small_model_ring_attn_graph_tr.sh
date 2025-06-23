@@ -106,7 +106,7 @@ accelerate launch --debug --num_processes 4  main.py --mode train \
     --graph_sampling
 
 
-accelerate launch --debug --num_processes 1  main.py --mode test \
+accelerate launch --debug --num_processes 4  main.py --mode test \
     --seed 42 \
     --data_path Dataset \
     --data testgeneval \
@@ -117,7 +117,7 @@ accelerate launch --debug --num_processes 1  main.py --mode test \
     --gradient_accumulation_steps 32 \
     --save_steps 320 \
     --validating_steps 5000 \
-    --num_gpu 1 \
+    --num_gpu 4 \
     --model_name "qwen2_5-7b"\
     --name "testing_qwen25_7b_graph_tr_accelerate" \
     --output_dir "./results/models/" \

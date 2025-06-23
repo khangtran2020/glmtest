@@ -472,12 +472,12 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             labels = nn.functional.pad(labels, (0, 1), value=ignore_index)
             labels = labels[..., 1:].contiguous()
 
-        seq_len = inputs_embeds.shape[-2]
+        # seq_len = inputs_embeds.shape[-2]
         rank = self.rank
-        if self.debug:
-            print(
-                f"Rank {rank} inputs_embeds at step {step}: {inputs_embeds.size()}, device: {inputs_embeds.device}"
-            )
+        # if self.debug:
+        #     print(
+        #         f"Rank {rank} inputs_embeds at step {step}: {inputs_embeds.size()}, device: {inputs_embeds.device}"
+        #     )
 
         num_processes = dist.get_world_size()
         inputs_embeds = extract_local(
@@ -485,30 +485,49 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         )
         if labels is not None:
             labels = extract_local(labels, rank, num_processes, labels.device)
-        position_ids = (
-            torch.arange(seq_len, device=inputs_embeds.device, dtype=torch.long)
-            .unsqueeze(0)
-            .expand(inputs_embeds.shape[0], -1)
-        )
+
+        if position_ids is None:
+            seq_len = inputs_embeds.shape[-2]
+            position_ids = (
+                torch.arange(seq_len, device=inputs_embeds, dtype=torch.long)
+                .unsqueeze(0)
+                .expand(inputs_embeds.shape[0], -1)
+            )
+
         position_ids = extract_local(
-            position_ids, rank, num_processes, position_ids.device
+            position_ids, rank, num_processes, inputs_embeds.device
         )
         if accelerator is not None:
             accelerator.wait_for_everyone()
 
-        outputs = self.llm_model.model.model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            past_key_values=past_key_values,
-            inputs_embeds=inputs_embeds,
-            # labels=labels,
-            use_cache=use_cache,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-            cache_position=cache_position,
-        )
+        if self.training:
+            outputs = self.llm_model.model.model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_values=past_key_values,
+                inputs_embeds=inputs_embeds,
+                # labels=labels,
+                use_cache=use_cache,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+                cache_position=cache_position,
+            )
+        else:
+            outputs = self.llm_model.model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_values=past_key_values,
+                inputs_embeds=inputs_embeds,
+                # labels=labels,
+                use_cache=use_cache,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+                cache_position=cache_position,
+            )
 
         hidden_states = outputs.last_hidden_state
 
