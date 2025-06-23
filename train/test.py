@@ -635,14 +635,18 @@ def merge_sequence_parallel_cache_optimized(
         B, H, L_local, D = k_local.shape
         world_size = accelerator.num_processes
 
+        print(
+            f"Rank {accelerator.local_process_index} - Layer {layer_idx}: All k shape: {k_all.shape}, v shape: {v_all.shape}"
+        )
+
         # Concatenate along sequence dimension (dim=3 after reshaping)
         k_merged = torch.cat(
-            [k_all[i] for i in range(world_size)], dim=3
+            [k_all[i] for i in range(world_size)], dim=2
         )  # [B, H, L_total, D]
         v_merged = torch.cat([v_all[i] for i in range(world_size)], dim=2)
 
         print(
-            f"Rank {accelerator.local_process_index} - Layer {layer_idx}: Merged k shape: {k_merged.shape}, v shape: {v_merged.shape}"
+            f"Rank {accelerator.local_process_index} - Layer {layer_idx}: Merge k shape: {k_merged.shape}, v shape: {v_merged.shape}"
         )
 
         # Remove the world_size dimension by taking the first element (they should all be identical after concat)
