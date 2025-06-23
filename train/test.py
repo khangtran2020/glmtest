@@ -135,6 +135,23 @@ def test(
                         do_sample=False,
                         use_cache=True,
                     )
+                    out_text = tokenizer.batch_decode(
+                        outputs[:, micro_input["input_ids"].size(1) :],
+                        skip_special_tokens=True,
+                    )[0]
+
+                    print(f"Generated text - {uuid}: {out_text}")
+
+                    generated_text[uuid] = out_text
+                    end_time = time.time()
+                    process_time = end_time - start_time
+                    time_list.append(process_time)
+                    avg_time = sum(time_list) / len(time_list)
+                    progress.update(
+                        test_task,
+                        advance=1,
+                        description=f"Testing... {idx}/{len(te_proj_dataset)} - {avg_time:.2f}s for 1 sample",
+                    )
                 else:
                     outputs = generate(
                         inputs_ids=micro_input["input_ids"],
@@ -151,30 +168,44 @@ def test(
                         max_seq_len=args.max_seq_length,
                     )
 
-                out_text = tokenizer.batch_decode(
-                    outputs[:, micro_input["input_ids"].size(1) :],
-                    skip_special_tokens=True,
-                )[0]
+                    if accelerator.is_main_process:
+                        out_text = tokenizer.batch_decode(
+                            outputs[:, micro_input["input_ids"].size(1) :],
+                            skip_special_tokens=True,
+                        )[0]
 
-                print(f"Generated text - {uuid}: {out_text}")
+                        print(f"Generated text - {uuid}: {out_text}")
 
-                generated_text[uuid] = out_text
-                end_time = time.time()
-                process_time = end_time - start_time
-                time_list.append(process_time)
-                avg_time = sum(time_list) / len(time_list)
-                progress.update(
-                    test_task,
-                    advance=1,
-                    description=f"Testing... {idx}/{len(te_proj_dataset)} - {avg_time:.2f}s for 1 sample",
-                )
-    console.log("Done Testing Project level finished.")
-    save_dir = os.path.join(args.gen_dir, f"{args.name}_proj.json")
-    with console.status("Saving results..."):
-        # save generated text to jsonl file
-        with open(save_dir, "w", encoding="utf-8") as f:
-            # save as json file
-            json.dump(generated_text, f, ensure_ascii=False, indent=4)
+                        generated_text[uuid] = out_text
+                        end_time = time.time()
+                        process_time = end_time - start_time
+                        time_list.append(process_time)
+                        avg_time = sum(time_list) / len(time_list)
+                        progress.update(
+                            test_task,
+                            advance=1,
+                            description=f"Testing... {idx}/{len(te_proj_dataset)} - {avg_time:.2f}s for 1 sample",
+                        )
+
+    if args.num_gpu == 1:
+        console.log("Done Testing Project level finished.")
+        save_dir = os.path.join(args.gen_dir, f"{args.name}_proj.json")
+        with console.status("Saving results..."):
+            # save generated text to jsonl file
+            with open(save_dir, "w", encoding="utf-8") as f:
+                # save as json file
+                json.dump(generated_text, f, ensure_ascii=False, indent=4)
+    else:
+        console.log(
+            "Done Testing Project level finished. Results saved in the main process only."
+        )
+        save_dir = os.path.join(args.gen_dir, f"{args.name}_proj.json")
+        if accelerator.is_main_process:
+            with console.status("Saving results..."):
+                # save generated text to jsonl file
+                with open(save_dir, "w", encoding="utf-8") as f:
+                    # save as json file
+                    json.dump(generated_text, f, ensure_ascii=False, indent=4)
 
     # Test modules
     with Progress(
@@ -186,7 +217,7 @@ def test(
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),  # Shows percentage
     ) as progress:
         test_task = progress.add_task(
-            "Testing modules level...", total=len(te_mod_dataset)
+            "Testing modules levels...", total=len(te_mod_dataset)
         )
         with torch.no_grad():
             generated_text = {}
@@ -194,6 +225,7 @@ def test(
             for idx in range(len(te_mod_dataset)):
                 start_time = time.time()
                 uuid, batch = te_mod_dataset[idx]
+                console.log(f"Testing {uuid} - {idx}/{len(te_mod_dataset)}")
                 batch_input = batch["input"].copy()
                 if "token_type_ids" in batch_input:
                     batch_input.pop("token_type_ids")
@@ -224,6 +256,10 @@ def test(
                     graph_token_index=graph_token_index,
                 )
 
+                console.log(
+                    f"Inputs embeds shape: {inputs_embeds.shape} | Graph token index: {len(graph_token_index)}"
+                )
+
                 if args.num_gpu == 1:
                     outputs = model.generate(
                         inputs=micro_input["input_ids"],
@@ -233,6 +269,23 @@ def test(
                         max_new_tokens=args.max_new_tokens,
                         do_sample=False,
                         use_cache=True,
+                    )
+                    out_text = tokenizer.batch_decode(
+                        outputs[:, micro_input["input_ids"].size(1) :],
+                        skip_special_tokens=True,
+                    )[0]
+
+                    print(f"Generated text - {uuid}: {out_text}")
+
+                    generated_text[uuid] = out_text
+                    end_time = time.time()
+                    process_time = end_time - start_time
+                    time_list.append(process_time)
+                    avg_time = sum(time_list) / len(time_list)
+                    progress.update(
+                        test_task,
+                        advance=1,
+                        description=f"Testing... {idx}/{len(te_proj_dataset)} - {avg_time:.2f}s for 1 sample",
                     )
                 else:
                     outputs = generate(
@@ -250,32 +303,44 @@ def test(
                         max_seq_len=args.max_seq_length,
                     )
 
-                out_text = tokenizer.batch_decode(
-                    outputs[:, micro_input["input_ids"].size(1) :],
-                    skip_special_tokens=True,
-                )[0]
+                    if accelerator.is_main_process:
+                        out_text = tokenizer.batch_decode(
+                            outputs[:, micro_input["input_ids"].size(1) :],
+                            skip_special_tokens=True,
+                        )[0]
 
-                print(f"Generated text - {uuid}: {out_text}")
+                        print(f"Generated text - {uuid}: {out_text}")
 
-                generated_text[uuid] = out_text
-                end_time = time.time()
-                process_time = end_time - start_time
-                time_list.append(process_time)
-                avg_time = sum(time_list) / len(time_list)
-                progress.update(
-                    test_task,
-                    advance=1,
-                    description=f"Testing... {idx}/{len(te_mod_dataset)} - {avg_time:.2f}s for 1 sample",
-                )
-    console.log("Done Testing Module level finished.")
-    save_dir = os.path.join(args.gen_dir, f"{args.name}_mod.json")
-    with console.status("Saving results..."):
-        # save generated text to jsonl file
-        with open(save_dir, "w", encoding="utf-8") as f:
-            # save as json file
-            json.dump(generated_text, f, ensure_ascii=False, indent=4)
+                        generated_text[uuid] = out_text
+                        end_time = time.time()
+                        process_time = end_time - start_time
+                        time_list.append(process_time)
+                        avg_time = sum(time_list) / len(time_list)
+                        progress.update(
+                            test_task,
+                            advance=1,
+                            description=f"Testing... {idx}/{len(te_mod_dataset)} - {avg_time:.2f}s for 1 sample",
+                        )
 
-    console.log(f"Results saved to {save_dir}")
+    if args.num_gpu == 1:
+        console.log("Done Testing Module level finished.")
+        save_dir = os.path.join(args.gen_dir, f"{args.name}_mod.json")
+        with console.status("Saving results..."):
+            # save generated text to jsonl file
+            with open(save_dir, "w", encoding="utf-8") as f:
+                # save as json file
+                json.dump(generated_text, f, ensure_ascii=False, indent=4)
+    else:
+        console.log(
+            "Done Testing Module level finished. Results saved in the main process only."
+        )
+        save_dir = os.path.join(args.gen_dir, f"{args.name}_mod.json")
+        if accelerator.is_main_process:
+            with console.status("Saving results..."):
+                # save generated text to jsonl file
+                with open(save_dir, "w", encoding="utf-8") as f:
+                    # save as json file
+                    json.dump(generated_text, f, ensure_ascii=False, indent=4)
 
 
 def eval_bleu_score(
@@ -426,7 +491,6 @@ def generate(
     tokenizer: PreTrainedTokenizer,
     max_new_tokens: int,
     do_sample: bool = False,
-    use_cache: bool = True,
     max_seq_len: Optional[int] = None,
 ):
     position_ids = (
@@ -501,13 +565,6 @@ def generate(
                 gathered_logits = accelerator.gather(preds.squeeze(0)).unsqueeze(0)
                 pred = undo_extract_local(gathered_logits, accelerator.num_processes)
                 pred = pred[:, current_length - 1 : current_length]
-
-                # key, val = out_past_key_values[0]
-                # print(
-                #     f"Sample past_key_values for rank {model.rank}: {key.shape} - {val.shape}"
-                # )
-
-                # update past_key_values through undo_extract_local
                 past_key_values = merge_sequence_parallel_cache_optimized(
                     cache=past_key_values,
                     local_outcome=out_past_key_values,
@@ -516,42 +573,47 @@ def generate(
                     accelerator=accelerator,
                 )
             else:
-                if step == 1:
-                    revert_model_patch(original_methods=original_attn_dict)
+                if accelerator.is_main_process:
+                    if step == 1:
+                        revert_model_patch(original_methods=original_attn_dict)
 
-                generated_embeddings = model.extract_embedding(
-                    input_ids=generated_ids[:, current_length - 1],
-                    graph=None,
-                    graph_mask=None,
-                    graph_token_index=None,
-                ).unsqueeze(0)
-                print(f"Generated embeddings shape: {generated_embeddings.shape}")
+                    generated_embeddings = model.extract_embedding(
+                        input_ids=generated_ids[:, current_length - 1],
+                        graph=None,
+                        graph_mask=None,
+                        graph_token_index=None,
+                    ).unsqueeze(0)
+                    print(f"Generated embeddings shape: {generated_embeddings.shape}")
 
-                outputs = model.llm_model.forward(
-                    inputs_embeds=generated_embeddings,
-                    past_key_values=past_key_values,
-                    position_ids=None,
-                )
-                logits = outputs.logits
-                past_key_values = outputs.past_key_values
+                    outputs = model.llm_model.forward(
+                        inputs_embeds=generated_embeddings,
+                        past_key_values=past_key_values,
+                        position_ids=None,
+                    )
+                    logits = outputs.logits
+                    past_key_values = outputs.past_key_values
 
-                # get prediction and manage prediction
-                preds = logits_to_prediction(
-                    logits, temperature, top_k, top_p, do_sample
-                )
+                    # get prediction and manage prediction
+                    preds = logits_to_prediction(
+                        logits, temperature, top_k, top_p, do_sample
+                    )
 
-            pred = pred.masked_fill(finished, tokenizer.pad_token_id)
-            # print(
-            #     f"Rank {model.rank} - Step {step + 1}/{max_new_tokens} - Pred shape: {pred.shape} - Finished: {generated_ids.shape}"
-            # )
-            generated_ids = torch.cat([generated_ids, pred], dim=1)
+            if accelerator.is_main_process:
+                pred = pred.masked_fill(finished, tokenizer.pad_token_id)
+                # print(
+                #     f"Rank {model.rank} - Step {step + 1}/{max_new_tokens} - Pred shape: {pred.shape} - Finished: {generated_ids.shape}"
+                # )
+                generated_ids = torch.cat([generated_ids, pred], dim=1)
 
-            finished = finished | (pred[:, -1] == tokenizer.eos_token_id)
-            current_length += 1
-            if finished.all():
-                break
-
-    return generated_ids
+                finished = finished | (pred[:, -1] == tokenizer.eos_token_id)
+                current_length += 1
+                if finished.all():
+                    break
+    if accelerator.is_main_process:
+        return generated_ids
+    else:
+        # If not the main process, return None
+        return None
 
 
 def logits_to_prediction(
@@ -635,23 +697,11 @@ def merge_sequence_parallel_cache_optimized(
         B, H, L_local, D = k_local.shape
         world_size = accelerator.num_processes
 
-        print(
-            f"Rank {accelerator.local_process_index} - Layer {layer_idx}: All k shape: {k_all.shape}, v shape: {v_all.shape}"
-        )
-
         # Concatenate along sequence dimension (dim=3 after reshaping)
         k_merged = torch.cat(
-            [k_all[i] for i in range(world_size)], dim=2
+            [k_all[i] for i in range(world_size)], dim=1
         )  # [B, H, L_total, D]
-        v_merged = torch.cat([v_all[i] for i in range(world_size)], dim=2)
-
-        print(
-            f"Rank {accelerator.local_process_index} - Layer {layer_idx}: Merge k shape: {k_merged.shape}, v shape: {v_merged.shape}"
-        )
-
-        # Remove the world_size dimension by taking the first element (they should all be identical after concat)
-        k_merged = k_merged[0]  # [B, H, L_total, D]
-        v_merged = v_merged[0]
+        v_merged = torch.cat([v_all[i] for i in range(world_size)], dim=1)
 
         cos, sin = positional_embedding
         cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
