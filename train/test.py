@@ -592,6 +592,17 @@ def generate(
                     logits = outputs.logits
                     past_key_values = outputs.past_key_values
 
+                    # reduce past_key_values shape by 1 dimension
+                    for i in range(len(past_key_values)):
+                        k, v = past_key_values[i]
+                        print(
+                            f"At step {step}, past_key_values[{i}] shape: {k.shape}, {v.shape}"
+                        )
+                        # past_key_values[i] = (
+                        #     k[:, :, -1:, :],
+                        #     v[:, :, -1:, :],
+                        # )
+
                     # get prediction and manage prediction
                     preds = logits_to_prediction(
                         logits, temperature, top_k, top_p, do_sample
