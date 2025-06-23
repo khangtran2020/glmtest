@@ -527,6 +527,9 @@ def generate(
             if current_length >= max_seq_len:
                 break
 
+            print(
+                f"Step {step + 1}/{max_new_tokens} - Current length: {current_length}"
+            )
             if step == 0:
 
                 positional_embedding = model.llm_model.model.rotary_emb(
