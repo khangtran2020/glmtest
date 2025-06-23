@@ -177,7 +177,7 @@ def test(
                         )[0]
 
                         console.log(
-                            f"[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input["input_ids"].size(1) :].size(1)}[/green]: {out_text}"
+                            f"[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}"
                         )
 
                         generated_text[uuid] = out_text
