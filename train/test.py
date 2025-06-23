@@ -632,24 +632,18 @@ def merge_sequence_parallel_cache_optimized(
         k_all = accelerator.gather(k_local)  # [B*world_size, H, L_local, D]
         v_all = accelerator.gather(v_local)
 
-        print(
-            f"Gathered k_all shape: {k_all.shape} - v_all shape: {v_all.shape} - world_size: {accelerator.num_processes}"
-        )
-
         B, H, L_local, D = k_local.shape
         world_size = accelerator.num_processes
-
-        # Reshape to separate the world_size dimension
-        k_all = k_all.view(
-            world_size, B, H, L_local, D
-        )  # [world_size, B, H, L_local, D]
-        v_all = v_all.view(world_size, B, H, L_local, D)
 
         # Concatenate along sequence dimension (dim=3 after reshaping)
         k_merged = torch.cat(
             [k_all[i] for i in range(world_size)], dim=3
         )  # [B, H, L_total, D]
-        v_merged = torch.cat([v_all[i] for i in range(world_size)], dim=3)
+        v_merged = torch.cat([v_all[i] for i in range(world_size)], dim=2)
+
+        print(
+            f"Rank {accelerator.local_process_index} - Layer {layer_idx}: Merged k shape: {k_merged.shape}, v shape: {v_merged.shape}"
+        )
 
         # Remove the world_size dimension by taking the first element (they should all be identical after concat)
         k_merged = k_merged[0]  # [B, H, L_total, D]
