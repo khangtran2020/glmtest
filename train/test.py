@@ -603,13 +603,6 @@ def generate(
                         inputs_embeds = inputs_embeds.cpu()
                         position_ids = position_ids.cpu()
                         logits = logits.cpu()
-                        for key in outputs.keys():
-                            if isinstance(outputs[key], torch.Tensor):
-                                outputs[key] = outputs[key].cpu()
-                            elif isinstance(outputs[key], tuple):
-                                for skey, svalue in enumerate(outputs[key]):
-                                    skey = skey.to("cpu")
-                                    svalue = svalue.to("cpu")
 
                         del inputs_embeds, position_ids, logits, outputs
                         gc.collect()
