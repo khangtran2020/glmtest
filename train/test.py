@@ -164,7 +164,6 @@ def test(
                         tokenizer=dataset.llm_tokenizer,
                         max_new_tokens=args.max_new_tokens,
                         do_sample=False,
-                        use_cache=True,
                         max_seq_len=args.max_seq_length,
                     )
 
@@ -299,7 +298,6 @@ def test(
                         tokenizer=dataset.llm_tokenizer,
                         max_new_tokens=args.max_new_tokens,
                         do_sample=False,
-                        use_cache=True,
                         max_seq_len=args.max_seq_length,
                     )
 
