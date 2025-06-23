@@ -140,7 +140,7 @@ def test(
                         skip_special_tokens=True,
                     )[0]
 
-                    print(f"Generated text - {uuid}: {out_text}")
+                    console.log(f"[green]Generated text - {uuid}[/green]: {out_text}")
 
                     generated_text[uuid] = out_text
                     end_time = time.time()
@@ -526,7 +526,7 @@ def generate(
 
         for step in range(max_new_tokens):
 
-            console.log(f"[yellow]Generating step: {step}[/yellow]")
+            # console.log(f"[yellow]Generating step: {step}[/yellow]")
             # Stop if sequence is too long
             if current_length >= max_seq_len:
                 break
