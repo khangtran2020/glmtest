@@ -611,6 +611,7 @@ def generate(
                         gc.collect()
                         torch.cuda.empty_cache()
 
+            accelerator.wait_for_everyone()
             if accelerator.is_main_process:
                 pred = pred.masked_fill(finished, tokenizer.pad_token_id)
                 # print(
