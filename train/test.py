@@ -575,6 +575,7 @@ def generate(
                     if step == 1:
                         revert_model_patch(original_methods=original_attn_dict)
 
+                    print(f"Rank {model.rank} - Step {step + 1}/{max_new_tokens}")
                     generated_embeddings = model.extract_embedding(
                         input_ids=generated_ids[:, current_length - 1],
                         graph=None,
