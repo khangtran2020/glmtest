@@ -538,14 +538,10 @@ def generate(
                 )
                 logits = outputs.logits
                 out_past_key_values = outputs.past_key_values
-                # print(f"The length of out_past_key_values: {len(out_past_key_values)}")
-
-                # get prediction and manage prediction
                 preds = logits_to_prediction(
                     logits, temperature, top_k, top_p, do_sample
                 )
 
-                # gather all logits using accelerator.gather
                 def undo_extract_local(gathered_value, world_size, dim=1):
                     value_chunks = gathered_value.chunk(2 * world_size, dim=dim)
                     reordered_chunks = [None] * (2 * world_size)
@@ -555,10 +551,6 @@ def generate(
                             i * 2 + 1
                         ]
                     return torch.cat(reordered_chunks, dim=dim)
-
-                # print(
-                #     f"Gathering logits for rank {model.rank}: {preds.shape} - {preds.device}"
-                # )
 
                 gathered_logits = accelerator.gather(preds.squeeze(0)).unsqueeze(0)
                 pred = undo_extract_local(gathered_logits, accelerator.num_processes)
@@ -582,7 +574,6 @@ def generate(
                         graph_mask=None,
                         graph_token_index=None,
                     ).unsqueeze(0)
-                    # print(f"Generated embeddings shape: {generated_embeddings.shape}")
 
                     outputs = model.llm_model.forward(
                         inputs_embeds=generated_embeddings,
@@ -592,18 +583,12 @@ def generate(
                     logits = outputs.logits
                     past_key_values = outputs.past_key_values
 
-                    # reduce past_key_values shape by 1 dimension
                     for i in range(len(past_key_values)):
                         k, v = past_key_values[i]
                         print(
                             f"At step {step}, past_key_values[{i}] shape: {k.shape}, {v.shape}"
                         )
-                        # past_key_values[i] = (
-                        #     k[:, :, -1:, :],
-                        #     v[:, :, -1:, :],
-                        # )
 
-                    # get prediction and manage prediction
                     preds = logits_to_prediction(
                         logits, temperature, top_k, top_p, do_sample
                     )
