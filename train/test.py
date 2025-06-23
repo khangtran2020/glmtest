@@ -599,15 +599,16 @@ def generate(
                 else:
                     # clean up everything and prepare for the next step to release RAM
                     # move to cpu first
-                    inputs_embeds = inputs_embeds.cpu()
-                    position_ids = position_ids.cpu()
-                    logits = logits.cpu()
-                    for key in outputs.keys():
-                        outputs[key] = outputs[key].cpu()
+                    if step == 1:
+                        inputs_embeds = inputs_embeds.cpu()
+                        position_ids = position_ids.cpu()
+                        logits = logits.cpu()
+                        for key in outputs.keys():
+                            outputs[key] = outputs[key].cpu()
 
-                    del inputs_embeds, position_ids, logits, outputs
-                    gc.collect()
-                    torch.cuda.empty_cache()
+                        del inputs_embeds, position_ids, logits, outputs
+                        gc.collect()
+                        torch.cuda.empty_cache()
 
             if accelerator.is_main_process:
                 pred = pred.masked_fill(finished, tokenizer.pad_token_id)
