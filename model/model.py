@@ -474,10 +474,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         # seq_len = inputs_embeds.shape[-2]
         rank = self.rank
-        if self.debug:
-            print(
-                f"Rank {rank} inputs_embeds at step {step}: {inputs_embeds.size()}, device: {inputs_embeds.device}"
-            )
+        # if self.debug:
+        #     print(
+        #         f"Rank {rank} inputs_embeds at step {step}: {inputs_embeds.size()}, device: {inputs_embeds.device}"
+        #     )
 
         num_processes = dist.get_world_size()
         inputs_embeds = extract_local(
