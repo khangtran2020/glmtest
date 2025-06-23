@@ -502,10 +502,10 @@ def generate(
                 pred = undo_extract_local(gathered_logits, accelerator.num_processes)
                 pred = pred[:, current_length - 1 : current_length]
 
-                key, val = out_past_key_values[0]
-                print(
-                    f"Sample past_key_values for rank {model.rank}: {key.shape} - {val.shape}"
-                )
+                # key, val = out_past_key_values[0]
+                # print(
+                #     f"Sample past_key_values for rank {model.rank}: {key.shape} - {val.shape}"
+                # )
 
                 # update past_key_values through undo_extract_local
                 past_key_values = merge_sequence_parallel_cache_optimized(
@@ -631,6 +631,10 @@ def merge_sequence_parallel_cache_optimized(
         # Use accelerator's built-in gather - this handles the distributed communication
         k_all = accelerator.gather(k_local)  # [B*world_size, H, L_local, D]
         v_all = accelerator.gather(v_local)
+
+        print(
+            f"Gathered k_all shape: {k_all.shape} - v_all shape: {v_all.shape} - world_size: {accelerator.num_processes}"
+        )
 
         B, H, L_local, D = k_local.shape
         world_size = accelerator.num_processes
