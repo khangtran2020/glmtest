@@ -184,7 +184,10 @@ def main() -> None:
             optimizer.load_state_dict(check_point["optimizer_state_dict"])
             lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
             start_step = check_point["global_step"]
-
+            if args.debug:
+                console.log(
+                    f"Checkpoint loaded from {args.checkpoint_path}, starting from step {start_step}."
+                )
         else:
             start_step = -1
 
