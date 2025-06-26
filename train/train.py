@@ -437,6 +437,7 @@ def train_multi_gpu_accelerate(
     accelerator.print(f"Distributed type: {accelerator.distributed_type}")
     accelerator.print(f"Number of processes: {accelerator.num_processes}")
     accelerator.print(f"Mixed precision: {mixed_precision}")
+    tokenizer = dataset.llm_tokenizer
 
     if args.model_debug == False:
         tr_dataset = GLMFDataset(
@@ -492,7 +493,6 @@ def train_multi_gpu_accelerate(
                 f"[yellow]================ Example label ================[/yellow]\n {data_point_example['input']['labels']}\n\n[yellow]================ End of example label ================[/yellow]"
             )
 
-    tokenizer = dataset.llm_tokenizer
     patch_model(model_type=model.config.model_type)
     console.log("Model patched with ring attention")
     device = accelerator.device
