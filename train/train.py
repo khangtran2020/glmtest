@@ -478,6 +478,10 @@ def train_multi_gpu_accelerate(
             console.log(f"Train data: {len(tr_dataset)} data points")
             console.log(f"Valid data: {len(va_dataset)} data points")
 
+            # print special token id of tokenizer
+            console.log(
+                f"[cyan]Tokenizer special tokens: {tokenizer.special_tokens_map}[/cyan]"
+            )
             console.log(
                 f"[yellow]================ Example data point ================[/yellow]\n {data_point_example['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
             )
