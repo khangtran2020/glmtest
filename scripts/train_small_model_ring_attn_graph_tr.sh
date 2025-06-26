@@ -90,7 +90,7 @@ accelerate launch --debug --num_processes 4  main.py --mode train \
     --validating_steps 5000 \
     --num_gpu 4 \
     --model_name "qwen2_5-7b"\
-    --name "testing_qwen25_7b_graph_tr_accelerate" \
+    --name "qwen25_7b_graph_tr_3_epochs" \
     --output_dir "./results/models/" \
     --overwrite_output_dir \
     --do_train \
@@ -98,7 +98,7 @@ accelerate launch --debug --num_processes 4  main.py --mode train \
     --n_hidden 16 \
     --learning_rate 1e-4 \
     --max_grad_norm 1.0 \
-    --num_train_epochs 1 \
+    --num_train_epochs 3 \
     --dtype bf16 \
     --use_lora \
     --lora_r 32 \
