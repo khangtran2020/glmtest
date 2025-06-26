@@ -486,7 +486,10 @@ def train_multi_gpu_accelerate(
             for key, value in tokenizer.special_tokens_map.items():
                 if isinstance(value, str):
                     value = tokenizer.convert_tokens_to_ids(value)
-                console.log(f"[cyan]{key}[/cyan]: {value}")
+                    console.log(f"[cyan]{key}[/cyan]: {value}")
+                if isinstance(value, list):
+                    value = [tokenizer.convert_tokens_to_ids(v) for v in value]
+                    console.log(f"[cyan]{key}[/cyan]: {value}")
 
             console.log(
                 f"[yellow]================ Example data point ================[/yellow]\n {data_point_example['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
