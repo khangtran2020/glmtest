@@ -52,7 +52,9 @@ def train(
             # rank=-1,
         )
     else:
-        console.log("Training on multi GPU with mode: train_multi_gpu_accelerate")
+        console.log(
+            f"Training on multi GPU - {args.num_gpu} GPUs - with mode: train_multi_gpu_accelerate"
+        )
         train_multi_gpu_accelerate(
             args=args,
             dataset=dataset,
@@ -469,11 +471,22 @@ def train_multi_gpu_accelerate(
         )
 
         data_point_example = next(iter(tr_loader))
+
         if accelerator.is_main_process:
-            console.log(f"Example data point: {data_point_example}")
-        console.log("Data prepared:")
-        console.log(f"Train data: {len(tr_dataset)} data points")
-        console.log(f"Valid data: {len(va_dataset)} data points")
+
+            console.log("Data prepared:")
+            console.log(f"Train data: {len(tr_dataset)} data points")
+            console.log(f"Valid data: {len(va_dataset)} data points")
+
+            console.log(
+                f"[yellow]================ Example data point ================[/yellow]\n {data_point_example['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
+            )
+            console.log(
+                f"[yellow]================ Example tokenized ================[/yellow]\n {data_point_example['input']['input_ids']}\n\n[yellow]================ End of example tokenized ================[/yellow]"
+            )
+            console.log(
+                f"[yellow]================ Example label ================[/yellow]\n {data_point_example['input']['labels']}\n\n[yellow]================ End of example label ================[/yellow]"
+            )
 
     tokenizer = dataset.llm_tokenizer
     patch_model(model_type=model.config.model_type)
