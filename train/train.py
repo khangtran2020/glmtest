@@ -480,7 +480,7 @@ def train_multi_gpu_accelerate(
 
             # print special token id of tokenizer
             console.log(
-                f"[cyan]Tokenizer special tokens: {tokenizer.special_tokens_map}[/cyan]"
+                f"[cyan]Tokenizer special tokens:[/cyan]\n{tokenizer.special_tokens_map}"
             )
             console.log(
                 f"[yellow]================ Example data point ================[/yellow]\n {data_point_example['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
