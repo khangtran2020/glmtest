@@ -208,16 +208,13 @@ def collate_fn(batch) -> dict:
                 [sample["input"][key] for sample in batch]
             )
         collated = {
+            "text": [x["text"] for x in batch],
             "input": collated_input,
-            # "attention_mask": torch.stack([x["attention_mask"] for x in batch]),
-            # "labels": torch.stack([x["labels"] for x in batch]),
             "graph_mask": torch.stack([x["graph_mask"] for x in batch]),
-            # Leave the graph as a list of dictionaries (or process as needed for your GNN)
             "graph": [x["graph"] for x in batch],
         }
         return collated
     else:
-        print(batch)
         uuid, batch = batch
         collated_input = {}
         for key in batch[0]["input"]:
@@ -226,11 +223,9 @@ def collate_fn(batch) -> dict:
                 [sample["input"][key] for sample in batch]
             )
         collated = {
+            "text": [x["text"] for x in batch],
             "input": collated_input,
-            # "attention_mask": torch.stack([x["attention_mask"] for x in batch]),
-            # "labels": torch.stack([x["labels"] for x in batch]),
             "graph_mask": torch.stack([x["graph_mask"] for x in batch]),
-            # Leave the graph as a list of dictionaries (or process as needed for your GNN)
             "graph": [x["graph"] for x in batch],
         }
         return collated
