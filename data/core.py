@@ -783,17 +783,16 @@ class Data(object):
             tokenize=False,
         )
 
+        task_prompt_output = tokenizer.apply_chat_template(
+            [{"role": "assistant", "content": response}],
+            tokenize=False,
+        )
+
         if len(self.llm_tokenizer.tokenize(task_prompt)) > self.max_tokens:
             self.logger.log(
                 f"[red]Task is too long: {len(self.llm_tokenizer.tokenize(task_prompt))} > {self.max_tokens}[/red]"
             )
             return None
-
-        # if len(task_prompt) > self.max_tokens:
-        #     task_prompt = task_prompt[: self.max_tokens]
-
-        assert task_prompt_input in task_prompt
-        task_prompt_output = task_prompt.replace(task_prompt_input, "")
 
         return task_prompt_input, task_prompt_output, task_prompt
 

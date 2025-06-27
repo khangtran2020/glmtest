@@ -437,6 +437,7 @@ def train_multi_gpu_accelerate(
     accelerator.print(f"Distributed type: {accelerator.distributed_type}")
     accelerator.print(f"Number of processes: {accelerator.num_processes}")
     accelerator.print(f"Mixed precision: {mixed_precision}")
+    tokenizer = dataset.llm_tokenizer
 
     if args.model_debug == False:
         tr_dataset = GLMFDataset(
@@ -478,17 +479,28 @@ def train_multi_gpu_accelerate(
             console.log(f"Train data: {len(tr_dataset)} data points")
             console.log(f"Valid data: {len(va_dataset)} data points")
 
+            # print special token id of tokenizer and the associated ids
+            console.log(
+                f"[cyan]Tokenizer special tokens:[/cyan]\n{tokenizer.special_tokens_map}"
+            )
+            for key, value in tokenizer.special_tokens_map.items():
+                if isinstance(value, str):
+                    value = tokenizer.convert_tokens_to_ids(value)
+                    console.log(f"[cyan]{key}[/cyan]: {value}")
+                if isinstance(value, list):
+                    value = [tokenizer.convert_tokens_to_ids(v) for v in value]
+                    console.log(f"[cyan]{key}[/cyan]: {value}")
+
             console.log(
                 f"[yellow]================ Example data point ================[/yellow]\n {data_point_example['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
             )
             console.log(
-                f"[yellow]================ Example tokenized ================[/yellow]\n {data_point_example['input']['input_ids']}\n\n[yellow]================ End of example tokenized ================[/yellow]"
+                f"[yellow]================ Example tokenized ================[/yellow]\n {data_point_example['input']['input_ids'].squeeze(0).tolist()}\n\n[yellow]================ End of example tokenized ================[/yellow]"
             )
             console.log(
-                f"[yellow]================ Example label ================[/yellow]\n {data_point_example['input']['labels']}\n\n[yellow]================ End of example label ================[/yellow]"
+                f"[yellow]================ Example label ================[/yellow]\n {data_point_example['input']['labels'].squeeze(0).tolist()}\n\n[yellow]================ End of example label ================[/yellow]"
             )
 
-    tokenizer = dataset.llm_tokenizer
     patch_model(model_type=model.config.model_type)
     console.log("Model patched with ring attention")
     device = accelerator.device
