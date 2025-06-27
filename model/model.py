@@ -20,6 +20,7 @@ from transformers.loss.loss_utils import fixed_cross_entropy
 # from utils.prompter import Prompter
 from model.gnn import MultiGAT
 from train.utils import extract_local
+from ring_flash_attn import update_ring_flash_attn_params
 from peft import get_peft_model, LoraConfig, TaskType
 
 # typing
@@ -467,6 +468,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         **kwargs,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
+        process_group = dist.group.WORLD
         ignore_index = -100
         if labels is not None:
             labels = nn.functional.pad(labels, (0, 1), value=ignore_index)
@@ -495,6 +497,16 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         position_ids = extract_local(
             position_ids, rank, num_processes, inputs_embeds.device
+        )
+
+        cu_seqlens = [0] + [
+            position_ids.size(1) * (i + 1) for i in range(num_processes)
+        ]
+        cu_seqlens = torch.tensor(
+            cu_seqlens, dtype=torch.int32, device=inputs_embeds.device
+        )
+        update_ring_flash_attn_params(
+            cu_seqlens=cu_seqlens, process_group=process_group
         )
         if accelerator is not None:
             accelerator.wait_for_everyone()

@@ -4,6 +4,7 @@ import torch
 import wandb
 import shutil
 import traceback
+import torch.distributed as dist
 from model.gnn import GRAPH_KEYS
 from torch.utils.data import DataLoader
 from data.core import Data
@@ -444,7 +445,7 @@ def train_multi_gpu_accelerate(
         log_with="wandb",
         project_dir=args.log_dir,
     )
-
+    process_group = dist.group.WORLD
     local_rank = model.rank
 
     if accelerator.is_main_process:
@@ -537,7 +538,7 @@ def train_multi_gpu_accelerate(
                 f"[yellow]================ Example label ================[/yellow]\n {data_point_example['input']['labels'].squeeze(0).tolist()}\n\n[yellow]================ End of example label ================[/yellow]"
             )
 
-    patch_model(model_type=model.config.model_type)
+    patch_model(process_group=process_group)
     console.log("Model patched with ring attention")
     device = accelerator.device
     config = model.config
