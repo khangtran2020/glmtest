@@ -438,8 +438,15 @@ def validate(
                     else:
                         graph_token_index = None
 
+                    position_ids = (
+                        torch.arange(micro_input["input_ids"].shape[1])
+                        .unsqueeze(0)
+                        .expand(micro_input["input_ids"].shape[0], -1)
+                    )
+
                     outputs = model(
                         **micro_input,
+                        position_ids=position_ids.to(micro_input["input_ids"].device),
                         graph=graph,
                         graph_mask=graph_mask,
                         graph_token_index=graph_token_index,

@@ -491,15 +491,15 @@ def train_multi_gpu_accelerate(
                     value = [tokenizer.convert_tokens_to_ids(v) for v in value]
                     console.log(f"[cyan]{key}[/cyan]: {value}")
 
-            console.log(
-                f"[yellow]================ Example data point ================[/yellow]\n {data_point_example['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
-            )
-            console.log(
-                f"[yellow]================ Example tokenized ================[/yellow]\n {data_point_example['input']['input_ids'].squeeze(0).tolist()}\n\n[yellow]================ End of example tokenized ================[/yellow]"
-            )
-            console.log(
-                f"[yellow]================ Example label ================[/yellow]\n {data_point_example['input']['labels'].squeeze(0).tolist()}\n\n[yellow]================ End of example label ================[/yellow]"
-            )
+            # console.log(
+            #     f"[yellow]================ Example data point ================[/yellow]\n {data_point_example['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
+            # )
+            # console.log(
+            #     f"[yellow]================ Example tokenized ================[/yellow]\n {data_point_example['input']['input_ids'].squeeze(0).tolist()}\n\n[yellow]================ End of example tokenized ================[/yellow]"
+            # )
+            # console.log(
+            #     f"[yellow]================ Example label ================[/yellow]\n {data_point_example['input']['labels'].squeeze(0).tolist()}\n\n[yellow]================ End of example label ================[/yellow]"
+            # )
 
     patch_model(model_type=model.config.model_type)
     console.log("Model patched with ring attention")
