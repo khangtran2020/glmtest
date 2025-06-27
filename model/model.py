@@ -540,7 +540,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 cache_position=cache_position,
             )
 
-        print("outputs", outputs)
+        # print("outputs", outputs)
+        print("ATTRS:", outputs.keys())
         hidden_states = outputs.last_hidden_state
 
         slice_indices = (
