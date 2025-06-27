@@ -411,10 +411,6 @@ def validate(
         if accelerator.is_main_process:
             val_task = progress.add_task("Validating...", total=len(loader))
 
-        console.log(
-            f"[blue]Validating: The mode of the model is {model.training}[/blue]"
-        )
-
         for step, batch in enumerate(loader):
             batch_loss = 0.0
             batch_size = batch["input"]["input_ids"].size(0)
@@ -445,6 +441,9 @@ def validate(
                     else:
                         graph_token_index = None
 
+                    console.log(
+                        f"[blue]Validating: The mode of the model is {model.training}[/blue]"
+                    )
                     outputs = model(
                         **micro_input,
                         graph=graph,
