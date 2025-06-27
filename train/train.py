@@ -151,9 +151,38 @@ def train_single_gpu_accelerate(
         console.log(f"Train data: {len(tr_dataset)} data points")
         console.log(f"Valid data: {len(va_dataset)} data points")
 
+        data_point_example = next(iter(tr_loader))
+        console.log("Data prepared:")
+        console.log(f"Train data: {len(tr_dataset)} data points")
+        console.log(f"Valid data: {len(va_dataset)} data points")
+
+        # print special token id of tokenizer and the associated ids
+        console.log(
+            f"[cyan]Tokenizer special tokens:[/cyan]\n{tokenizer.special_tokens_map}"
+        )
+        for key, value in tokenizer.special_tokens_map.items():
+            if isinstance(value, str):
+                value = tokenizer.convert_tokens_to_ids(value)
+                console.log(f"[cyan]{key}[/cyan]: {value}")
+            if isinstance(value, list):
+                value = [tokenizer.convert_tokens_to_ids(v) for v in value]
+                console.log(f"[cyan]{key}[/cyan]: {value}")
+
+        console.log(
+            f"[yellow]================ Example data point ================[/yellow]\n {data_point_example['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
+        )
+        console.log(
+            f"[yellow]================ Example tokenized ================[/yellow]\n {data_point_example['input']['input_ids'].squeeze(0).tolist()}\n\n[yellow]================ End of example tokenized ================[/yellow]"
+        )
+        console.log(
+            f"[yellow]================ Example label ================[/yellow]\n {data_point_example['input']['labels'].squeeze(0).tolist()}\n\n[yellow]================ End of example label ================[/yellow]"
+        )
+
     tokenizer = dataset.llm_tokenizer
 
     # Prepare everything with accelerator
+    device = accelerator.device
+    config = model.config
     model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
     global_step = 0
     previous_checkpoint_step = -1
@@ -174,14 +203,12 @@ def train_single_gpu_accelerate(
         train_task = progress.add_task("Training...", total=args.num_train_epochs)
 
         for epoch in range(args.num_train_epochs):
-            model.train()
 
-            if ((continue_training == True) and (global_step > start_step)) or (
-                continue_training == False
-            ):
-                train_epoch_task = progress.add_task(
-                    f"Epoch {epoch + 1}/{args.num_train_epochs}", total=len(tr_loader)
-                )
+            model.train()
+            train_epoch_task = progress.add_task(
+                f"Epoch {epoch + 1}/{args.num_train_epochs}",
+                total=len(tr_loader),
+            )
 
             epoch_loss = 0.0
             num_items = 0.0
@@ -190,6 +217,15 @@ def train_single_gpu_accelerate(
 
                 if (continue_training == True) and (global_step <= start_step):
                     global_step += args.batch_size
+                    ram_usage = log_ram_usage()
+                    console.log(
+                        f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
+                    )
+                    progress.update(
+                        train_epoch_task,
+                        advance=1,
+                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB",
+                    )
                     continue
 
                 global_step += args.batch_size
