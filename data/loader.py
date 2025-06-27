@@ -55,11 +55,7 @@ class GLMFDataset(Dataset):
             )
 
         if self.testing == False:
-            # graph = sample["graph"]
             full_text = sample["full_text"]
-            # graph_mask = sample["mask"]
-
-            # Tokenize text input
             tokenized = self.tokenize(full_text, num_gpu=self.num_gpus)
 
             tokenized_user_prompt = self.tokenizer(sample["prompt"])
@@ -112,9 +108,7 @@ class GLMFDataset(Dataset):
             # print(uuid, batch)
             return (uuid, batch)
 
-    def tokenize(
-        self, prompt: str, add_eos_token: bool = True, num_gpu: int = 1
-    ) -> dict:
+    def tokenize(self, prompt: str, num_gpu: int = 1) -> dict:
 
         result = self.tokenizer(
             prompt,
@@ -125,38 +119,20 @@ class GLMFDataset(Dataset):
 
         if num_gpu > 1:
 
-            if (
-                result["input_ids"][0, -1] != self.tokenizer.eos_token_id
-                and add_eos_token
-            ):
-                pad_tensor = (
-                    torch.tensor(
-                        [self.tokenizer.pad_token_id]
-                        * (
-                            (num_gpu * 2)
-                            - result["input_ids"].shape[1] % (num_gpu * 2)
-                            - 1
-                        )
-                    )
-                    .unsqueeze(0)
-                    .int()
-                    .to(result["input_ids"].device)
+            pad_tensor = (
+                torch.tensor(
+                    [self.tokenizer.pad_token_id]
+                    * ((num_gpu * 2) - result["input_ids"].shape[1] % (num_gpu * 2))
                 )
-            else:
-                pad_tensor = (
-                    torch.tensor(
-                        [self.tokenizer.pad_token_id]
-                        * ((num_gpu * 2) - result["input_ids"].shape[1] % (num_gpu * 2))
-                    )
-                    .unsqueeze(0)
-                    .int()
-                    .to(result["input_ids"].device)
-                )
+                .unsqueeze(0)
+                .int()
+                .to(result["input_ids"].device)
+            )
 
             result["input_ids"] = torch.cat((pad_tensor, result["input_ids"]), dim=1)
 
             attention_tensor = torch.tensor(
-                [[1] * pad_tensor.shape[1]],
+                [[0] * pad_tensor.shape[1]],
                 dtype=result["attention_mask"].dtype,
                 device=result["attention_mask"].device,
             )
@@ -164,31 +140,6 @@ class GLMFDataset(Dataset):
             result["attention_mask"] = torch.cat(
                 [attention_tensor, result["attention_mask"]], dim=1
             )
-
-        if result["input_ids"][0, -1] != self.tokenizer.eos_token_id and add_eos_token:
-
-            # Create a tensor for the EOS token with shape (1, 1)
-            eos_token_tensor = torch.tensor(
-                [[self.tokenizer.eos_token_id]],
-                dtype=result["input_ids"].dtype,
-                device=result["input_ids"].device,
-            )
-            # Create a corresponding tensor for the attention mask
-            attention_tensor = torch.tensor(
-                [[1]],
-                dtype=result["attention_mask"].dtype,
-                device=result["attention_mask"].device,
-            )
-
-            # Concatenate along the sequence dimension (dim=1)
-            result["input_ids"] = torch.cat(
-                [result["input_ids"], eos_token_tensor], dim=1
-            )
-            result["attention_mask"] = torch.cat(
-                [result["attention_mask"], attention_tensor], dim=1
-            )
-
-            # print(f"Input_ids shape: {result['input_ids'].shape}")
 
         # Use clone() to make a copy of the tensor for labels.
         result["labels"] = result["input_ids"].clone()
