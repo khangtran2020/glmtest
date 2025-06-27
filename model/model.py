@@ -541,7 +541,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             )
 
         # print("outputs", outputs)
-        print("ATTRS:", outputs.keys())
+        print("ATTRS:", outputs.keys(), "Mode:", self.training)
         hidden_states = outputs.last_hidden_state
 
         slice_indices = (
