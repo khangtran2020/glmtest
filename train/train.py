@@ -853,7 +853,7 @@ def train_multi_gpu_accelerate(
                 if global_step % args.validating_steps == 0:
                     accelerator.wait_for_everyone()
                     console.log(
-                        f"Step {global_step}: The mode of the model is {model.training}"
+                        f"[blue]Step {global_step}: The mode of the model is {model.training}[/blue]"
                     )
                     val_loss = validate(
                         args=args,
