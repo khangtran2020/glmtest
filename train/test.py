@@ -397,6 +397,7 @@ def validate(
     config: GLMFModelConfig,
     device: torch.device,
     progress: Progress,
+    console: Console,
     accelerator: Accelerator,
 ):
     model.eval()
@@ -409,6 +410,10 @@ def validate(
 
         if accelerator.is_main_process:
             val_task = progress.add_task("Validating...", total=len(loader))
+
+        console.log(
+            f"[blue]Validating: The mode of the model is {model.training}[/blue]"
+        )
 
         for step, batch in enumerate(loader):
             batch_loss = 0.0
