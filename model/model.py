@@ -472,7 +472,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             labels = nn.functional.pad(labels, (0, 1), value=ignore_index)
             labels = labels[..., 1:].contiguous()
 
-        # seq_len = inputs_embeds.shape[-2]
+        seq_len = inputs_embeds.shape[-2]
         rank = self.rank
         # if self.debug:
         #     print(
@@ -487,9 +487,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             labels = extract_local(labels, rank, num_processes, labels.device)
 
         if position_ids is None:
-            seq_len = inputs_embeds.shape[-2]
             position_ids = (
-                torch.arange(seq_len, device=inputs_embeds, dtype=torch.long)
+                torch.arange(seq_len, device=inputs_embeds.device, dtype=torch.long)
                 .unsqueeze(0)
                 .expand(inputs_embeds.shape[0], -1)
             )
