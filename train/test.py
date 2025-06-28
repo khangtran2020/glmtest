@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 from model.gnn import GRAPH_KEYS
 from tqdm import tqdm
+from rich import print as pprint
 from data.loader import GLMFDataset, collate_fn
 from model.model import GLMFModelForCausalLM, GLMFModelConfig
 from transformers import PreTrainedTokenizer
@@ -442,7 +443,7 @@ def validate(
                         graph_token_index = None
 
                     if accelerator.is_main_process:
-                        console.log(
+                        pprint(
                             f"[blue]Validating: The mode of the model is {model.training}[/blue]"
                         )
                     outputs = model(
