@@ -152,7 +152,7 @@ def main() -> None:
             multi_gpu=True if args.num_gpu > 1 else False,
             debug=args.debug,
             rank=rank,
-            training=True,
+            is_training=True,
         )
         model.llm_model.gradient_checkpointing_enable()
         model.config.graph_token_id = [
@@ -251,7 +251,7 @@ def main() -> None:
             debug=args.debug,
             rank=rank,
             multi_gpu=True if args.num_gpu > 1 else False,
-            training=False,
+            is_training=False,
         )
 
         model.config.graph_token_id = [

@@ -20,6 +20,7 @@ from transformers.loss.loss_utils import fixed_cross_entropy
 # from utils.prompter import Prompter
 from model.gnn import MultiGAT
 from train.utils import extract_local
+from ring_flash_attn import update_ring_flash_attn_params
 from peft import get_peft_model, LoraConfig, TaskType
 
 # typing
@@ -211,7 +212,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         baseline_prompt: str = None,
         multi_gpu: bool = False,
         debug: bool = False,
-        training: bool = False,
+        is_training: bool = False,
     ):
 
         super().__init__(config)
@@ -220,7 +221,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         self.multi_gpu = multi_gpu
         self.debug = debug
         self.rank = rank
-        self.training = training
+        self.is_training = is_training
 
         self.gnn = MultiGAT(
             config.mode,
@@ -249,7 +250,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 device_map=f"cuda:{rank}",
             )
 
-        if self.training:
+        if self.is_training:
             self.llm_model.resize_token_embeddings(len(tokenizer))
             self.config.vocab_size = len(tokenizer)
         else:
@@ -467,6 +468,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         **kwargs,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
+        process_group = dist.group.WORLD
         ignore_index = -100
         if labels is not None:
             labels = nn.functional.pad(labels, (0, 1), value=ignore_index)
@@ -496,10 +498,20 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         position_ids = extract_local(
             position_ids, rank, num_processes, inputs_embeds.device
         )
+
+        cu_seqlens = [0] + [
+            position_ids.size(1) * (i + 1) for i in range(num_processes)
+        ]
+        cu_seqlens = torch.tensor(
+            cu_seqlens, dtype=torch.int32, device=inputs_embeds.device
+        )
+        update_ring_flash_attn_params(
+            cu_seqlens=cu_seqlens, process_group=process_group
+        )
         if accelerator is not None:
             accelerator.wait_for_everyone()
 
-        if self.training:
+        if self.is_training:
             outputs = self.llm_model.model.model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,

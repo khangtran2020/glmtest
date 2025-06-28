@@ -15,6 +15,7 @@ from torch.optim.lr_scheduler import LRScheduler
 from transformers.models.qwen2.modeling_qwen2 import Qwen2RotaryEmbedding
 from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding
 from ring_flash_attn.zigzag_ring_flash_attn import zigzag_ring_flash_attn_func
+from ring_flash_attn import substitute_hf_flash_attn
 from transformers.modeling_flash_attention_utils import _flash_attention_forward
 from typing import Optional
 from rich.console import Console
@@ -92,39 +93,14 @@ def judge_dir(resume_dir):
 #         raise NotImplementedError(f"Model type {model_type} is not supported.")
 
 
-def patch_model(model_type: str):
+def patch_model(process_group=None):
 
     original_methods = {}
-
     # Store and patch attention
     original_methods["attention_forward"] = (
         transformers.modeling_flash_attention_utils._flash_attention_forward
     )
-    transformers.modeling_flash_attention_utils._flash_attention_forward = (
-        ring_flash_attention_forward
-    )
-
-    if model_type == "llama":
-        original_methods["llama_rope_forward"] = LlamaRotaryEmbedding.forward
-
-        def forward_llama_embed(self, x, seq_len=None):
-            seq_len = seq_len * dist.get_world_size()
-            return original_methods["llama_rope_forward"](self, x, seq_len)
-
-        LlamaRotaryEmbedding.forward = forward_llama_embed
-
-    elif model_type == "qwen2":
-        original_methods["qwen2_rope_forward"] = Qwen2RotaryEmbedding.forward
-
-        def forward_qwen2_embed(self, x, seq_len=None):
-            seq_len = seq_len * dist.get_world_size()
-            return original_methods["qwen2_rope_forward"](self, x, seq_len)
-
-        Qwen2RotaryEmbedding.forward = forward_qwen2_embed
-
-    else:
-        raise NotImplementedError(f"Model type {model_type} is not supported.")
-
+    substitute_hf_flash_attn(process_group=process_group, heads_k_stride=1)
     return original_methods
 
 
