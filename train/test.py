@@ -444,7 +444,7 @@ def validate(
 
                     if accelerator.is_main_process:
                         pprint(
-                            f"[blue]Validating: The mode of the model is {model.training}[/blue]"
+                            f"[blue]Validating: The mode of the model is {model.is_training}[/blue]"
                         )
                     outputs = model(
                         **micro_input,

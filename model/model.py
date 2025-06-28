@@ -212,7 +212,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         baseline_prompt: str = None,
         multi_gpu: bool = False,
         debug: bool = False,
-        training: bool = False,
+        is_training: bool = False,
     ):
 
         super().__init__(config)
@@ -221,7 +221,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         self.multi_gpu = multi_gpu
         self.debug = debug
         self.rank = rank
-        self.training = training
+        self.is_training = is_training
 
         self.gnn = MultiGAT(
             config.mode,
@@ -250,7 +250,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 device_map=f"cuda:{rank}",
             )
 
-        if self.training:
+        if self.is_training:
             self.llm_model.resize_token_embeddings(len(tokenizer))
             self.config.vocab_size = len(tokenizer)
         else:
@@ -511,7 +511,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if accelerator is not None:
             accelerator.wait_for_everyone()
 
-        if self.training:
+        if self.is_training:
             outputs = self.llm_model.model.model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
@@ -541,7 +541,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             )
 
         # print("outputs", outputs)
-        print("ATTRS:", outputs.keys(), "Mode:", self.training)
+        print("ATTRS:", outputs.keys(), "Mode:", self.is_training)
         hidden_states = outputs.last_hidden_state
 
         slice_indices = (

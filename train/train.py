@@ -855,7 +855,7 @@ def train_multi_gpu_accelerate(
                     accelerator.wait_for_everyone()
                     if accelerator.is_main_process:
                         pprint(
-                            f"[blue]Step {global_step}: The mode of the model is {model.training}[/blue]"
+                            f"[blue]Step {global_step}: The mode of the model is {model.is_training}[/blue]"
                         )
                     val_loss = validate(
                         args=args,
