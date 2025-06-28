@@ -441,9 +441,10 @@ def validate(
                     else:
                         graph_token_index = None
 
-                    console.log(
-                        f"[blue]Validating: The mode of the model is {model.training}[/blue]"
-                    )
+                    if accelerator.is_main_process:
+                        console.log(
+                            f"[blue]Validating: The mode of the model is {model.training}[/blue]"
+                        )
                     outputs = model(
                         **micro_input,
                         graph=graph,
