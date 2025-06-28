@@ -861,6 +861,7 @@ def train_multi_gpu_accelerate(
                         model=model,
                         device=device,
                         config=config,
+                        console=console,
                         accelerator=accelerator,
                         progress=progress,
                     )
