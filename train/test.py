@@ -441,11 +441,6 @@ def validate(
                         )[1].tolist()
                     else:
                         graph_token_index = None
-
-                    if accelerator.is_main_process:
-                        pprint(
-                            f"[blue]Validating: The mode of the model is {model.is_training}[/blue]"
-                        )
                     outputs = model(
                         **micro_input,
                         graph=graph,
