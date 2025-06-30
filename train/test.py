@@ -151,9 +151,10 @@ def test(
                         graph_token_index=graph_token_index,
                     )
 
-                    console.log(
-                        f"Inputs embeds shape: {inputs_embeds.shape} | Graph token index: {len(graph_token_index)}"
-                    )
+                    if args.debug and accelerator.is_main_process:
+                        console.log(
+                            f"Inputs embeds shape: {inputs_embeds.shape} | Graph token index: {len(graph_token_index)}"
+                        )
 
                     if args.num_gpu == 1:
                         outputs = model.generate(
@@ -169,10 +170,11 @@ def test(
                             outputs[:, micro_input["input_ids"].size(1) :],
                             skip_special_tokens=True,
                         )[0]
-
-                        console.log(
-                            f"[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}"
-                        )
+                        # print(f"Generated text - {uuid}: {out_text}")
+                        if args.debug and accelerator.is_main_process:
+                            console.log(
+                                f"\n\n[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}\n\n"
+                            )
 
                         generated_text[uuid] = out_text
                         end_time = time.time()
@@ -207,7 +209,7 @@ def test(
                             )[0]
 
                             console.log(
-                                f"[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}"
+                                f"\n\n[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}\n\n"
                             )
 
                             generated_text[uuid] = out_text
