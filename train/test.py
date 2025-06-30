@@ -36,9 +36,14 @@ def test(
     model: GLMFModelForCausalLM,
     console: Console,
     config: GLMFModelConfig = None,
-    accelerator: Accelerator = None,
     mixed_precision: str = "bf16",
 ):
+
+    accelerator = Accelerator(
+        mixed_precision=mixed_precision,
+        log_with="wandb",
+        project_dir=args.log_dir,
+    )
     process_group = dist.group.WORLD
     if config is None:
         config = model.config
@@ -124,12 +129,10 @@ def test(
 
                 if args.num_gpu == 1:
                     outputs = model.generate(
-                        input_ids=micro_input["input_ids"],
-                        attention_mask=micro_input["attention_mask"],
+                        inputs=micro_input["input_ids"],
                         graph=graph,
                         graph_mask=graph_mask,
                         graph_token_index=graph_token_index,
-                        pad_token_id=tokenizer.pad_token_id,
                         max_new_tokens=args.max_new_tokens,
                         do_sample=False,
                         use_cache=True,

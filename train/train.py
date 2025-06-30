@@ -36,7 +36,6 @@ def train(
     max_num_checkpoint: int = 5,
     mixed_precision: str = "bf16",
     collate_fn: callable = collate_fn,
-    accelerator: Accelerator = None,
 ):
     if args.num_gpu == 1:
         console.log("Training on single GPU with mode: train_single_gpu_accelerate")
@@ -52,7 +51,7 @@ def train(
             model=model,
             max_num_checkpoint=max_num_checkpoint,
             collate_fn=collate_fn,
-            accelerator=accelerator,
+            # rank=-1,
         )
     else:
         console.log(
@@ -70,7 +69,7 @@ def train(
             model=model,
             max_num_checkpoint=max_num_checkpoint,
             collate_fn=collate_fn,
-            accelerator=accelerator,
+            # rank=-1,
         )
 
 
@@ -86,16 +85,15 @@ def train_single_gpu_accelerate(
     max_num_checkpoint: int = 5,
     collate_fn: callable = collate_fn,
     mixed_precision: str = "bf16",
-    accelerator: Accelerator = None,
 ):
 
-    # # init wandb
-    # accelerator = Accelerator(
-    #     gradient_accumulation_steps=args.gradient_accumulation_steps,
-    #     mixed_precision=mixed_precision,
-    #     log_with="wandb",
-    #     project_dir=args.log_dir,
-    # )
+    # init wandb
+    accelerator = Accelerator(
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
+        mixed_precision=mixed_precision,
+        log_with="wandb",
+        project_dir=args.log_dir,
+    )
 
     save_path = os.path.join(args.output_dir, args.name)
     console.log(f"Model will be saved to {save_path}...")
@@ -440,15 +438,14 @@ def train_multi_gpu_accelerate(
     start_step: int = -1,
     max_num_checkpoint: int = 5,
     collate_fn: callable = collate_fn,
-    accelerator: Accelerator = None,
     mixed_precision: str = "bf16",
 ):
-    # accelerator = Accelerator(
-    #     gradient_accumulation_steps=args.gradient_accumulation_steps,
-    #     mixed_precision=mixed_precision,
-    #     log_with="wandb",
-    #     project_dir=args.log_dir,
-    # )
+    accelerator = Accelerator(
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
+        mixed_precision=mixed_precision,
+        log_with="wandb",
+        project_dir=args.log_dir,
+    )
     process_group = dist.group.WORLD
     local_rank = model.rank
 

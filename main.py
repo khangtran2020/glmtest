@@ -18,9 +18,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.optim import AdamW
 from utils.utils import log_ram_usage
 from datetime import timedelta
-from accelerate import Accelerator
 from torch.distributed import init_process_group
-from accelerate.utils import broadcast_object_list
 
 warnings.filterwarnings("ignore")
 
@@ -142,13 +140,6 @@ def main() -> None:
 
     if args.mode == "train":
 
-        accelerator = Accelerator(
-            gradient_accumulation_steps=args.gradient_accumulation_steps,
-            mixed_precision="bf16",
-            log_with="wandb",
-            project_dir=args.log_dir,
-        )
-
         config = GLMFModelConfig(
             llm_model=args.llm_model,
             use_lora=args.use_lora,
@@ -199,31 +190,11 @@ def main() -> None:
             assert (
                 args.checkpoint_path is not None
             ), "Checkpoint path must be specified."
-            if (args.num_gpu == 1) or (
-                args.num_gpu > 1 and accelerator.is_main_process
-            ):
-                check_point = load_checkpoint(path=args.checkpoint_path, rank=rank)
-                model.load_state_dict(check_point["model_state_dict"])
-                optimizer.load_state_dict(check_point["optimizer_state_dict"])
-                lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
-            else:
-                # In distributed training, only the main process should load the checkpoint
-                check_point = None
-                console.log(
-                    f"Skipping checkpoint loading in non-main process (rank {rank})."
-                )
+            check_point = load_checkpoint(path=args.checkpoint_path)
 
-            # Synchronize all processes to ensure the checkpoint is loaded correctly
-            if args.num_gpu > 1:
-                [check_point] = broadcast_object_list([check_point], from_process=0)
-                model.load_state_dict(check_point["model_state_dict"].to(device))
-                optimizer.load_state_dict(
-                    check_point["optimizer_state_dict"].to(device)
-                )
-                lr_scheduler.load_state_dict(
-                    check_point["scheduler_state_dict"].to(device)
-                )
-
+            model.load_state_dict(check_point["model_state_dict"])
+            optimizer.load_state_dict(check_point["optimizer_state_dict"])
+            lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
             start_step = check_point["global_step"]
             if args.debug:
                 console.log(
@@ -242,7 +213,6 @@ def main() -> None:
             continue_training=args.continue_training,
             start_step=start_step,
             mixed_precision="bf16",
-            accelerator=accelerator,
         )
 
         if args.do_test:
@@ -265,11 +235,6 @@ def main() -> None:
 
     elif args.mode == "test":
         # load model
-        accelerator = Accelerator(
-            mixed_precision="bf16",
-            log_with="wandb",
-            project_dir=args.log_dir,
-        )
         assert (
             args.model_weight_path is not None
         ), "Model directory must be specified for testing."
