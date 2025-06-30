@@ -126,6 +126,18 @@ def main() -> None:
         timeout_long_ncll = timedelta(seconds=90000)  # 100 minutes
         init_process_group("nccl", timeout=timeout_long_ncll)
 
+    # Debugging tokenizer:
+    console.log(
+        f"[cyan]Tokenizer special tokens:[/cyan]\n{dataset.llm_tokenizer.special_tokens_map}"
+    )
+    for key, value in dataset.llm_tokenizer.special_tokens_map.items():
+        if isinstance(value, str):
+            value = dataset.llm_tokenizer.convert_tokens_to_ids(value)
+            console.log(f"[cyan]{key}[/cyan]: {value}")
+        if isinstance(value, list):
+            value = [dataset.llm_tokenizer.convert_tokens_to_ids(v) for v in value]
+            console.log(f"[cyan]{key}[/cyan]: {value}")
+
     if args.mode == "train":
 
         config = GLMFModelConfig(
