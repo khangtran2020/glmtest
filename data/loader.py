@@ -100,7 +100,7 @@ class GLMFDataset(Dataset):
                 raise ValueError("Input must contain graph token")
 
             batch = {
-                "text": full_text,
+                "text": prompt,
                 "input": tokenized,
                 "graph": graph,  # Should be a dictionary of graph structures
                 "graph_mask": torch.tensor(graph_mask, dtype=torch.float),
