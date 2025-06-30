@@ -227,9 +227,14 @@ def main() -> None:
             args.model_weight_path is not None
         ), "Model directory must be specified for testing."
 
+        if "current_checkpoint" in args.model_weight_path:
+            use_lora = True
+        else:
+            use_lora = False
+
         config = GLMFModelConfig(
             llm_model=args.llm_model,
-            use_lora=False,
+            use_lora=use_lora,
             dtype=args.dtype,
             mode=args.gnn_mode,
             in_feats=args.in_feats,
@@ -269,6 +274,8 @@ def main() -> None:
                         map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
                     )
                 )
+                if use_lora:
+                    model.llm_model = model.llm_model.merge_and_unload()
         console.log(f"Model is loaded to device: {model.device}")
         test(args=args, dataset=dataset, model=model, console=console)
 
