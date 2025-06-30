@@ -268,12 +268,13 @@ def main() -> None:
         # take .pt file from the model_weight_path
         for file in os.listdir(args.model_weight_path):
             if file.endswith(".pt"):
-                model.load_state_dict(
-                    torch.load(
-                        os.path.join(args.model_weight_path, file),
-                        map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-                    )
+                state_dict = torch.load(
+                    os.path.join(args.model_weight_path, file),
+                    map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
                 )
+                if "current_checkpoint" in args.model_weight_path:
+                    state_dict = state_dict["model_state_dict"]
+                model.load_state_dict(state_dict)
                 if use_lora:
                     model.llm_model = model.llm_model.merge_and_unload()
         console.log(f"Model is loaded to device: {model.device}")
