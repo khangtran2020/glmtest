@@ -105,6 +105,34 @@ accelerate launch --debug --num_processes 4  main.py --mode train \
     --use_accelerate \
     --graph_sampling
 
+accelerate launch --debug --num_processes 1  main.py --mode train \
+    --seed 42 \
+    --data_path Dataset \
+    --data testgeneval \
+    --baseline_prompt graph_tr \
+    --llm_model "Qwen/Qwen2.5-Coder-3B-Instruct" \
+    --max_seq_len 28000 \
+    --batch_size 1 \
+    --gradient_accumulation_steps 32 \
+    --save_steps 1000 \
+    --validating_steps 5000 \
+    --num_gpu 1 \
+    --model_name "qwen2_5-3b"\
+    --name "qwen25_3b_inst_graph_tr_1_epochs" \
+    --output_dir "./results/models/" \
+    --overwrite_output_dir \
+    --do_train \
+    --do_eval \
+    --lora_r 32 \
+    --n_hidden 16 \
+    --learning_rate 5e-5 \
+    --max_grad_norm 1.0 \
+    --num_train_epochs 1 \
+    --dtype bf16 \
+    --use_lora \
+    --use_accelerate \
+    --graph_sampling
+
 
 accelerate launch --debug --num_processes 4  main.py --mode test \
     --seed 42 \
@@ -177,7 +205,7 @@ accelerate launch --debug --num_processes 2  main.py --mode train \
     --debug
 
 
-accelerate launch --debug --num_processes 1  main.py --mode test \
+accelerate launch --debug --num_processes 4  main.py --mode test \
     --seed 42 \
     --data_path Dataset \
     --data testgeneval \
@@ -188,7 +216,7 @@ accelerate launch --debug --num_processes 1  main.py --mode test \
     --gradient_accumulation_steps 32 \
     --save_steps 320 \
     --validating_steps 5000 \
-    --num_gpu 1 \
+    --num_gpu 4 \
     --model_name "qwen2_5-7b"\
     --name "qwen25_7b_inst_graph_tr_3_epochs_temp" \
     --output_dir "./results/models/" \

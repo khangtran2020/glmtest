@@ -122,6 +122,7 @@ def train_single_gpu_accelerate(
         init_kwargs={"wandb": {"name": args.name}},
     )
 
+    tokenizer = dataset.llm_tokenizer
     device = accelerator.device
     accelerator.print(f"Using {accelerator.num_processes} devices")
     accelerator.print(f"Mixed precision: {mixed_precision}")
@@ -180,7 +181,7 @@ def train_single_gpu_accelerate(
             f"[yellow]================ Example label ================[/yellow]\n {data_point_example['input']['labels'].squeeze(0).tolist()}\n\n[yellow]================ End of example label ================[/yellow]"
         )
 
-    tokenizer = dataset.llm_tokenizer
+    # tokenizer = dataset.llm_tokenizer
 
     # Prepare everything with accelerator
     device = accelerator.device
