@@ -190,7 +190,7 @@ def main() -> None:
             assert (
                 args.checkpoint_path is not None
             ), "Checkpoint path must be specified."
-            check_point = load_checkpoint(path=args.checkpoint_path)
+            check_point = load_checkpoint(path=args.checkpoint_path, rank=rank)
 
             model.load_state_dict(check_point["model_state_dict"])
             optimizer.load_state_dict(check_point["optimizer_state_dict"])
