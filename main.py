@@ -260,12 +260,15 @@ def main() -> None:
             dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
         ]
 
-        model.load_state_dict(
-            torch.load(
-                os.path.join(args.model_weight_path, "model_weight.pt"),
-                map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-            )
-        )
+        # take .pt file from the model_weight_path
+        for file in os.listdir(args.model_weight_path):
+            if file.endswith(".pt"):
+                model.load_state_dict(
+                    torch.load(
+                        os.path.join(args.model_weight_path, file),
+                        map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+                    )
+                )
         console.log(f"Model is loaded to device: {model.device}")
         test(args=args, dataset=dataset, model=model, console=console)
 
