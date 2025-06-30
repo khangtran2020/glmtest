@@ -478,67 +478,66 @@ def train_multi_gpu_accelerate(
     accelerator.print(f"Mixed precision: {mixed_precision}")
     tokenizer = dataset.llm_tokenizer
 
-    if args.model_debug == False:
-        tr_dataset = GLMFDataset(
-            data=dataset.train_data,
-            tokenizer=dataset.llm_tokenizer,
-            max_seq_length=args.max_seq_length,
-            debug=args.debug,
-            n_hops=dataset.n_hops,
+    tr_dataset = GLMFDataset(
+        data=dataset.train_data,
+        tokenizer=dataset.llm_tokenizer,
+        max_seq_length=args.max_seq_length,
+        debug=args.debug,
+        n_hops=dataset.n_hops,
+    )
+    va_dataset = GLMFDataset(
+        data=dataset.val_data,
+        tokenizer=dataset.llm_tokenizer,
+        max_seq_length=args.max_seq_length,
+        debug=args.debug,
+        n_hops=dataset.n_hops,
+    )
+    dataloader_params = {
+        "batch_size": args.batch_size,
+        "collate_fn": collate_fn,
+        "num_workers": 4,
+        "pin_memory": True,
+        "persistent_workers": True,
+    }
+
+    if not isinstance(tr_dataset, torch.utils.data.IterableDataset):
+        dataloader_params["drop_last"] = True
+        dataloader_params["worker_init_fn"] = seed_worker
+
+    tr_loader = DataLoader(tr_dataset, **dataloader_params)
+    va_loader = DataLoader(
+        va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
+    )
+
+    data_point_example = next(iter(tr_loader))
+
+    if accelerator.is_main_process:
+
+        console.log("Data prepared:")
+        console.log(f"Train data: {len(tr_dataset)} data points")
+        console.log(f"Valid data: {len(va_dataset)} data points")
+
+        # print special token id of tokenizer and the associated ids
+        console.log(
+            f"[cyan]Tokenizer special tokens:[/cyan]\n{tokenizer.special_tokens_map}"
         )
-        va_dataset = GLMFDataset(
-            data=dataset.val_data,
-            tokenizer=dataset.llm_tokenizer,
-            max_seq_length=args.max_seq_length,
-            debug=args.debug,
-            n_hops=dataset.n_hops,
+        for key, value in tokenizer.special_tokens_map.items():
+            if isinstance(value, str):
+                value = tokenizer.convert_tokens_to_ids(value)
+                console.log(f"[cyan]{key}[/cyan]: {value}")
+            if isinstance(value, list):
+                value = [tokenizer.convert_tokens_to_ids(v) for v in value]
+                console.log(f"[cyan]{key}[/cyan]: {value}")
+
+        console.log(
+            f"[yellow]================ Example data point ================[/yellow]\n {data_point_example['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
         )
-        dataloader_params = {
-            "batch_size": args.batch_size,
-            "collate_fn": collate_fn,
-            "num_workers": 4,
-            "pin_memory": True,
-            "persistent_workers": True,
-        }
-
-        if not isinstance(tr_dataset, torch.utils.data.IterableDataset):
-            dataloader_params["drop_last"] = True
-            dataloader_params["worker_init_fn"] = seed_worker
-
-        tr_loader = DataLoader(tr_dataset, **dataloader_params)
-        va_loader = DataLoader(
-            va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
+        console.log(
+            f"[yellow]================ Example tokenized ================[/yellow]\n {data_point_example['input']['input_ids'].squeeze(0).tolist()}\n\n[yellow]================ End of example tokenized ================[/yellow]"
         )
-
-        data_point_example = next(iter(tr_loader))
-
-        if accelerator.is_main_process:
-
-            console.log("Data prepared:")
-            console.log(f"Train data: {len(tr_dataset)} data points")
-            console.log(f"Valid data: {len(va_dataset)} data points")
-
-            # print special token id of tokenizer and the associated ids
-            console.log(
-                f"[cyan]Tokenizer special tokens:[/cyan]\n{tokenizer.special_tokens_map}"
-            )
-            for key, value in tokenizer.special_tokens_map.items():
-                if isinstance(value, str):
-                    value = tokenizer.convert_tokens_to_ids(value)
-                    console.log(f"[cyan]{key}[/cyan]: {value}")
-                if isinstance(value, list):
-                    value = [tokenizer.convert_tokens_to_ids(v) for v in value]
-                    console.log(f"[cyan]{key}[/cyan]: {value}")
-
-            console.log(
-                f"[yellow]================ Example data point ================[/yellow]\n {data_point_example['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
-            )
-            console.log(
-                f"[yellow]================ Example tokenized ================[/yellow]\n {data_point_example['input']['input_ids'].squeeze(0).tolist()}\n\n[yellow]================ End of example tokenized ================[/yellow]"
-            )
-            console.log(
-                f"[yellow]================ Example label ================[/yellow]\n {data_point_example['input']['labels'].squeeze(0).tolist()}\n\n[yellow]================ End of example label ================[/yellow]"
-            )
+        console.log(
+            f"[yellow]================ Example label ================[/yellow]\n {data_point_example['input']['labels'].squeeze(0).tolist()}\n\n[yellow]================ End of example label ================[/yellow]"
+        )
 
     patch_model(process_group=process_group)
     console.log("Model patched with ring attention")
@@ -578,9 +577,6 @@ def train_multi_gpu_accelerate(
         for epoch in range(args.num_train_epochs):
 
             if accelerator.is_main_process:
-                # if ((continue_training == True) and (global_step > start_step)) or (
-                #     continue_training == False
-                # ):
                 train_epoch_task = progress.add_task(
                     f"Epoch {epoch + 1}/{args.num_train_epochs}",
                     total=len(tr_loader),
@@ -696,6 +692,21 @@ def train_multi_gpu_accelerate(
                         loss = outputs.loss
                         accelerator.backward(loss)
 
+                        if args.debug:
+                            # Log the gradients norm for each model:
+                            total_norm_sq = 0.0
+                            for p in model.parameters():
+                                if p.grad is not None:
+                                    # compute L2 norm of this parameter’s gradient
+                                    param_norm = p.grad.data.norm(2)
+                                    total_norm_sq += param_norm.item() ** 2
+
+                            total_grad_norm = total_norm_sq**0.5
+                            accelerator.wait_for_everyone()
+                            console.log(
+                                f"[cyan]Step {global_step} - rank {local_rank}: total_grad_norm = {total_grad_norm:.4f}[/cyan]"
+                            )
+
                         all_losses = accelerator.gather(loss)
                         all_losses = torch.where(
                             torch.isnan(all_losses), 0.0, all_losses
@@ -763,9 +774,6 @@ def train_multi_gpu_accelerate(
                     del outputs, loss, micro_input
                     gc.collect()
                     torch.cuda.empty_cache()
-
-                # if args.debug:
-                #     pass
 
                 avg_batch_loss = batch_loss / batch_size
                 if accelerator.is_main_process:
@@ -847,10 +855,6 @@ def train_multi_gpu_accelerate(
                         )
                         accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
                         del unwrapped_model
-
-                # del outputs, loss, micro_input, graph, graph_mask  # Free memory
-                # if torch.cuda.is_available():
-                #     torch.cuda.empty_cache()
 
                 if global_step % args.validating_steps == 0:
                     accelerator.wait_for_everyone()
