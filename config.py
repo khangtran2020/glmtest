@@ -151,6 +151,11 @@ def add_model_group(group):
         action="store_true",
         help="continue training from checkpoint",
     )
+    group.add_argument(
+        "--test_on_train",
+        action="store_true",
+        help="test on train dataset",
+    )
 
 
 def add_training_group(group):
