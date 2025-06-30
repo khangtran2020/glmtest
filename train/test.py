@@ -129,7 +129,8 @@ def test(
 
                 if args.num_gpu == 1:
                     outputs = model.generate(
-                        inputs=micro_input["input_ids"],
+                        input_ids=micro_input["input_ids"],
+                        attention_mask=micro_input["attention_mask"],
                         graph=graph,
                         graph_mask=graph_mask,
                         graph_token_index=graph_token_index,
