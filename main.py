@@ -203,21 +203,9 @@ def main() -> None:
                 args.num_gpu > 1 and accelerator.is_main_process
             ):
                 check_point = load_checkpoint(path=args.checkpoint_path, rank=rank)
-                model.load_state_dict(
-                    check_point["model_state_dict"].to(
-                        f"cuda:{rank}" if args.num_gpu > 1 else "cpu"
-                    )
-                )
-                optimizer.load_state_dict(
-                    check_point["optimizer_state_dict"].to(
-                        f"cuda:{rank}" if args.num_gpu > 1 else "cpu"
-                    )
-                )
-                lr_scheduler.load_state_dict(
-                    check_point["scheduler_state_dict"].to(
-                        f"cuda:{rank}" if args.num_gpu > 1 else "cpu"
-                    )
-                )
+                model.load_state_dict(check_point["model_state_dict"])
+                optimizer.load_state_dict(check_point["optimizer_state_dict"])
+                lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
             else:
                 # In distributed training, only the main process should load the checkpoint
                 check_point = None
