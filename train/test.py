@@ -133,6 +133,7 @@ def test(
                         graph=graph,
                         graph_mask=graph_mask,
                         graph_token_index=graph_token_index,
+                        pad_token_id=tokenizer.pad_token_id,
                         max_new_tokens=args.max_new_tokens,
                         do_sample=False,
                         use_cache=True,

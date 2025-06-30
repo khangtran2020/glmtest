@@ -192,9 +192,21 @@ def main() -> None:
             ), "Checkpoint path must be specified."
             check_point = load_checkpoint(path=args.checkpoint_path, rank=rank)
 
-            model.load_state_dict(check_point["model_state_dict"])
-            optimizer.load_state_dict(check_point["optimizer_state_dict"])
-            lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
+            model.load_state_dict(
+                check_point["model_state_dict"].to(
+                    f"cuda:{rank}" if args.num_gpu > 1 else "cpu"
+                )
+            )
+            optimizer.load_state_dict(
+                check_point["optimizer_state_dict"].to(
+                    f"cuda:{rank}" if args.num_gpu > 1 else "cpu"
+                )
+            )
+            lr_scheduler.load_state_dict(
+                check_point["scheduler_state_dict"].to(
+                    f"cuda:{rank}" if args.num_gpu > 1 else "cpu"
+                )
+            )
             start_step = check_point["global_step"]
             if args.debug:
                 console.log(
