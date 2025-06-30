@@ -96,6 +96,14 @@ def test(
                 batch_input = batch["input"].copy()
                 if "token_type_ids" in batch_input:
                     batch_input.pop("token_type_ids")
+
+                if args.debug and accelerator.is_main_process:
+                    console.log(
+                        f"[yellow]================ Example data point ================[/yellow]\n {batch['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
+                    )
+                    console.log(
+                        f"[yellow]================ Example tokenized ================[/yellow]\n {batch_input['input_ids'].squeeze(0).tolist()}\n\n[yellow]================ End of example tokenized ================[/yellow]"
+                    )
                 micro_input = {
                     "input_ids": batch_input["input_ids"].to(device),
                     "attention_mask": batch_input["attention_mask"].to(device),
