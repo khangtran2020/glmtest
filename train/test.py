@@ -36,14 +36,9 @@ def test(
     model: GLMFModelForCausalLM,
     console: Console,
     config: GLMFModelConfig = None,
+    accelerator: Accelerator = None,
     mixed_precision: str = "bf16",
 ):
-
-    accelerator = Accelerator(
-        mixed_precision=mixed_precision,
-        log_with="wandb",
-        project_dir=args.log_dir,
-    )
     process_group = dist.group.WORLD
     if config is None:
         config = model.config

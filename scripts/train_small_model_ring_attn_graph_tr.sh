@@ -132,7 +132,7 @@ accelerate launch --debug --num_processes 4  main.py --mode test \
     --use_lora \
     --lora_r 32 \
     --use_accelerate \
-    --model_weight_path "./results/models/testing_qwen25_7b_graph_tr_accelerate/final_model" \
+    --model_weight_path "./results/models/qwen25_7b_graph_tr_3_epochs/current_checkpoint" \
     --graph_sampling
 
 accelerate launch --debug --num_processes 1  main.py --mode data \
