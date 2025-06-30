@@ -284,8 +284,8 @@ def main() -> None:
                     os.path.join(args.model_weight_path, file),
                     map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
                 )
-                if "current_checkpoint" in args.model_weight_path:
-                    state_dict = state_dict["model_state_dict"]
+                # if "current_checkpoint" in args.model_weight_path:
+                #     state_dict = state_dict["model_state_dict"]
                 model.load_state_dict(state_dict)
                 if use_lora:
                     model.llm_model = model.llm_model.merge_and_unload()
