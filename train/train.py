@@ -354,6 +354,8 @@ def train_single_gpu_accelerate(
                         model=model,
                         device=device,
                         accelerator=accelerator,
+                        console=console,
+                        config=config,
                         progress=progress,
                     )
                     wandb.log({"val_loss": val_loss})
