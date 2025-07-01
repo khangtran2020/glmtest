@@ -103,7 +103,8 @@ accelerate launch --debug --num_processes 4  main.py --mode train \
     --use_lora \
     --lora_r 32 \
     --use_accelerate \
-    --graph_sampling
+    --graph_sampling \
+    --debug
 
 accelerate launch --debug --num_processes 1  main.py --mode train \
     --seed 42 \

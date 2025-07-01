@@ -692,6 +692,13 @@ def train_multi_gpu_accelerate(
                         loss = outputs.loss
                         accelerator.backward(loss)
 
+                        accelerator.wait_for_everyone()
+                        for p in model.parameters():
+                            if p.grad is not None:
+                                # this will sum then average by world_size
+                                p.grad = accelerator.reduce(p.grad, reduction="mean")
+                        accelerator.wait_for_everyone()
+
                         if args.debug:
                             # Log the gradients norm for each model:
                             total_norm_sq = 0.0
