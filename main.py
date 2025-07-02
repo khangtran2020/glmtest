@@ -126,6 +126,18 @@ def main() -> None:
         timeout_long_ncll = timedelta(seconds=90000)  # 100 minutes
         init_process_group("nccl", timeout=timeout_long_ncll)
 
+    # Debugging tokenizer:
+    console.log(
+        f"[cyan]Tokenizer special tokens:[/cyan]\n{dataset.llm_tokenizer.special_tokens_map}"
+    )
+    for key, value in dataset.llm_tokenizer.special_tokens_map.items():
+        if isinstance(value, str):
+            value = dataset.llm_tokenizer.convert_tokens_to_ids(value)
+            console.log(f"[cyan]{key}[/cyan]: {value}")
+        if isinstance(value, list):
+            value = [dataset.llm_tokenizer.convert_tokens_to_ids(v) for v in value]
+            console.log(f"[cyan]{key}[/cyan]: {value}")
+
     if args.mode == "train":
 
         config = GLMFModelConfig(
@@ -178,7 +190,7 @@ def main() -> None:
             assert (
                 args.checkpoint_path is not None
             ), "Checkpoint path must be specified."
-            check_point = load_checkpoint(path=args.checkpoint_path)
+            check_point = load_checkpoint(path=args.checkpoint_path, rank=local_rank)
 
             model.load_state_dict(check_point["model_state_dict"])
             optimizer.load_state_dict(check_point["optimizer_state_dict"])
@@ -227,9 +239,14 @@ def main() -> None:
             args.model_weight_path is not None
         ), "Model directory must be specified for testing."
 
+        if "current_checkpoint" in args.model_weight_path:
+            use_lora = True
+        else:
+            use_lora = False
+
         config = GLMFModelConfig(
             llm_model=args.llm_model,
-            use_lora=False,
+            use_lora=use_lora,
             dtype=args.dtype,
             mode=args.gnn_mode,
             in_feats=args.in_feats,
@@ -260,12 +277,18 @@ def main() -> None:
             dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
         ]
 
-        model.load_state_dict(
-            torch.load(
-                os.path.join(args.model_weight_path, "model_weight.pt"),
-                map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-            )
-        )
+        # take .pt file from the model_weight_path
+        for file in os.listdir(args.model_weight_path):
+            if file.endswith(".pt"):
+                state_dict = torch.load(
+                    os.path.join(args.model_weight_path, file),
+                    map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+                )
+                # if "current_checkpoint" in args.model_weight_path:
+                #     state_dict = state_dict["model_state_dict"]
+                model.load_state_dict(state_dict)
+                if use_lora:
+                    model.llm_model = model.llm_model.merge_and_unload()
         console.log(f"Model is loaded to device: {model.device}")
         test(args=args, dataset=dataset, model=model, console=console)
 

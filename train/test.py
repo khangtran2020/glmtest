@@ -4,6 +4,7 @@ import json
 import time
 import torch
 import torch.nn.functional as F
+from itertools import islice
 from model.gnn import GRAPH_KEYS
 from tqdm import tqdm
 from rich import print as pprint
@@ -50,129 +51,251 @@ def test(
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device)
     console.log("Testing on device ... :", device)
-    te_mod_dataset = GLMFDataset(
-        data=dataset.test_data["module"],
-        tokenizer=dataset.llm_tokenizer,
-        max_seq_length=args.max_seq_length,
-        debug=args.debug,
-        n_hops=dataset.n_hops,
-        testing=True,
-        num_gpus=args.num_gpu,
-    )
-    te_proj_dataset = GLMFDataset(
-        data=dataset.test_data["project"],
-        tokenizer=dataset.llm_tokenizer,
-        max_seq_length=args.max_seq_length,
-        debug=args.debug,
-        n_hops=dataset.n_hops,
-        testing=True,
-        num_gpus=args.num_gpu,
-    )
-    tokenizer = dataset.llm_tokenizer
-    console.log(
-        f"Test data: by project - {len(te_proj_dataset)} data points, by module - {len(te_mod_dataset)} data points"
-    )
-    console.log("Testing...")
-
-    # Test projects
-    with Progress(
-        SpinnerColumn(),  # Shows a spinner
-        TextColumn(
-            "[progress.description]{task.description}"
-        ),  # Displays additional info
-        BarColumn(),  # Displays a progress bar
-        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),  # Shows percentage
-    ) as progress:
-        test_task = progress.add_task(
-            "Testing project levels...", total=len(te_proj_dataset)
+    if args.test_on_train:
+        te_dataset = GLMFDataset(
+            data=dict(islice(dataset.train_data.items(), 10)),
+            tokenizer=dataset.llm_tokenizer,
+            max_seq_length=args.max_seq_length,
+            debug=args.debug,
+            n_hops=dataset.n_hops,
+            testing=True,
+            num_gpus=args.num_gpu,
         )
-        with torch.no_grad():
-            generated_text = {}
-            time_list = []
-            for idx in range(len(te_proj_dataset)):
-                start_time = time.time()
-                uuid, batch = te_proj_dataset[idx]
-                console.log(f"Testing {uuid} - {idx}/{len(te_proj_dataset)}")
-                batch_input = batch["input"].copy()
-                if "token_type_ids" in batch_input:
-                    batch_input.pop("token_type_ids")
-                micro_input = {
-                    "input_ids": batch_input["input_ids"].to(device),
-                    "attention_mask": batch_input["attention_mask"].to(device),
-                    "labels": None,
-                }
-                if "graph" in args.baseline_prompt:
-                    graph = batch["graph"]
-                    for key in GRAPH_KEYS:
-                        if key in graph.keys():
-                            graph[key] = graph[key].to(device)
-                    graph_mask = batch["graph_mask"].to(device)
-                    graph_token_index = torch.where(
-                        micro_input["input_ids"] == config.graph_token_id[1]
-                    )[1].tolist()
-                else:
-                    graph = None
-                    graph_mask = None
-                    graph_token_index = None
+    else:
+        te_mod_dataset = GLMFDataset(
+            data=dataset.test_data["module"],
+            tokenizer=dataset.llm_tokenizer,
+            max_seq_length=args.max_seq_length,
+            debug=args.debug,
+            n_hops=dataset.n_hops,
+            testing=True,
+            num_gpus=args.num_gpu,
+        )
+        te_proj_dataset = GLMFDataset(
+            data=dataset.test_data["project"],
+            tokenizer=dataset.llm_tokenizer,
+            max_seq_length=args.max_seq_length,
+            debug=args.debug,
+            n_hops=dataset.n_hops,
+            testing=True,
+            num_gpus=args.num_gpu,
+        )
+    tokenizer = dataset.llm_tokenizer
+    if args.test_on_train:
+        console.log(
+            f"Test data: by project - {len(te_dataset)} data points (train set)"
+        )
+        console.log("Testing...")
+    else:
+        console.log(
+            f"Test data: by project - {len(te_proj_dataset)} data points, by module - {len(te_mod_dataset)} data points"
+        )
+        console.log("Testing...")
 
-                inputs_embeds = model.extract_embedding(
-                    input_ids=micro_input["input_ids"],
-                    graph=graph,
-                    inputs_embeds=None,
-                    graph_mask=graph_mask,
-                    graph_token_index=graph_token_index,
-                )
+    if args.test_on_train:
+        with Progress(
+            SpinnerColumn(),  # Shows a spinner
+            TextColumn(
+                "[progress.description]{task.description}"
+            ),  # Displays additional info
+            BarColumn(),  # Displays a progress bar
+            TextColumn(
+                "[progress.percentage]{task.percentage:>3.0f}%"
+            ),  # Shows percentage
+        ) as progress:
+            test_task = progress.add_task(
+                "Testing on train data...", total=len(te_dataset)
+            )
+            with torch.no_grad():
+                generated_text = {}
+                time_list = []
+                for idx in range(len(te_dataset)):
+                    start_time = time.time()
+                    uuid, batch = te_dataset[idx]
+                    console.log(f"Testing {uuid} - {idx}/{len(te_dataset)}")
+                    batch_input = batch["input"].copy()
+                    if "token_type_ids" in batch_input:
+                        batch_input.pop("token_type_ids")
 
-                console.log(
-                    f"Inputs embeds shape: {inputs_embeds.shape} | Graph token index: {len(graph_token_index)}"
-                )
+                    if args.debug and accelerator.is_main_process:
+                        console.log(
+                            f"[yellow]================ Example data point ================[/yellow]\n {batch['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
+                        )
+                        console.log(
+                            f"[yellow]================ Example tokenized ================[/yellow]\n {batch_input['input_ids'].squeeze(0).tolist()}\n\n[yellow]================ End of example tokenized ================[/yellow]"
+                        )
+                    micro_input = {
+                        "input_ids": batch_input["input_ids"].to(device),
+                        "attention_mask": batch_input["attention_mask"].to(device),
+                        "labels": None,
+                    }
+                    if "graph" in args.baseline_prompt:
+                        graph = batch["graph"]
+                        for key in GRAPH_KEYS:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to(device)
+                        graph_mask = batch["graph_mask"].to(device)
+                        graph_token_index = torch.where(
+                            micro_input["input_ids"] == config.graph_token_id[1]
+                        )[1].tolist()
+                    else:
+                        graph = None
+                        graph_mask = None
+                        graph_token_index = None
 
-                if args.num_gpu == 1:
-                    outputs = model.generate(
-                        inputs=micro_input["input_ids"],
+                    inputs_embeds = model.extract_embedding(
+                        input_ids=micro_input["input_ids"],
                         graph=graph,
+                        inputs_embeds=None,
                         graph_mask=graph_mask,
                         graph_token_index=graph_token_index,
-                        max_new_tokens=args.max_new_tokens,
-                        do_sample=False,
-                        use_cache=True,
                     )
-                    out_text = tokenizer.batch_decode(
-                        outputs[:, micro_input["input_ids"].size(1) :],
-                        skip_special_tokens=True,
-                    )[0]
+
+                    if args.debug and accelerator.is_main_process:
+                        console.log(
+                            f"Inputs embeds shape: {inputs_embeds.shape} | Graph token index: {len(graph_token_index)}"
+                        )
+
+                    if args.num_gpu == 1:
+                        outputs = model.generate(
+                            inputs=micro_input["input_ids"],
+                            graph=graph,
+                            graph_mask=graph_mask,
+                            graph_token_index=graph_token_index,
+                            max_new_tokens=args.max_new_tokens,
+                            do_sample=False,
+                            use_cache=True,
+                        )
+                        out_text = tokenizer.batch_decode(
+                            outputs[:, micro_input["input_ids"].size(1) :],
+                            skip_special_tokens=True,
+                        )[0]
+                        # print(f"Generated text - {uuid}: {out_text}")
+                        if args.debug and accelerator.is_main_process:
+                            console.log(
+                                f"\n\n[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}\n\n"
+                            )
+
+                        generated_text[uuid] = out_text
+                        end_time = time.time()
+                        process_time = end_time - start_time
+                        time_list.append(process_time)
+                        avg_time = sum(time_list) / len(time_list)
+                        progress.update(
+                            test_task,
+                            advance=1,
+                            description=f"Testing... {idx}/{len(te_proj_dataset)} - {avg_time:.2f}s for 1 sample",
+                        )
+                    else:
+                        outputs = generate(
+                            inputs_ids=micro_input["input_ids"],
+                            inputs_embeds=inputs_embeds,
+                            model=model,
+                            temperature=args.temp,
+                            top_k=args.top_k,
+                            top_p=args.top_p,
+                            accelerator=accelerator,
+                            tokenizer=dataset.llm_tokenizer,
+                            max_new_tokens=args.max_new_tokens,
+                            do_sample=False,
+                            max_seq_len=args.max_seq_length,
+                            console=console,
+                        )
+
+                        if accelerator.is_main_process:
+                            out_text = tokenizer.batch_decode(
+                                outputs[:, micro_input["input_ids"].size(1) :],
+                                skip_special_tokens=True,
+                            )[0]
+
+                            console.log(
+                                f"\n\n[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}\n\n"
+                            )
+
+                            generated_text[uuid] = out_text
+                            end_time = time.time()
+                            process_time = end_time - start_time
+                            time_list.append(process_time)
+                            avg_time = sum(time_list) / len(time_list)
+                            progress.update(
+                                test_task,
+                                advance=1,
+                                description=f"Testing... {idx}/{len(te_dataset)} - {avg_time:.2f}s for 1 sample",
+                            )
+    else:
+        # Test projects
+        with Progress(
+            SpinnerColumn(),  # Shows a spinner
+            TextColumn(
+                "[progress.description]{task.description}"
+            ),  # Displays additional info
+            BarColumn(),  # Displays a progress bar
+            TextColumn(
+                "[progress.percentage]{task.percentage:>3.0f}%"
+            ),  # Shows percentage
+        ) as progress:
+            test_task = progress.add_task(
+                "Testing project levels...", total=len(te_proj_dataset)
+            )
+            with torch.no_grad():
+                generated_text = {}
+                time_list = []
+                for idx in range(len(te_proj_dataset)):
+                    start_time = time.time()
+                    uuid, batch = te_proj_dataset[idx]
+                    console.log(f"Testing {uuid} - {idx}/{len(te_proj_dataset)}")
+                    batch_input = batch["input"].copy()
+                    if "token_type_ids" in batch_input:
+                        batch_input.pop("token_type_ids")
+
+                    if args.debug and accelerator.is_main_process:
+                        console.log(
+                            f"[yellow]================ Example data point ================[/yellow]\n {batch['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
+                        )
+                        console.log(
+                            f"[yellow]================ Example tokenized ================[/yellow]\n {batch_input['input_ids'].squeeze(0).tolist()}\n\n[yellow]================ End of example tokenized ================[/yellow]"
+                        )
+                    micro_input = {
+                        "input_ids": batch_input["input_ids"].to(device),
+                        "attention_mask": batch_input["attention_mask"].to(device),
+                        "labels": None,
+                    }
+                    if "graph" in args.baseline_prompt:
+                        graph = batch["graph"]
+                        for key in GRAPH_KEYS:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to(device)
+                        graph_mask = batch["graph_mask"].to(device)
+                        graph_token_index = torch.where(
+                            micro_input["input_ids"] == config.graph_token_id[1]
+                        )[1].tolist()
+                    else:
+                        graph = None
+                        graph_mask = None
+                        graph_token_index = None
+
+                    inputs_embeds = model.extract_embedding(
+                        input_ids=micro_input["input_ids"],
+                        graph=graph,
+                        inputs_embeds=None,
+                        graph_mask=graph_mask,
+                        graph_token_index=graph_token_index,
+                    )
 
                     console.log(
-                        f"[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}"
+                        f"Inputs embeds shape: {inputs_embeds.shape} | Graph token index: {len(graph_token_index)}"
                     )
 
-                    generated_text[uuid] = out_text
-                    end_time = time.time()
-                    process_time = end_time - start_time
-                    time_list.append(process_time)
-                    avg_time = sum(time_list) / len(time_list)
-                    progress.update(
-                        test_task,
-                        advance=1,
-                        description=f"Testing... {idx}/{len(te_proj_dataset)} - {avg_time:.2f}s for 1 sample",
-                    )
-                else:
-                    outputs = generate(
-                        inputs_ids=micro_input["input_ids"],
-                        inputs_embeds=inputs_embeds,
-                        model=model,
-                        temperature=args.temp,
-                        top_k=args.top_k,
-                        top_p=args.top_p,
-                        accelerator=accelerator,
-                        tokenizer=dataset.llm_tokenizer,
-                        max_new_tokens=args.max_new_tokens,
-                        do_sample=False,
-                        max_seq_len=args.max_seq_length,
-                        console=console,
-                    )
-
-                    if accelerator.is_main_process:
+                    if args.num_gpu == 1:
+                        outputs = model.generate(
+                            inputs=micro_input["input_ids"],
+                            graph=graph,
+                            graph_mask=graph_mask,
+                            graph_token_index=graph_token_index,
+                            max_new_tokens=args.max_new_tokens,
+                            do_sample=False,
+                            use_cache=True,
+                        )
                         out_text = tokenizer.batch_decode(
                             outputs[:, micro_input["input_ids"].size(1) :],
                             skip_special_tokens=True,
@@ -192,133 +315,134 @@ def test(
                             advance=1,
                             description=f"Testing... {idx}/{len(te_proj_dataset)} - {avg_time:.2f}s for 1 sample",
                         )
+                    else:
+                        outputs = generate(
+                            inputs_ids=micro_input["input_ids"],
+                            inputs_embeds=inputs_embeds,
+                            model=model,
+                            temperature=args.temp,
+                            top_k=args.top_k,
+                            top_p=args.top_p,
+                            accelerator=accelerator,
+                            tokenizer=dataset.llm_tokenizer,
+                            max_new_tokens=args.max_new_tokens,
+                            do_sample=False,
+                            max_seq_len=args.max_seq_length,
+                            console=console,
+                        )
 
-    if args.num_gpu == 1:
-        console.log("Done Testing Project level finished.")
-        save_dir = os.path.join(args.gen_dir, f"{args.name}_proj.json")
-        with console.status("Saving results..."):
-            # save generated text to jsonl file
-            with open(save_dir, "w", encoding="utf-8") as f:
-                # save as json file
-                json.dump(generated_text, f, ensure_ascii=False, indent=4)
-    else:
-        console.log(
-            "Done Testing Project level finished. Results saved in the main process only."
-        )
-        save_dir = os.path.join(args.gen_dir, f"{args.name}_proj.json")
-        if accelerator.is_main_process:
+                        if accelerator.is_main_process:
+                            out_text = tokenizer.batch_decode(
+                                outputs[:, micro_input["input_ids"].size(1) :],
+                                skip_special_tokens=True,
+                            )[0]
+
+                            console.log(
+                                f"[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}"
+                            )
+
+                            generated_text[uuid] = out_text
+                            end_time = time.time()
+                            process_time = end_time - start_time
+                            time_list.append(process_time)
+                            avg_time = sum(time_list) / len(time_list)
+                            progress.update(
+                                test_task,
+                                advance=1,
+                                description=f"Testing... {idx}/{len(te_proj_dataset)} - {avg_time:.2f}s for 1 sample",
+                            )
+
+        if args.num_gpu == 1:
+            console.log("Done Testing Project level finished.")
+            save_dir = os.path.join(args.gen_dir, f"{args.name}_proj.json")
             with console.status("Saving results..."):
                 # save generated text to jsonl file
                 with open(save_dir, "w", encoding="utf-8") as f:
                     # save as json file
                     json.dump(generated_text, f, ensure_ascii=False, indent=4)
+        else:
+            console.log(
+                "Done Testing Project level finished. Results saved in the main process only."
+            )
+            save_dir = os.path.join(args.gen_dir, f"{args.name}_proj.json")
+            if accelerator.is_main_process:
+                with console.status("Saving results..."):
+                    # save generated text to jsonl file
+                    with open(save_dir, "w", encoding="utf-8") as f:
+                        # save as json file
+                        json.dump(generated_text, f, ensure_ascii=False, indent=4)
 
-    # Test modules
-    with Progress(
-        SpinnerColumn(),  # Shows a spinner
-        TextColumn(
-            "[progress.description]{task.description}"
-        ),  # Displays additional info
-        BarColumn(),  # Displays a progress bar
-        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),  # Shows percentage
-    ) as progress:
-        test_task = progress.add_task(
-            "Testing modules levels...", total=len(te_mod_dataset)
-        )
-        with torch.no_grad():
-            generated_text = {}
-            time_list = []
-            for idx in range(len(te_mod_dataset)):
-                start_time = time.time()
-                uuid, batch = te_mod_dataset[idx]
-                console.log(f"Testing {uuid} - {idx}/{len(te_mod_dataset)}")
-                batch_input = batch["input"].copy()
-                if "token_type_ids" in batch_input:
-                    batch_input.pop("token_type_ids")
-                micro_input = {
-                    "input_ids": batch_input["input_ids"].to(device),
-                    "attention_mask": batch_input["attention_mask"].to(device),
-                    "labels": None,
-                }
-                if "graph" in args.baseline_prompt:
-                    graph = batch["graph"]
-                    for key in GRAPH_KEYS:
-                        if key in graph.keys():
-                            graph[key] = graph[key].to(device)
-                    graph_mask = batch["graph_mask"].to(device)
-                    graph_token_index = torch.where(
-                        micro_input["input_ids"] == config.graph_token_id[1]
-                    )[1].tolist()
-                else:
-                    graph = None
-                    graph_mask = None
-                    graph_token_index = None
+        # Test modules
+        with Progress(
+            SpinnerColumn(),  # Shows a spinner
+            TextColumn(
+                "[progress.description]{task.description}"
+            ),  # Displays additional info
+            BarColumn(),  # Displays a progress bar
+            TextColumn(
+                "[progress.percentage]{task.percentage:>3.0f}%"
+            ),  # Shows percentage
+        ) as progress:
+            test_task = progress.add_task(
+                "Testing modules levels...", total=len(te_mod_dataset)
+            )
+            with torch.no_grad():
+                generated_text = {}
+                time_list = []
+                for idx in range(len(te_mod_dataset)):
+                    start_time = time.time()
+                    uuid, batch = te_mod_dataset[idx]
+                    console.log(f"Testing {uuid} - {idx}/{len(te_mod_dataset)}")
+                    batch_input = batch["input"].copy()
+                    if "token_type_ids" in batch_input:
+                        batch_input.pop("token_type_ids")
+                    micro_input = {
+                        "input_ids": batch_input["input_ids"].to(device),
+                        "attention_mask": batch_input["attention_mask"].to(device),
+                        "labels": None,
+                    }
+                    if "graph" in args.baseline_prompt:
+                        graph = batch["graph"]
+                        for key in GRAPH_KEYS:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to(device)
+                        graph_mask = batch["graph_mask"].to(device)
+                        graph_token_index = torch.where(
+                            micro_input["input_ids"] == config.graph_token_id[1]
+                        )[1].tolist()
+                    else:
+                        graph = None
+                        graph_mask = None
+                        graph_token_index = None
 
-                inputs_embeds = model.extract_embedding(
-                    input_ids=micro_input["input_ids"],
-                    graph=graph,
-                    inputs_embeds=None,
-                    graph_mask=graph_mask,
-                    graph_token_index=graph_token_index,
-                )
-
-                console.log(
-                    f"Inputs embeds shape: {inputs_embeds.shape} | Graph token index: {len(graph_token_index)}"
-                )
-
-                if args.num_gpu == 1:
-                    outputs = model.generate(
-                        inputs=micro_input["input_ids"],
+                    inputs_embeds = model.extract_embedding(
+                        input_ids=micro_input["input_ids"],
                         graph=graph,
+                        inputs_embeds=None,
                         graph_mask=graph_mask,
                         graph_token_index=graph_token_index,
-                        max_new_tokens=args.max_new_tokens,
-                        do_sample=False,
-                        use_cache=True,
                     )
-                    out_text = tokenizer.batch_decode(
-                        outputs[:, micro_input["input_ids"].size(1) :],
-                        skip_special_tokens=True,
-                    )[0]
 
-                    # print(f"Generated text - {uuid}: {out_text}")
                     console.log(
-                        f"[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}"
+                        f"Inputs embeds shape: {inputs_embeds.shape} | Graph token index: {len(graph_token_index)}"
                     )
 
-                    generated_text[uuid] = out_text
-                    end_time = time.time()
-                    process_time = end_time - start_time
-                    time_list.append(process_time)
-                    avg_time = sum(time_list) / len(time_list)
-                    progress.update(
-                        test_task,
-                        advance=1,
-                        description=f"Testing... {idx}/{len(te_proj_dataset)} - {avg_time:.2f}s for 1 sample",
-                    )
-                else:
-                    outputs = generate(
-                        inputs_ids=micro_input["input_ids"],
-                        inputs_embeds=inputs_embeds,
-                        model=model,
-                        temperature=args.temp,
-                        top_k=args.top_k,
-                        top_p=args.top_p,
-                        accelerator=accelerator,
-                        tokenizer=dataset.llm_tokenizer,
-                        max_new_tokens=args.max_new_tokens,
-                        do_sample=False,
-                        max_seq_len=args.max_seq_length,
-                        console=console,
-                        process_group=process_group,
-                    )
-
-                    if accelerator.is_main_process:
+                    if args.num_gpu == 1:
+                        outputs = model.generate(
+                            inputs=micro_input["input_ids"],
+                            graph=graph,
+                            graph_mask=graph_mask,
+                            graph_token_index=graph_token_index,
+                            max_new_tokens=args.max_new_tokens,
+                            do_sample=False,
+                            use_cache=True,
+                        )
                         out_text = tokenizer.batch_decode(
                             outputs[:, micro_input["input_ids"].size(1) :],
                             skip_special_tokens=True,
                         )[0]
 
+                        # print(f"Generated text - {uuid}: {out_text}")
                         console.log(
                             f"[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}"
                         )
@@ -331,28 +455,65 @@ def test(
                         progress.update(
                             test_task,
                             advance=1,
-                            description=f"Testing... {idx}/{len(te_mod_dataset)} - {avg_time:.2f}s for 1 sample",
+                            description=f"Testing... {idx}/{len(te_proj_dataset)} - {avg_time:.2f}s for 1 sample",
+                        )
+                    else:
+                        outputs = generate(
+                            inputs_ids=micro_input["input_ids"],
+                            inputs_embeds=inputs_embeds,
+                            model=model,
+                            temperature=args.temp,
+                            top_k=args.top_k,
+                            top_p=args.top_p,
+                            accelerator=accelerator,
+                            tokenizer=dataset.llm_tokenizer,
+                            max_new_tokens=args.max_new_tokens,
+                            do_sample=False,
+                            max_seq_len=args.max_seq_length,
+                            console=console,
+                            process_group=process_group,
                         )
 
-    if args.num_gpu == 1:
-        console.log("Done Testing Module level finished.")
-        save_dir = os.path.join(args.gen_dir, f"{args.name}_mod.json")
-        with console.status("Saving results..."):
-            # save generated text to jsonl file
-            with open(save_dir, "w", encoding="utf-8") as f:
-                # save as json file
-                json.dump(generated_text, f, ensure_ascii=False, indent=4)
-    else:
-        console.log(
-            "Done Testing Module level finished. Results saved in the main process only."
-        )
-        save_dir = os.path.join(args.gen_dir, f"{args.name}_mod.json")
-        if accelerator.is_main_process:
+                        if accelerator.is_main_process:
+                            out_text = tokenizer.batch_decode(
+                                outputs[:, micro_input["input_ids"].size(1) :],
+                                skip_special_tokens=True,
+                            )[0]
+
+                            console.log(
+                                f"[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}"
+                            )
+
+                            generated_text[uuid] = out_text
+                            end_time = time.time()
+                            process_time = end_time - start_time
+                            time_list.append(process_time)
+                            avg_time = sum(time_list) / len(time_list)
+                            progress.update(
+                                test_task,
+                                advance=1,
+                                description=f"Testing... {idx}/{len(te_mod_dataset)} - {avg_time:.2f}s for 1 sample",
+                            )
+
+        if args.num_gpu == 1:
+            console.log("Done Testing Module level finished.")
+            save_dir = os.path.join(args.gen_dir, f"{args.name}_mod.json")
             with console.status("Saving results..."):
                 # save generated text to jsonl file
                 with open(save_dir, "w", encoding="utf-8") as f:
                     # save as json file
                     json.dump(generated_text, f, ensure_ascii=False, indent=4)
+        else:
+            console.log(
+                "Done Testing Module level finished. Results saved in the main process only."
+            )
+            save_dir = os.path.join(args.gen_dir, f"{args.name}_mod.json")
+            if accelerator.is_main_process:
+                with console.status("Saving results..."):
+                    # save generated text to jsonl file
+                    with open(save_dir, "w", encoding="utf-8") as f:
+                        # save as json file
+                        json.dump(generated_text, f, ensure_ascii=False, indent=4)
 
 
 def eval_bleu_score(

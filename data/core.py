@@ -487,9 +487,15 @@ class Data(object):
         else:
             processed_data_path = os.path.join(
                 self.data_path,
+                f"raw",
+            )
+            processed_prompt_path = os.path.join(
+                self.data_path,
                 f"{self.baseline_prompt}_{self.max_tokens}_{self.model_name}",
             )
+
             os.makedirs(processed_data_path, exist_ok=True)
+            os.makedirs(processed_prompt_path, exist_ok=True)
 
         if processed_data:
             self.logger.log("[green]Data is already processed![/green]")
@@ -499,9 +505,8 @@ class Data(object):
         with self.logger.status("[green]Preparing data...[/green]"):
 
             self.processed_data = {}
-            prompts = {}
-
             num_tokens = []
+            num_discarded = 0
 
             if ("graph" in self.baseline_prompt) and self.debug:
                 graph_stats = {}
@@ -515,8 +520,6 @@ class Data(object):
                         "out_min_degrees": [],
                         "num_components": [],
                     }
-
-            num_discarded = 0
 
             for data_n in self.data.keys():
 
@@ -533,34 +536,39 @@ class Data(object):
                     assert len(mask) == len(dat["test_cases"])
 
                     if "graph" in self.baseline_prompt:
-                        graph = self.read_graph(dat)
-
-                        check_graph_exist_dict = {}
-                        graph_dict = {}
-                        for key in GRAPH_KEYS:
-                            check_graph_exist_dict[key] = False
-
-                        for key in graph.keys():
-                            if isinstance(graph[key], dgl.DGLGraph):
-                                graph_dict[key] = graph[key]
-                                check_graph_exist_dict[key] = True
-
-                        exist_atleast_one = False
-                        for key in check_graph_exist_dict.keys():
-                            if check_graph_exist_dict[key] == True:
-                                exist_atleast_one = True
-                                break
-
-                        if not exist_atleast_one:
-                            self.logger.log(
-                                f"[red]Graph is not generated for {uuid}[/red]"
-                            )
-                            num_discarded += len(dat["test_cases"])
-                            continue
-
                         graph_name = f"{uuid}_graph.pt"
                         graph_path = os.path.join(processed_data_path, graph_name)
-                        torch.save(graph_dict, graph_path)
+
+                        if os.path.exists(graph_path):
+                            self.logger.log(
+                                f"[yellow]Graph already exists for {uuid}, loading...[/yellow]"
+                            )
+                        else:
+                            graph = self.read_graph(dat)
+
+                            check_graph_exist_dict = {}
+                            graph_dict = {}
+                            for key in GRAPH_KEYS:
+                                check_graph_exist_dict[key] = False
+
+                            for key in graph.keys():
+                                if isinstance(graph[key], dgl.DGLGraph):
+                                    graph_dict[key] = graph[key]
+                                    check_graph_exist_dict[key] = True
+
+                            exist_atleast_one = False
+                            for key in check_graph_exist_dict.keys():
+                                if check_graph_exist_dict[key] == True:
+                                    exist_atleast_one = True
+                                    break
+
+                            if not exist_atleast_one:
+                                self.logger.log(
+                                    f"[red]Graph is not generated for {uuid}[/red]"
+                                )
+                                num_discarded += len(dat["test_cases"])
+                                continue
+                            torch.save(graph_dict, graph_path)
 
                         if self.debug:
                             gstats = self.get_graph_stats(graph_dict)
@@ -604,7 +612,6 @@ class Data(object):
                             num_discarded += 1
                             continue
 
-                        # self.logger.log("Preparing prompts for {}...".format(testcase))
                         result = self.get_prompt(
                             src_code=src_code,
                             testcase_out=test_code,
@@ -621,14 +628,6 @@ class Data(object):
                         num_token = len(self.llm_tokenizer.tokenize(full_text))
                         num_tokens.append(num_token)
 
-                        # if self.graph_sampling and ("graph" in self.baseline_prompt):
-                        #     for key in graph_dict.keys():
-                        #         graph_dict[key] = self.sampling_neighbor(
-                        #             graph=graph_dict[key],
-                        #             mask=active_node,
-                        #             n_hops=self.n_hops,
-                        #         )
-
                         data = {
                             "uuid": f"{uuid}_{testcase}",
                             "prompt": prompt,
@@ -640,7 +639,7 @@ class Data(object):
                         }
 
                         data_name = f"{uuid}_testcase_{testcase}.json"
-                        data_path = os.path.join(processed_data_path, data_name)
+                        data_path = os.path.join(processed_prompt_path, data_name)
                         with open(data_path, "w") as file:
                             json.dump(data, file, indent=4)
 
@@ -659,10 +658,6 @@ class Data(object):
         self.logger.log(
             f"Size of processed data: {len(self.processed_data)}, num_discarded: {num_discarded}"
         )
-        if self.debug:
-            pass
-            # self.logger.log(f"Sample prompt: {full_text}")
-            # self.logger.log(f"Branch line: {branch_line}")
 
         quartiles = np.quantile(num_tokens, [0, 0.25, 0.5, 0.75, 1])
         max_num_tokens = max(num_tokens)
@@ -670,8 +665,6 @@ class Data(object):
         self.logger.log(
             f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_tokens)}"
         )
-
-        # save processed data
 
         if "graph" in self.baseline_prompt and self.debug:
             for key in graph_stats.keys():

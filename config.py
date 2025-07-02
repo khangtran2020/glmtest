@@ -138,7 +138,7 @@ def add_model_group(group):
         "--max_num_checkpoint",
         type=int,
         help="maximum number of checkpoints",
-        default=5,
+        default=2,
     )
     group.add_argument(
         "--model_weight_path", type=str, help="path to the model weight", default=None
@@ -150,6 +150,11 @@ def add_model_group(group):
         "--continue_training",
         action="store_true",
         help="continue training from checkpoint",
+    )
+    group.add_argument(
+        "--test_on_train",
+        action="store_true",
+        help="test on train dataset",
     )
 
 
