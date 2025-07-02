@@ -222,12 +222,12 @@ def train_single_gpu_accelerate(
                     global_step += args.batch_size
                     ram_usage = log_ram_usage()
                     console.log(
-                        f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
+                        f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB"
                     )
                     progress.update(
                         train_epoch_task,
                         advance=1,
-                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB",
+                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
                     )
                     continue
 
@@ -593,12 +593,12 @@ def train_multi_gpu_accelerate(
                     global_step += args.batch_size
                     ram_usage = log_ram_usage()
                     console.log(
-                        f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
+                        f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB"
                     )
                     progress.update(
                         train_epoch_task,
                         advance=1,
-                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB",
+                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
                     )
                     continue
 
