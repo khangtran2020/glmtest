@@ -603,6 +603,7 @@ def train_multi_gpu_accelerate(
                         )
                     continue
 
+                accelerator.wait_for_everyone()
                 global_step += args.batch_size
                 batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
