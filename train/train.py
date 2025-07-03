@@ -1,5 +1,6 @@
 import os
 import gc
+import sys
 import torch
 import wandb
 import shutil
@@ -299,7 +300,7 @@ def train_single_gpu_accelerate(
                 epoch_loss += avg_batch_loss * batch_size
                 num_items += batch_size
 
-                if (global_step % args.logging_steps == 0) and (args.debug == False):
+                if global_step % args.logging_steps == 0:
                     current_lr = lr_scheduler.get_last_lr()[0]
                     if accelerator.is_main_process:
                         accelerator.log(
@@ -310,9 +311,11 @@ def train_single_gpu_accelerate(
                             },
                             step=global_step,
                         )
-                    accelerator.print(
-                        f"Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}"
+                    console.log(
+                        f"[yellow]Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}[/yellow]"
                     )
+                    if args.debug:
+                        sys.exit(0)
 
                 if accelerator.sync_gradients and global_step % args.save_steps == 0:
                     if previous_checkpoint_step != -1:
@@ -347,7 +350,7 @@ def train_single_gpu_accelerate(
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
 
-                if (global_step % args.validating_steps == 0) and (args.debug == False):
+                if global_step % args.validating_steps == 0:
                     val_loss = validate(
                         args=args,
                         loader=va_loader,
@@ -694,10 +697,8 @@ def train_multi_gpu_accelerate(
                 num_items += batch_size
 
                 if (
-                    (global_step % args.logging_steps == 0)
-                    and accelerator.is_main_process
-                    and (args.debug == False)
-                ):
+                    global_step % args.logging_steps == 0
+                ) and accelerator.is_main_process:
                     current_lr = lr_scheduler.get_last_lr()[0]
                     if accelerator.is_main_process:
                         accelerator.log(
@@ -708,9 +709,11 @@ def train_multi_gpu_accelerate(
                             },
                             step=global_step,
                         )
-                        accelerator.print(
-                            f"Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}"
+                        console.print(
+                            f"[yellow]Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}[/yellow]"
                         )
+                        if args.debug:
+                            sys.exit(0)
 
                 if accelerator.sync_gradients and (global_step % args.save_steps == 0):
                     accelerator.wait_for_everyone()
