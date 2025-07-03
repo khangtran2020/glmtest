@@ -470,16 +470,13 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         process_group = dist.group.WORLD
         ignore_index = -100
+
         if labels is not None:
             labels = nn.functional.pad(labels, (0, 1), value=ignore_index)
             labels = labels[..., 1:].contiguous()
 
         seq_len = inputs_embeds.shape[-2]
         rank = self.rank
-        # if self.debug:
-        #     print(
-        #         f"Rank {rank} inputs_embeds at step {step}: {inputs_embeds.size()}, device: {inputs_embeds.device}"
-        #     )
 
         num_processes = dist.get_world_size()
         inputs_embeds = extract_local(
@@ -518,7 +515,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 position_ids=position_ids,
                 past_key_values=past_key_values,
                 inputs_embeds=inputs_embeds,
-                # labels=labels,
                 use_cache=use_cache,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
@@ -532,7 +528,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 position_ids=position_ids,
                 past_key_values=past_key_values,
                 inputs_embeds=inputs_embeds,
-                # labels=labels,
                 use_cache=use_cache,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
@@ -541,7 +536,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             )
 
         hidden_states = outputs.last_hidden_state
-
         slice_indices = (
             slice(-logits_to_keep, None)
             if isinstance(logits_to_keep, int)
@@ -551,14 +545,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         loss = None
         if labels is not None:
-            # loss = self.llm_model.loss_function(
-            #     logits=logits,
-            #     labels=None,
-            #     shift_labels=labels,
-            #     vocab_size=self.config.vocab_size,
-            #     **kwargs,
-            # )
-            # loss = ForCausalLMLoss(logits=logits, shift_labels=shift_labels)
             logits = logits.float()
             logits = logits.view(-1, self.config.vocab_size)
             labels = labels.view(-1)

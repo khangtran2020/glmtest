@@ -212,6 +212,7 @@ def main() -> None:
             lr_scheduler=lr_scheduler,
             continue_training=args.continue_training,
             start_step=start_step,
+            max_num_checkpoint=args.max_num_checkpoint,
             mixed_precision="bf16",
         )
 

@@ -21,9 +21,6 @@ class GLMFDataset(Dataset):
     ):
         self.data = data
         self.tokenizer = tokenizer
-
-        if self.tokenizer.pad_token_id is None:
-            tokenizer.pad_token_id = tokenizer.eos_token_id
         self.baseline_prompt = baseline_prompt
         self.max_seq_length = max_seq_length
         self.graph_token_id = self.tokenizer.convert_tokens_to_ids([GRAPH_PAD_TOKEN])[0]
@@ -37,7 +34,7 @@ class GLMFDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        # print(f"########### Loading sample {idx} from dataset")
+
         data_path = self.data[self.index_to_key_dict[idx]]
         with open(data_path, "r") as f:
             sample = json.load(f)
@@ -45,7 +42,6 @@ class GLMFDataset(Dataset):
         graph = torch.load(graph_path)
         active_node = torch.Tensor(sample["active_node"])
         graph_mask = torch.Tensor(sample["mask"])
-        # graph = sampling_neighbor(graph=graph, mask=active_node, n_hops=self.n_hops)
 
         for key in graph.keys():
             graph[key] = sampling_neighbor(
@@ -83,14 +79,9 @@ class GLMFDataset(Dataset):
                 "graph_mask": torch.tensor(graph_mask, dtype=torch.float),
             }
         else:
-            # graph = sample["graph"]
             prompt = sample["prompt"]
-            # graph_mask = sample["mask"]
             uuid = sample["uuid"]
 
-            if self.num_gpus > 1:
-                pass
-            # Tokenize text input
             tokenized = self.tokenize(prompt, num_gpu=self.num_gpus)
             input_ids = tokenized["input_ids"]
 
@@ -102,10 +93,9 @@ class GLMFDataset(Dataset):
             batch = {
                 "text": prompt,
                 "input": tokenized,
-                "graph": graph,  # Should be a dictionary of graph structures
+                "graph": graph,
                 "graph_mask": torch.tensor(graph_mask, dtype=torch.float),
             }
-            # print(uuid, batch)
             return (uuid, batch)
 
     def tokenize(self, prompt: str, num_gpu: int = 1) -> dict:

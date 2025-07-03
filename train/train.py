@@ -398,15 +398,6 @@ def train_single_gpu_accelerate(
 
     if not os.path.exists(final_model_path):
         os.makedirs(final_model_path, exist_ok=True)
-    # final_tokenizer_path = os.path.join(save_path, "tokenizer")
-
-    # console.log(f"Config: {unwrapped_model.config}")
-
-    # unwrapped_model.save_pretrained(
-    #     final_model_path,
-    #     is_main_process=accelerator.is_main_process,
-    #     save_function=accelerator.save,
-    # )
 
     torch.save(
         unwrapped_model.state_dict(),
@@ -624,29 +615,7 @@ def train_multi_gpu_accelerate(
 
                     accelerator.wait_for_everyone()
                     if "graph" in args.baseline_prompt:
-                        if args.debug:
-                            console.log("=" * 10 + "\n")
-                            console.log(
-                                f"Step {global_step}: Graph found in batch, checking keys..."
-                            )
-                            check_graph_exist_dict = {}
-                            for key in GRAPH_KEYS:
-                                check_graph_exist_dict[key] = False
                         graph = batch["graph"][i]
-                        for key in GRAPH_KEYS:
-                            if key in graph.keys():
-                                graph[key] = graph[key].to(device)
-                                if args.debug:
-                                    check_graph_exist_dict[key] = True
-                        if args.debug:
-                            for key in GRAPH_KEYS:
-                                if check_graph_exist_dict[key] == False:
-                                    console.log(f"=" * 10 + "\n")
-                                    console.log(
-                                        f"[red]Step {global_step}: Graph {key} not found in batch !!!!"
-                                    )
-                            console.log("Done checking graph keys")
-                            console.log(f"=" * 10 + "\n")
                         graph_mask = batch["graph_mask"][i].to(device)
                         graph_token_index = torch.where(
                             micro_input["input_ids"] == config.graph_token_id[1]
@@ -667,111 +636,35 @@ def train_multi_gpu_accelerate(
                         console.log(f"Step {global_step}: processed data")
 
                     with accelerator.accumulate(model):
-                        try:
-                            outputs = model(
-                                **micro_input,
-                                position_ids=position_ids.to(device),
-                                graph=graph,
-                                graph_mask=graph_mask,
-                                graph_token_index=graph_token_index,
-                                step=global_step,
-                                accelerator=accelerator,
-                            )
-                        except Exception as e:
-                            console.log(
-                                "Uncaught exception:\n" + traceback.format_exc()
-                            )
-                            raise
+
+                        outputs = model(
+                            **micro_input,
+                            position_ids=position_ids.to(device),
+                            graph=graph,
+                            graph_mask=graph_mask,
+                            graph_token_index=graph_token_index,
+                            step=global_step,
+                            accelerator=accelerator,
+                        )
                         accelerator.wait_for_everyone()
-
-                        if args.debug & accelerator.is_main_process:
-                            console.log(
-                                "=" * 10
-                                + "\n"
-                                + f"Step {global_step}: completed forward pass"
-                                + "\n"
-                                + "=" * 10
-                            )
-
                         loss = outputs.loss
                         accelerator.backward(loss)
 
-                        # accelerator.wait_for_everyone()
-                        # for p in model.parameters():
-                        #     if p.grad is not None:
-                        #         # this will sum then average by world_size
-                        #         p.grad = accelerator.reduce(p.grad, reduction="mean")
-                        # accelerator.wait_for_everyone()
-
-                        all_losses = accelerator.gather(loss)
-                        all_losses = torch.where(
-                            torch.isnan(all_losses), 0.0, all_losses
-                        )
-                        total_loss = torch.sum(all_losses)
-                        # mean_loss = accelerator.reduce(loss, reduction="mean")
-                        if args.debug & accelerator.is_main_process:
-                            console.log(f"Step {global_step}: completed backward pass")
+                        with torch.no_grad():
+                            all_losses = accelerator.gather(loss)
+                            all_losses = torch.where(
+                                torch.isnan(all_losses), 0.0, all_losses
+                            )
+                            total_loss = torch.sum(all_losses)
+                            batch_loss += total_loss.detach().float().item()
 
                         if accelerator.sync_gradients:
                             accelerator.wait_for_everyone()
-                            if args.debug:
-                                # Log the gradients norm for each model:
-                                total_norm_sq = 0.0
-                                for p in model.parameters():
-                                    if p.grad is not None:
-                                        # compute L2 norm of this parameter’s gradient
-                                        param_norm = p.grad.data.norm(2)
-                                        total_norm_sq += param_norm.item() ** 2
-
-                                total_grad_norm = total_norm_sq**0.5
-                                console.log(
-                                    f"[cyan]Step {global_step} - rank {local_rank}: total_grad_norm = {total_grad_norm:.4f}[/cyan]"
-                                )
-                                accelerator.wait_for_everyone()
-
-                            if args.debug & accelerator.is_main_process:
-                                console.log(
-                                    f"Step {global_step}: Everyone waited for gradients"
-                                )
                             accelerator.clip_grad_norm_(model.parameters(), 1.0)
-                            if args.debug & accelerator.is_main_process:
-                                console.log(f"Step {global_step}: Clipped gradients")
-
-                                console.log("=" * 100)
-                                console.log(
-                                    f"Step {global_step} - rank {local_rank}: Checking unused parameters"
-                                )
-                                found = False
-                                for name, param in model.named_parameters():
-                                    if param.grad is None and param.requires_grad:
-                                        if found == False:
-                                            console.log(
-                                                f"Step {global_step} - rank {local_rank}: Found unused parameters:"
-                                            )
-                                            found = True
-                                        console.log(f"{name}")
-                                if found == False:
-                                    console.log(
-                                        f"Step {global_step} - rank {local_rank}: No unused parameters found"
-                                    )
-                                console.log("=" * 100)
-                                console.log("\n" * 5)
-
                             optimizer.step()
-                            if args.debug & accelerator.is_main_process:
-                                console.log(
-                                    f"Step {global_step}: Updated model parameters"
-                                )
                             lr_scheduler.step()
-                            if args.debug & accelerator.is_main_process:
-                                console.log(
-                                    f"Step {global_step}: Updated scheduler - learning rate is: {lr_scheduler.get_last_lr()[0]}"
-                                )
                             optimizer.zero_grad()
-                            if args.debug & accelerator.is_main_process:
-                                console.log(f"Step {global_step}: Updated scheduler")
-
-                    batch_loss += total_loss.detach().float().item()
+                            model.zero_grad()
 
                     for key in micro_input.keys():
                         micro_input[key] = micro_input[key].to("cpu")
@@ -815,9 +708,9 @@ def train_multi_gpu_accelerate(
                             },
                             step=global_step,
                         )
-                    accelerator.print(
-                        f"Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}"
-                    )
+                        accelerator.print(
+                            f"Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}"
+                        )
 
                 if accelerator.sync_gradients and (global_step % args.save_steps == 0):
                     accelerator.wait_for_everyone()
@@ -889,9 +782,6 @@ def train_multi_gpu_accelerate(
                         )
                     model.train()
 
-            # if args.debug:
-            #     break
-
             if accelerator.is_main_process:
                 if ((continue_training == True) and (global_step > start_step)) or (
                     continue_training == False
@@ -920,25 +810,6 @@ def train_multi_gpu_accelerate(
             unwrapped_model.llm_model = unwrapped_model.llm_model.merge_and_unload()
             unwrapped_model.config.use_lora = False
 
-        # if any(p.device.type == "meta" for p in unwrapped_model.parameters()):
-        #     device_to_save = (
-        #         torch.device("cuda")
-        #         if torch.cuda.is_available()
-        #         else torch.device("cpu")
-        #     )
-        #     move_model_to_device(unwrapped_model, device_to_save)
-
-        # for p in unwrapped_model.parameters():
-        #     console.log(f"Parameter device: {p.device}")
-        #     if p.device.type == "meta":
-        #         console.log("Model has meta parameters. Converting to CPU.")
-        # break
-
-        # unwrapped_model.save_pretrained(
-        #     final_model_path,
-        #     is_main_process=accelerator.is_main_process,
-        #     save_function=accelerator.save,
-        # )
         torch.save(
             unwrapped_model.state_dict(),
             os.path.join(final_model_path, "model_weight.pt"),
@@ -946,16 +817,4 @@ def train_multi_gpu_accelerate(
         tokenizer.save_pretrained(final_model_path)
         console.log(f"Final model saved to {final_model_path}")
 
-        # Log final model to W&B
-        # if wandb.run is not None:
-        #     os.makedirs(os.path.join(save_path, "antifact"), exist_ok=True)
-        #     model_artifact = wandb.Artifact(
-        #         name=f"model-{wandb.run.id}",
-        #         type="model",
-        #         description=f"Final model checkpoint",
-        #     )
-        #     model_artifact.add_dir(os.path.join(save_path, "antifact"))
-        #     wandb.log_artifact(model_artifact)
-
-    # End W&B run
     accelerator.end_training()
