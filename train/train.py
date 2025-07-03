@@ -714,6 +714,21 @@ def train_multi_gpu_accelerate(
 
                         if accelerator.sync_gradients:
                             accelerator.wait_for_everyone()
+                            if args.debug:
+                                # Log the gradients norm for each model:
+                                total_norm_sq = 0.0
+                                for p in model.parameters():
+                                    if p.grad is not None:
+                                        # compute L2 norm of this parameter’s gradient
+                                        param_norm = p.grad.data.norm(2)
+                                        total_norm_sq += param_norm.item() ** 2
+
+                                total_grad_norm = total_norm_sq**0.5
+                                console.log(
+                                    f"[cyan]Step {global_step} - rank {local_rank}: total_grad_norm = {total_grad_norm:.4f}[/cyan]"
+                                )
+                                accelerator.wait_for_everyone()
+
                             if args.debug & accelerator.is_main_process:
                                 console.log(
                                     f"Step {global_step}: Everyone waited for gradients"
@@ -806,21 +821,6 @@ def train_multi_gpu_accelerate(
 
                 if accelerator.sync_gradients and (global_step % args.save_steps == 0):
                     accelerator.wait_for_everyone()
-
-                    if args.debug:
-                        # Log the gradients norm for each model:
-                        total_norm_sq = 0.0
-                        for p in model.parameters():
-                            if p.grad is not None:
-                                # compute L2 norm of this parameter’s gradient
-                                param_norm = p.grad.data.norm(2)
-                                total_norm_sq += param_norm.item() ** 2
-
-                        total_grad_norm = total_norm_sq**0.5
-                        console.log(
-                            f"[cyan]Step {global_step} - rank {local_rank}: total_grad_norm = {total_grad_norm:.4f}[/cyan]"
-                        )
-                        accelerator.wait_for_everyone()
 
                     if (previous_checkpoint_step != -1) and (
                         accelerator.is_main_process
