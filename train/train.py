@@ -620,6 +620,9 @@ def train_multi_gpu_accelerate(
                     if "graph" in args.baseline_prompt:
                         graph = batch["graph"][i]
                         graph_mask = batch["graph_mask"][i].to(device)
+                        for key in GRAPH_KEYS:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to(device)
                         graph_token_index = torch.where(
                             micro_input["input_ids"] == config.graph_token_id[1]
                         )[1].tolist()
