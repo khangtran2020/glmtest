@@ -655,8 +655,8 @@ def train_multi_gpu_accelerate(
 
                         with torch.no_grad():
                             all_losses = accelerator.gather(loss)
-                            all_losses = torch.where(
-                                torch.isnan(all_losses), 0.0, all_losses
+                            console.log(
+                                f"Step {global_step}: gathered losses: {all_losses}"
                             )
                             total_loss = torch.sum(all_losses)
                             batch_loss += total_loss.detach().float().item()
