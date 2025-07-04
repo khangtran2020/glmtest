@@ -1,5 +1,6 @@
 import os
 import gc
+from numpy import source
 import torch
 from torch import nn
 from rich import print as pprint
@@ -550,16 +551,20 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             logits = logits.view(-1, self.config.vocab_size)
             labels = labels.view(-1)
             labels = labels.to(logits.device)
-            loss = fixed_cross_entropy(
-                logits,
-                labels,
-                num_items_in_batch=None,
-                ignore_index=ignore_index,
-                **kwargs,
+            # loss = fixed_cross_entropy(
+            #     logits,
+            #     labels,
+            #     num_items_in_batch=None,
+            #     ignore_index=ignore_index,
+            #     **kwargs,
+            # )
+            loss = nn.functional.cross_entropy(
+                logits, labels, ignore_index=ignore_index, reduction="none"
             )
             pprint(
                 f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]loss: {loss}[/cyan], [green]logits shape: {logits}[/green], [blue]labels shape: {labels}[/blue]"
             )
+            loss = loss.mean(dim=-1)
 
         return CausalLMOutputWithPast(
             loss=loss,
