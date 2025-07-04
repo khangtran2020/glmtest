@@ -2,6 +2,7 @@ import os
 import gc
 import torch
 from torch import nn
+from rich import print as pprint
 import torch.nn.functional as F
 
 from transformers import AutoModelForCausalLM, AutoConfig
@@ -555,6 +556,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 num_items_in_batch=None,
                 ignore_index=ignore_index,
                 **kwargs,
+            )
+            pprint(
+                f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]loss: {loss}[/cyan], [green]logits shape: {logits}[/green], [blue]labels shape: {labels}[/blue]"
             )
 
         return CausalLMOutputWithPast(
