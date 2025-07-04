@@ -557,7 +557,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             #     ignore_index=ignore_index,
             #     **kwargs,
             # )
-            loss = nn.functional.cross_entropy(
+            loss = F.cross_entropy(
                 logits, labels, ignore_index=ignore_index, reduction="none"
             )
             pprint(
