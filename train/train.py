@@ -277,7 +277,8 @@ def train_single_gpu_accelerate(
                         )
 
                         loss = outputs.loss
-                        accelerator.backward(loss)
+                        # accelerator.backward(loss)
+                        loss.backward()
 
                         if accelerator.sync_gradients:
                             # check whether NaN in gradients
