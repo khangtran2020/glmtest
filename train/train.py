@@ -833,11 +833,9 @@ def train_multi_gpu_accelerate(
                             batch_input.pop("token_type_ids")
 
                         micro_input = {
-                            "input_ids": batch_input["input_ids"][i].to(device),
-                            "attention_mask": batch_input["attention_mask"][i].to(
-                                device
-                            ),
-                            "labels": batch_input["labels"][i].to(device),
+                            "input_ids": batch_input["input_ids"].to(device),
+                            "attention_mask": batch_input["attention_mask"].to(device),
+                            "labels": batch_input["labels"].to(device),
                         }
 
                         accelerator.wait_for_everyone()
