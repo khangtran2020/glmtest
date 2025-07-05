@@ -845,7 +845,7 @@ def train_multi_gpu_accelerate(
                             for key in GRAPH_KEYS:
                                 if key in graph.keys():
                                     graph[key] = graph[key].to(device)
-                            console.log(f"input ids: {micro_input['input_ids']}")
+                            console.log(f"input ids: {micro_input["input_ids"] == config.graph_token_id}")
                             graph_token_index = torch.where(
                                 micro_input["input_ids"] == config.graph_token_id
                             )[1].tolist()
