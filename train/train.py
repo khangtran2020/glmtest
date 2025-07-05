@@ -423,6 +423,7 @@ def train_single_gpu_accelerate(
                             f"Validation loss: {val_loss:.4f} at step {global_step}"
                         )
 
+                sys.exit(0)
             else:
                 for step, batch in enumerate(tr_loader):
 
@@ -956,8 +957,6 @@ def train_multi_gpu_accelerate(
                             console.print(
                                 f"[yellow]Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}[/yellow]"
                             )
-                            if args.debug:
-                                sys.exit(0)
 
                     if accelerator.sync_gradients and (
                         global_step % args.save_steps == 0
@@ -1034,6 +1033,7 @@ def train_multi_gpu_accelerate(
                                 f"Validation loss: {val_loss:.4f} at step {global_step}"
                             )
                         model.train()
+                sys.exit(0)
 
             else:
                 for step, batch in enumerate(tr_loader):
