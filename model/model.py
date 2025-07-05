@@ -557,9 +557,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 ignore_index=ignore_index,
                 **kwargs,
             )
-            pprint(
-                f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]loss: {loss}[/cyan], [green]logits shape: {logits}[/green], [blue]labels shape: {labels}[/blue]"
-            )
+            # pprint(
+            #     f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]loss: {loss}[/cyan], [green]logits shape: {logits}[/green], [blue]labels shape: {labels}[/blue]"
+            # )
 
         return CausalLMOutputWithPast(
             loss=loss,
