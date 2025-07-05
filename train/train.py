@@ -279,16 +279,6 @@ def train_single_gpu_accelerate(
                         loss = outputs.loss
                         # accelerator.backward(loss)
                         loss.backward()
-                        for name, param in model.named_parameters():
-                            if param.grad is not None:
-                                if torch.isnan(param.grad).any():
-                                    console.log(
-                                        f"[red]NaN detected in gradients of {name} at step {global_step}[/red]"
-                                    )
-                                    raise ValueError(
-                                        f"NaN detected in gradients of {name} at step {global_step}"
-                                    )
-
                         if accelerator.sync_gradients:
                             # check whether NaN in gradients
 
@@ -666,7 +656,18 @@ def train_multi_gpu_accelerate(
                         )
                         accelerator.wait_for_everyone()
                         loss = outputs.loss
-                        accelerator.backward(loss)
+                        loss.backward()
+                        for name, param in model.named_parameters():
+                            if param.grad is not None:
+                                if torch.isnan(param.grad).any():
+                                    console.log(
+                                        f"[red]NaN detected in gradients of {name} at step {global_step}[/red]"
+                                    )
+                                    raise ValueError(
+                                        f"NaN detected in gradients of {name} at step {global_step}"
+                                    )
+
+                        # accelerator.backward(loss)
 
                         with torch.no_grad():
                             all_losses = accelerator.gather(loss)
