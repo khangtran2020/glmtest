@@ -60,15 +60,15 @@ class GLMFDataset(Dataset):
 
         if self.testing == False:
             full_text = sample["full_text"]
-            tokenized = self.tokenize(full_text, num_gpu=self.num_gpus)
+            tokenized, pad_size = self.tokenize(full_text, num_gpu=self.num_gpus)
 
             tokenized_user_prompt = self.tokenizer(sample["prompt"])
             user_prompt_len = len(tokenized_user_prompt["input_ids"])
 
             tokenized["labels"] = torch.cat(
                 [
-                    torch.Tensor([-100] * user_prompt_len).unsqueeze(0),
-                    tokenized["labels"][:, user_prompt_len:],
+                    torch.Tensor([-100] * (user_prompt_len + pad_size)).unsqueeze(0),
+                    tokenized["labels"][:, (user_prompt_len + pad_size) :],
                 ],
                 dim=1,
             ).long()
@@ -114,7 +114,7 @@ class GLMFDataset(Dataset):
             truncation=True,
             max_length=self.max_seq_length,
         )
-
+        pad_size = 0
         if num_gpu > 1:
 
             pad_tensor = (
@@ -138,11 +138,11 @@ class GLMFDataset(Dataset):
             result["attention_mask"] = torch.cat(
                 [attention_tensor, result["attention_mask"]], dim=1
             )
+            pad_size = pad_tensor.shape[1]
 
         # Use clone() to make a copy of the tensor for labels.
         result["labels"] = result["input_ids"].clone()
-
-        return result
+        return result, pad_size
 
 
 def collate_fn(batch) -> dict:
