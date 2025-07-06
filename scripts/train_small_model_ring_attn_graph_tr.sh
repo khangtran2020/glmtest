@@ -265,7 +265,7 @@ accelerate launch --debug --num_processes 4  main.py --mode train \
     --checkpoint_path "results/models/qwen25_7b_graph_tr_3_epochs/current_checkpoint/checkpoint-106880.pt"
 
 
-CUDA_VISIBLE_DEVICES=0 accelerate launch --debug --num_processes 1  main.py --mode train \
+CUDA_VISIBLE_DEVICES=1,2 accelerate launch --debug --num_processes 2  main.py --mode train \
     --seed 42 \
     --data_path Dataset \
     --data testgeneval \
@@ -276,9 +276,9 @@ CUDA_VISIBLE_DEVICES=0 accelerate launch --debug --num_processes 1  main.py --mo
     --gradient_accumulation_steps 16 \
     --save_steps 100 \
     --validating_steps 1000 \
-    --num_gpu 1 \
+    --num_gpu 2 \
     --model_name "qwen2_5-1_5b"\
-    --name "testing_qwen25_1-5b_graph_tr_1_epochs" \
+    --name "debugging_qwen25_1-5b_graph_tr_1_epochs" \
     --output_dir "./results/models/" \
     --overwrite_output_dir \
     --do_train \

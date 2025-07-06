@@ -172,6 +172,18 @@ def main() -> None:
             dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
             dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
         ]
+
+        attn_impl = getattr(config, "_attn_implementation", None)
+
+        if attn_impl is None:
+            console.log(
+                f"[red]Model config for the current model has no `_attn_implementation` field.[/red]"
+            )
+        else:
+            console.log(
+                f"[green]`_attn_implementation` for the current model: {attn_impl}[/green]"
+            )
+
         if args.model_debug:
             return
 
