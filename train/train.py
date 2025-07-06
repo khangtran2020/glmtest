@@ -192,6 +192,7 @@ def train_single_gpu_accelerate(
         debug=args.debug,
         n_hops=dataset.n_hops,
         num_gpus=args.num_gpu,
+        logger=console,
     )
     va_dataset = GLMFDataset(
         data=dataset.val_data,
@@ -200,6 +201,7 @@ def train_single_gpu_accelerate(
         debug=args.debug,
         n_hops=dataset.n_hops,
         num_gpus=args.num_gpu,
+        logger=console,
     )
     tr_loader = DataLoader(
         tr_dataset, batch_size=1, shuffle=True, collate_fn=collate_fn
