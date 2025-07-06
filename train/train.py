@@ -635,6 +635,19 @@ def train_multi_gpu_accelerate(
                         loss = outputs.loss
                         accelerator.backward(loss)
 
+                        with torch.no_grad():
+                            # check gradient norms
+                            grad_norm = 0.0
+                            for name, param in model.named_parameters():
+                                if param.grad is not None:
+                                    grad_norm = (
+                                        grad_norm + param.grad.values.norm(2) ** 2
+                                    )
+                            grad_norm = grad_norm.sqrt().item()
+                            console.log(
+                                f"Step {global_step} - for rank {local_rank}: gradient norm: {grad_norm:.4f}"
+                            )
+
                         if accelerator.sync_gradients:
                             accelerator.wait_for_everyone()
                             accelerator.clip_grad_norm_(model.parameters(), 1.0)
