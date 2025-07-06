@@ -486,6 +486,8 @@ def train_multi_gpu_accelerate(
         max_seq_length=args.max_seq_length,
         debug=args.debug,
         n_hops=dataset.n_hops,
+        logger=console,
+        num_gpus=args.num_gpu,
     )
     va_dataset = GLMFDataset(
         data=dataset.val_data,
@@ -493,6 +495,8 @@ def train_multi_gpu_accelerate(
         max_seq_length=args.max_seq_length,
         debug=args.debug,
         n_hops=dataset.n_hops,
+        logger=console,
+        num_gpus=args.num_gpu,
     )
     dataloader_params = {
         "batch_size": args.batch_size,
