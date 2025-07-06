@@ -645,6 +645,7 @@ def train_multi_gpu_accelerate(
                             console.log(
                                 f"Step {global_step} - for rank {local_rank}: gradient norm: {grad_norm:.4f}"
                             )
+                        accelerator.wait_for_everyone()
 
                         if accelerator.sync_gradients:
                             accelerator.wait_for_everyone()
