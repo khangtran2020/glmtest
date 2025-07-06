@@ -28,6 +28,7 @@ from utils.utils import log_ram_usage
 # typing
 from argparse import Namespace
 from rich.console import Console
+from transformers import PreTrainedTokenizer
 
 
 def train(
@@ -57,7 +58,6 @@ def train(
             model=model,
             max_num_checkpoint=max_num_checkpoint,
             collate_fn=collate_fn,
-            # rank=-1,
         )
     else:
         console.log(
@@ -75,8 +75,55 @@ def train(
             model=model,
             max_num_checkpoint=max_num_checkpoint,
             collate_fn=collate_fn,
-            # rank=-1,
         )
+
+
+def logging_train_data(
+    console: Console, datasets: tuple, tokenizer: PreTrainedTokenizer
+):
+
+    tr_dataset, va_dataset = datasets
+    console.log("Data prepared:")
+    console.log(f"Train data: {len(tr_dataset)} data points")
+    console.log(f"Valid data: {len(va_dataset)} data points")
+
+    data_point_example = tr_dataset[0]
+    console.log("Data prepared:")
+    console.log(f"Train data: {len(tr_dataset)} data points")
+    console.log(f"Valid data: {len(va_dataset)} data points")
+
+    # print special token id of tokenizer and the associated ids
+    console.log(
+        f"[cyan]Tokenizer special tokens:[/cyan]\n{tokenizer.special_tokens_map}"
+    )
+    for key, value in tokenizer.special_tokens_map.items():
+        if isinstance(value, str):
+            value = tokenizer.convert_tokens_to_ids(value)
+            console.log(f"[cyan]{key}[/cyan]: {value}")
+        if isinstance(value, list):
+            value = [tokenizer.convert_tokens_to_ids(v) for v in value]
+            console.log(f"[cyan]{key}[/cyan]: {value}")
+
+    console.log(
+        f"[yellow]================ Example data point ================[/yellow]\n"
+        + f"{data_point_example['text']}\n"
+        + "[yellow]================ End of example data point ================[/yellow]"
+    )
+    console.log(
+        f"[yellow]================ Example tokenized ================[/yellow]\n"
+        + f"{data_point_example['input']['input_ids'].squeeze(0).tolist()}\n"
+        + "[yellow]================ End of example tokenized ================[/yellow]"
+    )
+    console.log(
+        f"[yellow]================ Example attention_mask ================[/yellow]\n"
+        + f"{data_point_example['input']['attention_mask'].squeeze(0).tolist()}\n"
+        + "[yellow]================ End of example tokenized ================[/yellow]"
+    )
+    console.log(
+        f"[yellow]================ Example label ================[/yellow]\n"
+        + f"{data_point_example['input']['labels'].squeeze(0).tolist()}\n"
+        + "[yellow]================ End of example label ================[/yellow]"
+    )
 
 
 def train_single_gpu_accelerate(
@@ -133,69 +180,37 @@ def train_single_gpu_accelerate(
     accelerator.print(f"Using {accelerator.num_processes} devices")
     accelerator.print(f"Mixed precision: {mixed_precision}")
 
-    if args.model_debug == False:
-        tr_dataset = GLMFDataset(
-            data=dataset.train_data,
-            tokenizer=dataset.llm_tokenizer,
-            max_seq_length=args.max_seq_length,
-            debug=args.debug,
-            n_hops=dataset.n_hops,
-            num_gpus=args.num_gpu,
-        )
-        va_dataset = GLMFDataset(
-            data=dataset.val_data,
-            tokenizer=dataset.llm_tokenizer,
-            max_seq_length=args.max_seq_length,
-            debug=args.debug,
-            n_hops=dataset.n_hops,
-            num_gpus=args.num_gpu,
-        )
-        tr_loader = DataLoader(
-            tr_dataset, batch_size=1, shuffle=True, collate_fn=collate_fn
-        )
-        va_loader = DataLoader(
-            va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
-        )
-        console.log("Data prepared:")
-        console.log(f"Train data: {len(tr_dataset)} data points")
-        console.log(f"Valid data: {len(va_dataset)} data points")
-
-        data_point_example = next(iter(tr_loader))
-        console.log("Data prepared:")
-        console.log(f"Train data: {len(tr_dataset)} data points")
-        console.log(f"Valid data: {len(va_dataset)} data points")
-
-        # print special token id of tokenizer and the associated ids
-        console.log(
-            f"[cyan]Tokenizer special tokens:[/cyan]\n{tokenizer.special_tokens_map}"
-        )
-        for key, value in tokenizer.special_tokens_map.items():
-            if isinstance(value, str):
-                value = tokenizer.convert_tokens_to_ids(value)
-                console.log(f"[cyan]{key}[/cyan]: {value}")
-            if isinstance(value, list):
-                value = [tokenizer.convert_tokens_to_ids(v) for v in value]
-                console.log(f"[cyan]{key}[/cyan]: {value}")
-
-        console.log(
-            f"[yellow]================ Example data point ================[/yellow]\n {data_point_example['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
-        )
-        console.log(
-            f"[yellow]================ Example tokenized ================[/yellow]\n {data_point_example['input']['input_ids'].squeeze(0).tolist()}\n\n[yellow]================ End of example tokenized ================[/yellow]"
-        )
-        console.log(
-            f"[yellow]================ Example label ================[/yellow]\n {data_point_example['input']['labels'].squeeze(0).tolist()}\n\n[yellow]================ End of example label ================[/yellow]"
-        )
-
-    # tokenizer = dataset.llm_tokenizer
-
-    # Prepare everything with accelerator
+    tr_dataset = GLMFDataset(
+        data=dataset.train_data,
+        tokenizer=dataset.llm_tokenizer,
+        max_seq_length=args.max_seq_length,
+        debug=args.debug,
+        n_hops=dataset.n_hops,
+        num_gpus=args.num_gpu,
+    )
+    va_dataset = GLMFDataset(
+        data=dataset.val_data,
+        tokenizer=dataset.llm_tokenizer,
+        max_seq_length=args.max_seq_length,
+        debug=args.debug,
+        n_hops=dataset.n_hops,
+        num_gpus=args.num_gpu,
+    )
+    tr_loader = DataLoader(
+        tr_dataset, batch_size=1, shuffle=True, collate_fn=collate_fn
+    )
+    va_loader = DataLoader(
+        va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
+    )
+    logging_train_data(
+        console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
+    )
     device = accelerator.device
     config = model.config
     model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
     global_step = 0
     previous_checkpoint_step = -1
-    # Zero gradients initially.
+
     if continue_training == False:
         optimizer.zero_grad()
 
@@ -210,380 +225,157 @@ def train_single_gpu_accelerate(
     ) as progress:
 
         train_task = progress.add_task("Training...", total=args.num_train_epochs)
-
         for epoch in range(args.num_train_epochs):
-
             model.train()
-            if args.debug:
-                train_epoch_task = progress.add_task(
-                    f"Epoch {epoch + 1}/{10}",
-                    total=10,
-                )
-            else:
-                train_epoch_task = progress.add_task(
-                    f"Epoch {epoch + 1}/{args.num_train_epochs}",
-                    total=len(tr_loader),
-                )
+            train_epoch_task = progress.add_task(
+                f"Epoch {epoch + 1}/{args.num_train_epochs}",
+                total=len(tr_loader),
+            )
 
             epoch_loss = 0.0
             num_items = 0.0
 
-            if args.debug:
-                for step in range(10):
-                    if (continue_training == True) and (global_step <= start_step):
-                        global_step += args.batch_size
-                        ram_usage = log_ram_usage()
-                        console.log(
-                            f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB"
-                        )
-                        progress.update(
-                            train_epoch_task,
-                            advance=1,
-                            description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
-                        )
-                        continue
+            for step, batch in enumerate(tr_loader):
 
+                if (continue_training == True) and (global_step <= start_step):
                     global_step += args.batch_size
-                    batch = tr_dataset[step]
-                    batch_loss = 0.0
-                    batch_size = batch["input"]["input_ids"].size(0)
-
-                    # Process each sample in the batch as a micro-batch.
-                    for i in range(batch_size):
-
-                        batch_input = batch["input"].copy()
-                        if "token_type_ids" in batch_input:
-                            batch_input.pop("token_type_ids")
-
-                        micro_input = {
-                            "input_ids": batch_input["input_ids"].to(device),
-                            "attention_mask": batch_input["attention_mask"].to(device),
-                            "labels": batch_input["labels"].to(device),
-                        }
-
-                        if args.debug:
-                            log_info = f"Length of input_ids - {micro_input['input_ids'].size()}, attention_mask - {micro_input['attention_mask'].size()}, labels - {micro_input['labels'].size()}"
-                            console.log(f"Step {global_step}: {log_info}")
-
-                        if "graph" in args.baseline_prompt:
-                            graph = batch["graph"]
-                            for key in GRAPH_KEYS:
-                                if key in graph.keys():
-                                    graph[key] = graph[key].to(device)
-
-                            graph_mask = batch["graph_mask"].to(device)
-                            graph_token_index = torch.where(
-                                micro_input["input_ids"]
-                                == model.config.graph_token_id[1]
-                            )[1].tolist()
-                        else:
-                            graph = None
-                            graph_mask = None
-                            graph_token_index = None
-
-                        with accelerator.accumulate(model):
-                            outputs = model(
-                                **micro_input,
-                                graph=graph,
-                                graph_mask=graph_mask,
-                                graph_token_index=graph_token_index,
-                            )
-
-                            loss = outputs.loss
-                            rank_0_logits = extract_local(
-                                value=outputs.logits,
-                                rank=0,
-                                world_size=4,
-                                device=device,
-                            )
-                            rank_1_logits = extract_local(
-                                value=outputs.logits,
-                                rank=1,
-                                world_size=4,
-                                device=device,
-                            )
-                            rank_2_logits = extract_local(
-                                value=outputs.logits,
-                                rank=2,
-                                world_size=4,
-                                device=device,
-                            )
-                            rank_3_logits = extract_local(
-                                value=outputs.logits,
-                                rank=3,
-                                world_size=4,
-                                device=device,
-                            )
-                            console.log(
-                                f"Step {global_step}: loss = {loss.item()}, logits = {outputs.logits}"
-                            )
-                            console.log(
-                                f"Step {global_step}: rank_0_logits = {rank_0_logits}"
-                            )
-                            console.log(
-                                f"Step {global_step}: rank_1_logits = {rank_1_logits}"
-                            )
-                            console.log(
-                                f"Step {global_step}: rank_2_logits = {rank_2_logits}"
-                            )
-                            console.log(
-                                f"Step {global_step}: rank_3_logits = {rank_3_logits}"
-                            )
-                            # accelerator.backward(loss)
-                            loss.backward()
-                            if accelerator.sync_gradients:
-                                # check whether NaN in gradients
-
-                                accelerator.clip_grad_norm_(model.parameters(), 1.0)
-                                optimizer.step()
-                                lr_scheduler.step()
-                                optimizer.zero_grad()
-
-                        batch_loss += loss.item()
-
-                    avg_batch_loss = batch_loss / batch_size
                     ram_usage = log_ram_usage()
-                    console.log(
-                        f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
-                    )
                     progress.update(
                         train_epoch_task,
                         advance=1,
-                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB",
+                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
                     )
-                    epoch_loss += avg_batch_loss * batch_size
-                    num_items += batch_size
+                    continue
 
-                    if global_step % args.logging_steps == 0:
-                        current_lr = lr_scheduler.get_last_lr()[0]
-                        if accelerator.is_main_process:
-                            accelerator.log(
-                                {
-                                    "train/loss": avg_batch_loss,
-                                    "train/learning_rate": current_lr,
-                                    "train/step": global_step,
-                                },
-                                step=global_step,
-                            )
-                        console.log(
-                            f"[yellow]Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}[/yellow]"
+                global_step += args.batch_size
+                batch_loss = 0.0
+                batch_size = batch["input"]["input_ids"].size(0)
+
+                for i in range(batch_size):
+
+                    batch_input = batch["input"].copy()
+                    if "token_type_ids" in batch_input:
+                        batch_input.pop("token_type_ids")
+
+                    micro_input = {
+                        "input_ids": batch_input["input_ids"][i].to(device),
+                        "attention_mask": batch_input["attention_mask"][i].to(device),
+                        "labels": batch_input["labels"][i].to(device),
+                    }
+
+                    if "graph" in args.baseline_prompt:
+                        graph = batch["graph"][i]
+                        for key in GRAPH_KEYS:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to(device)
+
+                        graph_mask = batch["graph_mask"][i].to(device)
+                        graph_token_index = torch.where(
+                            micro_input["input_ids"] == model.config.graph_token_id[1]
+                        )[1].tolist()
+                    else:
+                        graph = None
+                        graph_mask = None
+                        graph_token_index = None
+
+                    with accelerator.accumulate(model):
+                        outputs = model(
+                            **micro_input,
+                            graph=graph,
+                            graph_mask=graph_mask,
+                            graph_token_index=graph_token_index,
                         )
-                        if args.debug:
-                            sys.exit(0)
 
-                    if (
-                        accelerator.sync_gradients
-                        and global_step % args.save_steps == 0
-                    ):
-                        if previous_checkpoint_step != -1:
-                            old_dir = os.path.join(
-                                save_path,
-                                f"current_checkpoint",
-                            )
-                            new_dir = os.path.join(
-                                save_path,
-                                f"checkpoint-{previous_checkpoint_step}",
-                            )
-                            os.rename(old_dir, new_dir)
-                        checkpoint_dir = os.path.join(
+                        loss = outputs.loss
+                        accelerator.backward(loss)
+
+                        if accelerator.sync_gradients:
+                            accelerator.clip_grad_norm_(model.parameters(), 1.0)
+                            optimizer.step()
+                            lr_scheduler.step()
+                            optimizer.zero_grad()
+
+                    batch_loss += loss.item()
+
+                avg_batch_loss = batch_loss / batch_size
+                ram_usage = log_ram_usage()
+                progress.update(
+                    train_epoch_task,
+                    advance=1,
+                    description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB",
+                )
+                epoch_loss += avg_batch_loss * batch_size
+                num_items += batch_size
+
+                for key in micro_input.keys():
+                    micro_input[key] = micro_input[key].to("cpu")
+                if "graph" in args.baseline_prompt:
+                    for key in GRAPH_KEYS:
+                        if key in graph.keys():
+                            graph[key] = graph[key].to("cpu")
+                            graph.pop(key, None)
+                    graph_mask = graph_mask.to("cpu")
+                    del graph_mask, graph
+                outputs.logits = outputs.logits.to("cpu")
+                loss = loss.to("cpu")
+                del outputs, loss, micro_input
+                gc.collect()
+                torch.cuda.empty_cache()
+
+                if global_step % args.logging_steps == 0:
+                    current_lr = lr_scheduler.get_last_lr()[0]
+                    accelerator.log(
+                        {
+                            "train/loss": avg_batch_loss,
+                            "train/learning_rate": current_lr,
+                            "train/step": global_step,
+                        },
+                        step=global_step,
+                    )
+
+                if accelerator.sync_gradients and global_step % args.save_steps == 0:
+                    if previous_checkpoint_step != -1:
+                        old_dir = os.path.join(
                             save_path,
                             f"current_checkpoint",
                         )
-                        previous_checkpoint_step = global_step
-                        save_checkpoint(
-                            model=model,
-                            path=checkpoint_dir,
-                            optimizer=optimizer,
-                            scheduler=lr_scheduler,
-                            global_step=global_step,
-                            max_num_checkpoint=max_num_checkpoint,
-                            seed=args.seed,
+                        new_dir = os.path.join(
+                            save_path,
+                            f"checkpoint-{previous_checkpoint_step}",
                         )
-                        # accelerator.save_state(checkpoint_dir)
-                        if accelerator.is_main_process:
-                            accelerator.print(f"Saving checkpoint to {checkpoint_dir}")
+                        os.rename(old_dir, new_dir)
+                    checkpoint_dir = os.path.join(
+                        save_path,
+                        f"current_checkpoint",
+                    )
+                    previous_checkpoint_step = global_step
+                    save_checkpoint(
+                        model=model,
+                        path=checkpoint_dir,
+                        optimizer=optimizer,
+                        scheduler=lr_scheduler,
+                        global_step=global_step,
+                        max_num_checkpoint=max_num_checkpoint,
+                        seed=args.seed,
+                    )
+                    if accelerator.is_main_process:
+                        accelerator.print(f"Saving checkpoint to {checkpoint_dir}")
 
-                    del outputs, loss, micro_input, graph, graph_mask  # Free memory
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
-
-                    if global_step % args.validating_steps == 0:
-                        val_loss = validate(
-                            args=args,
-                            loader=va_loader,
-                            model=model,
-                            device=device,
-                            accelerator=accelerator,
-                            console=console,
-                            config=config,
-                            progress=progress,
-                        )
-                        wandb.log({"val_loss": val_loss})
-                        console.log(
-                            f"Validation loss: {val_loss:.4f} at step {global_step}"
-                        )
-
-                sys.exit(0)
-            else:
-                for step, batch in enumerate(tr_loader):
-
-                    if (continue_training == True) and (global_step <= start_step):
-                        global_step += args.batch_size
-                        ram_usage = log_ram_usage()
-                        console.log(
-                            f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB"
-                        )
-                        progress.update(
-                            train_epoch_task,
-                            advance=1,
-                            description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
-                        )
-                        continue
-
-                    global_step += args.batch_size
-                    batch_loss = 0.0
-                    batch_size = batch["input"]["input_ids"].size(0)
-
-                    # Process each sample in the batch as a micro-batch.
-                    for i in range(batch_size):
-
-                        batch_input = batch["input"].copy()
-                        if "token_type_ids" in batch_input:
-                            batch_input.pop("token_type_ids")
-
-                        micro_input = {
-                            "input_ids": batch_input["input_ids"][i].to(device),
-                            "attention_mask": batch_input["attention_mask"][i].to(
-                                device
-                            ),
-                            "labels": batch_input["labels"][i].to(device),
-                        }
-
-                        if args.debug:
-                            log_info = f"Length of input_ids - {micro_input['input_ids'].size()}, attention_mask - {micro_input['attention_mask'].size()}, labels - {micro_input['labels'].size()}"
-                            console.log(f"Step {global_step}: {log_info}")
-
-                        if "graph" in args.baseline_prompt:
-                            graph = batch["graph"][i]
-                            for key in GRAPH_KEYS:
-                                if key in graph.keys():
-                                    graph[key] = graph[key].to(device)
-
-                            graph_mask = batch["graph_mask"][i].to(device)
-                            graph_token_index = torch.where(
-                                micro_input["input_ids"]
-                                == model.config.graph_token_id[1]
-                            )[1].tolist()
-                        else:
-                            graph = None
-                            graph_mask = None
-                            graph_token_index = None
-
-                        with accelerator.accumulate(model):
-                            outputs = model(
-                                **micro_input,
-                                graph=graph,
-                                graph_mask=graph_mask,
-                                graph_token_index=graph_token_index,
-                            )
-
-                            loss = outputs.loss
-                            # accelerator.backward(loss)
-                            loss.backward()
-                            if accelerator.sync_gradients:
-                                # check whether NaN in gradients
-
-                                accelerator.clip_grad_norm_(model.parameters(), 1.0)
-                                optimizer.step()
-                                lr_scheduler.step()
-                                optimizer.zero_grad()
-
-                        batch_loss += loss.item()
-
-                    avg_batch_loss = batch_loss / batch_size
-                    ram_usage = log_ram_usage()
+                if global_step % args.validating_steps == 0:
+                    val_loss = validate(
+                        args=args,
+                        loader=va_loader,
+                        model=model,
+                        device=device,
+                        accelerator=accelerator,
+                        console=console,
+                        config=config,
+                        progress=progress,
+                    )
+                    wandb.log({"val_loss": val_loss})
                     console.log(
-                        f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
+                        f"Validation loss: {val_loss:.4f} at step {global_step}"
                     )
-                    progress.update(
-                        train_epoch_task,
-                        advance=1,
-                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB",
-                    )
-                    epoch_loss += avg_batch_loss * batch_size
-                    num_items += batch_size
-
-                    if global_step % args.logging_steps == 0:
-                        current_lr = lr_scheduler.get_last_lr()[0]
-                        if accelerator.is_main_process:
-                            accelerator.log(
-                                {
-                                    "train/loss": avg_batch_loss,
-                                    "train/learning_rate": current_lr,
-                                    "train/step": global_step,
-                                },
-                                step=global_step,
-                            )
-                        console.log(
-                            f"[yellow]Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}[/yellow]"
-                        )
-                        if args.debug:
-                            sys.exit(0)
-
-                    if (
-                        accelerator.sync_gradients
-                        and global_step % args.save_steps == 0
-                    ):
-                        if previous_checkpoint_step != -1:
-                            old_dir = os.path.join(
-                                save_path,
-                                f"current_checkpoint",
-                            )
-                            new_dir = os.path.join(
-                                save_path,
-                                f"checkpoint-{previous_checkpoint_step}",
-                            )
-                            os.rename(old_dir, new_dir)
-                        checkpoint_dir = os.path.join(
-                            save_path,
-                            f"current_checkpoint",
-                        )
-                        previous_checkpoint_step = global_step
-                        save_checkpoint(
-                            model=model,
-                            path=checkpoint_dir,
-                            optimizer=optimizer,
-                            scheduler=lr_scheduler,
-                            global_step=global_step,
-                            max_num_checkpoint=max_num_checkpoint,
-                            seed=args.seed,
-                        )
-                        # accelerator.save_state(checkpoint_dir)
-                        if accelerator.is_main_process:
-                            accelerator.print(f"Saving checkpoint to {checkpoint_dir}")
-
-                    del outputs, loss, micro_input, graph, graph_mask  # Free memory
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
-
-                    if global_step % args.validating_steps == 0:
-                        val_loss = validate(
-                            args=args,
-                            loader=va_loader,
-                            model=model,
-                            device=device,
-                            accelerator=accelerator,
-                            console=console,
-                            config=config,
-                            progress=progress,
-                        )
-                        wandb.log({"val_loss": val_loss})
-                        console.log(
-                            f"Validation loss: {val_loss:.4f} at step {global_step}"
-                        )
-
-                # if args.debug:
-                #     break
 
             if ((continue_training == True) and (global_step > start_step)) or (
                 continue_training == False
@@ -596,21 +388,12 @@ def train_single_gpu_accelerate(
                     description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
                 )
 
-            # if args.debug:
-            #     break
-
     if model.config.use_lora == True:
         model.llm_model = model.llm_model.merge_and_unload()
         model.config.use_lora = False
 
     accelerator.wait_for_everyone()
     unwrapped_model = accelerator.unwrap_model(model)
-
-    if any(p.device.type == "meta" for p in unwrapped_model.parameters()):
-        device_to_save = (
-            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-        )
-        move_model_to_device(unwrapped_model, device_to_save)
 
     final_model_path = os.path.join(save_path, "final_model")
     console.log(f"Saving final model to {final_model_path}...")
@@ -680,16 +463,16 @@ def train_multi_gpu_accelerate(
             },
             init_kwargs={"wandb": {"name": args.name}},
         )
-    save_path = os.path.join(args.output_dir, args.name)
-    if os.path.exists(save_path):
-        if continue_training == False:
-            shutil.rmtree(save_path)
-    os.makedirs(save_path, exist_ok=True)
-    accelerator.print(f"Distributed type: {accelerator.distributed_type}")
-    accelerator.print(f"Number of processes: {accelerator.num_processes}")
-    accelerator.print(f"Mixed precision: {mixed_precision}")
-    tokenizer = dataset.llm_tokenizer
+        save_path = os.path.join(args.output_dir, args.name)
+        if os.path.exists(save_path):
+            if continue_training == False:
+                shutil.rmtree(save_path)
+        os.makedirs(save_path, exist_ok=True)
+        accelerator.print(f"Distributed type: {accelerator.distributed_type}")
+        accelerator.print(f"Number of processes: {accelerator.num_processes}")
+        accelerator.print(f"Mixed precision: {mixed_precision}")
 
+    tokenizer = dataset.llm_tokenizer
     tr_dataset = GLMFDataset(
         data=dataset.train_data,
         tokenizer=dataset.llm_tokenizer,
@@ -721,34 +504,9 @@ def train_multi_gpu_accelerate(
         va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
     )
 
-    data_point_example = next(iter(tr_loader))
-
     if accelerator.is_main_process:
-
-        console.log("Data prepared:")
-        console.log(f"Train data: {len(tr_dataset)} data points")
-        console.log(f"Valid data: {len(va_dataset)} data points")
-
-        # print special token id of tokenizer and the associated ids
-        console.log(
-            f"[cyan]Tokenizer special tokens:[/cyan]\n{tokenizer.special_tokens_map}"
-        )
-        for key, value in tokenizer.special_tokens_map.items():
-            if isinstance(value, str):
-                value = tokenizer.convert_tokens_to_ids(value)
-                console.log(f"[cyan]{key}[/cyan]: {value}")
-            if isinstance(value, list):
-                value = [tokenizer.convert_tokens_to_ids(v) for v in value]
-                console.log(f"[cyan]{key}[/cyan]: {value}")
-
-        console.log(
-            f"[yellow]================ Example data point ================[/yellow]\n {data_point_example['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
-        )
-        console.log(
-            f"[yellow]================ Example tokenized ================[/yellow]\n {data_point_example['input']['input_ids'].squeeze(0).tolist()}\n\n[yellow]================ End of example tokenized ================[/yellow]"
-        )
-        console.log(
-            f"[yellow]================ Example label ================[/yellow]\n {data_point_example['input']['labels'].squeeze(0).tolist()}\n\n[yellow]================ End of example label ================[/yellow]"
+        logging_train_data(
+            console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
         )
 
     patch_model(process_group=process_group)
@@ -770,7 +528,6 @@ def train_multi_gpu_accelerate(
         )
 
     global_step = 0
-    model.train()
     previous_checkpoint_step = -1
 
     with Progress(
@@ -787,484 +544,223 @@ def train_multi_gpu_accelerate(
             train_task = progress.add_task("Training...", total=args.num_train_epochs)
 
         for epoch in range(args.num_train_epochs):
-
+            model.train()
             if accelerator.is_main_process:
-                if args.debug:
-                    train_epoch_task = progress.add_task(
-                        f"Epoch {epoch + 1}/{args.num_train_epochs}",
-                        total=10,
-                    )
-                else:
-                    train_epoch_task = progress.add_task(
-                        f"Epoch {epoch + 1}/{args.num_train_epochs}",
-                        total=len(tr_loader),
-                    )
+                train_epoch_task = progress.add_task(
+                    f"Epoch {epoch + 1}/{args.num_train_epochs}",
+                    total=len(tr_loader),
+                )
 
             epoch_loss = 0.0
             num_items = 0.0
 
-            if args.debug:
-                for step in range(10):
-                    if (continue_training == True) and (global_step <= start_step):
-                        global_step += args.batch_size
-                        ram_usage = log_ram_usage()
-                        if accelerator.is_main_process:
-                            console.log(
-                                f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB"
-                            )
-                            progress.update(
-                                train_epoch_task,
-                                advance=1,
-                                description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
-                            )
-                        continue
+            for step, batch in enumerate(tr_loader):
 
-                    accelerator.wait_for_everyone()
+                if (continue_training == True) and (global_step <= start_step):
                     global_step += args.batch_size
-                    batch_loss = 0.0
-                    batch = tr_dataset[step]
-                    batch_size = batch["input"]["input_ids"].size(0)
-
-                    # Process each sample in the batch as a micro-batch.
-                    for i in range(batch_size):
-
-                        accelerator.wait_for_everyone()
-                        batch_input = batch["input"].copy()
-                        if "token_type_ids" in batch_input:
-                            batch_input.pop("token_type_ids")
-
-                        micro_input = {
-                            "input_ids": batch_input["input_ids"].to(device),
-                            "attention_mask": batch_input["attention_mask"].to(device),
-                            "labels": batch_input["labels"].to(device),
-                        }
-
-                        accelerator.wait_for_everyone()
-                        if "graph" in args.baseline_prompt:
-                            graph = batch["graph"]
-                            graph_mask = batch["graph_mask"].to(device)
-                            for key in GRAPH_KEYS:
-                                if key in graph.keys():
-                                    graph[key] = graph[key].to(device)
-                            graph_token_index = torch.where(
-                                micro_input["input_ids"] == config.graph_token_id[1]
-                            )[1].tolist()
-                        else:
-                            graph = None
-                            graph_mask = None
-                            graph_token_index = None
-
-                        position_ids = (
-                            torch.arange(micro_input["input_ids"].shape[1])
-                            .unsqueeze(0)
-                            .expand(micro_input["input_ids"].shape[0], -1)
-                        )
-
-                        accelerator.wait_for_everyone()
-                        if args.debug & accelerator.is_main_process:
-                            console.log(f"Step {global_step}: processed data")
-
-                        with accelerator.accumulate(model):
-
-                            outputs = model(
-                                **micro_input,
-                                position_ids=position_ids.to(device),
-                                graph=graph,
-                                graph_mask=graph_mask,
-                                graph_token_index=graph_token_index,
-                                step=global_step,
-                                accelerator=accelerator,
-                            )
-                            accelerator.wait_for_everyone()
-                            loss = outputs.loss
-                            loss.backward()
-
-                            console.log(
-                                f"Step {global_step} - rank {local_rank}: loss = {loss.item()}, logits = {outputs.logits}"
-                            )
-
-                            # accelerator.backward(loss)
-
-                            with torch.no_grad():
-                                console.log(
-                                    f"[yellow]Checking nan in gradient[/yellow]"
-                                )
-                                for name, param in model.named_parameters():
-                                    if param.grad is not None:
-                                        if torch.isnan(param.grad).any():
-                                            console.log(
-                                                f"[red]NaN detected in gradients of {name} at step {global_step}[/red]"
-                                            )
-                                            raise ValueError(
-                                                f"NaN detected in gradients of {name} at step {global_step}"
-                                            )
-
-                                all_losses = accelerator.gather(loss)
-                                console.log(
-                                    f"Step {global_step}: gathered losses: {all_losses}"
-                                )
-                                total_loss = torch.sum(all_losses)
-                                batch_loss += total_loss.detach().float().item()
-
-                            if accelerator.sync_gradients:
-                                accelerator.wait_for_everyone()
-                                accelerator.clip_grad_norm_(model.parameters(), 1.0)
-                                optimizer.step()
-                                lr_scheduler.step()
-                                optimizer.zero_grad()
-                                model.zero_grad()
-
-                        for key in micro_input.keys():
-                            micro_input[key] = micro_input[key].to("cpu")
-                        if "graph" in args.baseline_prompt:
-                            for key in GRAPH_KEYS:
-                                if key in graph.keys():
-                                    graph[key] = graph[key].to("cpu")
-                                    graph.pop(key, None)
-                            graph_mask = graph_mask.to("cpu")
-                            del graph_mask, graph
-                        del outputs, loss, micro_input
-                        gc.collect()
-                        torch.cuda.empty_cache()
-
-                    avg_batch_loss = batch_loss / batch_size
+                    ram_usage = log_ram_usage()
                     if accelerator.is_main_process:
-                        ram_usage = log_ram_usage()
-                        console.log(
-                            f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
-                        )
                         progress.update(
                             train_epoch_task,
                             advance=1,
-                            description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB",
+                            description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
                         )
-                    epoch_loss += avg_batch_loss * batch_size
-                    num_items += batch_size
+                    continue
 
-                    if (
-                        global_step % args.logging_steps == 0
-                    ) and accelerator.is_main_process:
-                        current_lr = lr_scheduler.get_last_lr()[0]
-                        if accelerator.is_main_process:
-                            accelerator.log(
-                                {
-                                    "train/loss": avg_batch_loss,
-                                    "train/learning_rate": current_lr,
-                                    "train/step": global_step,
-                                },
-                                step=global_step,
-                            )
-                            console.print(
-                                f"[yellow]Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}[/yellow]"
-                            )
+                accelerator.wait_for_everyone()
+                global_step += args.batch_size
+                batch_loss = 0.0
+                batch_size = batch["input"]["input_ids"].size(0)
 
-                    if accelerator.sync_gradients and (
-                        global_step % args.save_steps == 0
-                    ):
-                        accelerator.wait_for_everyone()
-
-                        if (previous_checkpoint_step != -1) and (
-                            accelerator.is_main_process
-                        ):
-
-                            old_dir = os.path.join(
-                                save_path,
-                                f"current_checkpoint",
-                            )
-                            new_dir = os.path.join(
-                                save_path,
-                                f"checkpoint-{previous_checkpoint_step}",
-                            )
-                            os.rename(old_dir, new_dir)
-
-                        if accelerator.is_main_process:
-                            checkpoint_dir_new = os.path.join(
-                                save_path,
-                                f"current_checkpoint",
-                            )
-                            previous_checkpoint_step = global_step
-
-                            while len(os.listdir(save_path)) >= max_num_checkpoint:
-                                oldest_checkpoint = min(
-                                    [
-                                        os.path.join(save_path, f)
-                                        for f in os.listdir(save_path)
-                                        if f.startswith("checkpoint-")
-                                    ],
-                                    key=os.path.getctime,
-                                )
-                                print(
-                                    f"Removing oldest checkpoint: {oldest_checkpoint}"
-                                )
-                                shutil.rmtree(oldest_checkpoint)
-
-                            unwrapped_model = accelerator.unwrap_model(model)
-                            save_checkpoint(
-                                model=unwrapped_model,
-                                path=checkpoint_dir_new,
-                                optimizer=optimizer,
-                                scheduler=lr_scheduler,
-                                global_step=global_step,
-                                max_num_checkpoint=max_num_checkpoint,
-                                seed=args.seed,
-                            )
-                            accelerator.print(
-                                f"Saving checkpoint to {checkpoint_dir_new}"
-                            )
-                            del unwrapped_model
-
-                    if global_step % args.validating_steps == 0:
-                        accelerator.wait_for_everyone()
-                        val_loss = validate(
-                            args=args,
-                            loader=va_loader,
-                            model=model,
-                            device=device,
-                            config=config,
-                            console=console,
-                            accelerator=accelerator,
-                            progress=progress,
-                        )
-                        accelerator.wait_for_everyone()
-
-                        if accelerator.is_main_process:
-                            wandb.log({"val_loss": val_loss})
-                            console.log(
-                                f"Validation loss: {val_loss:.4f} at step {global_step}"
-                            )
-                        model.train()
-                sys.exit(0)
-
-            else:
-                for step, batch in enumerate(tr_loader):
-
-                    if (continue_training == True) and (global_step <= start_step):
-                        global_step += args.batch_size
-                        ram_usage = log_ram_usage()
-                        if accelerator.is_main_process:
-                            console.log(
-                                f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB"
-                            )
-                            progress.update(
-                                train_epoch_task,
-                                advance=1,
-                                description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
-                            )
-                        continue
+                # Process each sample in the batch as a micro-batch.
+                for i in range(batch_size):
 
                     accelerator.wait_for_everyone()
-                    global_step += args.batch_size
-                    batch_loss = 0.0
-                    batch_size = batch["input"]["input_ids"].size(0)
+                    batch_input = batch["input"].copy()
+                    if "token_type_ids" in batch_input:
+                        batch_input.pop("token_type_ids")
 
-                    # Process each sample in the batch as a micro-batch.
-                    for i in range(batch_size):
+                    micro_input = {
+                        "input_ids": batch_input["input_ids"][i].to(device),
+                        "attention_mask": batch_input["attention_mask"][i].to(device),
+                        "labels": batch_input["labels"][i].to(device),
+                    }
 
-                        accelerator.wait_for_everyone()
-                        batch_input = batch["input"].copy()
-                        if "token_type_ids" in batch_input:
-                            batch_input.pop("token_type_ids")
+                    accelerator.wait_for_everyone()
+                    if "graph" in args.baseline_prompt:
+                        graph = batch["graph"][i]
+                        graph_mask = batch["graph_mask"][i].to(device)
+                        for key in GRAPH_KEYS:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to(device)
+                        graph_token_index = torch.where(
+                            micro_input["input_ids"] == config.graph_token_id[1]
+                        )[1].tolist()
+                    else:
+                        graph = None
+                        graph_mask = None
+                        graph_token_index = None
 
-                        micro_input = {
-                            "input_ids": batch_input["input_ids"][i].to(device),
-                            "attention_mask": batch_input["attention_mask"][i].to(
-                                device
-                            ),
-                            "labels": batch_input["labels"][i].to(device),
-                        }
+                    position_ids = (
+                        torch.arange(micro_input["input_ids"].shape[1])
+                        .unsqueeze(0)
+                        .expand(micro_input["input_ids"].shape[0], -1)
+                    )
 
-                        accelerator.wait_for_everyone()
-                        if "graph" in args.baseline_prompt:
-                            graph = batch["graph"][i]
-                            graph_mask = batch["graph_mask"][i].to(device)
-                            for key in GRAPH_KEYS:
-                                if key in graph.keys():
-                                    graph[key] = graph[key].to(device)
-                            graph_token_index = torch.where(
-                                micro_input["input_ids"] == config.graph_token_id[1]
-                            )[1].tolist()
-                        else:
-                            graph = None
-                            graph_mask = None
-                            graph_token_index = None
+                    accelerator.wait_for_everyone()
 
-                        position_ids = (
-                            torch.arange(micro_input["input_ids"].shape[1])
-                            .unsqueeze(0)
-                            .expand(micro_input["input_ids"].shape[0], -1)
-                        )
+                    with accelerator.accumulate(model):
 
-                        accelerator.wait_for_everyone()
-                        if args.debug & accelerator.is_main_process:
-                            console.log(f"Step {global_step}: processed data")
-
-                        with accelerator.accumulate(model):
-
-                            outputs = model(
-                                **micro_input,
-                                position_ids=position_ids.to(device),
-                                graph=graph,
-                                graph_mask=graph_mask,
-                                graph_token_index=graph_token_index,
-                                step=global_step,
-                                accelerator=accelerator,
-                            )
-                            accelerator.wait_for_everyone()
-                            loss = outputs.loss
-                            loss.backward()
-
-                            # accelerator.backward(loss)
-
-                            with torch.no_grad():
-                                console.log(
-                                    f"[yellow]Checking nan in gradient[/yellow]"
-                                )
-                                for name, param in model.named_parameters():
-                                    if param.grad is not None:
-                                        if torch.isnan(param.grad).any():
-                                            console.log(
-                                                f"[red]NaN detected in gradients of {name} at step {global_step}[/red]"
-                                            )
-                                            raise ValueError(
-                                                f"NaN detected in gradients of {name} at step {global_step}"
-                                            )
-
-                                all_losses = accelerator.gather(loss)
-                                console.log(
-                                    f"Step {global_step}: gathered losses: {all_losses}"
-                                )
-                                total_loss = torch.sum(all_losses)
-                                batch_loss += total_loss.detach().float().item()
-
-                            if accelerator.sync_gradients:
-                                accelerator.wait_for_everyone()
-                                accelerator.clip_grad_norm_(model.parameters(), 1.0)
-                                optimizer.step()
-                                lr_scheduler.step()
-                                optimizer.zero_grad()
-                                model.zero_grad()
-
-                        for key in micro_input.keys():
-                            micro_input[key] = micro_input[key].to("cpu")
-                        if "graph" in args.baseline_prompt:
-                            for key in GRAPH_KEYS:
-                                if key in graph.keys():
-                                    graph[key] = graph[key].to("cpu")
-                                    graph.pop(key, None)
-                            graph_mask = graph_mask.to("cpu")
-                            del graph_mask, graph
-                        del outputs, loss, micro_input
-                        gc.collect()
-                        torch.cuda.empty_cache()
-
-                    avg_batch_loss = batch_loss / batch_size
-                    if accelerator.is_main_process:
-                        ram_usage = log_ram_usage()
-                        console.log(
-                            f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
-                        )
-                        progress.update(
-                            train_epoch_task,
-                            advance=1,
-                            description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB",
-                        )
-                    epoch_loss += avg_batch_loss * batch_size
-                    num_items += batch_size
-
-                    if (
-                        global_step % args.logging_steps == 0
-                    ) and accelerator.is_main_process:
-                        current_lr = lr_scheduler.get_last_lr()[0]
-                        if accelerator.is_main_process:
-                            accelerator.log(
-                                {
-                                    "train/loss": avg_batch_loss,
-                                    "train/learning_rate": current_lr,
-                                    "train/step": global_step,
-                                },
-                                step=global_step,
-                            )
-                            console.print(
-                                f"[yellow]Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}[/yellow]"
-                            )
-                            if args.debug:
-                                sys.exit(0)
-
-                    if accelerator.sync_gradients and (
-                        global_step % args.save_steps == 0
-                    ):
-                        accelerator.wait_for_everyone()
-
-                        if (previous_checkpoint_step != -1) and (
-                            accelerator.is_main_process
-                        ):
-
-                            old_dir = os.path.join(
-                                save_path,
-                                f"current_checkpoint",
-                            )
-                            new_dir = os.path.join(
-                                save_path,
-                                f"checkpoint-{previous_checkpoint_step}",
-                            )
-                            os.rename(old_dir, new_dir)
-
-                        if accelerator.is_main_process:
-                            checkpoint_dir_new = os.path.join(
-                                save_path,
-                                f"current_checkpoint",
-                            )
-                            previous_checkpoint_step = global_step
-
-                            while len(os.listdir(save_path)) >= max_num_checkpoint:
-                                oldest_checkpoint = min(
-                                    [
-                                        os.path.join(save_path, f)
-                                        for f in os.listdir(save_path)
-                                        if f.startswith("checkpoint-")
-                                    ],
-                                    key=os.path.getctime,
-                                )
-                                print(
-                                    f"Removing oldest checkpoint: {oldest_checkpoint}"
-                                )
-                                shutil.rmtree(oldest_checkpoint)
-
-                            unwrapped_model = accelerator.unwrap_model(model)
-                            save_checkpoint(
-                                model=unwrapped_model,
-                                path=checkpoint_dir_new,
-                                optimizer=optimizer,
-                                scheduler=lr_scheduler,
-                                global_step=global_step,
-                                max_num_checkpoint=max_num_checkpoint,
-                                seed=args.seed,
-                            )
-                            accelerator.print(
-                                f"Saving checkpoint to {checkpoint_dir_new}"
-                            )
-                            del unwrapped_model
-
-                    if global_step % args.validating_steps == 0:
-                        accelerator.wait_for_everyone()
-                        val_loss = validate(
-                            args=args,
-                            loader=va_loader,
-                            model=model,
-                            device=device,
-                            config=config,
-                            console=console,
+                        outputs = model(
+                            **micro_input,
+                            position_ids=position_ids.to(device),
+                            graph=graph,
+                            graph_mask=graph_mask,
+                            graph_token_index=graph_token_index,
+                            step=global_step,
                             accelerator=accelerator,
-                            progress=progress,
                         )
                         accelerator.wait_for_everyone()
+                        loss = outputs.loss
+                        accelerator.backward(loss)
 
-                        if accelerator.is_main_process:
-                            wandb.log({"val_loss": val_loss})
-                            console.log(
-                                f"Validation loss: {val_loss:.4f} at step {global_step}"
+                        if accelerator.sync_gradients:
+                            accelerator.wait_for_everyone()
+                            accelerator.clip_grad_norm_(model.parameters(), 1.0)
+                            optimizer.step()
+                            lr_scheduler.step()
+                            optimizer.zero_grad()
+                            model.zero_grad()
+
+                        with torch.no_grad():
+                            all_losses = accelerator.gather(loss)
+                            # fill all_losses with zero if it is NaN with torch.where
+                            all_losses = torch.where(
+                                torch.isnan(all_losses),
+                                torch.zeros_like(all_losses),
+                                all_losses,
                             )
-                        model.train()
+                            console.log(
+                                f"Step {global_step}: gathered losses: {all_losses}"
+                            )
+                            total_loss = torch.sum(all_losses)
+                            batch_loss += total_loss.detach().float().item()
+
+                    for key in micro_input.keys():
+                        micro_input[key] = micro_input[key].to("cpu")
+                    if "graph" in args.baseline_prompt:
+                        for key in GRAPH_KEYS:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to("cpu")
+                                graph.pop(key, None)
+                        graph_mask = graph_mask.to("cpu")
+                        del graph_mask, graph
+                    outputs.logits = outputs.logits.to("cpu")
+                    loss = loss.to("cpu")
+                    del outputs, loss, micro_input
+                    gc.collect()
+                    torch.cuda.empty_cache()
+
+                avg_batch_loss = batch_loss / batch_size
+                if accelerator.is_main_process:
+                    ram_usage = log_ram_usage()
+                    console.log(
+                        f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
+                    )
+                    progress.update(
+                        train_epoch_task,
+                        advance=1,
+                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB",
+                    )
+                epoch_loss += avg_batch_loss * batch_size
+                num_items += batch_size
+
+                if (
+                    global_step % args.logging_steps == 0
+                ) and accelerator.is_main_process:
+                    current_lr = lr_scheduler.get_last_lr()[0]
+                    if accelerator.is_main_process:
+                        accelerator.log(
+                            {
+                                "train/loss": avg_batch_loss,
+                                "train/learning_rate": current_lr,
+                                "train/step": global_step,
+                            },
+                            step=global_step,
+                        )
+                        console.print(
+                            f"[yellow]Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}[/yellow]"
+                        )
+
+                if accelerator.sync_gradients and (global_step % args.save_steps == 0):
+                    accelerator.wait_for_everyone()
+
+                    if (previous_checkpoint_step != -1) and (
+                        accelerator.is_main_process
+                    ):
+
+                        old_dir = os.path.join(
+                            save_path,
+                            f"current_checkpoint",
+                        )
+                        new_dir = os.path.join(
+                            save_path,
+                            f"checkpoint-{previous_checkpoint_step}",
+                        )
+                        os.rename(old_dir, new_dir)
+
+                    if accelerator.is_main_process:
+                        checkpoint_dir_new = os.path.join(
+                            save_path,
+                            f"current_checkpoint",
+                        )
+                        previous_checkpoint_step = global_step
+
+                        while len(os.listdir(save_path)) >= max_num_checkpoint:
+                            oldest_checkpoint = min(
+                                [
+                                    os.path.join(save_path, f)
+                                    for f in os.listdir(save_path)
+                                    if f.startswith("checkpoint-")
+                                ],
+                                key=os.path.getctime,
+                            )
+                            print(f"Removing oldest checkpoint: {oldest_checkpoint}")
+                            shutil.rmtree(oldest_checkpoint)
+
+                        unwrapped_model = accelerator.unwrap_model(model)
+                        save_checkpoint(
+                            model=unwrapped_model,
+                            path=checkpoint_dir_new,
+                            optimizer=optimizer,
+                            scheduler=lr_scheduler,
+                            global_step=global_step,
+                            max_num_checkpoint=max_num_checkpoint,
+                            seed=args.seed,
+                        )
+                        accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
+                        del unwrapped_model
+
+                if global_step % args.validating_steps == 0:
+                    accelerator.wait_for_everyone()
+                    val_loss = validate(
+                        args=args,
+                        loader=va_loader,
+                        model=model,
+                        device=device,
+                        config=config,
+                        console=console,
+                        accelerator=accelerator,
+                        progress=progress,
+                    )
+                    accelerator.wait_for_everyone()
+
+                    if accelerator.is_main_process:
+                        wandb.log({"val_loss": val_loss})
+                        console.log(
+                            f"Validation loss: {val_loss:.4f} at step {global_step}"
+                        )
+                    model.train()
 
             if accelerator.is_main_process:
                 if ((continue_training == True) and (global_step > start_step)) or (

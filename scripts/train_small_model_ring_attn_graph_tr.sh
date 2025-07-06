@@ -265,20 +265,20 @@ accelerate launch --debug --num_processes 4  main.py --mode train \
     --checkpoint_path "results/models/qwen25_7b_graph_tr_3_epochs/current_checkpoint/checkpoint-106880.pt"
 
 
-accelerate launch --debug --num_processes 1  main.py --mode train \
+CUDA_VISIBLE_DEVICES=0 accelerate launch --debug --num_processes 1  main.py --mode train \
     --seed 42 \
     --data_path Dataset \
     --data testgeneval \
     --baseline_prompt graph_tr \
-    --llm_model "Qwen/Qwen2.5-Coder-7B-Instruct" \
-    --max_seq_len 28000 \
+    --llm_model "Qwen/Qwen2.5-Coder-1.5B-Instruct" \
+    --max_seq_len 8196 \
     --batch_size 1 \
-    --gradient_accumulation_steps 32 \
-    --save_steps 320 \
-    --validating_steps 5000 \
+    --gradient_accumulation_steps 16 \
+    --save_steps 100 \
+    --validating_steps 1000 \
     --num_gpu 1 \
-    --model_name "qwen2_5-7b"\
-    --name "qwen25_7b_graph_tr_3_epochs" \
+    --model_name "qwen2_5-1_5b"\
+    --name "testing_qwen25_1-5b_graph_tr_1_epochs" \
     --output_dir "./results/models/" \
     --overwrite_output_dir \
     --do_train \
@@ -286,9 +286,9 @@ accelerate launch --debug --num_processes 1  main.py --mode train \
     --n_hidden 16 \
     --learning_rate 5e-5 \
     --max_grad_norm 1.0 \
-    --num_train_epochs 3 \
+    --num_train_epochs 1 \
     --dtype bf16 \
     --use_lora \
-    --lora_r 32 \
+    --lora_r 4 \
     --use_accelerate \
     --graph_sampling 
