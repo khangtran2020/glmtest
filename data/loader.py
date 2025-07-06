@@ -33,7 +33,7 @@ class GLMFDataset(Dataset):
         self.index_to_key_dict = dict(zip(range(len(self.data)), self.data.keys()))
 
         if self.logger is not None:
-            self.logger.info(
+            self.logger.log(
                 f"Dataset initialized with {len(self.data)} samples, max_seq_length={self.max_seq_length}, "
                 f"baseline_prompt={self.baseline_prompt}, n_hops={self.n_hops}, testing={self.testing}, num_gpus={self.num_gpus}"
             )
