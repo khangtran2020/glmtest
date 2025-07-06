@@ -641,7 +641,7 @@ def train_multi_gpu_accelerate(
                             for name, param in model.named_parameters():
                                 if param.grad is not None:
                                     grad_norm = (
-                                        grad_norm + param.grad.values.norm(2) ** 2
+                                        grad_norm + param.grad.values().norm(2) ** 2
                                     )
                             grad_norm = grad_norm.sqrt().item()
                             console.log(
