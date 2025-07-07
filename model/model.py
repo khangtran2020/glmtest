@@ -233,14 +233,14 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             config.num_head,
             config.dropout,
         )
-        if config.dtype == "float16":
+        if config.dtype == "fp16":
             self.llm_model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
                 torch_dtype=torch.float16,
                 device_map=f"cuda:{rank}",
                 attn_implementation="flash_attention_2",
             )
-        elif config.dtype == "bfloat16":
+        elif config.dtype == "bf16":
             self.llm_model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
                 torch_dtype=torch.bfloat16,
