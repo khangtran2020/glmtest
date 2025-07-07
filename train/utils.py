@@ -25,10 +25,25 @@ old_flash_attn = _flash_attention_forward
 
 def extract_local(value, rank, world_size, device, dim=1):
     value_chunks = value.chunk(2 * world_size, dim=dim)
-    local_value = torch.cat(
-        [value_chunks[rank], value_chunks[2 * world_size - rank - 1]], dim=dim
-    )
-    return local_value.to(device)
+    local_values = []
+    lengths = []
+    for r in range(world_size):
+        l_value = torch.cat(
+            [value_chunks[r], value_chunks[2 * world_size - r - 1]], dim=dim
+        )
+        local_values.append(l_value)
+        lengths.append(l_value.shape[dim])
+
+    local_value = local_values[rank]
+    # Compute cu_seqlens and update parameters
+    cu_seqlens = torch.cat(
+        [
+            torch.tensor([0], device=device),
+            torch.cumsum(torch.tensor(lengths, device=device), dim=0),
+        ]
+    ).to(torch.int32)
+    # update_ring_flash_attn_params(cu_seqlens, group)
+    return local_value.to(device), cu_seqlens
 
 
 def ring_flash_attention_forward(

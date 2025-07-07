@@ -483,11 +483,18 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         rank = self.rank
 
         num_processes = dist.get_world_size()
-        inputs_embeds = extract_local(
+        inputs_embeds, cu_seqlens_emb = extract_local(
             inputs_embeds, rank, num_processes, inputs_embeds.device
         )
         if labels is not None:
-            labels = extract_local(labels, rank, num_processes, labels.device)
+            labels, cu_seqlens_lab = extract_local(
+                labels, rank, num_processes, labels.device
+            )
+            assert (
+                cu_seqlens_emb - cu_seqlens_lab
+            ).sum().item() == 0, (
+                f"cu_seqlens_emb: {cu_seqlens_emb}, cu_seqlens_lab: {cu_seqlens_lab}"
+            )
 
         if position_ids is None:
             position_ids = (
@@ -496,18 +503,17 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 .expand(inputs_embeds.shape[0], -1)
             )
 
-        position_ids = extract_local(
+        position_ids, cu_seqlens_pos = extract_local(
             position_ids, rank, num_processes, inputs_embeds.device
         )
-
-        cu_seqlens = [0] + [
-            position_ids.size(1) * (i + 1) for i in range(num_processes)
-        ]
-        cu_seqlens = torch.tensor(
-            cu_seqlens, dtype=torch.int32, device=inputs_embeds.device
+        assert (
+            cu_seqlens_emb - cu_seqlens_pos
+        ).sum().item() == 0, (
+            f"cu_seqlens_emb: {cu_seqlens_emb}, cu_seqlens_pos: {cu_seqlens_pos}"
         )
+
         update_ring_flash_attn_params(
-            cu_seqlens=cu_seqlens, process_group=process_group
+            cu_seqlens=cu_seqlens_emb, process_group=process_group
         )
         if accelerator is not None:
             accelerator.wait_for_everyone()
