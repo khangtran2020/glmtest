@@ -512,6 +512,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             f"cu_seqlens_emb: {cu_seqlens_emb}, cu_seqlens_pos: {cu_seqlens_pos}"
         )
 
+        pprint(
+            f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]cu_seqlens_emb: {cu_seqlens_emb} [/cyan]"
+        )
         update_ring_flash_attn_params(
             cu_seqlens=cu_seqlens_emb, process_group=process_group
         )
