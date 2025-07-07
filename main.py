@@ -157,6 +157,23 @@ def main() -> None:
             device_map="cuda" if torch.cuda.is_available() else "cpu",
         )
 
+        attn_impl = getattr(config, "_attn_implementation", None)
+        if attn_impl is None:
+            console.log(
+                f"[red]Model config for the current model has no `_attn_implementation` field.[/red]"
+            )
+        else:
+            console.log(
+                f"[green]`_attn_implementation` for the current model: {attn_impl}[/green]"
+            )
+        # set attn_impl to flash_attention_2
+        if (attn_impl is not None) and (attn_impl != "flash_attention_2"):
+            config._attn_implementation = "flash_attention_2"
+            console.log(
+                f"[yellow]Set `_attn_implementation` to `flash_attention_2` for better performance.[/yellow]"
+            )
+        console.log(f"Model config: {config}")
+
         model = GLMFModelForCausalLM(
             config=config,
             tokenizer=dataset.llm_tokenizer,
@@ -172,17 +189,6 @@ def main() -> None:
             dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
             dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
         ]
-
-        attn_impl = getattr(config, "_attn_implementation", None)
-
-        if attn_impl is None:
-            console.log(
-                f"[red]Model config for the current model has no `_attn_implementation` field.[/red]"
-            )
-        else:
-            console.log(
-                f"[green]`_attn_implementation` for the current model: {attn_impl}[/green]"
-            )
 
         if args.model_debug:
             return
