@@ -238,17 +238,20 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 config.model_name,
                 torch_dtype=torch.float16,
                 device_map=f"cuda:{rank}",
+                attn_implementation="flash_attention_2",
             )
         elif config.dtype == "bfloat16":
             self.llm_model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
                 torch_dtype=torch.bfloat16,
                 device_map=f"cuda:{rank}",
+                attn_implementation="flash_attention_2",
             )
         else:
             self.llm_model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
                 device_map=f"cuda:{rank}",
+                attn_implementation="flash_attention_2",
             )
 
         if self.is_training:
