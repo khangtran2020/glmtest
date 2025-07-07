@@ -18,12 +18,10 @@ class GLMFDataset(Dataset):
         n_hops: int = 2,
         testing: bool = False,
         num_gpus: int = 1,
+        logger=None,
     ):
         self.data = data
         self.tokenizer = tokenizer
-
-        if self.tokenizer.pad_token_id is None:
-            tokenizer.pad_token_id = tokenizer.eos_token_id
         self.baseline_prompt = baseline_prompt
         self.max_seq_length = max_seq_length
         self.graph_token_id = self.tokenizer.convert_tokens_to_ids([GRAPH_PAD_TOKEN])[0]
@@ -31,13 +29,20 @@ class GLMFDataset(Dataset):
         self.n_hops = n_hops
         self.testing = testing
         self.num_gpus = num_gpus
+        self.logger = logger
         self.index_to_key_dict = dict(zip(range(len(self.data)), self.data.keys()))
+
+        if self.logger is not None:
+            self.logger.log(
+                f"Dataset initialized with {len(self.data)} samples, max_seq_length={self.max_seq_length}, "
+                f"baseline_prompt={self.baseline_prompt}, n_hops={self.n_hops}, testing={self.testing}, num_gpus={self.num_gpus}"
+            )
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        # print(f"########### Loading sample {idx} from dataset")
+
         data_path = self.data[self.index_to_key_dict[idx]]
         with open(data_path, "r") as f:
             sample = json.load(f)
@@ -45,7 +50,6 @@ class GLMFDataset(Dataset):
         graph = torch.load(graph_path)
         active_node = torch.Tensor(sample["active_node"])
         graph_mask = torch.Tensor(sample["mask"])
-        # graph = sampling_neighbor(graph=graph, mask=active_node, n_hops=self.n_hops)
 
         for key in graph.keys():
             graph[key] = sampling_neighbor(
@@ -56,15 +60,15 @@ class GLMFDataset(Dataset):
 
         if self.testing == False:
             full_text = sample["full_text"]
-            tokenized = self.tokenize(full_text, num_gpu=self.num_gpus)
+            tokenized, pad_size = self.tokenize(full_text, num_gpu=self.num_gpus)
 
             tokenized_user_prompt = self.tokenizer(sample["prompt"])
             user_prompt_len = len(tokenized_user_prompt["input_ids"])
 
             tokenized["labels"] = torch.cat(
                 [
-                    torch.Tensor([-100] * user_prompt_len).unsqueeze(0),
-                    tokenized["labels"][:, user_prompt_len:],
+                    torch.Tensor([-100] * (user_prompt_len + pad_size)).unsqueeze(0),
+                    tokenized["labels"][:, (user_prompt_len + pad_size) :],
                 ],
                 dim=1,
             ).long()
@@ -83,14 +87,9 @@ class GLMFDataset(Dataset):
                 "graph_mask": torch.tensor(graph_mask, dtype=torch.float),
             }
         else:
-            # graph = sample["graph"]
             prompt = sample["prompt"]
-            # graph_mask = sample["mask"]
             uuid = sample["uuid"]
 
-            if self.num_gpus > 1:
-                pass
-            # Tokenize text input
             tokenized = self.tokenize(prompt, num_gpu=self.num_gpus)
             input_ids = tokenized["input_ids"]
 
@@ -102,10 +101,9 @@ class GLMFDataset(Dataset):
             batch = {
                 "text": prompt,
                 "input": tokenized,
-                "graph": graph,  # Should be a dictionary of graph structures
+                "graph": graph,
                 "graph_mask": torch.tensor(graph_mask, dtype=torch.float),
             }
-            # print(uuid, batch)
             return (uuid, batch)
 
     def tokenize(self, prompt: str, num_gpu: int = 1) -> dict:
@@ -116,7 +114,7 @@ class GLMFDataset(Dataset):
             truncation=True,
             max_length=self.max_seq_length,
         )
-
+        pad_size = 0
         if num_gpu > 1:
 
             pad_tensor = (
@@ -140,11 +138,11 @@ class GLMFDataset(Dataset):
             result["attention_mask"] = torch.cat(
                 [attention_tensor, result["attention_mask"]], dim=1
             )
+            pad_size = pad_tensor.shape[1]
 
         # Use clone() to make a copy of the tensor for labels.
         result["labels"] = result["input_ids"].clone()
-
-        return result
+        return result, pad_size
 
 
 def collate_fn(batch) -> dict:

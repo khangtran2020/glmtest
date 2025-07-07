@@ -1,5 +1,6 @@
 import os
 import gc
+import sys
 import torch
 import wandb
 import shutil
@@ -14,7 +15,12 @@ from model.model import GLMFModelForCausalLM, GLMFModelConfig
 from accelerate import Accelerator
 from transformers.trainer_utils import seed_worker
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
-from train.utils import patch_model, move_model_to_device, save_checkpoint
+from train.utils import (
+    patch_model,
+    move_model_to_device,
+    save_checkpoint,
+    extract_local,
+)
 from train.test import validate
 from utils.utils import log_ram_usage
 
@@ -22,6 +28,7 @@ from utils.utils import log_ram_usage
 # typing
 from argparse import Namespace
 from rich.console import Console
+from transformers import PreTrainedTokenizer
 
 
 def train(
@@ -51,7 +58,6 @@ def train(
             model=model,
             max_num_checkpoint=max_num_checkpoint,
             collate_fn=collate_fn,
-            # rank=-1,
         )
     else:
         console.log(
@@ -69,8 +75,60 @@ def train(
             model=model,
             max_num_checkpoint=max_num_checkpoint,
             collate_fn=collate_fn,
-            # rank=-1,
         )
+
+
+def logging_train_data(
+    console: Console, datasets: tuple, tokenizer: PreTrainedTokenizer
+):
+
+    tr_dataset, va_dataset = datasets
+    console.log("Data prepared:")
+    console.log(f"Train data: {len(tr_dataset)} data points")
+    console.log(f"Valid data: {len(va_dataset)} data points")
+
+    data_point_example = tr_dataset[0]
+    console.log("Data prepared:")
+    console.log(f"Train data: {len(tr_dataset)} data points")
+    console.log(f"Valid data: {len(va_dataset)} data points")
+
+    # print special token id of tokenizer and the associated ids
+    console.log(
+        f"[cyan]Tokenizer special tokens:[/cyan]\n{tokenizer.special_tokens_map}"
+    )
+    for key, value in tokenizer.special_tokens_map.items():
+        if isinstance(value, str):
+            value = tokenizer.convert_tokens_to_ids(value)
+            console.log(f"[cyan]{key}[/cyan]: {value}")
+        if isinstance(value, list):
+            value = [tokenizer.convert_tokens_to_ids(v) for v in value]
+            console.log(f"[cyan]{key}[/cyan]: {value}")
+
+    console.log(
+        f"[yellow]================ Example data point ================[/yellow]\n"
+        + f"{data_point_example['text']}\n"
+        + "[yellow]================ End of example data point ================[/yellow]"
+    )
+    len_of_tokenized = len(data_point_example["input"]["input_ids"].squeeze(0))
+    len_of_labels = len(data_point_example["input"]["labels"].squeeze(0))
+    len_of_attention_mask = len(
+        data_point_example["input"]["attention_mask"].squeeze(0)
+    )
+    console.log(
+        f"[yellow]================ Example tokenized - {len_of_tokenized} ================[/yellow]\n"
+        + f"{data_point_example['input']['input_ids'].squeeze(0).tolist()}\n"
+        + "[yellow]================ End of example tokenized ================[/yellow]"
+    )
+    console.log(
+        f"[yellow]================ Example attention_mask - {len_of_attention_mask} ================[/yellow]\n"
+        + f"{data_point_example['input']['attention_mask'].squeeze(0).tolist()}\n"
+        + "[yellow]================ End of example tokenized ================[/yellow]"
+    )
+    console.log(
+        f"[yellow]================ Example label - {len_of_labels} ================[/yellow]\n"
+        + f"{data_point_example['input']['labels'].squeeze(0).tolist()}\n"
+        + "[yellow]================ End of example label ================[/yellow]"
+    )
 
 
 def train_single_gpu_accelerate(
@@ -127,69 +185,39 @@ def train_single_gpu_accelerate(
     accelerator.print(f"Using {accelerator.num_processes} devices")
     accelerator.print(f"Mixed precision: {mixed_precision}")
 
-    if args.model_debug == False:
-        tr_dataset = GLMFDataset(
-            data=dataset.train_data,
-            tokenizer=dataset.llm_tokenizer,
-            max_seq_length=args.max_seq_length,
-            debug=args.debug,
-            n_hops=dataset.n_hops,
-            num_gpus=args.num_gpu,
-        )
-        va_dataset = GLMFDataset(
-            data=dataset.val_data,
-            tokenizer=dataset.llm_tokenizer,
-            max_seq_length=args.max_seq_length,
-            debug=args.debug,
-            n_hops=dataset.n_hops,
-            num_gpus=args.num_gpu,
-        )
-        tr_loader = DataLoader(
-            tr_dataset, batch_size=1, shuffle=True, collate_fn=collate_fn
-        )
-        va_loader = DataLoader(
-            va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
-        )
-        console.log("Data prepared:")
-        console.log(f"Train data: {len(tr_dataset)} data points")
-        console.log(f"Valid data: {len(va_dataset)} data points")
-
-        data_point_example = next(iter(tr_loader))
-        console.log("Data prepared:")
-        console.log(f"Train data: {len(tr_dataset)} data points")
-        console.log(f"Valid data: {len(va_dataset)} data points")
-
-        # print special token id of tokenizer and the associated ids
-        console.log(
-            f"[cyan]Tokenizer special tokens:[/cyan]\n{tokenizer.special_tokens_map}"
-        )
-        for key, value in tokenizer.special_tokens_map.items():
-            if isinstance(value, str):
-                value = tokenizer.convert_tokens_to_ids(value)
-                console.log(f"[cyan]{key}[/cyan]: {value}")
-            if isinstance(value, list):
-                value = [tokenizer.convert_tokens_to_ids(v) for v in value]
-                console.log(f"[cyan]{key}[/cyan]: {value}")
-
-        console.log(
-            f"[yellow]================ Example data point ================[/yellow]\n {data_point_example['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
-        )
-        console.log(
-            f"[yellow]================ Example tokenized ================[/yellow]\n {data_point_example['input']['input_ids'].squeeze(0).tolist()}\n\n[yellow]================ End of example tokenized ================[/yellow]"
-        )
-        console.log(
-            f"[yellow]================ Example label ================[/yellow]\n {data_point_example['input']['labels'].squeeze(0).tolist()}\n\n[yellow]================ End of example label ================[/yellow]"
-        )
-
-    # tokenizer = dataset.llm_tokenizer
-
-    # Prepare everything with accelerator
+    tr_dataset = GLMFDataset(
+        data=dataset.train_data,
+        tokenizer=dataset.llm_tokenizer,
+        max_seq_length=args.max_seq_length,
+        debug=args.debug,
+        n_hops=dataset.n_hops,
+        num_gpus=args.num_gpu,
+        logger=console,
+    )
+    va_dataset = GLMFDataset(
+        data=dataset.val_data,
+        tokenizer=dataset.llm_tokenizer,
+        max_seq_length=args.max_seq_length,
+        debug=args.debug,
+        n_hops=dataset.n_hops,
+        num_gpus=args.num_gpu,
+        logger=console,
+    )
+    tr_loader = DataLoader(
+        tr_dataset, batch_size=1, shuffle=True, collate_fn=collate_fn
+    )
+    va_loader = DataLoader(
+        va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
+    )
+    logging_train_data(
+        console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
+    )
     device = accelerator.device
     config = model.config
     model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
     global_step = 0
     previous_checkpoint_step = -1
-    # Zero gradients initially.
+
     if continue_training == False:
         optimizer.zero_grad()
 
@@ -204,9 +232,7 @@ def train_single_gpu_accelerate(
     ) as progress:
 
         train_task = progress.add_task("Training...", total=args.num_train_epochs)
-
         for epoch in range(args.num_train_epochs):
-
             model.train()
             train_epoch_task = progress.add_task(
                 f"Epoch {epoch + 1}/{args.num_train_epochs}",
@@ -221,13 +247,10 @@ def train_single_gpu_accelerate(
                 if (continue_training == True) and (global_step <= start_step):
                     global_step += args.batch_size
                     ram_usage = log_ram_usage()
-                    console.log(
-                        f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
-                    )
                     progress.update(
                         train_epoch_task,
                         advance=1,
-                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB",
+                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
                     )
                     continue
 
@@ -235,7 +258,6 @@ def train_single_gpu_accelerate(
                 batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
 
-                # Process each sample in the batch as a micro-batch.
                 for i in range(batch_size):
 
                     batch_input = batch["input"].copy()
@@ -247,10 +269,6 @@ def train_single_gpu_accelerate(
                         "attention_mask": batch_input["attention_mask"][i].to(device),
                         "labels": batch_input["labels"][i].to(device),
                     }
-
-                    if args.debug:
-                        log_info = f"Length of input_ids - {micro_input['input_ids'].size()}, attention_mask - {micro_input['attention_mask'].size()}, labels - {micro_input['labels'].size()}"
-                        console.log(f"Step {global_step}: {log_info}")
 
                     if "graph" in args.baseline_prompt:
                         graph = batch["graph"][i]
@@ -288,9 +306,6 @@ def train_single_gpu_accelerate(
 
                 avg_batch_loss = batch_loss / batch_size
                 ram_usage = log_ram_usage()
-                console.log(
-                    f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
-                )
                 progress.update(
                     train_epoch_task,
                     advance=1,
@@ -299,19 +314,30 @@ def train_single_gpu_accelerate(
                 epoch_loss += avg_batch_loss * batch_size
                 num_items += batch_size
 
-                if (global_step % args.logging_steps == 0) and (args.debug == False):
+                for key in micro_input.keys():
+                    micro_input[key] = micro_input[key].to("cpu")
+                if "graph" in args.baseline_prompt:
+                    for key in GRAPH_KEYS:
+                        if key in graph.keys():
+                            graph[key] = graph[key].to("cpu")
+                            graph.pop(key, None)
+                    graph_mask = graph_mask.to("cpu")
+                    del graph_mask, graph
+                outputs.logits = outputs.logits.to("cpu")
+                loss = loss.to("cpu")
+                del outputs, loss, micro_input
+                gc.collect()
+                torch.cuda.empty_cache()
+
+                if global_step % args.logging_steps == 0:
                     current_lr = lr_scheduler.get_last_lr()[0]
-                    if accelerator.is_main_process:
-                        accelerator.log(
-                            {
-                                "train/loss": avg_batch_loss,
-                                "train/learning_rate": current_lr,
-                                "train/step": global_step,
-                            },
-                            step=global_step,
-                        )
-                    accelerator.print(
-                        f"Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}"
+                    accelerator.log(
+                        {
+                            "train/loss": avg_batch_loss,
+                            "train/learning_rate": current_lr,
+                            "train/step": global_step,
+                        },
+                        step=global_step,
                     )
 
                 if accelerator.sync_gradients and global_step % args.save_steps == 0:
@@ -339,15 +365,10 @@ def train_single_gpu_accelerate(
                         max_num_checkpoint=max_num_checkpoint,
                         seed=args.seed,
                     )
-                    # accelerator.save_state(checkpoint_dir)
                     if accelerator.is_main_process:
                         accelerator.print(f"Saving checkpoint to {checkpoint_dir}")
 
-                del outputs, loss, micro_input, graph, graph_mask  # Free memory
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-
-                if (global_step % args.validating_steps == 0) and (args.debug == False):
+                if global_step % args.validating_steps == 0:
                     val_loss = validate(
                         args=args,
                         loader=va_loader,
@@ -363,9 +384,6 @@ def train_single_gpu_accelerate(
                         f"Validation loss: {val_loss:.4f} at step {global_step}"
                     )
 
-                # if args.debug:
-                #     break
-
             if ((continue_training == True) and (global_step > start_step)) or (
                 continue_training == False
             ):
@@ -377,9 +395,6 @@ def train_single_gpu_accelerate(
                     description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
                 )
 
-            # if args.debug:
-            #     break
-
     if model.config.use_lora == True:
         model.llm_model = model.llm_model.merge_and_unload()
         model.config.use_lora = False
@@ -387,26 +402,11 @@ def train_single_gpu_accelerate(
     accelerator.wait_for_everyone()
     unwrapped_model = accelerator.unwrap_model(model)
 
-    if any(p.device.type == "meta" for p in unwrapped_model.parameters()):
-        device_to_save = (
-            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-        )
-        move_model_to_device(unwrapped_model, device_to_save)
-
     final_model_path = os.path.join(save_path, "final_model")
     console.log(f"Saving final model to {final_model_path}...")
 
     if not os.path.exists(final_model_path):
         os.makedirs(final_model_path, exist_ok=True)
-    # final_tokenizer_path = os.path.join(save_path, "tokenizer")
-
-    # console.log(f"Config: {unwrapped_model.config}")
-
-    # unwrapped_model.save_pretrained(
-    #     final_model_path,
-    #     is_main_process=accelerator.is_main_process,
-    #     save_function=accelerator.save,
-    # )
 
     torch.save(
         unwrapped_model.state_dict(),
@@ -470,22 +470,24 @@ def train_multi_gpu_accelerate(
             },
             init_kwargs={"wandb": {"name": args.name}},
         )
-    save_path = os.path.join(args.output_dir, args.name)
-    if os.path.exists(save_path):
-        if continue_training == False:
-            shutil.rmtree(save_path)
-    os.makedirs(save_path, exist_ok=True)
-    accelerator.print(f"Distributed type: {accelerator.distributed_type}")
-    accelerator.print(f"Number of processes: {accelerator.num_processes}")
-    accelerator.print(f"Mixed precision: {mixed_precision}")
-    tokenizer = dataset.llm_tokenizer
+        save_path = os.path.join(args.output_dir, args.name)
+        if os.path.exists(save_path):
+            if continue_training == False:
+                shutil.rmtree(save_path)
+        os.makedirs(save_path, exist_ok=True)
+        accelerator.print(f"Distributed type: {accelerator.distributed_type}")
+        accelerator.print(f"Number of processes: {accelerator.num_processes}")
+        accelerator.print(f"Mixed precision: {mixed_precision}")
 
+    tokenizer = dataset.llm_tokenizer
     tr_dataset = GLMFDataset(
         data=dataset.train_data,
         tokenizer=dataset.llm_tokenizer,
         max_seq_length=args.max_seq_length,
         debug=args.debug,
         n_hops=dataset.n_hops,
+        logger=console,
+        num_gpus=args.num_gpu,
     )
     va_dataset = GLMFDataset(
         data=dataset.val_data,
@@ -493,6 +495,8 @@ def train_multi_gpu_accelerate(
         max_seq_length=args.max_seq_length,
         debug=args.debug,
         n_hops=dataset.n_hops,
+        logger=console,
+        num_gpus=args.num_gpu,
     )
     dataloader_params = {
         "batch_size": args.batch_size,
@@ -511,34 +515,9 @@ def train_multi_gpu_accelerate(
         va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
     )
 
-    data_point_example = next(iter(tr_loader))
-
     if accelerator.is_main_process:
-
-        console.log("Data prepared:")
-        console.log(f"Train data: {len(tr_dataset)} data points")
-        console.log(f"Valid data: {len(va_dataset)} data points")
-
-        # print special token id of tokenizer and the associated ids
-        console.log(
-            f"[cyan]Tokenizer special tokens:[/cyan]\n{tokenizer.special_tokens_map}"
-        )
-        for key, value in tokenizer.special_tokens_map.items():
-            if isinstance(value, str):
-                value = tokenizer.convert_tokens_to_ids(value)
-                console.log(f"[cyan]{key}[/cyan]: {value}")
-            if isinstance(value, list):
-                value = [tokenizer.convert_tokens_to_ids(v) for v in value]
-                console.log(f"[cyan]{key}[/cyan]: {value}")
-
-        console.log(
-            f"[yellow]================ Example data point ================[/yellow]\n {data_point_example['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
-        )
-        console.log(
-            f"[yellow]================ Example tokenized ================[/yellow]\n {data_point_example['input']['input_ids'].squeeze(0).tolist()}\n\n[yellow]================ End of example tokenized ================[/yellow]"
-        )
-        console.log(
-            f"[yellow]================ Example label ================[/yellow]\n {data_point_example['input']['labels'].squeeze(0).tolist()}\n\n[yellow]================ End of example label ================[/yellow]"
+        logging_train_data(
+            console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
         )
 
     patch_model(process_group=process_group)
@@ -560,7 +539,6 @@ def train_multi_gpu_accelerate(
         )
 
     global_step = 0
-    model.train()
     previous_checkpoint_step = -1
 
     with Progress(
@@ -577,7 +555,7 @@ def train_multi_gpu_accelerate(
             train_task = progress.add_task("Training...", total=args.num_train_epochs)
 
         for epoch in range(args.num_train_epochs):
-
+            model.train()
             if accelerator.is_main_process:
                 train_epoch_task = progress.add_task(
                     f"Epoch {epoch + 1}/{args.num_train_epochs}",
@@ -592,16 +570,15 @@ def train_multi_gpu_accelerate(
                 if (continue_training == True) and (global_step <= start_step):
                     global_step += args.batch_size
                     ram_usage = log_ram_usage()
-                    console.log(
-                        f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
-                    )
-                    progress.update(
-                        train_epoch_task,
-                        advance=1,
-                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB",
-                    )
+                    if accelerator.is_main_process:
+                        progress.update(
+                            train_epoch_task,
+                            advance=1,
+                            description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
+                        )
                     continue
 
+                accelerator.wait_for_everyone()
                 global_step += args.batch_size
                 batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
@@ -622,30 +599,11 @@ def train_multi_gpu_accelerate(
 
                     accelerator.wait_for_everyone()
                     if "graph" in args.baseline_prompt:
-                        if args.debug:
-                            console.log("=" * 10 + "\n")
-                            console.log(
-                                f"Step {global_step}: Graph found in batch, checking keys..."
-                            )
-                            check_graph_exist_dict = {}
-                            for key in GRAPH_KEYS:
-                                check_graph_exist_dict[key] = False
                         graph = batch["graph"][i]
+                        graph_mask = batch["graph_mask"][i].to(device)
                         for key in GRAPH_KEYS:
                             if key in graph.keys():
                                 graph[key] = graph[key].to(device)
-                                if args.debug:
-                                    check_graph_exist_dict[key] = True
-                        if args.debug:
-                            for key in GRAPH_KEYS:
-                                if check_graph_exist_dict[key] == False:
-                                    console.log(f"=" * 10 + "\n")
-                                    console.log(
-                                        f"[red]Step {global_step}: Graph {key} not found in batch !!!!"
-                                    )
-                            console.log("Done checking graph keys")
-                            console.log(f"=" * 10 + "\n")
-                        graph_mask = batch["graph_mask"][i].to(device)
                         graph_token_index = torch.where(
                             micro_input["input_ids"] == config.graph_token_id[1]
                         )[1].tolist()
@@ -661,115 +619,55 @@ def train_multi_gpu_accelerate(
                     )
 
                     accelerator.wait_for_everyone()
-                    if args.debug & accelerator.is_main_process:
-                        console.log(f"Step {global_step}: processed data")
 
                     with accelerator.accumulate(model):
-                        try:
-                            outputs = model(
-                                **micro_input,
-                                position_ids=position_ids.to(device),
-                                graph=graph,
-                                graph_mask=graph_mask,
-                                graph_token_index=graph_token_index,
-                                step=global_step,
-                                accelerator=accelerator,
-                            )
-                        except Exception as e:
-                            console.log(
-                                "Uncaught exception:\n" + traceback.format_exc()
-                            )
-                            raise
+
+                        outputs = model(
+                            **micro_input,
+                            position_ids=position_ids.to(device),
+                            graph=graph,
+                            graph_mask=graph_mask,
+                            graph_token_index=graph_token_index,
+                            step=global_step,
+                            accelerator=accelerator,
+                        )
                         accelerator.wait_for_everyone()
-
-                        if args.debug & accelerator.is_main_process:
-                            console.log(
-                                "=" * 10
-                                + "\n"
-                                + f"Step {global_step}: completed forward pass"
-                                + "\n"
-                                + "=" * 10
-                            )
-
                         loss = outputs.loss
                         accelerator.backward(loss)
 
-                        accelerator.wait_for_everyone()
-                        for p in model.parameters():
-                            if p.grad is not None:
-                                # this will sum then average by world_size
-                                p.grad = accelerator.reduce(p.grad, reduction="mean")
-                        accelerator.wait_for_everyone()
-
-                        if args.debug:
-                            # Log the gradients norm for each model:
-                            total_norm_sq = 0.0
-                            for p in model.parameters():
-                                if p.grad is not None:
-                                    # compute L2 norm of this parameter’s gradient
-                                    param_norm = p.grad.data.norm(2)
-                                    total_norm_sq += param_norm.item() ** 2
-
-                            total_grad_norm = total_norm_sq**0.5
-                            accelerator.wait_for_everyone()
+                        with torch.no_grad():
+                            # check gradient norms
+                            grad_norm = 0.0
+                            for name, param in model.named_parameters():
+                                if param.grad is not None:
+                                    grad_norm = grad_norm + param.grad.norm(2) ** 2
+                            grad_norm = grad_norm.sqrt().item()
                             console.log(
-                                f"[cyan]Step {global_step} - rank {local_rank}: total_grad_norm = {total_grad_norm:.4f}[/cyan]"
+                                f"Step {global_step} - for rank {local_rank}: gradient norm: {grad_norm:.4f}"
                             )
-
-                        all_losses = accelerator.gather(loss)
-                        all_losses = torch.where(
-                            torch.isnan(all_losses), 0.0, all_losses
-                        )
-                        total_loss = torch.sum(all_losses)
-                        # mean_loss = accelerator.reduce(loss, reduction="mean")
-                        if args.debug & accelerator.is_main_process:
-                            console.log(f"Step {global_step}: completed backward pass")
+                        accelerator.wait_for_everyone()
 
                         if accelerator.sync_gradients:
                             accelerator.wait_for_everyone()
-                            if args.debug & accelerator.is_main_process:
-                                console.log(
-                                    f"Step {global_step}: Everyone waited for gradients"
-                                )
                             accelerator.clip_grad_norm_(model.parameters(), 1.0)
-                            if args.debug & accelerator.is_main_process:
-                                console.log(f"Step {global_step}: Clipped gradients")
-
-                                console.log("=" * 100)
-                                console.log(
-                                    f"Step {global_step} - rank {local_rank}: Checking unused parameters"
-                                )
-                                found = False
-                                for name, param in model.named_parameters():
-                                    if param.grad is None and param.requires_grad:
-                                        if found == False:
-                                            console.log(
-                                                f"Step {global_step} - rank {local_rank}: Found unused parameters:"
-                                            )
-                                            found = True
-                                        console.log(f"{name}")
-                                if found == False:
-                                    console.log(
-                                        f"Step {global_step} - rank {local_rank}: No unused parameters found"
-                                    )
-                                console.log("=" * 100)
-                                console.log("\n" * 5)
-
                             optimizer.step()
-                            if args.debug & accelerator.is_main_process:
-                                console.log(
-                                    f"Step {global_step}: Updated model parameters"
-                                )
                             lr_scheduler.step()
-                            if args.debug & accelerator.is_main_process:
-                                console.log(
-                                    f"Step {global_step}: Updated scheduler - learning rate is: {lr_scheduler.get_last_lr()[0]}"
-                                )
                             optimizer.zero_grad()
-                            if args.debug & accelerator.is_main_process:
-                                console.log(f"Step {global_step}: Updated scheduler")
+                            model.zero_grad()
 
-                    batch_loss += total_loss.detach().float().item()
+                        with torch.no_grad():
+                            all_losses = accelerator.gather(loss)
+                            # fill all_losses with zero if it is NaN with torch.where
+                            all_losses = torch.where(
+                                torch.isnan(all_losses),
+                                torch.zeros_like(all_losses),
+                                all_losses,
+                            )
+                            console.log(
+                                f"Step {global_step}: gathered losses: {all_losses}"
+                            )
+                            total_loss = torch.sum(all_losses)
+                            batch_loss += total_loss.detach().float().item()
 
                     for key in micro_input.keys():
                         micro_input[key] = micro_input[key].to("cpu")
@@ -780,6 +678,8 @@ def train_multi_gpu_accelerate(
                                 graph.pop(key, None)
                         graph_mask = graph_mask.to("cpu")
                         del graph_mask, graph
+                    outputs.logits = outputs.logits.to("cpu")
+                    loss = loss.to("cpu")
                     del outputs, loss, micro_input
                     gc.collect()
                     torch.cuda.empty_cache()
@@ -799,10 +699,8 @@ def train_multi_gpu_accelerate(
                 num_items += batch_size
 
                 if (
-                    (global_step % args.logging_steps == 0)
-                    and accelerator.is_main_process
-                    and (args.debug == False)
-                ):
+                    global_step % args.logging_steps == 0
+                ) and accelerator.is_main_process:
                     current_lr = lr_scheduler.get_last_lr()[0]
                     if accelerator.is_main_process:
                         accelerator.log(
@@ -813,12 +711,13 @@ def train_multi_gpu_accelerate(
                             },
                             step=global_step,
                         )
-                    accelerator.print(
-                        f"Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}"
-                    )
+                        console.print(
+                            f"[yellow]Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}[/yellow]"
+                        )
 
                 if accelerator.sync_gradients and (global_step % args.save_steps == 0):
                     accelerator.wait_for_everyone()
+
                     if (previous_checkpoint_step != -1) and (
                         accelerator.is_main_process
                     ):
@@ -886,9 +785,6 @@ def train_multi_gpu_accelerate(
                         )
                     model.train()
 
-            # if args.debug:
-            #     break
-
             if accelerator.is_main_process:
                 if ((continue_training == True) and (global_step > start_step)) or (
                     continue_training == False
@@ -917,25 +813,6 @@ def train_multi_gpu_accelerate(
             unwrapped_model.llm_model = unwrapped_model.llm_model.merge_and_unload()
             unwrapped_model.config.use_lora = False
 
-        # if any(p.device.type == "meta" for p in unwrapped_model.parameters()):
-        #     device_to_save = (
-        #         torch.device("cuda")
-        #         if torch.cuda.is_available()
-        #         else torch.device("cpu")
-        #     )
-        #     move_model_to_device(unwrapped_model, device_to_save)
-
-        # for p in unwrapped_model.parameters():
-        #     console.log(f"Parameter device: {p.device}")
-        #     if p.device.type == "meta":
-        #         console.log("Model has meta parameters. Converting to CPU.")
-        # break
-
-        # unwrapped_model.save_pretrained(
-        #     final_model_path,
-        #     is_main_process=accelerator.is_main_process,
-        #     save_function=accelerator.save,
-        # )
         torch.save(
             unwrapped_model.state_dict(),
             os.path.join(final_model_path, "model_weight.pt"),
@@ -943,16 +820,4 @@ def train_multi_gpu_accelerate(
         tokenizer.save_pretrained(final_model_path)
         console.log(f"Final model saved to {final_model_path}")
 
-        # Log final model to W&B
-        # if wandb.run is not None:
-        #     os.makedirs(os.path.join(save_path, "antifact"), exist_ok=True)
-        #     model_artifact = wandb.Artifact(
-        #         name=f"model-{wandb.run.id}",
-        #         type="model",
-        #         description=f"Final model checkpoint",
-        #     )
-        #     model_artifact.add_dir(os.path.join(save_path, "antifact"))
-        #     wandb.log_artifact(model_artifact)
-
-    # End W&B run
     accelerator.end_training()

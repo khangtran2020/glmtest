@@ -2,6 +2,7 @@ import os
 import gc
 import torch
 from torch import nn
+from rich import print as pprint
 import torch.nn.functional as F
 
 from transformers import AutoModelForCausalLM, AutoConfig
@@ -232,22 +233,25 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             config.num_head,
             config.dropout,
         )
-        if config.dtype == "float16":
+        if config.dtype == "fp16":
             self.llm_model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
                 torch_dtype=torch.float16,
                 device_map=f"cuda:{rank}",
+                attn_implementation="flash_attention_2",
             )
-        elif config.dtype == "bfloat16":
+        elif config.dtype == "bf16":
             self.llm_model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
                 torch_dtype=torch.bfloat16,
                 device_map=f"cuda:{rank}",
+                attn_implementation="flash_attention_2",
             )
         else:
             self.llm_model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
                 device_map=f"cuda:{rank}",
+                attn_implementation="flash_attention_2",
             )
 
         if self.is_training:
@@ -470,23 +474,27 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         process_group = dist.group.WORLD
         ignore_index = -100
+
         if labels is not None:
             labels = nn.functional.pad(labels, (0, 1), value=ignore_index)
             labels = labels[..., 1:].contiguous()
 
         seq_len = inputs_embeds.shape[-2]
         rank = self.rank
-        # if self.debug:
-        #     print(
-        #         f"Rank {rank} inputs_embeds at step {step}: {inputs_embeds.size()}, device: {inputs_embeds.device}"
-        #     )
 
         num_processes = dist.get_world_size()
-        inputs_embeds = extract_local(
+        inputs_embeds, cu_seqlens_emb = extract_local(
             inputs_embeds, rank, num_processes, inputs_embeds.device
         )
         if labels is not None:
-            labels = extract_local(labels, rank, num_processes, labels.device)
+            labels, cu_seqlens_lab = extract_local(
+                labels, rank, num_processes, labels.device
+            )
+            assert (
+                cu_seqlens_emb - cu_seqlens_lab
+            ).sum().item() == 0, (
+                f"cu_seqlens_emb: {cu_seqlens_emb}, cu_seqlens_lab: {cu_seqlens_lab}"
+            )
 
         if position_ids is None:
             position_ids = (
@@ -495,18 +503,20 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 .expand(inputs_embeds.shape[0], -1)
             )
 
-        position_ids = extract_local(
+        position_ids, cu_seqlens_pos = extract_local(
             position_ids, rank, num_processes, inputs_embeds.device
         )
+        assert (
+            cu_seqlens_emb - cu_seqlens_pos
+        ).sum().item() == 0, (
+            f"cu_seqlens_emb: {cu_seqlens_emb}, cu_seqlens_pos: {cu_seqlens_pos}"
+        )
 
-        cu_seqlens = [0] + [
-            position_ids.size(1) * (i + 1) for i in range(num_processes)
-        ]
-        cu_seqlens = torch.tensor(
-            cu_seqlens, dtype=torch.int32, device=inputs_embeds.device
+        pprint(
+            f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]cu_seqlens_emb: {cu_seqlens_emb} [/cyan]"
         )
         update_ring_flash_attn_params(
-            cu_seqlens=cu_seqlens, process_group=process_group
+            cu_seqlens=cu_seqlens_emb, process_group=process_group
         )
         if accelerator is not None:
             accelerator.wait_for_everyone()
@@ -518,7 +528,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 position_ids=position_ids,
                 past_key_values=past_key_values,
                 inputs_embeds=inputs_embeds,
-                # labels=labels,
                 use_cache=use_cache,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
@@ -532,7 +541,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 position_ids=position_ids,
                 past_key_values=past_key_values,
                 inputs_embeds=inputs_embeds,
-                # labels=labels,
                 use_cache=use_cache,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
@@ -541,7 +549,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             )
 
         hidden_states = outputs.last_hidden_state
-
         slice_indices = (
             slice(-logits_to_keep, None)
             if isinstance(logits_to_keep, int)
@@ -551,14 +558,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         loss = None
         if labels is not None:
-            # loss = self.llm_model.loss_function(
-            #     logits=logits,
-            #     labels=None,
-            #     shift_labels=labels,
-            #     vocab_size=self.config.vocab_size,
-            #     **kwargs,
-            # )
-            # loss = ForCausalLMLoss(logits=logits, shift_labels=shift_labels)
             logits = logits.float()
             logits = logits.view(-1, self.config.vocab_size)
             labels = labels.view(-1)
@@ -570,6 +569,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 ignore_index=ignore_index,
                 **kwargs,
             )
+            # pprint(
+            #     f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]loss: {loss}[/cyan], [green]logits shape: {logits}[/green], [blue]labels shape: {labels}[/blue]"
+            # )
 
         return CausalLMOutputWithPast(
             loss=loss,

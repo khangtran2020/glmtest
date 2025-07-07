@@ -172,6 +172,7 @@ def main() -> None:
             dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
             dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
         ]
+
         if args.model_debug:
             return
 
@@ -212,6 +213,7 @@ def main() -> None:
             lr_scheduler=lr_scheduler,
             continue_training=args.continue_training,
             start_step=start_step,
+            max_num_checkpoint=args.max_num_checkpoint,
             mixed_precision="bf16",
         )
 
