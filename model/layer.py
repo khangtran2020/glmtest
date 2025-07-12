@@ -4,8 +4,8 @@ Inherited from NVIB Transformer Encoder Layer: https://github.com/idiap/nvib_sel
 
 import torch
 import torch.nn.functional as F
-from nvib.denoising_attention import DenoisingMultiheadAttention
-from nvib.nvib_layer import Nvib
+from model.nvib.nvib.denoising_attention import DenoisingMultiheadAttention
+from model.nvib.nvib.nvib_layer import Nvib
 from torch import Tensor
 from torch.nn.modules import Dropout, LayerNorm, Linear, Module
 from torch.nn.modules.transformer import _get_activation_fn, _get_clones
