@@ -4,3 +4,6 @@
 [submodule "data/testgeneval_pipeline"]
 	path = data/testgeneval_pipeline
 	url = https://github.com/khangtran2020/testgeneval.git
+[submodule "model/nvib"]
+	path = model/nvib
+	url = https://github.com/khangtran2020/nvib.git

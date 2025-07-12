@@ -380,6 +380,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 use_cache=use_cache,
+                past_key_values=past_key_values,
                 labels=labels,
             )
 
@@ -584,3 +585,97 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
 CONFIG_MAPPING.register(key="glmf", value=GLMFModelConfig)
 MODEL_FOR_CAUSAL_LM_MAPPING.register(key=GLMFModelConfig, value=GLMFModelForCausalLM)
+
+
+class GLMFModelFuzzing(GLMFModel, GenerationMixin):
+    """
+    A model class for fuzzing the GLMFModelForCausalLM.
+    This class is used to test the model's behavior with different inputs.
+    """
+
+    config_class = GLMFModelConfig
+
+    def __init__(
+        self,
+        config: GLMFModelConfig,
+        rank: int = 0,
+        tokenizer: PreTrainedTokenizer = None,
+        baseline_prompt: str = None,
+        multi_gpu: bool = False,
+        debug: bool = False,
+        is_training: bool = False,
+        glmf_model: Optional[GLMFModelForCausalLM] = None,
+        **kwargs,
+    ):
+
+        super().__init__(config)
+
+        self.baseline_prompt = baseline_prompt
+        self.multi_gpu = multi_gpu
+        self.debug = debug
+        self.rank = rank
+        self.is_training = is_training
+
+        if glmf_model is not None:
+
+            # If a GLMFModelForCausalLM is provided, use its configuration
+            config = glmf_model.config
+            self.gnn = glmf_model.gnn
+            self.llm_model = glmf_model.llm_model
+
+        else:
+            self.gnn = MultiGAT(
+                config.mode,
+                config.in_feats,
+                config.n_hidden,
+                config.hidden_size,
+                config.n_layers,
+                config.num_head,
+                config.dropout,
+            )
+            if config.dtype == "fp16":
+                self.llm_model = AutoModelForCausalLM.from_pretrained(
+                    config.model_name,
+                    torch_dtype=torch.float16,
+                    device_map=f"cuda:{rank}",
+                    attn_implementation="flash_attention_2",
+                )
+            elif config.dtype == "bf16":
+                self.llm_model = AutoModelForCausalLM.from_pretrained(
+                    config.model_name,
+                    torch_dtype=torch.bfloat16,
+                    device_map=f"cuda:{rank}",
+                    attn_implementation="flash_attention_2",
+                )
+            else:
+                self.llm_model = AutoModelForCausalLM.from_pretrained(
+                    config.model_name,
+                    device_map=f"cuda:{rank}",
+                    attn_implementation="flash_attention_2",
+                )
+
+            if self.is_training:
+                self.llm_model.resize_token_embeddings(len(tokenizer))
+                self.config.vocab_size = len(tokenizer)
+            else:
+                self.llm_model.resize_token_embeddings(len(tokenizer))
+
+        # LoRA init
+        if config.use_lora:
+            lora_config = LoraConfig(
+                r=config.lora_r,
+                lora_alpha=config.lora_alpha,
+                target_modules=config.lora_target_modules,
+                lora_dropout=config.lora_dropout,
+                bias="none",
+                task_type=TaskType.CAUSAL_LM,
+            )
+            self.llm_model = get_peft_model(self.llm_model, lora_config)
+
+        gc.collect()
+        torch.cuda.empty_cache()
+        self.model_type = config.model_type
+
+    def forward(self, *args, **kwargs):
+        # Override the forward method to test different inputs
+        return super().forward(*args, **kwargs)
