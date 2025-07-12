@@ -73,6 +73,7 @@ class NVIBTransformerLayer(Module):
         src_mask: Optional[Tensor] = None,
         src_key_padding_mask: Optional[Tensor] = None,
         latent_dict=None,
+        fuzzing_mask: Optional[Tensor] = None,
     ) -> Tensor:
 
         if src_key_padding_mask is not None:
@@ -193,6 +194,9 @@ class NVIBTransformerLayer(Module):
         latent_dict["memory_key_padding_mask"] = latent_dict[
             "memory_key_padding_mask"
         ].transpose(1, 0)
+        latent_dict["fuzzing_mask"] = (
+            fuzzing_mask.transpose(1, 0) if fuzzing_mask is not None else None
+        )
         kl_g = self.nvib_layer.kl_gaussian(**latent_dict)
         kl_d = self.nvib_layer.kl_dirichlet(**latent_dict)
         return x, attention, kl_g, kl_d, latent_dict

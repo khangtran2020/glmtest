@@ -24,6 +24,9 @@ from train.utils import extract_local
 from ring_flash_attn import update_ring_flash_attn_params
 from peft import get_peft_model, LoraConfig, TaskType
 
+# VAE
+from model.layer import GLMFFuzzingLayer
+
 # typing
 from accelerate import Accelerator
 from typing import Callable, List, Optional, Tuple, Union, Dict, Any
@@ -604,7 +607,9 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         multi_gpu: bool = False,
         debug: bool = False,
         is_training: bool = False,
+        layer_indices: List[int] = None,
         glmf_model: Optional[GLMFModelForCausalLM] = None,
+        glmf_model_weight_path: Optional[str] = None,
         **kwargs,
     ):
 
@@ -617,9 +622,24 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         self.is_training = is_training
 
         if glmf_model is not None:
-
             # If a GLMFModelForCausalLM is provided, use its configuration
             config = glmf_model.config
+            self.gnn = glmf_model.gnn
+            self.llm_model = glmf_model.llm_model
+        elif glmf_model_weight_path is not None:
+            # If a weight path is provided, load the model from the path
+            glmf_model = GLMFModelForCausalLM(
+                config=config,
+                rank=rank,
+                tokenizer=tokenizer,
+                baseline_prompt=baseline_prompt,
+                multi_gpu=multi_gpu,
+                debug=debug,
+                is_training=is_training,
+            )
+            glmf_model.load_state_dict(
+                torch.load(glmf_model_weight_path, map_location=f"cuda:{rank}")
+            )
             self.gnn = glmf_model.gnn
             self.llm_model = glmf_model.llm_model
 
@@ -660,6 +680,10 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             else:
                 self.llm_model.resize_token_embeddings(len(tokenizer))
 
+        if layer_indices is not None:
+            # Patch the model with GLMFFuzzingLayer at the specified layer indices
+            self.patch_model_with_fuzz_layer(layer_indices)
+
         # LoRA init
         if config.use_lora:
             lora_config = LoraConfig(
@@ -675,6 +699,49 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         gc.collect()
         torch.cuda.empty_cache()
         self.model_type = config.model_type
+
+    def patch_model_with_fuzz_layer(self, layer_indices: List[int]) -> None:
+        """
+        Patch the model with a GLMFFuzzingLayer at the specified layer index.
+        This is used to test the model's behavior with fuzzing inputs.
+        """
+        if not hasattr(self.llm_model, "model") or not hasattr(
+            self.llm_model.model, "model"
+        ):
+            raise ValueError("The model does not have a valid structure for patching.")
+
+        for layer_index in layer_indices:
+            # Replace the specified layer with GLMFFuzzingLayer
+            if hasattr(self.llm_model.model.model, "layers"):
+                if layer_index < 0 or layer_index >= len(
+                    self.llm_model.model.model.layers
+                ):
+                    raise IndexError(
+                        f"Layer index {layer_index} is out of bounds for the model's layers."
+                    )
+                # Patch the layer
+                self.llm_model.model.model.layers[layer_index] = GLMFFuzzingLayer(
+                    d_model=self.config.hidden_size,
+                    nhead=self.config.num_head,
+                    llm_layer=self.llm_model.model.model.layers[layer_index],
+                    dim_feedforward=self.config.n_hidden,
+                    dropout=self.config.dropout,
+                    is_fuzz=True,
+                )
+            if hasattr(self.llm_model.model, "layers"):
+                if layer_index < 0 or layer_index >= len(self.llm_model.model.layers):
+                    raise IndexError(
+                        f"Layer index {layer_index} is out of bounds for the model's layers."
+                    )
+                # Patch the layer
+                self.llm_model.model.layers[layer_index] = GLMFFuzzingLayer(
+                    d_model=self.config.hidden_size,
+                    nhead=self.config.num_head,
+                    llm_layer=self.llm_model.model.layers[layer_index],
+                    dim_feedforward=self.config.n_hidden,
+                    dropout=self.config.dropout,
+                    is_fuzz=True,
+                )
 
     def forward(self, *args, **kwargs):
         # Override the forward method to test different inputs
