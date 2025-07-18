@@ -24,6 +24,7 @@ from model.utils.utils import create_causal_mask, create_sliding_window_causal_m
 from train.utils import extract_local
 from ring_flash_attn import update_ring_flash_attn_params
 from peft import get_peft_model, LoraConfig, TaskType
+from peft.peft_model import PeftModel
 
 # VAE
 from model.layer import GLMFFuzzingLayer
@@ -630,8 +631,12 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             config = glmf_model.config
             self.glmf_model = glmf_model
             self.gnn = glmf_model.gnn
-            self.llm_model = glmf_model.llm_model
-            self.rotary_emb = glmf_model.llm_model.model.rotary_emb
+            self.llm_model = (
+                glmf_model.llm_model
+                if not isinstance(glmf_model.llm_model, PeftModel)
+                else glmf_model.llm_model.base_model
+            )
+            self.rotary_emb = self.llm_model.model.rotary_emb
         else:
             raise ValueError(
                 "A GLMFModelForCausalLM instance must be provided to GLMFModelFuzzing."
