@@ -610,7 +610,6 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         is_training: bool = False,
         layer_indices: List[int] = None,
         glmf_model: Optional[GLMFModelForCausalLM] = None,
-        glmf_model_weight_path: Optional[str] = None,
         kl_g_reg: float = 0.0,
         kl_d_reg: float = 0.0,
         **kwargs,
@@ -629,62 +628,14 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         if glmf_model is not None:
             # If a GLMFModelForCausalLM is provided, use its configuration
             config = glmf_model.config
+            self.glmf_model = glmf_model
             self.gnn = glmf_model.gnn
             self.llm_model = glmf_model.llm_model
             self.rotary_emb = glmf_model.llm_model.model.rotary_emb
-        elif glmf_model_weight_path is not None:
-            # If a weight path is provided, load the model from the path
-            glmf_model = GLMFModelForCausalLM(
-                config=config,
-                rank=rank,
-                tokenizer=tokenizer,
-                baseline_prompt=baseline_prompt,
-                multi_gpu=multi_gpu,
-                debug=debug,
-                is_training=is_training,
-            )
-            glmf_model.load_state_dict(
-                torch.load(glmf_model_weight_path, map_location=f"cuda:{rank}")
-            )
-            self.gnn = glmf_model.gnn
-            self.llm_model = glmf_model.llm_model
-
         else:
-            self.gnn = MultiGAT(
-                config.mode,
-                config.in_feats,
-                config.n_hidden,
-                config.hidden_size,
-                config.n_layers,
-                config.num_head,
-                config.dropout,
+            raise ValueError(
+                "A GLMFModelForCausalLM instance must be provided to GLMFModelFuzzing."
             )
-            if config.dtype == "fp16":
-                self.llm_model = AutoModelForCausalLM.from_pretrained(
-                    config.model_name,
-                    torch_dtype=torch.float16,
-                    device_map=f"cuda:{rank}",
-                    attn_implementation="flash_attention_2",
-                )
-            elif config.dtype == "bf16":
-                self.llm_model = AutoModelForCausalLM.from_pretrained(
-                    config.model_name,
-                    torch_dtype=torch.bfloat16,
-                    device_map=f"cuda:{rank}",
-                    attn_implementation="flash_attention_2",
-                )
-            else:
-                self.llm_model = AutoModelForCausalLM.from_pretrained(
-                    config.model_name,
-                    device_map=f"cuda:{rank}",
-                    attn_implementation="flash_attention_2",
-                )
-
-            if self.is_training:
-                self.llm_model.resize_token_embeddings(len(tokenizer))
-                self.config.vocab_size = len(tokenizer)
-            else:
-                self.llm_model.resize_token_embeddings(len(tokenizer))
 
         # LoRA init
         if config.use_lora:
@@ -826,7 +777,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             if not isinstance(causal_mask_mapping := attention_mask, dict):
                 # Prepare mask arguments
                 mask_kwargs = {
-                    "config": self.config,
+                    "config": self.glmf_model.config,
                     "input_embeds": inputs_embeds,
                     "attention_mask": attention_mask,
                     "cache_position": cache_position,
@@ -843,7 +794,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                     )
         elif self.config.model_type == "llama":
             causal_mask = create_causal_mask(
-                config=self.config,
+                config=self.glmf_model.config,
                 input_embeds=inputs_embeds,
                 attention_mask=attention_mask,
                 cache_position=cache_position,

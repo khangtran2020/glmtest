@@ -164,31 +164,30 @@ def main() -> None:
             layer_indices = [
                 i for i in range(args.start_fuzz_layer_index, args.end_fuzz_layer_index)
             ]
-            if args.model_weight_path is not None:
-                glmf_model = GLMFModelForCausalLM(
-                    config=config,
-                    tokenizer=dataset.llm_tokenizer,
-                    baseline_prompt=args.baseline_prompt,
-                    debug=args.debug,
-                    rank=rank,
-                    multi_gpu=True if args.num_gpu > 1 else False,
-                    is_training=True,
-                )
+            glmf_model = GLMFModelForCausalLM(
+                config=config,
+                tokenizer=dataset.llm_tokenizer,
+                baseline_prompt=args.baseline_prompt,
+                debug=args.debug,
+                rank=rank,
+                multi_gpu=True if args.num_gpu > 1 else False,
+                is_training=True,
+            )
 
-                glmf_model.config.graph_token_id = [
-                    dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
-                    dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
-                    dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
-                ]
+            glmf_model.config.graph_token_id = [
+                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
+                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
+                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
+            ]
+
+            if args.model_weight_path is not None:
                 for file in os.listdir(args.model_weight_path):
                     if file.endswith(".pt"):
                         state_dict = torch.load(
                             os.path.join(args.model_weight_path, file),
                             map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
                         )
-                        model.load_state_dict(state_dict)
-            else:
-                glmf_model = None
+                        glmf_model.load_state_dict(state_dict)
 
             config.graph_token_id = [
                 dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
