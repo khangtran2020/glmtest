@@ -354,11 +354,11 @@ class GLMFFuzzingLayer(Module):
             )
         )
         hidden_states = fuzzing_mask * nvib_hidden_states + (
-            (1 - fuzzing_mask) * llm_hidden_state
+            (1 - fuzzing_mask) * llm_hidden_state[0]
         )
         return (
             hidden_states,
-            attention_out,
+            (llm_hidden_state[1], attention_out),
             kl_g,
             kl_d,
             latent_dict_out,

@@ -20,6 +20,7 @@ from transformers.loss.loss_utils import fixed_cross_entropy
 
 # from utils.prompter import Prompter
 from model.gnn import MultiGAT
+from model.utils.utils import create_causal_mask, create_sliding_window_causal_mask
 from train.utils import extract_local
 from ring_flash_attn import update_ring_flash_attn_params
 from peft import get_peft_model, LoraConfig, TaskType
@@ -610,6 +611,8 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         layer_indices: List[int] = None,
         glmf_model: Optional[GLMFModelForCausalLM] = None,
         glmf_model_weight_path: Optional[str] = None,
+        kl_g_reg: float = 0.0,
+        kl_d_reg: float = 0.0,
         **kwargs,
     ):
 
@@ -620,12 +623,15 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         self.debug = debug
         self.rank = rank
         self.is_training = is_training
+        self.kl_g_reg = kl_g_reg
+        self.kl_d_reg = kl_d_reg
 
         if glmf_model is not None:
             # If a GLMFModelForCausalLM is provided, use its configuration
             config = glmf_model.config
             self.gnn = glmf_model.gnn
             self.llm_model = glmf_model.llm_model
+            self.rotary_emb = glmf_model.llm_model.model.rotary_emb
         elif glmf_model_weight_path is not None:
             # If a weight path is provided, load the model from the path
             glmf_model = GLMFModelForCausalLM(
@@ -680,10 +686,6 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             else:
                 self.llm_model.resize_token_embeddings(len(tokenizer))
 
-        if layer_indices is not None:
-            # Patch the model with GLMFFuzzingLayer at the specified layer indices
-            self.patch_model_with_fuzz_layer(layer_indices)
-
         # LoRA init
         if config.use_lora:
             lora_config = LoraConfig(
@@ -696,6 +698,10 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             )
             self.llm_model = get_peft_model(self.llm_model, lora_config)
 
+        if layer_indices is not None:
+            # Patch the model with GLMFFuzzingLayer at the specified layer indices
+            self.patch_model_with_fuzz_layer(layer_indices=layer_indices)
+
         gc.collect()
         torch.cuda.empty_cache()
         self.model_type = config.model_type
@@ -705,8 +711,13 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         Patch the model with a GLMFFuzzingLayer at the specified layer index.
         This is used to test the model's behavior with fuzzing inputs.
         """
-        if not hasattr(self.llm_model, "model") or not hasattr(
-            self.llm_model.model, "model"
+        if (
+            not hasattr(self.llm_model, "model")
+            or not hasattr(self.llm_model.model, "model")
+            or (
+                not hasattr(self.llm_model, "base_model")
+                and not hasattr(self.llm_model.base_model, "model")
+            )
         ):
             raise ValueError("The model does not have a valid structure for patching.")
 
@@ -742,7 +753,221 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                     dropout=self.config.dropout,
                     is_fuzz=True,
                 )
+            if hasattr(self.llm_model.base_model.model, "layers"):
+                if layer_index < 0 or layer_index >= len(
+                    self.llm_model.base_model.model.layers
+                ):
+                    raise IndexError(
+                        f"Layer index {layer_index} is out of bounds for the base model's layers."
+                    )
+                # Patch the layer
+                self.llm_model.base_model.model.layers[layer_index] = GLMFFuzzingLayer(
+                    d_model=self.config.hidden_size,
+                    nhead=self.config.num_head,
+                    llm_layer=self.llm_model.base_model.model.layers[layer_index],
+                    dim_feedforward=self.config.n_hidden,
+                    dropout=self.config.dropout,
+                    is_fuzz=True,
+                )
 
-    def forward(self, *args, **kwargs):
-        # Override the forward method to test different inputs
-        return super().forward(*args, **kwargs)
+    def forward(
+        self,
+        input_ids: Optional[torch.LongTensor] = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        graph: Optional[dict] = None,
+        graph_mask: Optional[torch.Tensor] = None,
+        fuzzing_mask: Optional[torch.Tensor] = None,
+        graph_token_index: Optional[torch.LongTensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        past_key_values: Optional[Union[Cache, List[torch.FloatTensor]]] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
+        use_cache: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+        cache_position: Optional[torch.LongTensor] = None,
+        logits_to_keep: Union[int, torch.Tensor] = 0,
+        step: int = 0,
+        accelerator: Optional[Accelerator] = None,
+        **flash_attn_kwargs,
+    ):
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
+        )
+        output_hidden_states = (
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
+        )
+
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
+
+        if (input_ids is None) ^ (inputs_embeds is not None):
+            raise ValueError(
+                "You must specify exactly one of input_ids or inputs_embeds"
+            )
+
+        inputs_embeds = self.extract_embedding(
+            input_ids=input_ids,
+            graph=graph,
+            inputs_embeds=inputs_embeds,
+            graph_mask=graph_mask,
+            graph_token_index=graph_token_index,
+        )
+
+        if self.config.model_type == "qwen2":
+            if not isinstance(causal_mask_mapping := attention_mask, dict):
+                # Prepare mask arguments
+                mask_kwargs = {
+                    "config": self.config,
+                    "input_embeds": inputs_embeds,
+                    "attention_mask": attention_mask,
+                    "cache_position": cache_position,
+                    "past_key_values": past_key_values,
+                }
+                # Create the masks
+                causal_mask_mapping = {
+                    "full_attention": create_causal_mask(**mask_kwargs),
+                }
+                # The sliding window alternating layers are not always activated depending on the config
+                if self.has_sliding_layers:
+                    causal_mask_mapping["sliding_attention"] = (
+                        create_sliding_window_causal_mask(**mask_kwargs)
+                    )
+        elif self.config.model_type == "llama":
+            causal_mask = create_causal_mask(
+                config=self.config,
+                input_embeds=inputs_embeds,
+                attention_mask=attention_mask,
+                cache_position=cache_position,
+                past_key_values=past_key_values,
+            )
+
+        hidden_states = inputs_embeds
+
+        # create position embeddings to be shared across the decoder layers
+        position_embeddings = self.rotary_emb(hidden_states, position_ids)
+        # decoder layers
+        all_hidden_states = () if output_hidden_states else None
+        all_self_attns = () if output_attentions else None
+        latent_dict = None
+        kl_d_total = 0.0
+        kl_g_total = 0.0
+
+        for decoder_layer in self.layers[: self.config.num_hidden_layers]:
+            if output_hidden_states:
+                all_hidden_states += (hidden_states,)
+
+            if self.config.model_type == "qwen2":
+                layer_outputs = decoder_layer(
+                    hidden_states,
+                    attention_mask=causal_mask_mapping[decoder_layer.attention_type],
+                    fuzzing_mask=fuzzing_mask,
+                    position_ids=position_ids,
+                    past_key_value=past_key_values,
+                    output_attentions=output_attentions,
+                    use_cache=use_cache,
+                    cache_position=cache_position,
+                    position_embeddings=position_embeddings,
+                    latent_dict=latent_dict,
+                    **flash_attn_kwargs,
+                )
+            elif self.config.model_type == "llama":
+                layer_outputs = decoder_layer(
+                    hidden_states,
+                    attention_mask=causal_mask,
+                    position_ids=position_ids,
+                    past_key_value=past_key_values,
+                    output_attentions=output_attentions,
+                    use_cache=use_cache,
+                    cache_position=cache_position,
+                    position_embeddings=position_embeddings,
+                    **flash_attn_kwargs,
+                )
+
+            if decoder_layer.is_fuzz:
+                hidden_states, attention_out, kl_g, kl_d, latent_dict = layer_outputs
+                if kl_g is not None:
+                    kl_g_total += kl_g
+                if kl_d is not None:
+                    kl_d_total += kl_d
+                if output_attentions:
+                    all_self_attns += (attention_out,)
+            else:
+                hidden_states = layer_outputs[0]
+                if output_attentions:
+                    all_self_attns += (layer_outputs[1],)
+
+        hidden_states = self.norm(hidden_states)
+        if output_hidden_states:
+            all_hidden_states += (hidden_states,)
+
+        # logits = self.lm_head(hidden_states)
+        slice_indices = (
+            slice(-logits_to_keep, None)
+            if isinstance(logits_to_keep, int)
+            else logits_to_keep
+        )
+        logits = self.lm_head(hidden_states[:, slice_indices, :])
+        loss = None
+        if labels is not None:
+            logits = logits.float()
+            logits = logits.view(-1, self.config.vocab_size)
+            labels = labels.view(-1)
+            labels = labels.to(logits.device)
+            loss = fixed_cross_entropy(
+                logits,
+                labels,
+                num_items_in_batch=None,
+                ignore_index=-100,
+            )
+            loss = loss + self.kl_g_reg * kl_g_total + self.kl_d_reg * kl_d_total
+
+        return CausalLMOutputWithPast(
+            loss=loss,
+            logits=logits,
+            past_key_values=past_key_values if use_cache else None,
+            hidden_states=all_hidden_states if output_hidden_states else None,
+            attentions=all_self_attns if output_attentions else None,
+        )
+
+    def extract_embedding(
+        self,
+        input_ids: torch.Tensor,
+        graph: Optional[dict],
+        graph_mask: Optional[torch.Tensor],
+        graph_token_index: Optional[torch.LongTensor],
+        inputs_embeds: torch.Tensor = None,
+    ) -> torch.Tensor:
+        if inputs_embeds is None:
+            inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
+
+        if (
+            (graph is not None)
+            and ("graph" in self.baseline_prompt)
+            and (inputs_embeds.size(1) > 1)
+        ):
+            assert graph_mask is not None
+            assert graph_token_index is not None
+
+            graph_embeds = self.gnn(graph, graph_mask)
+            graph_embeds = graph_embeds.to(inputs_embeds.device)
+            assert (
+                graph_embeds.shape
+                == inputs_embeds[
+                    0, graph_token_index[0] : (graph_token_index[-1] + 1), :
+                ].shape
+            ), f"Shape mismatch in assignment: graph embedding shape {graph_embeds.shape}, input embedding shape: {inputs_embeds.shape}, graph_token_index: {len(graph_token_index)}!"
+
+            inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :] = (
+                graph_embeds
+            )
+
+        return inputs_embeds

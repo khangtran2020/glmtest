@@ -6,7 +6,8 @@ from utils.console import console
 from utils.utils import print_args, seed_everything
 from data.utils import get_dataset
 from graph.utils import get_graph
-from train.train import train, GLMFModelForCausalLM, GLMFModelConfig
+from train.train import train
+from model.model import GLMFModelForCausalLM, GLMFModelConfig, GLMFModelFuzzing
 from train.test import test, eval_bleu_score
 from train.utils import load_checkpoint
 from utils.constant import (
@@ -157,21 +158,66 @@ def main() -> None:
             device_map="cuda" if torch.cuda.is_available() else "cpu",
         )
 
-        model = GLMFModelForCausalLM(
-            config=config,
-            tokenizer=dataset.llm_tokenizer,
-            baseline_prompt=args.baseline_prompt,
-            multi_gpu=True if args.num_gpu > 1 else False,
-            debug=args.debug,
-            rank=rank,
-            is_training=True,
-        )
-        model.llm_model.gradient_checkpointing_enable()
-        model.config.graph_token_id = [
-            dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
-            dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
-            dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
-        ]
+        if args.fuzz_model:
+            layer_indices = [
+                i for i in range(args.start_fuzz_layer_index, args.end_fuzz_layer_index)
+            ]
+            if args.model_weight_path is not None:
+                glmf_model = GLMFModelForCausalLM(
+                    config=config,
+                    tokenizer=dataset.llm_tokenizer,
+                    baseline_prompt=args.baseline_prompt,
+                    debug=args.debug,
+                    rank=rank,
+                    multi_gpu=True if args.num_gpu > 1 else False,
+                    is_training=True,
+                )
+
+                glmf_model.config.graph_token_id = [
+                    dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
+                    dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
+                    dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
+                ]
+                for file in os.listdir(args.model_weight_path):
+                    if file.endswith(".pt"):
+                        state_dict = torch.load(
+                            os.path.join(args.model_weight_path, file),
+                            map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+                        )
+                        model.load_state_dict(state_dict)
+            else:
+                glmf_model = None
+
+            model = GLMFModelFuzzing(
+                config=config,
+                rank=local_rank,
+                tokenizer=dataset.llm_tokenizer,
+                baseline_prompt=args.baseline_prompt,
+                multi_gpu=True if args.num_gpu > 1 else False,
+                debug=args.debug,
+                is_training=True,
+                layer_indices=layer_indices,
+                glmf_model=glmf_model,
+                glmf_model_weight_path=args.model_weight_path,
+                kl_g_reg=args.kl_g_reg,
+                kl_d_reg=args.kl_d_reg,
+            )
+        else:
+            model = GLMFModelForCausalLM(
+                config=config,
+                tokenizer=dataset.llm_tokenizer,
+                baseline_prompt=args.baseline_prompt,
+                multi_gpu=True if args.num_gpu > 1 else False,
+                debug=args.debug,
+                rank=rank,
+                is_training=True,
+            )
+            model.llm_model.gradient_checkpointing_enable()
+            model.config.graph_token_id = [
+                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
+                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
+                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
+            ]
 
         if args.model_debug:
             return
