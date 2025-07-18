@@ -180,13 +180,6 @@ def main() -> None:
                     dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
                     dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
                 ]
-
-                config.graph_token_id = [
-                    dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
-                    dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
-                    dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
-                ]
-
                 for file in os.listdir(args.model_weight_path):
                     if file.endswith(".pt"):
                         state_dict = torch.load(
@@ -196,6 +189,12 @@ def main() -> None:
                         model.load_state_dict(state_dict)
             else:
                 glmf_model = None
+
+            config.graph_token_id = [
+                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
+                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
+                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
+            ]
 
             model = GLMFModelFuzzing(
                 config=config,
