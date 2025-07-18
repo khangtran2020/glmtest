@@ -116,11 +116,13 @@ def main() -> None:
                 console.log("Using 1 GPU.")
                 device = torch.device("cuda:0")
                 rank = 0
+                local_rank = 0
                 args.num_gpu = 1
     else:
         console.log("No GPUs available, using CPU instead.")
         device = torch.device("cpu")
         rank = -1
+        local_rank = 0
         args.num_gpu = 0
 
     if args.num_gpu > 1:
