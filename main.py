@@ -195,7 +195,7 @@ def main() -> None:
                 dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
                 dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
             ]
-            config._attn_implementation = "flash_attention_2""
+            config._attn_implementation = "flash_attention_2"
 
             model = GLMFModelFuzzing(
                 config=config,
