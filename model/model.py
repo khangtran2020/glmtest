@@ -684,19 +684,21 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
 
         for layer_index in layer_indices:
             if layer_index < 0 or layer_index >= len(
-                self.llm_model.base_model.model.layers
+                self.llm_model.base_model.model.model.layers
             ):
                 raise IndexError(
                     f"Layer index {layer_index} is out of bounds for the LoRA model's layers."
                 )
             # Patch the layer
-            self.llm_model.base_model.model.layers[layer_index] = GLMFFuzzingLayer(
-                d_model=self.config.hidden_size,
-                nhead=self.config.num_head,
-                llm_layer=self.llm_model.base_model.model.layers[layer_index],
-                dim_feedforward=self.config.n_hidden,
-                dropout=self.config.dropout,
-                is_fuzz=True,
+            self.llm_model.base_model.model.model.layers[layer_index] = (
+                GLMFFuzzingLayer(
+                    d_model=self.config.hidden_size,
+                    nhead=self.config.num_head,
+                    llm_layer=self.llm_model.base_model.model.layers[layer_index],
+                    dim_feedforward=self.config.n_hidden,
+                    dropout=self.config.dropout,
+                    is_fuzz=True,
+                )
             )
 
     def _patch_casual_lm_model(self, layer_indices: List[int]) -> None:
