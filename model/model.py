@@ -641,6 +641,8 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
 
         # LoRA init
         if config.use_lora:
+            print("Using LoRA for the model.")
+            # If LoRA is enabled, we need to apply
             lora_config = LoraConfig(
                 r=config.lora_r,
                 lora_alpha=config.lora_alpha,
