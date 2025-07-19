@@ -143,29 +143,30 @@ def main() -> None:
 
     if args.mode == "train":
 
-        config = GLMFModelConfig(
-            llm_model=args.llm_model,
-            use_lora=args.use_lora,
-            dtype=args.dtype,
-            mode=args.gnn_mode,
-            in_feats=args.in_feats,
-            n_hidden=args.n_hidden,
-            n_layers=args.n_layers,
-            num_head=args.num_head,
-            dropout=args.dropout,
-            lora_r=args.lora_r,
-            lora_alpha=args.lora_alpha,
-            lora_dropout=args.lora_dropout,
-            lora_target_modules=args.lora_target_modules,
-            device_map="cuda" if torch.cuda.is_available() else "cpu",
-        )
-
         if args.fuzz_model:
+
+            glmf_model_config = GLMFModelConfig(
+                llm_model=args.llm_model,
+                use_lora=False,
+                dtype=args.dtype,
+                mode=args.gnn_mode,
+                in_feats=args.in_feats,
+                n_hidden=args.n_hidden,
+                n_layers=args.n_layers,
+                num_head=args.num_head,
+                dropout=args.dropout,
+                lora_r=args.lora_r,
+                lora_alpha=args.lora_alpha,
+                lora_dropout=args.lora_dropout,
+                lora_target_modules=args.lora_target_modules,
+                device_map="cuda" if torch.cuda.is_available() else "cpu",
+            )
+
             layer_indices = [
                 i for i in range(args.start_fuzz_layer_index, args.end_fuzz_layer_index)
             ]
             glmf_model = GLMFModelForCausalLM(
-                config=config,
+                config=glmf_model_config,
                 tokenizer=dataset.llm_tokenizer,
                 baseline_prompt=args.baseline_prompt,
                 debug=args.debug,
@@ -189,12 +190,28 @@ def main() -> None:
                         )
                         glmf_model.load_state_dict(state_dict)
 
+            config = GLMFModelConfig(
+                llm_model=args.llm_model,
+                use_lora=args.use_lora,
+                dtype=args.dtype,
+                mode=args.gnn_mode,
+                in_feats=args.in_feats,
+                n_hidden=args.n_hidden,
+                n_layers=args.n_layers,
+                num_head=args.num_head,
+                dropout=args.dropout,
+                lora_r=args.lora_r,
+                lora_alpha=args.lora_alpha,
+                lora_dropout=args.lora_dropout,
+                lora_target_modules=args.lora_target_modules,
+                device_map="cuda" if torch.cuda.is_available() else "cpu",
+            )
+
             config.graph_token_id = [
                 dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
                 dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
                 dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
             ]
-            # config._attn_implementation = "flash_attention_2"
 
             model = GLMFModelFuzzing(
                 config=config,
@@ -210,7 +227,25 @@ def main() -> None:
                 kl_g_reg=args.kl_g_reg,
                 kl_d_reg=args.kl_d_reg,
             )
+
         else:
+            config = GLMFModelConfig(
+                llm_model=args.llm_model,
+                use_lora=args.use_lora,
+                dtype=args.dtype,
+                mode=args.gnn_mode,
+                in_feats=args.in_feats,
+                n_hidden=args.n_hidden,
+                n_layers=args.n_layers,
+                num_head=args.num_head,
+                dropout=args.dropout,
+                lora_r=args.lora_r,
+                lora_alpha=args.lora_alpha,
+                lora_dropout=args.lora_dropout,
+                lora_target_modules=args.lora_target_modules,
+                device_map="cuda" if torch.cuda.is_available() else "cpu",
+            )
+
             model = GLMFModelForCausalLM(
                 config=config,
                 tokenizer=dataset.llm_tokenizer,

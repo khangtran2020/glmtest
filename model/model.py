@@ -631,11 +631,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             config = glmf_model.config
             self.glmf_model = glmf_model
             self.gnn = glmf_model.gnn
-            self.llm_model = (
-                glmf_model.llm_model
-                if not isinstance(glmf_model.llm_model, LoraModel)
-                else glmf_model.llm_model.base_model
-            )
+            self.llm_model = glmf_model.llm_model
             print(f"Type of the glmf_model.llm_model: {type(self.llm_model)}")
             self.rotary_emb = self.llm_model.model.rotary_emb
         else:
