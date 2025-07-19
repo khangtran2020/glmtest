@@ -675,11 +675,11 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
 
         if hasattr(self.llm_model, "model"):
             print(
-                f"Model has 'model' attribute with {len(self.llm_model.model.layers)} layers."
+                f"Model has 'model' attribute with model type: {type(self.llm_model)}."
             )
         if hasattr(self.llm_model, "base_model"):
             print(
-                f"Model has 'base_model' attribute with {len(self.llm_model.base_model.model.layers)} layers."
+                f"Model has 'base_model' attribute with model type: {type(self.llm_model)}."
             )
 
         for layer_index in layer_indices:
