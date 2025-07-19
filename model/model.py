@@ -659,6 +659,11 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             # Patch the model with GLMFFuzzingLayer at the specified layer indices
             self.patch_model_with_fuzz_layer(layer_indices=layer_indices)
 
+        if hasattr(self.llm_model, "base_model"):
+            self.layers = self.llm_model.base_model.model.model.layers
+        else:
+            self.layers = self.llm_model.model.layers
+
         gc.collect()
         torch.cuda.empty_cache()
         self.model_type = config.model_type
@@ -789,10 +794,17 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                     "full_attention": create_causal_mask(**mask_kwargs),
                 }
                 # The sliding window alternating layers are not always activated depending on the config
-                if self.llm_model.base_model.model.has_sliding_layers:
-                    causal_mask_mapping["sliding_attention"] = (
-                        create_sliding_window_causal_mask(**mask_kwargs)
-                    )
+                if hasattr(self.llm_model, "base_model"):
+                    if self.llm_model.base_model.model.model.has_sliding_layers:
+                        causal_mask_mapping["sliding_attention"] = (
+                            create_sliding_window_causal_mask(**mask_kwargs)
+                        )
+                else:
+                    if self.llm_model.model.has_sliding_layers:
+                        causal_mask_mapping["sliding_attention"] = (
+                            create_sliding_window_causal_mask(**mask_kwargs)
+                        )
+
         elif self.config.model_type == "llama":
             causal_mask = create_causal_mask(
                 config=self.llm_model.config,
