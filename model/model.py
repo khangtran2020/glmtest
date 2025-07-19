@@ -632,7 +632,6 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             self.glmf_model = glmf_model
             self.gnn = glmf_model.gnn
             self.llm_model = glmf_model.llm_model
-            print(f"Type of the glmf_model.llm_model: {type(self.llm_model)}")
             self.rotary_emb = self.llm_model.model.rotary_emb
         else:
             raise ValueError(
@@ -671,29 +670,12 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         """
         if not hasattr(self.llm_model, "model") or (
             not hasattr(self.llm_model, "base_model")
-            and not hasattr(self.llm_model.base_model, "model")
         ):
             raise ValueError("The model does not have a valid structure for patching.")
 
         for layer_index in layer_indices:
             # Replace the specified layer with GLMFFuzzingLayer
-            if hasattr(self.llm_model.model.model, "layers"):
-                if layer_index < 0 or layer_index >= len(
-                    self.llm_model.model.model.layers
-                ):
-                    raise IndexError(
-                        f"Layer index {layer_index} is out of bounds for the model's layers."
-                    )
-                # Patch the layer
-                self.llm_model.model.model.layers[layer_index] = GLMFFuzzingLayer(
-                    d_model=self.config.hidden_size,
-                    nhead=self.config.num_head,
-                    llm_layer=self.llm_model.model.model.layers[layer_index],
-                    dim_feedforward=self.config.n_hidden,
-                    dropout=self.config.dropout,
-                    is_fuzz=True,
-                )
-            if hasattr(self.llm_model.model, "layers"):
+            if hasattr(self.llm_model, "model"):
                 if layer_index < 0 or layer_index >= len(self.llm_model.model.layers):
                     raise IndexError(
                         f"Layer index {layer_index} is out of bounds for the model's layers."
@@ -702,26 +684,28 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                 self.llm_model.model.layers[layer_index] = GLMFFuzzingLayer(
                     d_model=self.config.hidden_size,
                     nhead=self.config.num_head,
-                    llm_layer=self.llm_model.model.layers[layer_index],
+                    llm_layer=self.llm_model.model.model.layers[layer_index],
                     dim_feedforward=self.config.n_hidden,
                     dropout=self.config.dropout,
                     is_fuzz=True,
                 )
-            if hasattr(self.llm_model.base_model.model, "layers"):
+            if hasattr(self.llm_model, "base_model"):
                 if layer_index < 0 or layer_index >= len(
-                    self.llm_model.base_model.model.layers
+                    self.llm_model.base_model.model.model.layers
                 ):
                     raise IndexError(
                         f"Layer index {layer_index} is out of bounds for the base model's layers."
                     )
                 # Patch the layer
-                self.llm_model.base_model.model.layers[layer_index] = GLMFFuzzingLayer(
-                    d_model=self.config.hidden_size,
-                    nhead=self.config.num_head,
-                    llm_layer=self.llm_model.base_model.model.layers[layer_index],
-                    dim_feedforward=self.config.n_hidden,
-                    dropout=self.config.dropout,
-                    is_fuzz=True,
+                self.llm_model.base_model.model.model.layers[layer_index] = (
+                    GLMFFuzzingLayer(
+                        d_model=self.config.hidden_size,
+                        nhead=self.config.num_head,
+                        llm_layer=self.llm_model.base_model.model.layers[layer_index],
+                        dim_feedforward=self.config.n_hidden,
+                        dropout=self.config.dropout,
+                        is_fuzz=True,
+                    )
                 )
 
     def forward(
