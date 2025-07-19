@@ -24,7 +24,7 @@ from model.utils.utils import create_causal_mask, create_sliding_window_causal_m
 from train.utils import extract_local
 from ring_flash_attn import update_ring_flash_attn_params
 from peft import get_peft_model, LoraConfig, TaskType
-from peft.peft_model import PeftModel
+from peft.tuners.lora.model import LoraModel
 
 # VAE
 from model.layer import GLMFFuzzingLayer
@@ -633,7 +633,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             self.gnn = glmf_model.gnn
             self.llm_model = (
                 glmf_model.llm_model
-                if not isinstance(glmf_model.llm_model, PeftModel)
+                if not isinstance(glmf_model.llm_model, LoraModel)
                 else glmf_model.llm_model.base_model
             )
             print(f"Type of the glmf_model.llm_model: {type(self.llm_model)}")
