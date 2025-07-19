@@ -779,6 +779,15 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             graph_token_index=graph_token_index,
         )
 
+        if position_ids is None:
+            position_ids = (
+                torch.arange(
+                    inputs_embeds.size(1), device=inputs_embeds.device, dtype=torch.long
+                )
+                .unsqueeze(0)
+                .expand(inputs_embeds.shape[0], -1)
+            )
+
         if self.config.model_type == "qwen2":
             if not isinstance(causal_mask_mapping := attention_mask, dict):
                 # Prepare mask arguments
