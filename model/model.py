@@ -673,49 +673,52 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         ):
             raise ValueError("The model does not have a valid structure for patching.")
 
-        if hasattr(self.llm_model, "model"):
-            print(
-                f"Model has 'model' attribute with model type: {type(self.llm_model)}."
-            )
         if hasattr(self.llm_model, "base_model"):
-            print(
-                f"Model has 'base_model' attribute with model type: {type(self.llm_model)}."
-            )
+            # If the model has a base_model attribute, it is likely a LoRA model
+            self._patch_peft_model(layer_indices)
+        else:
+            # If the model does not have a base_model attribute, it is likely a casual LM model
+            self._patch_casual_lm_model(layer_indices)
+
+    def _patch_peft_model(self, layer_indices: List[int]) -> None:
 
         for layer_index in layer_indices:
-            # Replace the specified layer with GLMFFuzzingLayer
-            if hasattr(self.llm_model, "model"):
-                if layer_index < 0 or layer_index >= len(self.llm_model.model.layers):
-                    raise IndexError(
-                        f"Layer index {layer_index} is out of bounds for the model's layers."
-                    )
-                # Patch the layer
-                self.llm_model.model.layers[layer_index] = GLMFFuzzingLayer(
-                    d_model=self.config.hidden_size,
-                    nhead=self.config.num_head,
-                    llm_layer=self.llm_model.model.model.layers[layer_index],
-                    dim_feedforward=self.config.n_hidden,
-                    dropout=self.config.dropout,
-                    is_fuzz=True,
+            if layer_index < 0 or layer_index >= len(
+                self.llm_model.base_model.model.layers
+            ):
+                raise IndexError(
+                    f"Layer index {layer_index} is out of bounds for the LoRA model's layers."
                 )
-            if hasattr(self.llm_model, "base_model"):
-                if layer_index < 0 or layer_index >= len(
-                    self.llm_model.base_model.model.model.layers
-                ):
-                    raise IndexError(
-                        f"Layer index {layer_index} is out of bounds for the base model's layers."
-                    )
-                # Patch the layer
-                self.llm_model.base_model.model.model.layers[layer_index] = (
-                    GLMFFuzzingLayer(
-                        d_model=self.config.hidden_size,
-                        nhead=self.config.num_head,
-                        llm_layer=self.llm_model.base_model.model.layers[layer_index],
-                        dim_feedforward=self.config.n_hidden,
-                        dropout=self.config.dropout,
-                        is_fuzz=True,
-                    )
+            # Patch the layer
+            self.llm_model.base_model.model.layers[layer_index] = GLMFFuzzingLayer(
+                d_model=self.config.hidden_size,
+                nhead=self.config.num_head,
+                llm_layer=self.llm_model.base_model.model.layers[layer_index],
+                dim_feedforward=self.config.n_hidden,
+                dropout=self.config.dropout,
+                is_fuzz=True,
+            )
+
+    def _patch_casual_lm_model(self, layer_indices: List[int]) -> None:
+        """
+        Patch the model with a GLMFFuzzingLayer at the specified layer index.
+        This is used to test the model's behavior with fuzzing inputs.
+        """
+
+        for layer_index in layer_indices:
+            if layer_index < 0 or layer_index >= len(self.llm_model.model.layers):
+                raise IndexError(
+                    f"Layer index {layer_index} is out of bounds for the model's layers."
                 )
+            # Patch the layer
+            self.llm_model.model.layers[layer_index] = GLMFFuzzingLayer(
+                d_model=self.config.hidden_size,
+                nhead=self.config.num_head,
+                llm_layer=self.llm_model.model.layers[layer_index],
+                dim_feedforward=self.config.n_hidden,
+                dropout=self.config.dropout,
+                is_fuzz=True,
+            )
 
     def forward(
         self,
