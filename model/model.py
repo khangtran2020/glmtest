@@ -651,7 +651,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             )
             self.llm_model = get_peft_model(self.llm_model, lora_config)
 
-        print(f"Struture of the model: {self}")
+        print(f"Struture of the model: {self.llm_model}")
 
         if layer_indices is not None:
             # Patch the model with GLMFFuzzingLayer at the specified layer indices
