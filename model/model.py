@@ -669,13 +669,9 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         Patch the model with a GLMFFuzzingLayer at the specified layer index.
         This is used to test the model's behavior with fuzzing inputs.
         """
-        if (
-            not hasattr(self.llm_model, "model")
-            or not hasattr(self.llm_model.model, "model")
-            or (
-                not hasattr(self.llm_model, "base_model")
-                and not hasattr(self.llm_model.base_model, "model")
-            )
+        if not hasattr(self.llm_model, "model") or (
+            not hasattr(self.llm_model, "base_model")
+            and not hasattr(self.llm_model.base_model, "model")
         ):
             raise ValueError("The model does not have a valid structure for patching.")
 
@@ -784,7 +780,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             if not isinstance(causal_mask_mapping := attention_mask, dict):
                 # Prepare mask arguments
                 mask_kwargs = {
-                    "config": self.glmf_model.config,
+                    "config": self.llm_model.config,
                     "input_embeds": inputs_embeds,
                     "attention_mask": attention_mask,
                     "cache_position": cache_position,
@@ -801,7 +797,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                     )
         elif self.config.model_type == "llama":
             causal_mask = create_causal_mask(
-                config=self.glmf_model.config,
+                config=self.llm_model.config,
                 input_embeds=inputs_embeds,
                 attention_mask=attention_mask,
                 cache_position=cache_position,
