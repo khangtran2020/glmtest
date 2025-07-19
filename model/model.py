@@ -791,7 +791,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                     "full_attention": create_causal_mask(**mask_kwargs),
                 }
                 # The sliding window alternating layers are not always activated depending on the config
-                if self.has_sliding_layers:
+                if self.llm_model.has_sliding_layers:
                     causal_mask_mapping["sliding_attention"] = (
                         create_sliding_window_causal_mask(**mask_kwargs)
                     )
