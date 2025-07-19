@@ -673,6 +673,15 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         ):
             raise ValueError("The model does not have a valid structure for patching.")
 
+        if hasattr(self.llm_model, "model"):
+            print(
+                f"Model has 'model' attribute with {len(self.llm_model.model.layers)} layers."
+            )
+        if hasattr(self.llm_model, "base_model"):
+            print(
+                f"Model has 'base_model' attribute with {len(self.llm_model.base_model.model.layers)} layers."
+            )
+
         for layer_index in layer_indices:
             # Replace the specified layer with GLMFFuzzingLayer
             if hasattr(self.llm_model, "model"):
