@@ -628,7 +628,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
 
         if glmf_model is not None:
             # If a GLMFModelForCausalLM is provided, use its configuration
-            config = glmf_model.config
+            # config = glmf_model.config
             self.glmf_model = glmf_model
             self.gnn = glmf_model.gnn
             self.llm_model = glmf_model.llm_model
@@ -640,9 +640,9 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             )
 
         # LoRA init
-        print("Config use_lora:", config.use_lora)
+        # print("Config use_lora:", config.use_lora)
         if config.use_lora:
-            print("Using LoRA for the model.")
+            # print("Using LoRA for the model.")
             # If LoRA is enabled, we need to apply
             lora_config = LoraConfig(
                 r=config.lora_r,
