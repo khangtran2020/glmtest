@@ -694,7 +694,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                 GLMFFuzzingLayer(
                     d_model=self.config.hidden_size,
                     nhead=self.config.num_head,
-                    llm_layer=self.llm_model.base_model.model.layers[layer_index],
+                    llm_layer=self.llm_model.base_model.model.model.layers[layer_index],
                     dim_feedforward=self.config.n_hidden,
                     dropout=self.config.dropout,
                     is_fuzz=True,
