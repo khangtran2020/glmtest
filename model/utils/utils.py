@@ -169,9 +169,7 @@ def _preprocess_mask_arguments(
 
     # Move the mask to correct device, and potentially switch dtype for efficiency
     if attention_mask is not None and attention_mask.ndim == 2:
-        attention_mask = attention_mask.to(
-            device=cache_position.device, dtype=torch.bool
-        )
+        attention_mask = attention_mask.to(device=input_embeds.device, dtype=torch.bool)
 
     # If using a cache, it can give all informations about mask sizes based on seen tokens
     if past_key_values is not None:
