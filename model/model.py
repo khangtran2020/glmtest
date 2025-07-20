@@ -790,6 +790,9 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
 
         if self.config.model_type == "qwen2":
             if not isinstance(causal_mask_mapping := attention_mask, dict):
+                pprint(
+                    "[green]Using Qwen2 model type for forward pass. Creating causal_mask[/green]"
+                )
                 # Prepare mask arguments
                 mask_kwargs = {
                     "config": self.llm_model.config,
