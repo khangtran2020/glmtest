@@ -839,6 +839,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                 all_hidden_states += (hidden_states,)
 
             if self.config.model_type == "qwen2":
+                pprint("[green]Casual mask mapping:[/green]", causal_mask_mapping)
                 layer_outputs = decoder_layer(
                     hidden_states,
                     attention_mask=causal_mask_mapping[
