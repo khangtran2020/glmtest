@@ -910,7 +910,11 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                 if output_attentions:
                     all_self_attns += (layer_outputs[1],)
 
-        hidden_states = self.norm(hidden_states)
+        if hasattr(self.llm_model, "base_model"):
+            hidden_states = self.llm_model.base_model.model.model.norm(hidden_states)
+        else:
+            hidden_states = self.llm_model.model.norm(hidden_states)
+
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
 
@@ -920,7 +924,12 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             if isinstance(logits_to_keep, int)
             else logits_to_keep
         )
-        logits = self.lm_head(hidden_states[:, slice_indices, :])
+        if hasattr(self.llm_model, "base_model"):
+            logits = self.llm_model.base_model.lm_head(
+                hidden_states[:, slice_indices, :]
+            )
+        else:
+            logits = self.llm_model.lm_head(hidden_states[:, slice_indices, :])
         loss = None
         if labels is not None:
             logits = logits.float()
