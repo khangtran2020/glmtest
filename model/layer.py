@@ -370,7 +370,7 @@ class GLMFFuzzingLayer(Module):
             (1 - fuzzing_mask) * llm_hidden_state[0]
         )
         attention_out_ = (
-            (llm_hidden_state[1], attention_out) if attention_out is not None else None
+            (llm_hidden_state[1], attention_out) if output_attentions else None
         )
         return (
             hidden_states,
