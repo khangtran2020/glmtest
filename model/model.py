@@ -931,10 +931,14 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         else:
             logits = self.llm_model.lm_head(hidden_states[:, slice_indices, :])
         loss = None
+
+        pprint(
+            f"[yellow]Step {step}[/yellow]: [cyan]logits shape: {logits.shape}[/cyan]"
+        )
         if labels is not None:
             logits = logits.float()
             logits = logits.view(-1, self.config.vocab_size)
-            labels = labels.view(-1)
+            # labels = labels.view(-1)
             labels = labels.to(logits.device)
             loss = fixed_cross_entropy(
                 logits,
