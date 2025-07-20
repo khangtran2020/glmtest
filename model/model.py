@@ -767,9 +767,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             # get token id from tokenizer
             fuzz_start_id = self.tokenizer.convert_tokens_to_ids(FUZZ_START_TOKEN)
             fuzz_end_id = self.tokenizer.convert_tokens_to_ids(FUZZ_END_TOKEN)
-            fuzzing_mask = torch.zeros(
-                labels.shape, dtype=torch.bool, device=labels.device
-            )
+            fuzzing_mask = torch.zeros(labels.shape, device=labels.device)
             for i in range(labels.shape[0]):
                 saw_start = False
                 for j in range(labels.shape[1]):
