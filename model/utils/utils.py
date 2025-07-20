@@ -151,6 +151,10 @@ def _preprocess_mask_arguments(
     """
     # If the mask is already 4D, simply return as-is (it was already prepared, or it is custom)
     if isinstance(attention_mask, torch.Tensor) and len(attention_mask.shape) == 4:
+        print(
+            "The attention mask is already a 4D mask, returning it as-is. "
+            "This is usually the case for custom attention implementations."
+        )
         return True, attention_mask, None, None
 
     # For TGI/vLLM backends, or other custom attention without equivalent mask creation: we don't need a mask!
