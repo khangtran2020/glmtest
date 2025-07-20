@@ -165,7 +165,7 @@ def _preprocess_mask_arguments(
         )
         sys.stderr.flush()
         sys.exit(1)
-        return True, None, None, None
+        # return True, None, None, None
 
     # Move the mask to correct device, and potentially switch dtype for efficiency
     if attention_mask is not None and attention_mask.ndim == 2:
