@@ -841,7 +841,13 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             if self.config.model_type == "qwen2":
                 layer_outputs = decoder_layer(
                     hidden_states,
-                    attention_mask=causal_mask_mapping[decoder_layer.attention_type],
+                    attention_mask=causal_mask_mapping[
+                        (
+                            decoder_layer.llm_layer.attention_type
+                            if isinstance(decoder_layer, GLMFFuzzingLayer)
+                            else decoder_layer.attention_type
+                        )
+                    ],
                     fuzzing_mask=fuzzing_mask,
                     position_ids=position_ids,
                     past_key_value=past_key_values,
