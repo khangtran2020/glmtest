@@ -780,6 +780,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                         saw_start = True
                     elif labels[i, j] == fuzz_end_id:
                         saw_start = False
+            fuzzing_mask = fuzzing_mask.unsqueeze(-1)
         else:
             fuzzing_mask = None
 
