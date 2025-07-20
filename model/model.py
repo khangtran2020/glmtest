@@ -957,6 +957,9 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             #         labels=labels,
             #         vocab_size=self.config.vocab_size,
             #     )
+            pprint(
+                f"[yellow]Step {step}[/yellow]: [cyan]loss: {loss}[/cyan], [green]kl_g shape: {kl_g_total}[/green], [blue]kl_d shape: {kl_d_total}[/blue]"
+            )
             loss = loss + self.kl_g_reg * kl_g_total + self.kl_d_reg * kl_d_total
 
         return CausalLMOutputWithPast(
