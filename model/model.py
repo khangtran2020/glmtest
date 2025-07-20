@@ -627,6 +627,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         self.kl_g_reg = kl_g_reg
         self.kl_d_reg = kl_d_reg
         self.tokenizer = tokenizer
+        self.config.vocab_size = len(tokenizer)
 
         if glmf_model is not None:
             # If a GLMFModelForCausalLM is provided, use its configuration
