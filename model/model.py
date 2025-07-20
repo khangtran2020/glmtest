@@ -933,18 +933,29 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
 
         loss = None
         if labels is not None:
-            if hasattr(self.llm_model, "base_model"):
-                self.llm_model.base_model.loss_function(
-                    logits=logits,
-                    labels=labels,
-                    vocab_size=self.config.vocab_size,
-                )
-            else:
-                self.llm_model.loss_function(
-                    logits=logits,
-                    labels=labels,
-                    vocab_size=self.config.vocab_size,
-                )
+
+            logits = logits.float()
+            logits = logits.view(-1, self.config.vocab_size)
+            labels = labels.view(-1)
+            labels = labels.to(logits.device)
+            loss = fixed_cross_entropy(
+                logits,
+                labels,
+                num_items_in_batch=None,
+                ignore_index=-100,
+            )
+            # if hasattr(self.llm_model, "base_model"):
+            #     self.llm_model.base_model.loss_function(
+            #         logits=logits,
+            #         labels=labels,
+            #         vocab_size=self.config.vocab_size,
+            #     )
+            # else:
+            #     self.llm_model.loss_function(
+            #         logits=logits,
+            #         labels=labels,
+            #         vocab_size=self.config.vocab_size,
+            #     )
             loss = loss + self.kl_g_reg * kl_g_total + self.kl_d_reg * kl_d_total
 
         return CausalLMOutputWithPast(

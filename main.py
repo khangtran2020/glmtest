@@ -145,6 +145,11 @@ def main() -> None:
 
         if args.fuzz_model:
 
+            # Logging the vocabulary size of the tokenizer
+            console.log(
+                f"[cyan]Tokenizer vocabulary size:[/cyan] {dataset.llm_tokenizer.vocab_size}"
+            )
+
             glmf_model_config = GLMFModelConfig(
                 llm_model=args.llm_model,
                 use_lora=False,
@@ -212,6 +217,11 @@ def main() -> None:
                 dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
                 dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
             ]
+
+            console.log(
+                f"Config vocab size: {config.vocab_size}, "
+                f"Tokenizer vocab size: {dataset.llm_tokenizer.vocab_size}"
+            )
 
             model = GLMFModelFuzzing(
                 config=config,
