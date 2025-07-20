@@ -11,6 +11,7 @@ from torch.nn.modules import Dropout, LayerNorm, Linear, Module
 from torch.nn.modules.transformer import _get_activation_fn, _get_clones
 from torch.nn import Module, Linear, Dropout, LayerNorm
 from transformers import Cache
+from rich import print as pprint
 
 # typings
 from typing import Callable, Optional, Union, Tuple
@@ -359,6 +360,12 @@ class GLMFFuzzingLayer(Module):
                 latent_dict=latent_dict,
             )
         )
+
+        # print shape
+        pprint(f"[green]nvib_hidden_states shape: {nvib_hidden_states.shape}[/green]")
+        pprint(f"[green]llm_hidden_state shape: {llm_hidden_state[0].shape}[/green]")
+        pprint(f"[green]fuzzing_mask shape: {fuzzing_mask.shape}[/green]")
+
         hidden_states = fuzzing_mask * nvib_hidden_states + (
             (1 - fuzzing_mask) * llm_hidden_state[0]
         )
