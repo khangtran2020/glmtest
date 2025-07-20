@@ -25,6 +25,7 @@ from train.utils import extract_local
 from ring_flash_attn import update_ring_flash_attn_params
 from peft import get_peft_model, LoraConfig, TaskType
 from peft.tuners.lora.model import LoraModel
+from utils.constant import FUZZ_START_TOKEN, FUZZ_END_TOKEN
 
 # VAE
 from model.layer import GLMFFuzzingLayer
@@ -625,6 +626,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         self.is_training = is_training
         self.kl_g_reg = kl_g_reg
         self.kl_d_reg = kl_d_reg
+        self.tokenizer = tokenizer
 
         if glmf_model is not None:
             # If a GLMFModelForCausalLM is provided, use its configuration
@@ -733,7 +735,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         attention_mask: Optional[torch.Tensor] = None,
         graph: Optional[dict] = None,
         graph_mask: Optional[torch.Tensor] = None,
-        fuzzing_mask: Optional[torch.Tensor] = None,
+        # fuzzing_mask: Optional[torch.Tensor] = None,
         graph_token_index: Optional[torch.LongTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[Union[Cache, List[torch.FloatTensor]]] = None,
@@ -759,6 +761,27 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             if output_hidden_states is not None
             else self.config.output_hidden_states
         )
+
+        # extract the fuzzing mask from labels.
+        if labels is not None:
+            # get token id from tokenizer
+            fuzz_start_id = self.tokenizer.convert_tokens_to_ids(FUZZ_START_TOKEN)
+            fuzz_end_id = self.tokenizer.convert_tokens_to_ids(FUZZ_END_TOKEN)
+            fuzzing_mask = torch.zeros(
+                labels.shape, dtype=torch.bool, device=labels.device
+            )
+            for i in range(labels.shape[0]):
+                saw_start = False
+                for j in range(labels.shape[1]):
+                    if saw_start:
+                        fuzzing_mask[i, j] = 1
+
+                    if labels[i, j] == fuzz_start_id:
+                        saw_start = True
+                    elif labels[i, j] == fuzz_end_id:
+                        saw_start = False
+        else:
+            fuzzing_mask = None
 
         use_cache = use_cache if use_cache is not None else self.config.use_cache
 
