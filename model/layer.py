@@ -344,7 +344,13 @@ class GLMFFuzzingLayer(Module):
         if not self.is_fuzz:
             return llm_hidden_state
 
-        src_key_padding_mask = ~(attention_mask.bool())
+        src_key_padding_mask = (
+            ~(attention_mask.bool())
+            if attention_mask is not None
+            else torch.zeros(
+                hidden_states.shape[:2], dtype=torch.bool, device=hidden_states.device
+            )
+        )
         hidden_states = self.llm_layer.input_layernorm(hidden_states)
         nvib_hidden_states, attention_out, kl_g, kl_d, latent_dict_out = (
             self.nvib_layer(
