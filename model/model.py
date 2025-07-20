@@ -865,7 +865,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                     **flash_attn_kwargs,
                 )
 
-            if decoder_layer.is_fuzz:
+            if isinstance(decoder_layer, GLMFFuzzingLayer):
                 hidden_states, attention_out, kl_g, kl_d, latent_dict = layer_outputs
                 if kl_g is not None:
                     kl_g_total += kl_g
