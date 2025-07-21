@@ -361,10 +361,19 @@ class GLMFFuzzingLayer(Module):
             )
         )
 
-        # print shape
-        pprint(f"[green]nvib_hidden_states shape: {nvib_hidden_states.shape}[/green]")
-        pprint(f"[green]llm_hidden_state shape: {llm_hidden_state[0].shape}[/green]")
-        pprint(f"[green]fuzzing_mask shape: {fuzzing_mask.shape}[/green]")
+        # Check nan in the outcome
+        if torch.isnan(nvib_hidden_states).any():
+            print("NaN detected in nvib_hidden_states")
+            pprint(nvib_hidden_states)
+        if torch.isnan(attention_out).any():
+            print("NaN detected in attention_out")
+            pprint(attention_out)
+        if torch.isnan(kl_g).any():
+            print("NaN detected in kl_g")
+            pprint(kl_g)
+        if torch.isnan(kl_d).any():
+            print("NaN detected in kl_d")
+            pprint(kl_d)
 
         hidden_states = fuzzing_mask * nvib_hidden_states + (
             (1 - fuzzing_mask) * llm_hidden_state[0]
