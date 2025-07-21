@@ -219,18 +219,19 @@ class NVIBTransformerLayer(Module):
         key = latent_dict["z"]
         value = latent_dict["z"]
 
+        pprint("Latent dictionary:", latent_dict)
         # check nan in the query, key, value
-        if torch.isnan(query).any():
-            print("NaN detected in query inside _sa_block")
-            pprint(query)
+        # if torch.isnan(query).any():
+        #     print("NaN detected in query inside _sa_block")
+        #     pprint(query)
 
-        if torch.isnan(key).any():
-            print("NaN detected in key inside _sa_block")
-            pprint(key)
+        # if torch.isnan(key).any():
+        #     print("NaN detected in key inside _sa_block")
+        #     pprint(key)
 
-        if torch.isnan(value).any():
-            print("NaN detected in value inside _sa_block")
-            pprint(value)
+        # if torch.isnan(value).any():
+        #     print("NaN detected in value inside _sa_block")
+        #     pprint(value)
 
         x, attention = self.self_attn(
             query,
