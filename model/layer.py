@@ -171,7 +171,10 @@ class NVIBTransformerLayer(Module):
                 )
 
         x = src
-
+        # Check nan in the input
+        if torch.isnan(x).any():
+            print("NaN detected in input x")
+            pprint(x)
         # Alpha skip
         if latent_dict is not None:
             alpha_skip = latent_dict["alpha"]
@@ -215,6 +218,19 @@ class NVIBTransformerLayer(Module):
         query = x
         key = latent_dict["z"]
         value = latent_dict["z"]
+
+        # check nan in the query, key, value
+        if torch.isnan(query).any():
+            print("NaN detected in query inside _sa_block")
+            pprint(query)
+
+        if torch.isnan(key).any():
+            print("NaN detected in key inside _sa_block")
+            pprint(key)
+
+        if torch.isnan(value).any():
+            print("NaN detected in value inside _sa_block")
+            pprint(value)
 
         x, attention = self.self_attn(
             query,
