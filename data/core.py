@@ -657,15 +657,26 @@ class Data(object):
                         num_token = len(self.llm_tokenizer.tokenize(full_text))
                         num_tokens.append(num_token)
 
-                        data = {
-                            "uuid": f"{uuid}_{testcase}",
-                            "prompt": prompt,
-                            "response": response,
-                            "full_text": full_text,
-                            "active_node": active_node.tolist(),
-                            "mask": mask[mask_key].tolist(),
-                            "graph_path": graph_path,
-                        }
+                        if "graph" in self.baseline_prompt:
+                            data = {
+                                "uuid": f"{uuid}_{testcase}",
+                                "prompt": prompt,
+                                "response": response,
+                                "full_text": full_text,
+                                "active_node": active_node.tolist(),
+                                "mask": mask[mask_key].tolist(),
+                                "graph_path": graph_path,
+                            }
+                        else:
+                            data = {
+                                "uuid": f"{uuid}_{testcase}",
+                                "prompt": prompt,
+                                "response": response,
+                                "full_text": full_text,
+                                "active_node": None,
+                                "mask": None,
+                                "graph_path": None,
+                            }
 
                         data_name = f"{uuid}_testcase_{testcase}.json"
                         data_path = os.path.join(processed_prompt_path, data_name)
