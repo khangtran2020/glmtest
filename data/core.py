@@ -60,6 +60,35 @@ RESPONSE_TEMPLATE = """Here is the test case:
 ```
 """
 
+PROMPT_COT = """Generate a test case for the following module such that:
+- The test case use the pytest framework and executable.
+- The test case will be put in the `tests/` directory which is place in the root of the project.
+- The test case will need to execute the provided branch of execution in the provided module.
+
+Here is the module:
+```python
+{module}
+```
+
+Here is the execution branch. The execution branch is a sequence of executable line number in the module:
+{execution_branch}
+
+THINK STEP-BY-STEP and provide your response in the following format:
+
+```json
+{{
+  "test_case": <YOUR ANSWER FOR THE TEST CASE - JUST ONLY THE EXECUTABLE PYTHON CODE>
+}}
+```
+"""
+
+RESPONSE_BASELINE_TEMPLATE = """```json
+{{
+  "test_case": {}
+}}
+```
+"""
+
 import ast
 
 
@@ -762,6 +791,10 @@ class Data(object):
             trucated_code = self.truncate_code(src_code=src_code, branch=branch)
             text = PROMPT_CODE_GRAPH.format(trucated_code, graph_pad)
             response = RESPONSE_TEMPLATE.format(testcase_out)
+        elif self.baseline_prompt == "code_baseline":
+            code_line = self.generate_code_line(branch)
+            text = PROMPT_COT.format(module=src_code, execution_branch=code_line)
+            response = RESPONSE_BASELINE_TEMPLATE.format(testcase_out)
 
         task_prompt = tokenizer.apply_chat_template(
             [
