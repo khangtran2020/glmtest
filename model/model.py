@@ -495,6 +495,11 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         inputs_embeds, cu_seqlens_emb = extract_local(
             inputs_embeds, rank, num_processes, inputs_embeds.device
         )
+
+        pprint(
+            f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]inputs_embeds shape: {inputs_embeds.shape} [/cyan]"
+        )
+
         if labels is not None:
             labels, cu_seqlens_lab = extract_local(
                 labels, rank, num_processes, labels.device
