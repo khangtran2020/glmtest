@@ -497,7 +497,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         )
 
         pprint(
-            f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]inputs_embeds shape: {inputs_embeds.shape} [/cyan]"
+            f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]inputs_embeds shape: {inputs_embeds.shape} [/cyan]\n\n\n"
         )
 
         if labels is not None:
