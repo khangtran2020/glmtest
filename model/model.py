@@ -556,9 +556,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         hidden_states = outputs.last_hidden_state
 
-        pprint(
-            f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]Last hidden_states value: {hidden_states} [/cyan]\n\n\n"
-        )
+        # pprint(
+        #     f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]Last hidden_states value: {hidden_states} [/cyan]\n\n\n"
+        # )
 
         slice_indices = (
             slice(-logits_to_keep, None)
