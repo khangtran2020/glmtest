@@ -8,7 +8,7 @@ pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https
 pip install  dgl -f https://data.dgl.ai/wheels/torch-2.4/cu124/repo.html
 
 # installing transformers + accelerate + peft
-pip install transformers==4.52.0 accelerate peft
+pip install transformers==4.51.3 accelerate peft
 
 # install ring_flash_attn + flash_attn
 pip install ring-flash-attn

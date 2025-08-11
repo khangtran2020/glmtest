@@ -451,6 +451,7 @@ def train_multi_gpu_accelerate(
     )
     process_group = dist.group.WORLD
     local_rank = model.rank
+    console.log(f"Local rank: {local_rank} of the training process")
 
     if accelerator.is_main_process:
         accelerator.init_trackers(
