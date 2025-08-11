@@ -496,10 +496,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             inputs_embeds, rank, num_processes, inputs_embeds.device
         )
 
-        pprint(
-            f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]inputs_embeds shape: {inputs_embeds.shape} [/cyan]\n\n\n"
-        )
-
         if labels is not None:
             labels, cu_seqlens_lab = extract_local(
                 labels, rank, num_processes, labels.device
@@ -524,10 +520,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             cu_seqlens_emb - cu_seqlens_pos
         ).sum().item() == 0, (
             f"cu_seqlens_emb: {cu_seqlens_emb}, cu_seqlens_pos: {cu_seqlens_pos}"
-        )
-
-        pprint(
-            f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]cu_seqlens_emb: {cu_seqlens_emb} [/cyan]"
         )
         update_ring_flash_attn_params(
             cu_seqlens=cu_seqlens_emb, process_group=process_group
@@ -563,6 +555,11 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             )
 
         hidden_states = outputs.last_hidden_state
+
+        pprint(
+            f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]inputs_embeds shape: {hidden_states.shape} [/cyan]\n\n\n"
+        )
+
         slice_indices = (
             slice(-logits_to_keep, None)
             if isinstance(logits_to_keep, int)
