@@ -639,7 +639,7 @@ def train_multi_gpu_accelerate(
                                     grad_norm = grad_norm + param.grad.norm(2) ** 2
                             grad_norm = grad_norm.sqrt().item()
                             console.log(
-                                f"Step {global_step} - for rank {local_rank}: gradient norm: {grad_norm:.4f}"
+                                f"Step {global_step} - for rank {local_rank}: gradient norm: {grad_norm:.4f}\n\n\n"
                             )
                         accelerator.wait_for_everyone()
 
