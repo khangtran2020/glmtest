@@ -100,7 +100,7 @@ def main() -> None:
             world_size = int(os.environ["WORLD_SIZE"])
             device = torch.device("cuda", local_rank)
             console.log(
-                f"Distributed training: rank {rank}/{world_size}, using device {device}."
+                f"Distributed training: rank {rank+1}/{world_size}, using device {device}."
             )
             args.num_gpu = world_size
         else:
@@ -262,9 +262,10 @@ def main() -> None:
                 baseline_prompt=args.baseline_prompt,
                 multi_gpu=True if args.num_gpu > 1 else False,
                 debug=args.debug,
-                rank=rank,
+                rank=local_rank,
                 is_training=True,
             )
+
             model.llm_model.gradient_checkpointing_enable()
             model.config.graph_token_id = [
                 dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),

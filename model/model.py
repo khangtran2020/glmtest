@@ -230,6 +230,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         self.rank = rank
         self.is_training = is_training
 
+        pprint(f"[green]Model is loaded to device of rank: {rank}[/green]")
+
         self.gnn = MultiGAT(
             config.mode,
             config.in_feats,

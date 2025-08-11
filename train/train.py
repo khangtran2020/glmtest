@@ -451,7 +451,7 @@ def train_multi_gpu_accelerate(
     )
     process_group = dist.group.WORLD
     local_rank = model.rank
-    console.log(f"Local rank: {local_rank} of the training process")
+    # console.log(f"Local rank: {local_rank} of the training process")
 
     if accelerator.is_main_process:
         accelerator.init_trackers(
@@ -476,9 +476,9 @@ def train_multi_gpu_accelerate(
             if continue_training == False:
                 shutil.rmtree(save_path)
         os.makedirs(save_path, exist_ok=True)
-        accelerator.print(f"Distributed type: {accelerator.distributed_type}")
-        accelerator.print(f"Number of processes: {accelerator.num_processes}")
-        accelerator.print(f"Mixed precision: {mixed_precision}")
+        console.log(f"Distributed type: {accelerator.distributed_type}")
+        console.log(f"Number of processes: {accelerator.num_processes}")
+        console.log(f"Mixed precision: {mixed_precision}")
 
     tokenizer = dataset.llm_tokenizer
     tr_dataset = GLMFDataset(
