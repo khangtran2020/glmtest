@@ -174,8 +174,14 @@ def collate_fn(batch) -> dict:
         collated = {
             "text": [x["text"] for x in batch],
             "input": collated_input,
-            "graph_mask": torch.stack([x["graph_mask"] for x in batch]),
-            "graph": [x["graph"] for x in batch],
+            "graph_mask": (
+                torch.stack([x["graph_mask"] for x in batch])
+                if batch[0]["graph_mask"] is not None
+                else None
+            ),
+            "graph": (
+                [x["graph"] for x in batch] if batch[0]["graph"] is not None else None
+            ),
         }
         return collated
     else:
@@ -189,7 +195,13 @@ def collate_fn(batch) -> dict:
         collated = {
             "text": [x["text"] for x in batch],
             "input": collated_input,
-            "graph_mask": torch.stack([x["graph_mask"] for x in batch]),
-            "graph": [x["graph"] for x in batch],
+            "graph_mask": (
+                torch.stack([x["graph_mask"] for x in batch])
+                if batch[0]["graph_mask"] is not None
+                else None
+            ),
+            "graph": (
+                [x["graph"] for x in batch] if batch[0]["graph"] is not None else None
+            ),
         }
         return collated
