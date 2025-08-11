@@ -47,16 +47,23 @@ class GLMFDataset(Dataset):
         with open(data_path, "r") as f:
             sample = json.load(f)
         graph_path = sample["graph_path"]
-        graph = torch.load(graph_path)
-        active_node = torch.Tensor(sample["active_node"])
-        graph_mask = torch.Tensor(sample["mask"])
+        graph = torch.load(graph_path) if graph_path is not None else None
+        active_node = (
+            torch.Tensor(sample["active_node"])
+            if sample["active_node"] is not None
+            else None
+        )
+        graph_mask = (
+            torch.Tensor(sample["mask"]) if sample["mask"] is not None else None
+        )
 
-        for key in graph.keys():
-            graph[key] = sampling_neighbor(
-                graph=graph[key],
-                mask=active_node,
-                n_hops=self.n_hops,
-            )
+        if graph is not None:
+            for key in graph.keys():
+                graph[key] = sampling_neighbor(
+                    graph=graph[key],
+                    mask=active_node,
+                    n_hops=self.n_hops,
+                )
 
         if self.testing == False:
             full_text = sample["full_text"]
@@ -84,7 +91,11 @@ class GLMFDataset(Dataset):
                 "text": full_text,
                 "input": tokenized,
                 "graph": graph,  # Should be a dictionary of graph structures
-                "graph_mask": torch.tensor(graph_mask, dtype=torch.float),
+                "graph_mask": (
+                    torch.tensor(graph_mask, dtype=torch.float)
+                    if graph_mask is not None
+                    else None
+                ),
             }
         else:
             prompt = sample["prompt"]
@@ -102,7 +113,11 @@ class GLMFDataset(Dataset):
                 "text": prompt,
                 "input": tokenized,
                 "graph": graph,
-                "graph_mask": torch.tensor(graph_mask, dtype=torch.float),
+                "graph_mask": (
+                    torch.tensor(graph_mask, dtype=torch.float)
+                    if graph_mask is not None
+                    else None
+                ),
             }
             return (uuid, batch)
 

@@ -1,4 +1,4 @@
-accelerate launch --debug --num_processes 2 python main.py --mode train \
+accelerate launch --debug --num_processes 2 main.py --mode train \
     --seed 42 \
     --data_path Dataset \
     --data testgeneval \
