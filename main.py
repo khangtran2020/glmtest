@@ -273,8 +273,9 @@ def main() -> None:
                 dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
             ]
 
-        if args.model_debug:
-            return
+            console.log(
+                f"Attention implementation of the model is: {model.llm_model.attn_implementation}"
+            )
 
         if args.debug:
             console.log("Model & tokenizer loaded")
