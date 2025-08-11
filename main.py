@@ -274,7 +274,7 @@ def main() -> None:
             ]
 
             console.log(
-                f"Attention implementation of the model is: {model.llm_model.attn_implementation}"
+                f"Attention implementation of the model is: {model.llm_model._attn_implementation}"
             )
 
         if args.debug:
