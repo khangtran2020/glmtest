@@ -3,6 +3,7 @@ import gc
 import torch
 import wandb
 import shutil
+import transformers
 import torch.distributed as dist
 from model.gnn import GRAPH_KEYS
 from torch.utils.data import DataLoader
@@ -516,7 +517,13 @@ def train_multi_gpu_accelerate(
             console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
         )
 
+    console.log(
+        f"[green]Forward function before patching model: {transformers.modeling_flash_attention_utils._flash_attention_forward}[/green]\n\n"
+    )
     patch_model(process_group=process_group)
+    console.log(
+        f"[cyan]Forward function after patching model: {transformers.modeling_flash_attention_utils._flash_attention_forward}[/cyan]\n\n"
+    )
     console.log("Model patched with ring attention")
     device = accelerator.device
     config = model.config
