@@ -512,10 +512,11 @@ def train_multi_gpu_accelerate(
         va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
     )
 
-    if accelerator.is_main_process:
-        logging_train_data(
-            console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
-        )
+    # if accelerator.is_main_process:
+    #     # logging_train_data(
+    #     #     console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
+    #     # )
+    #     pass
 
     console.log(
         f"[green]Forward function before patching model: {transformers.modeling_flash_attention_utils._flash_attention_forward}[/green]\n\n"
