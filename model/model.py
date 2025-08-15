@@ -528,6 +528,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             accelerator.wait_for_everyone()
 
         if self.is_training:
+            print("Running in training mode.")
             outputs = self.llm_model.base_model.model.model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
