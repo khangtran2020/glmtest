@@ -531,7 +531,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         if self.is_training:
             # print("Running in training mode.")
-            outputs = self.llm_model.get_base_model()(
+            outputs = self.llm_model.get_base_model().model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
@@ -568,7 +568,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             if isinstance(logits_to_keep, int)
             else logits_to_keep
         )
-        logits = self.llm_model.base_model.lm_head(hidden_states[:, slice_indices, :])
+        logits = self.llm_model.get_base_model().lm_head(
+            hidden_states[:, slice_indices, :]
+        )
 
         loss = None
         if labels is not None:
