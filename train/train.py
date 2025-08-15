@@ -642,9 +642,9 @@ def train_multi_gpu_accelerate(
                         accelerator.backward(loss)
                         accelerator.wait_for_everyone()
 
-                        for name, param in model.named_parameters():
-                            if param.requires_grad and param.grad is None:
-                                print(f"No grad for: {name}")
+                        # for name, param in model.named_parameters():
+                        #     if param.requires_grad and param.grad is None:
+                        #         print(f"No grad for: {name}")
 
                         # with torch.no_grad():
                         #     # check gradient norms
