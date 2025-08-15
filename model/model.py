@@ -232,15 +232,17 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         pprint(f"[green]Model is loaded to device of rank: {rank}[/green]")
 
-        self.gnn = MultiGAT(
-            config.mode,
-            config.in_feats,
-            config.n_hidden,
-            config.hidden_size,
-            config.n_layers,
-            config.num_head,
-            config.dropout,
-        )
+        if "graph" in self.baseline_prompt:
+            self.gnn = MultiGAT(
+                config.mode,
+                config.in_feats,
+                config.n_hidden,
+                config.hidden_size,
+                config.n_layers,
+                config.num_head,
+                config.dropout,
+            )
+
         if config.dtype == "fp16":
             self.llm_model = AutoModelForCausalLM.from_pretrained(
                 config.model_name,
@@ -293,7 +295,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         inputs_embeds: torch.Tensor = None,
     ) -> torch.Tensor:
         if inputs_embeds is None:
-            inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
+            inputs_embeds = self.llm_model.base_model.get_input_embeddings()(input_ids)
 
         if (
             (graph is not None)
