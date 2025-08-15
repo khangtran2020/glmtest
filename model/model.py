@@ -528,7 +528,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             accelerator.wait_for_everyone()
 
         if self.is_training:
-            outputs = self.llm_model.model.model(
+            outputs = self.llm_model.base_model.model.model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
