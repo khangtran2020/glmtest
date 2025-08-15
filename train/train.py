@@ -647,7 +647,7 @@ def train_multi_gpu_accelerate(
                                 if param.grad is not None:
                                     grad_norm = grad_norm + param.grad.norm(2) ** 2
                             grad_norm = grad_norm.sqrt().item()
-                            console.log(
+                            print(
                                 f"Step {global_step} - for rank {local_rank}: gradient norm: {grad_norm:.4f}\n\n\n"
                             )
 
