@@ -529,73 +529,87 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if accelerator is not None:
             accelerator.wait_for_everyone()
 
-        if self.is_training:
-            # print("Running in training mode.")
-            outputs = self.llm_model.get_base_model().model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
-                past_key_values=past_key_values,
-                inputs_embeds=inputs_embeds,
-                use_cache=use_cache,
-                output_attentions=output_attentions,
-                output_hidden_states=output_hidden_states,
-                return_dict=return_dict,
-                cache_position=cache_position,
-            )
-        else:
-            outputs = self.llm_model.model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
-                past_key_values=past_key_values,
-                inputs_embeds=inputs_embeds,
-                use_cache=use_cache,
-                output_attentions=output_attentions,
-                output_hidden_states=output_hidden_states,
-                return_dict=return_dict,
-                cache_position=cache_position,
-            )
+        return self.llm_model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+            inputs_embeds=inputs_embeds,
+            labels=labels,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            cache_position=cache_position,
+        )
 
-        hidden_states = outputs.last_hidden_state
+        # if self.is_training:
+        #     # print("Running in training mode.")
+        #     outputs = self.llm_model.get_base_model().model(
+        #         input_ids=input_ids,
+        #         attention_mask=attention_mask,
+        #         position_ids=position_ids,
+        #         past_key_values=past_key_values,
+        #         inputs_embeds=inputs_embeds,
+        #         use_cache=use_cache,
+        #         output_attentions=output_attentions,
+        #         output_hidden_states=output_hidden_states,
+        #         return_dict=return_dict,
+        #         cache_position=cache_position,
+        #     )
+        # else:
+        #     outputs = self.llm_model.model(
+        #         input_ids=input_ids,
+        #         attention_mask=attention_mask,
+        #         position_ids=position_ids,
+        #         past_key_values=past_key_values,
+        #         inputs_embeds=inputs_embeds,
+        #         use_cache=use_cache,
+        #         output_attentions=output_attentions,
+        #         output_hidden_states=output_hidden_states,
+        #         return_dict=return_dict,
+        #         cache_position=cache_position,
+        #     )
 
-        # pprint(
-        #     f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]Last hidden_states value: {hidden_states} [/cyan]\n\n\n"
+        # hidden_states = outputs.last_hidden_state
+
+        # # pprint(
+        # #     f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]Last hidden_states value: {hidden_states} [/cyan]\n\n\n"
+        # # )
+
+        # slice_indices = (
+        #     slice(-logits_to_keep, None)
+        #     if isinstance(logits_to_keep, int)
+        #     else logits_to_keep
+        # )
+        # logits = self.llm_model.get_base_model().lm_head(
+        #     hidden_states[:, slice_indices, :]
         # )
 
-        slice_indices = (
-            slice(-logits_to_keep, None)
-            if isinstance(logits_to_keep, int)
-            else logits_to_keep
-        )
-        logits = self.llm_model.get_base_model().lm_head(
-            hidden_states[:, slice_indices, :]
-        )
+        # loss = None
+        # if labels is not None:
+        #     logits = logits.float()
+        #     logits = logits.view(-1, self.config.vocab_size)
+        #     labels = labels.view(-1)
+        #     labels = labels.to(logits.device)
+        #     loss = fixed_cross_entropy(
+        #         logits,
+        #         labels,
+        #         num_items_in_batch=None,
+        #         ignore_index=ignore_index,
+        #         **kwargs,
+        #     )
+        #     # pprint(
+        #     #     f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]loss: {loss}[/cyan], [green]logits shape: {logits}[/green], [blue]labels shape: {labels}[/blue]"
+        #     # )
 
-        loss = None
-        if labels is not None:
-            logits = logits.float()
-            logits = logits.view(-1, self.config.vocab_size)
-            labels = labels.view(-1)
-            labels = labels.to(logits.device)
-            loss = fixed_cross_entropy(
-                logits,
-                labels,
-                num_items_in_batch=None,
-                ignore_index=ignore_index,
-                **kwargs,
-            )
-            # pprint(
-            #     f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]loss: {loss}[/cyan], [green]logits shape: {logits}[/green], [blue]labels shape: {labels}[/blue]"
-            # )
-
-        return CausalLMOutputWithPast(
-            loss=loss,
-            logits=logits,
-            past_key_values=outputs.past_key_values,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
+        # return CausalLMOutputWithPast(
+        #     loss=loss,
+        #     logits=logits,
+        #     past_key_values=outputs.past_key_values,
+        #     hidden_states=outputs.hidden_states,
+        #     attentions=outputs.attentions,
+        # )
 
 
 CONFIG_MAPPING.register(key="glmf", value=GLMFModelConfig)
