@@ -531,7 +531,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         if self.is_training:
             # print("Running in training mode.")
-            outputs = self.llm_model.base_model.model.model(
+            outputs = self.llm_model.get_base_model()(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
