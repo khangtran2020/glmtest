@@ -1,5 +1,6 @@
 import os
 import gc
+import sys
 import torch
 import wandb
 import shutil
@@ -19,6 +20,7 @@ from train.utils import (
 )
 from train.test import validate
 from utils.utils import log_ram_usage
+from torchviz import make_dot
 
 
 # typing
@@ -639,6 +641,10 @@ def train_multi_gpu_accelerate(
                         )
                         accelerator.wait_for_everyone()
                         loss = outputs.loss
+                        dot = make_dot(loss, params=dict(model.named_parameters()))
+                        dot.format = "png"
+                        dot.render("causallm_graph")
+                        sys.exit(0)
                         accelerator.backward(loss)
                         accelerator.wait_for_everyone()
 
