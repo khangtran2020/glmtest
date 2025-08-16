@@ -1,6 +1,5 @@
 import os
 import gc
-import sys
 import torch
 import wandb
 import shutil
@@ -20,7 +19,6 @@ from train.utils import (
 )
 from train.test import validate
 from utils.utils import log_ram_usage
-from torchviz import make_dot
 
 
 # typing
