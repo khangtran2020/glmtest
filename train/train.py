@@ -641,10 +641,10 @@ def train_multi_gpu_accelerate(
                         )
                         accelerator.wait_for_everyone()
                         loss = outputs.loss
-                        dot = make_dot(loss, params=dict(model.named_parameters()))
-                        dot.format = "png"
-                        dot.render("causallm_graph")
-                        sys.exit(0)
+                        # dot = make_dot(loss, params=dict(model.named_parameters()))
+                        # dot.format = "png"
+                        # dot.render("causallm_graph")
+                        # sys.exit(0)
                         accelerator.backward(loss)
                         accelerator.wait_for_everyone()
 
