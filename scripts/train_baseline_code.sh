@@ -1,26 +1,26 @@
-accelerate launch --debug --num_processes 2 main.py --mode train \
+accelerate launch --debug --num_processes 2  main.py --mode train \
     --seed 42 \
     --data_path Dataset \
     --data testgeneval \
     --baseline_prompt code_baseline \
     --llm_model "Qwen/Qwen2.5-Coder-1.5B-Instruct" \
-    --max_seq_len 8196 \
+    --max_seq_len 8192 \
     --batch_size 1 \
     --gradient_accumulation_steps 16 \
-    --save_steps 100 \
-    --validating_steps 1000 \
+    --save_steps 320 \
+    --validating_steps 5000 \
     --num_gpu 2 \
     --model_name "qwen2_5-1_5b"\
-    --name "debugging_qwen25_1-5b_code_baseline_1ep" \
+    --name "qwen25_7b_graph_tr_3_epochs" \
     --output_dir "./results/models/" \
     --overwrite_output_dir \
     --do_train \
     --do_eval \
     --n_hidden 16 \
-    --learning_rate 5e-5 \
+    --learning_rate 1e-4 \
     --max_grad_norm 1.0 \
     --num_train_epochs 1 \
     --dtype bf16 \
     --use_lora \
-    --lora_r 4 \
+    --lora_r 32 \
     --use_accelerate

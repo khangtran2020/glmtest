@@ -156,6 +156,35 @@ def add_model_group(group):
         action="store_true",
         help="test on train dataset",
     )
+    group.add_argument(
+        "--fuzz_model",
+        action="store_true",
+        help="using fuzz model",
+    )
+    group.add_argument(
+        "--start_fuzz_layer_index",
+        type=int,
+        help="start layer index for fuzzing",
+        default=0,
+    )
+    group.add_argument(
+        "--end_fuzz_layer_index",
+        type=int,
+        help="end layer index for fuzzing",
+        default=0,
+    )
+    group.add_argument(
+        "--kl_g_reg",
+        type=float,
+        help="kl regularization for gaussian",
+        default=0.001,
+    )
+    group.add_argument(
+        "--kl_d_reg",
+        type=float,
+        help="kl regularization for dirichlet",
+        default=0.001,
+    )
 
 
 def add_training_group(group):

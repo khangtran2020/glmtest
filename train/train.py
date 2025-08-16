@@ -1,25 +1,21 @@
 import os
 import gc
-import sys
 import torch
 import wandb
 import shutil
-import traceback
+import transformers
 import torch.distributed as dist
 from model.gnn import GRAPH_KEYS
-from rich import print as pprint
 from torch.utils.data import DataLoader
 from data.core import Data
 from data.loader import GLMFDataset, collate_fn
-from model.model import GLMFModelForCausalLM, GLMFModelConfig
+from model.model import GLMFModelForCausalLM
 from accelerate import Accelerator
 from transformers.trainer_utils import seed_worker
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from train.utils import (
     patch_model,
-    move_model_to_device,
     save_checkpoint,
-    extract_local,
 )
 from train.test import validate
 from utils.utils import log_ram_usage
@@ -451,6 +447,7 @@ def train_multi_gpu_accelerate(
     )
     process_group = dist.group.WORLD
     local_rank = model.rank
+    # console.log(f"Local rank: {local_rank} of the training process")
 
     if accelerator.is_main_process:
         accelerator.init_trackers(
@@ -475,9 +472,9 @@ def train_multi_gpu_accelerate(
             if continue_training == False:
                 shutil.rmtree(save_path)
         os.makedirs(save_path, exist_ok=True)
-        accelerator.print(f"Distributed type: {accelerator.distributed_type}")
-        accelerator.print(f"Number of processes: {accelerator.num_processes}")
-        accelerator.print(f"Mixed precision: {mixed_precision}")
+        console.log(f"Distributed type: {accelerator.distributed_type}")
+        console.log(f"Number of processes: {accelerator.num_processes}")
+        console.log(f"Mixed precision: {mixed_precision}")
 
     tokenizer = dataset.llm_tokenizer
     tr_dataset = GLMFDataset(
@@ -515,16 +512,25 @@ def train_multi_gpu_accelerate(
         va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
     )
 
-    if accelerator.is_main_process:
-        logging_train_data(
-            console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
-        )
+    # if accelerator.is_main_process:
+    #     # logging_train_data(
+    #     #     console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
+    #     # )
+    #     pass
 
+    console.log(
+        f"[green]Forward function before patching model: {transformers.modeling_flash_attention_utils._flash_attention_forward}[/green]\n\n"
+    )
     patch_model(process_group=process_group)
+    console.log(
+        f"[cyan]Forward function after patching model: {transformers.modeling_flash_attention_utils._flash_attention_forward}[/cyan]\n\n"
+    )
     console.log("Model patched with ring attention")
     device = accelerator.device
     config = model.config
     model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
+
+    console.log(f"Model prepared with accelerator: {model}")
 
     if accelerator.is_main_process:
         accelerator.print(f"***** Running training *****")
@@ -633,19 +639,27 @@ def train_multi_gpu_accelerate(
                         )
                         accelerator.wait_for_everyone()
                         loss = outputs.loss
+                        # dot = make_dot(loss, params=dict(model.named_parameters()))
+                        # dot.format = "png"
+                        # dot.render("causallm_graph")
+                        # sys.exit(0)
                         accelerator.backward(loss)
-
-                        with torch.no_grad():
-                            # check gradient norms
-                            grad_norm = 0.0
-                            for name, param in model.named_parameters():
-                                if param.grad is not None:
-                                    grad_norm = grad_norm + param.grad.norm(2) ** 2
-                            grad_norm = grad_norm.sqrt().item()
-                            console.log(
-                                f"Step {global_step} - for rank {local_rank}: gradient norm: {grad_norm:.4f}"
-                            )
                         accelerator.wait_for_everyone()
+
+                        # for name, param in model.named_parameters():
+                        #     if param.requires_grad and param.grad is None:
+                        #         print(f"No grad for: {name}")
+
+                        # with torch.no_grad():
+                        #     # check gradient norms
+                        #     grad_norm = 0.0
+                        #     for name, param in model.named_parameters():
+                        #         if param.grad is not None:
+                        #             grad_norm = grad_norm + param.grad.norm(2) ** 2
+                        #     grad_norm = grad_norm.sqrt().item()
+                        #     print(
+                        #         f"Step {global_step} - for rank {local_rank}: gradient norm: {grad_norm:.4f}\n\n\n"
+                        #     )
 
                         if accelerator.sync_gradients:
                             accelerator.wait_for_everyone()
