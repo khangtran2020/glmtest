@@ -487,7 +487,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         process_group = dist.group.WORLD
         ignore_index = -100
 
-        print("Input embeds requires_grad:", inputs_embeds.requires_grad)
+        # print("Input embeds requires_grad:", inputs_embeds.requires_grad)
 
         if labels is not None:
             labels = nn.functional.pad(labels, (0, 1), value=ignore_index)
@@ -572,8 +572,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             )
 
         hidden_states = outputs.last_hidden_state
-        print("Hidden states requires_grad:", hidden_states.requires_grad)
-        print("Hidden states grad_fn:", hidden_states.grad_fn)
+        # print("Hidden states requires_grad:", hidden_states.requires_grad)
+        # print("Hidden states grad_fn:", hidden_states.grad_fn)
 
         # # pprint(
         # #     f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]Last hidden_states value: {hidden_states} [/cyan]\n\n\n"
