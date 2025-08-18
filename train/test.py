@@ -602,6 +602,9 @@ def validate(
                         )[1].tolist()
                     else:
                         graph_token_index = None
+                        graph = None
+                        graph_mask = None
+
                     outputs = model(
                         **micro_input,
                         graph=graph,
