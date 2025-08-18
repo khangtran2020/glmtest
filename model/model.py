@@ -877,6 +877,9 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
 
             if isinstance(decoder_layer, GLMFFuzzingLayer):
                 hidden_states, attention_out, kl_g, kl_d, latent_dict = layer_outputs
+                pprint(
+                    f"[yellow]Step {step}[/yellow]: [green]kl_g: {kl_g}[/green], [blue]kl_d: {kl_d}[/blue]"
+                )
                 if kl_g is not None:
                     kl_g_total += kl_g
                 if kl_d is not None:
@@ -920,21 +923,6 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                 labels,
                 num_items_in_batch=None,
                 ignore_index=-100,
-            )
-            # if hasattr(self.llm_model, "base_model"):
-            #     self.llm_model.base_model.loss_function(
-            #         logits=logits,
-            #         labels=labels,
-            #         vocab_size=self.config.vocab_size,
-            #     )
-            # else:
-            #     self.llm_model.loss_function(
-            #         logits=logits,
-            #         labels=labels,
-            #         vocab_size=self.config.vocab_size,
-            #     )
-            pprint(
-                f"[yellow]Step {step}[/yellow]: [cyan]loss: {loss}[/cyan], [green]kl_g: {kl_g_total}[/green], [blue]kl_d: {kl_d_total}[/blue]"
             )
             loss = loss + self.kl_g_reg * kl_g_total + self.kl_d_reg * kl_d_total
 

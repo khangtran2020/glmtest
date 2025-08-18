@@ -284,6 +284,7 @@ def train_single_gpu_accelerate(
                     with accelerator.accumulate(model):
                         outputs = model(
                             **micro_input,
+                            step=global_step,
                             graph=graph,
                             graph_mask=graph_mask,
                             graph_token_index=graph_token_index,
