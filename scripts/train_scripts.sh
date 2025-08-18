@@ -15,6 +15,8 @@ max_grad_norm=3.0
 num_train_epochs=3
 gnn_hidden_size=16
 lora_rank=32
+start_fuzz_layer_index=7
+end_fuzz_layer_index=8
 
 # Check if nvidia-smi is available
 if ! command -v nvidia-smi &> /dev/null; then
@@ -55,7 +57,9 @@ elif [ "$gpu_count" -eq 1 ]; then
         --lora_r $lora_rank \
         --use_accelerate \
         --graph_sampling # \
-        # --fuzz_model # uncomment if you want fuzzing model
+        # --fuzz_model \
+        # --start_fuzz_layer_index $start_fuzz_layer_index \
+        # --end_fuzz_layer_index $end_fuzz_layer_index \ # uncomment if you want fuzzing model
         # --continue_training \
         # --checkpoint_path $checkpoint_path # uncomment if you want to continue training
 else
@@ -85,7 +89,9 @@ else
         --lora_r $lora_rank \
         --use_accelerate \
         --graph_sampling \
-        --fuzz_model #
+        # --fuzz_model \
+        # --start_fuzz_layer_index $start_fuzz_layer_index \
+        # --end_fuzz_layer_index $end_fuzz_layer_index \ # uncomment if you want fuzzing model
         # --continue_training \
         # --checkpoint_path $checkpoint_path # uncomment if you want to continue training
 fi
