@@ -296,8 +296,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
     ) -> torch.Tensor:
         if inputs_embeds is None:
             inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
-            if self.is_training:
-                inputs_embeds = inputs_embeds.requires_grad_(True)
 
         if (
             (graph is not None)
@@ -319,6 +317,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :] = (
                 graph_embeds
             )
+        else:
+            if self.is_training:
+                inputs_embeds = inputs_embeds.requires_grad_(True)
 
         return inputs_embeds
 
@@ -956,8 +957,6 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
     ) -> torch.Tensor:
         if inputs_embeds is None:
             inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
-            if self.is_training:
-                inputs_embeds = inputs_embeds.requires_grad_(True)
 
         if (
             (graph is not None)
@@ -979,6 +978,9 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :] = (
                 graph_embeds
             )
+        else:
+            if self.is_training:
+                inputs_embeds = inputs_embeds.requires_grad_(True)
 
         return inputs_embeds
 
