@@ -55,6 +55,7 @@ elif [ "$gpu_count" -eq 1 ]; then
         --lora_r $lora_rank \
         --use_accelerate \
         --graph_sampling # \
+        # --fuzz_model # uncomment if you want fuzzing model
         # --continue_training \
         # --checkpoint_path $checkpoint_path # uncomment if you want to continue training
 else
@@ -83,7 +84,8 @@ else
         --use_lora \
         --lora_r $lora_rank \
         --use_accelerate \
-        --graph_sampling # \
+        --graph_sampling \
+        --fuzz_model #
         # --continue_training \
         # --checkpoint_path $checkpoint_path # uncomment if you want to continue training
 fi
