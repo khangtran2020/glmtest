@@ -15,7 +15,6 @@ max_grad_norm=3.0
 num_train_epochs=3
 gnn_hidden_size=16
 lora_rank=32
-model_weight_path="" # set the trained model weight
 
 # Check if nvidia-smi is available
 if ! command -v nvidia-smi &> /dev/null; then
@@ -30,7 +29,7 @@ gpu_count=$(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)
 if [ "$gpu_count" -eq 0 ]; then
     echo "No GPUs detected."
 elif [ "$gpu_count" -eq 1 ]; then
-    python main.py --mode test \
+    python main.py --mode train \
         --seed 42 \
         --data_path $data_path \
         --data $data \
@@ -38,14 +37,29 @@ elif [ "$gpu_count" -eq 1 ]; then
         --llm_model $llm_model \
         --max_seq_len $max_seq_len \
         --batch_size 1 \
+        --gradient_accumulation_steps $gradient_accumulation_steps \
+        --save_steps 320 \
+        --validating_steps 5000 \
         --model_name $model_name \
         --name $name \
+        --output_dir $output_dir \
+        --overwrite_output_dir \
+        --do_train \
+        --do_eval \
         --n_hidden $gnn_hidden_size \
+        --learning_rate $learning_rate \
+        --max_grad_norm $max_grad_norm \
+        --num_train_epochs $num_train_epochs \
+        --dtype bf16 \
+        --use_lora \
+        --lora_r $lora_rank \
         --use_accelerate \
-        --graph_sampling \
-        --model_weight_path $model_weight_path
+        --graph_sampling # \
+        # --fuzz_model # uncomment if you want fuzzing model
+        # --continue_training \
+        # --checkpoint_path $checkpoint_path # uncomment if you want to continue training
 else
-    accelerate launch --debug --num_processes "$gpu_count"  main.py --mode test \
+    accelerate launch --debug --num_processes "$gpu_count"  main.py --mode train \
         --seed 42 \
         --data_path $data_path \
         --data $data \
@@ -53,40 +67,25 @@ else
         --llm_model $llm_model \
         --max_seq_len $max_seq_len \
         --batch_size 1 \
+        --gradient_accumulation_steps $gradient_accumulation_steps \
+        --save_steps 320 \
+        --validating_steps 5000 \
         --model_name $model_name \
         --name $name \
+        --output_dir $output_dir \
+        --overwrite_output_dir \
+        --do_train \
+        --do_eval \
         --n_hidden $gnn_hidden_size \
+        --learning_rate $learning_rate \
+        --max_grad_norm $max_grad_norm \
+        --num_train_epochs $num_train_epochs \
+        --dtype bf16 \
+        --use_lora \
+        --lora_r $lora_rank \
         --use_accelerate \
         --graph_sampling \
-        --model_weight_path $model_weight_path
+        --fuzz_model #
+        # --continue_training \
+        # --checkpoint_path $checkpoint_path # uncomment if you want to continue training
 fi
-
-
-
-# accelerate launch main.py --mode test \
-#     --seed 42 \
-#     --data_path Dataset \
-#     --data testgeneval \
-#     --baseline_prompt graph \
-#     --llm_model "HuggingFaceTB/SmolLM2-135M-Instruct" \
-#     --max_seq_len 16384 \
-#     --batch_size 1 \
-#     --gradient_accumulation_steps 16 \
-#     --save_steps 1000 \
-#     --validating_steps 1000 \
-#     --num_gpu 1 \
-#     --name "testing_small_graph_accelerate" \
-#     --output_dir "./results/models/" \
-#     --overwrite_output_dir \
-#     --do_train \
-#     --do_eval \
-#     --n_hidden 16 \
-#     --learning_rate 5e-5 \
-#     --max_grad_norm 1.0 \
-#     --num_train_epochs 3 \
-#     --dtype bfloat16 \
-#     --use_lora \
-#     --use_accelerate \
-#     --graph_sampling \
-#     --model_weight_path results/models/testing_small_graph_accelerate/final_model \
-#     --do_test
