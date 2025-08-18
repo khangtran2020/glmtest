@@ -911,7 +911,6 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
 
         loss = None
         if labels is not None:
-
             logits = logits.float()
             logits = logits.view(-1, self.config.vocab_size)
             labels = labels.view(-1)
@@ -935,7 +934,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             #         vocab_size=self.config.vocab_size,
             #     )
             pprint(
-                f"[yellow]Step {step}[/yellow]: [cyan]loss: {loss}[/cyan], [green]kl_g shape: {kl_g_total}[/green], [blue]kl_d shape: {kl_d_total}[/blue]"
+                f"[yellow]Step {step}[/yellow]: [cyan]loss: {loss}[/cyan], [green]kl_g: {kl_g_total}[/green], [blue]kl_d: {kl_d_total}[/blue]"
             )
             loss = loss + self.kl_g_reg * kl_g_total + self.kl_d_reg * kl_d_total
 
