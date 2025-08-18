@@ -296,7 +296,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
     ) -> torch.Tensor:
         if inputs_embeds is None:
             inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
-            inputs_embeds = inputs_embeds.requires_grad_(True)
+            if self.is_training:
+                inputs_embeds = inputs_embeds.requires_grad_(True)
 
         if (
             (graph is not None)
@@ -687,7 +688,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             # Patch the model with GLMFFuzzingLayer at the specified layer indices
             self.patch_model_with_fuzz_layer(layer_indices=layer_indices)
 
-        if hasattr(self.llm_model, "base_model"):
+        if self.is_training:
             self.layers = self.llm_model.base_model.model.model.layers
         else:
             self.layers = self.llm_model.model.layers
@@ -836,43 +837,13 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                 .expand(inputs_embeds.shape[0], -1)
             )
 
-        if self.config.model_type == "qwen2":
-            if not isinstance(causal_mask_mapping := attention_mask, dict):
-                pprint(
-                    "[green]Using Qwen2 model type for forward pass. Creating causal_mask[/green]"
-                )
-                # Prepare mask arguments
-                mask_kwargs = {
-                    "config": self.llm_model.config,
-                    "input_embeds": inputs_embeds,
-                    "attention_mask": attention_mask,
-                    "cache_position": cache_position,
-                    "past_key_values": past_key_values,
-                }
-                # Create the masks
-                causal_mask_mapping = {
-                    "full_attention": create_causal_mask(**mask_kwargs),
-                }
-                # The sliding window alternating layers are not always activated depending on the config
-                if hasattr(self.llm_model, "base_model"):
-                    if self.llm_model.base_model.model.model.has_sliding_layers:
-                        causal_mask_mapping["sliding_attention"] = (
-                            create_sliding_window_causal_mask(**mask_kwargs)
-                        )
-                else:
-                    if self.llm_model.model.has_sliding_layers:
-                        causal_mask_mapping["sliding_attention"] = (
-                            create_sliding_window_causal_mask(**mask_kwargs)
-                        )
-
-        elif self.config.model_type == "llama":
-            causal_mask = create_causal_mask(
-                config=self.llm_model.config,
-                input_embeds=inputs_embeds,
-                attention_mask=attention_mask,
-                cache_position=cache_position,
-                past_key_values=past_key_values,
-            )
+        causal_mask = self._update_causal_mask(
+            attention_mask=attention_mask,
+            input_tensor=inputs_embeds,
+            cache_position=cache_position,
+            past_key_values=past_key_values,
+            output_attentions=output_attentions,
+        )
 
         hidden_states = inputs_embeds
 
@@ -889,39 +860,19 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
-            if self.config.model_type == "qwen2":
-                pprint("[green]Casual mask mapping:[/green]", causal_mask_mapping)
-                layer_outputs = decoder_layer(
-                    hidden_states,
-                    attention_mask=causal_mask_mapping[
-                        (
-                            decoder_layer.llm_layer.attention_type
-                            if isinstance(decoder_layer, GLMFFuzzingLayer)
-                            else decoder_layer.attention_type
-                        )
-                    ],
-                    fuzzing_mask=fuzzing_mask,
-                    position_ids=position_ids,
-                    past_key_value=past_key_values,
-                    output_attentions=output_attentions,
-                    use_cache=use_cache,
-                    cache_position=cache_position,
-                    position_embeddings=position_embeddings,
-                    latent_dict=latent_dict,
-                    **flash_attn_kwargs,
-                )
-            elif self.config.model_type == "llama":
-                layer_outputs = decoder_layer(
-                    hidden_states,
-                    attention_mask=causal_mask,
-                    position_ids=position_ids,
-                    past_key_value=past_key_values,
-                    output_attentions=output_attentions,
-                    use_cache=use_cache,
-                    cache_position=cache_position,
-                    position_embeddings=position_embeddings,
-                    **flash_attn_kwargs,
-                )
+            layer_outputs = decoder_layer(
+                hidden_states,
+                attention_mask=causal_mask,
+                fuzzing_mask=fuzzing_mask,
+                position_ids=position_ids,
+                past_key_value=past_key_values,
+                output_attentions=output_attentions,
+                use_cache=use_cache,
+                cache_position=cache_position,
+                position_embeddings=position_embeddings,
+                latent_dict=latent_dict,
+                **flash_attn_kwargs,
+            )
 
             if isinstance(decoder_layer, GLMFFuzzingLayer):
                 hidden_states, attention_out, kl_g, kl_d, latent_dict = layer_outputs
@@ -936,7 +887,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                 if output_attentions:
                     all_self_attns += (layer_outputs[1],)
 
-        if hasattr(self.llm_model, "base_model"):
+        if self.is_training:
             hidden_states = self.llm_model.base_model.model.model.norm(hidden_states)
         else:
             hidden_states = self.llm_model.model.norm(hidden_states)
@@ -950,8 +901,8 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             if isinstance(logits_to_keep, int)
             else logits_to_keep
         )
-        if hasattr(self.llm_model, "base_model"):
-            logits = self.llm_model.base_model.lm_head(
+        if self.is_training:
+            logits = self.llm_model.base_model.model.lm_head(
                 hidden_states[:, slice_indices, :]
             )
         else:
@@ -1005,6 +956,8 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
     ) -> torch.Tensor:
         if inputs_embeds is None:
             inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
+            if self.is_training:
+                inputs_embeds = inputs_embeds.requires_grad_(True)
 
         if (
             (graph is not None)
@@ -1028,3 +981,30 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             )
 
         return inputs_embeds
+
+    def _update_causal_mask(
+        self,
+        attention_mask: torch.Tensor,
+        input_tensor: torch.Tensor,
+        cache_position: torch.Tensor,
+        past_key_values: Cache,
+        output_attentions: bool = False,
+    ):
+        if self.llm_model.config._attn_implementation == "flash_attention_2":
+            if attention_mask is not None and past_key_values is not None:
+                is_padding_right = (
+                    attention_mask[:, -1].sum().item() != input_tensor.size()[0]
+                )
+                if is_padding_right:
+                    raise ValueError(
+                        "You are attempting to perform batched generation with padding_side='right'"
+                        " this may lead to unexpected behaviour for Flash Attention version of Qwen2. Make sure to "
+                        " call `tokenizer.padding_side  = 'left'` before tokenizing the input. "
+                    )
+            if attention_mask is not None and 0.0 in attention_mask:
+                return attention_mask
+            return None
+        else:
+            raise ValueError(
+                f"Unsupported attention implementation: {self.llm_model.config._attn_implementation}, please use 'flash_attention_2'"
+            )
