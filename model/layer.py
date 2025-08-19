@@ -201,8 +201,16 @@ class NVIBTransformerLayer(Module):
         latent_dict["fuzzing_mask"] = (
             fuzzing_mask.transpose(1, 0) if fuzzing_mask is not None else None
         )
-        kl_g = self.nvib_layer.kl_gaussian(**latent_dict)
-        kl_d = self.nvib_layer.kl_dirichlet(**latent_dict)
+        kl_g = self.nvib_layer.kl_gaussian(
+            alpha=latent_dict["alpha"],
+            memory_key_padding_mask=latent_dict["memory_key_padding_mask"],
+            fuzzing_mask=fuzzing_mask,
+        )
+        kl_d = self.nvib_layer.kl_dirichlet(
+            alpha=latent_dict["alpha"],
+            memory_key_padding_mask=latent_dict["memory_key_padding_mask"],
+            fuzzing_mask=fuzzing_mask,
+        )
         return x, attention, kl_g, kl_d, latent_dict
 
     # self-attention block
@@ -362,7 +370,7 @@ class GLMFFuzzingLayer(Module):
         if not self.is_fuzz:
             return llm_hidden_state
 
-        print(f"Fuzzing mask: {fuzzing_mask}")
+        # print(f"Fuzzing mask: {fuzzing_mask}")
 
         src_key_padding_mask = (
             ~(attention_mask.bool())
