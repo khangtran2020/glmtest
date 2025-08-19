@@ -362,6 +362,8 @@ class GLMFFuzzingLayer(Module):
         if not self.is_fuzz:
             return llm_hidden_state
 
+        print(f"Fuzzing mask: {fuzzing_mask}")
+
         src_key_padding_mask = (
             ~(attention_mask.bool())
             if attention_mask is not None
