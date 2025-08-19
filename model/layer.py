@@ -387,6 +387,7 @@ class GLMFFuzzingLayer(Module):
                 hidden_states,
                 src_key_padding_mask=src_key_padding_mask,
                 latent_dict=latent_dict,
+                fuzzing_mask=fuzzing_mask,
             )
         )
 
