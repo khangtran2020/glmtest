@@ -708,7 +708,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         ):
             raise ValueError("The model does not have a valid structure for patching.")
 
-        if hasattr(self.llm_model, "base_model"):
+        if self.is_training:
             # If the model has a base_model attribute, it is likely a LoRA model
             self._patch_peft_model(layer_indices)
         else:
