@@ -202,6 +202,8 @@ class NVIBTransformerLayer(Module):
             fuzzing_mask.transpose(1, 0) if fuzzing_mask is not None else None
         )
         kl_g = self.nvib_layer.kl_gaussian(
+            mu=latent_dict["mu"],
+            logvar=latent_dict["logvar"],
             alpha=latent_dict["alpha"],
             memory_key_padding_mask=latent_dict["memory_key_padding_mask"],
             fuzzing_mask=fuzzing_mask,
