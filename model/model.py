@@ -880,9 +880,9 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
 
             if isinstance(decoder_layer, GLMFFuzzingLayer):
                 hidden_states, attention_out, kl_g, kl_d, latent_dict = layer_outputs
-                pprint(
-                    f"[yellow]Step {step}[/yellow]: [green]kl_g: {kl_g}[/green], [blue]kl_d: {kl_d}[/blue]"
-                )
+                # pprint(
+                #     f"[yellow]Step {step}[/yellow]: [green]kl_g: {kl_g}[/green], [blue]kl_d: {kl_d}[/blue]"
+                # )
                 if kl_g is not None:
                     kl_g_total += kl_g
                 if kl_d is not None:
