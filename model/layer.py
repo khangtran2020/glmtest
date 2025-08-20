@@ -183,6 +183,7 @@ class NVIBTransformerLayer(Module):
             alpha_skip = None
 
         # Nvib latent dictionary
+        pprint(f"[blue]Masking value: {src_mask}, {src_key_padding_mask}[/blue]")
         out, attention, latent_dict = self._sa_block(
             x, src_mask, src_key_padding_mask, alpha_skip
         )
@@ -228,15 +229,6 @@ class NVIBTransformerLayer(Module):
         query = x
         key = latent_dict["z"]
         value = latent_dict["z"]
-
-        pprint(
-            "Checking shape and size before nvib_layer\n",
-            f"query size: {query.size()}\n",
-            f"key size: {key[0].size()}\n",
-            f"value size: {value[0].size()}\n",
-            f"attn_mask size: {attn_mask.size() if attn_mask is not None else None}\n",
-            f"key_padding_mask size: {key_padding_mask.size() if key_padding_mask is not None else None}\n",
-        )
 
         x, attention = self.self_attn(
             query,
