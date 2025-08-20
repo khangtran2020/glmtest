@@ -224,29 +224,19 @@ class NVIBTransformerLayer(Module):
     ) -> Tensor:
         # Note query does not include the prior
 
-        pprint(
-            "Checking shape and size before nvib_layer",
-            x.size(),
-            key_padding_mask.size(),
-            alpha_skip.size() if alpha_skip is not None else None,
-        )
         latent_dict = self.nvib_layer(x, key_padding_mask, alpha_skip)
         query = x
         key = latent_dict["z"]
         value = latent_dict["z"]
 
-        # check nan in the query, key, value
-        # if torch.isnan(query).any():
-        #     print("NaN detected in query inside _sa_block")
-        #     pprint(query)
-
-        # if torch.isnan(key).any():
-        #     print("NaN detected in key inside _sa_block")
-        #     pprint(key)
-
-        # if torch.isnan(value).any():
-        #     print("NaN detected in value inside _sa_block")
-        #     pprint(value)
+        pprint(
+            "Checking shape and size before nvib_layer\n",
+            f"query size: {query.size()}\n",
+            f"key size: {key.size()}\n",
+            f"value size: {value.size()}\n",
+            f"attn_mask size: {attn_mask.size() if attn_mask is not None else None}\n",
+            f"key_padding_mask size: {key_padding_mask.size() if key_padding_mask is not None else None}\n",
+        )
 
         x, attention = self.self_attn(
             query,
