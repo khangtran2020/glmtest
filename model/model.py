@@ -807,9 +807,9 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                     elif labels[i, j] == fuzz_end_id:
                         saw_start = False
             fuzzing_mask = fuzzing_mask.unsqueeze(-1)
-            pprint(
-                f"[cyan]Fuzzing mask is extracted from labels: {fuzzing_mask.size()} - {fuzzing_mask}.[/cyan]"
-            )
+            # pprint(
+            #     f"[cyan]Fuzzing mask is extracted from labels: {fuzzing_mask.size()} - {fuzzing_mask}.[/cyan]"
+            # )
         else:
             fuzzing_mask = None
 

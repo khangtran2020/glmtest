@@ -229,7 +229,6 @@ class NVIBTransformerLayer(Module):
         query = x
         key = latent_dict["z"]
         value = latent_dict["z"]
-        pprint(f"[blue]Masking value: {attn_mask}, {key_padding_mask}[/blue]")
         x, attention = self.self_attn(
             query,
             key,
