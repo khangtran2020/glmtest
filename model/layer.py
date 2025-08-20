@@ -50,6 +50,7 @@ class NVIBTransformerLayer(Module):
         self.linear2 = Linear(dim_feedforward, d_model, **factory_kwargs)
         self.dropout1 = Dropout(dropout)
         self.dropout2 = Dropout(dropout)
+        self.norm1 = LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
         self.norm2 = LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
 
         if isinstance(activation, str):
