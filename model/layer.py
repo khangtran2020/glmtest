@@ -232,7 +232,7 @@ class NVIBTransformerLayer(Module):
         pprint(
             "Checking shape and size before nvib_layer\n",
             f"query size: {query.size()}\n",
-            f"key size: {key[[0]].size()}\n",
+            f"key size: {key[0].size()}\n",
             f"value size: {value[0].size()}\n",
             f"attn_mask size: {attn_mask.size() if attn_mask is not None else None}\n",
             f"key_padding_mask size: {key_padding_mask.size() if key_padding_mask is not None else None}\n",
