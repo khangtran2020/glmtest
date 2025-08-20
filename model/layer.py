@@ -223,12 +223,18 @@ class NVIBTransformerLayer(Module):
         alpha_skip=None,
     ) -> Tensor:
         # Note query does not include the prior
+
+        pprint(
+            "Checking shape and size before nvib_layer",
+            x.size(),
+            key_padding_mask.size(),
+            alpha_skip.size() if alpha_skip is not None else None,
+        )
         latent_dict = self.nvib_layer(x, key_padding_mask, alpha_skip)
         query = x
         key = latent_dict["z"]
         value = latent_dict["z"]
 
-        pprint("Latent dictionary:", latent_dict)
         # check nan in the query, key, value
         # if torch.isnan(query).any():
         #     print("NaN detected in query inside _sa_block")
@@ -390,16 +396,16 @@ class GLMFFuzzingLayer(Module):
 
         # Check nan in the outcome
         if torch.isnan(nvib_hidden_states).any():
-            print("NaN detected in nvib_hidden_states")
+            raise ("NaN detected in nvib_hidden_states")
             pprint(nvib_hidden_states)
         if torch.isnan(attention_out).any():
-            print("NaN detected in attention_out")
+            raise ("NaN detected in attention_out")
             pprint(attention_out)
         if torch.isnan(kl_g).any():
-            print("NaN detected in kl_g")
+            raise ("NaN detected in kl_g")
             pprint(kl_g)
         if torch.isnan(kl_d).any():
-            print("NaN detected in kl_d")
+            raise ("NaN detected in kl_d")
             pprint(kl_d)
 
         hidden_states = fuzzing_mask * nvib_hidden_states + (
