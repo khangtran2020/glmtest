@@ -404,7 +404,7 @@ def train_single_gpu_accelerate(
     if model.config.use_lora == True:
         model.llm_model = model.llm_model.merge_and_unload()
         model.config.use_lora = False
-        console.log("Merged LoRA weights into the base model")
+        console.log("[blue]Merged LoRA weights into the base model[/blue]")
 
     accelerator.wait_for_everyone()
     unwrapped_model = accelerator.unwrap_model(model)
