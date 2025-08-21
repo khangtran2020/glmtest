@@ -358,7 +358,7 @@ def main() -> None:
                 debug=args.debug,
                 rank=rank,
                 multi_gpu=True if args.num_gpu > 1 else False,
-                is_training=True,
+                is_training=False,
             )
 
             glmf_model.config.graph_token_id = [
@@ -397,7 +397,7 @@ def main() -> None:
                 baseline_prompt=args.baseline_prompt,
                 multi_gpu=True if args.num_gpu > 1 else False,
                 debug=args.debug,
-                is_training=True,
+                is_training=False,
                 layer_indices=layer_indices,
                 glmf_model=glmf_model,
                 glmf_model_weight_path=args.model_weight_path,

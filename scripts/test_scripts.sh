@@ -1,6 +1,5 @@
 #!/bin/bash
 
-checkpoint_path="" # set this if continue training.
 data_path="Dataset"
 data="testgeneval"
 baseline_prompt="graph_tr" # other prompts: ['code', 'code_tr', 'graph', 'code_baseline']
