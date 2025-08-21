@@ -790,28 +790,22 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             else self.config.output_hidden_states
         )
 
-        # extract the fuzzing mask from labels.
-        if labels is not None:
-            # get token id from tokenizer
-            fuzz_start_id = self.tokenizer.convert_tokens_to_ids(FUZZ_START_TOKEN)
-            fuzz_end_id = self.tokenizer.convert_tokens_to_ids(FUZZ_END_TOKEN)
-            fuzzing_mask = torch.zeros(labels.shape, device=labels.device)
-            for i in range(labels.shape[0]):
-                saw_start = False
-                for j in range(labels.shape[1]):
-                    if saw_start:
-                        fuzzing_mask[i, j] = 1
+        # extract the fuzzing mask from input_ids.
+        # get token id from tokenizer
+        fuzz_start_id = self.tokenizer.convert_tokens_to_ids(FUZZ_START_TOKEN)
+        fuzz_end_id = self.tokenizer.convert_tokens_to_ids(FUZZ_END_TOKEN)
+        fuzzing_mask = torch.zeros(input_ids.shape, device=input_ids.device)
+        for i in range(input_ids.shape[0]):
+            saw_start = False
+            for j in range(input_ids.shape[1]):
+                if saw_start:
+                    fuzzing_mask[i, j] = 1
 
-                    if labels[i, j] == fuzz_start_id:
-                        saw_start = True
-                    elif labels[i, j] == fuzz_end_id:
-                        saw_start = False
-            fuzzing_mask = fuzzing_mask.unsqueeze(-1)
-            # pprint(
-            #     f"[cyan]Fuzzing mask is extracted from labels: {fuzzing_mask.size()} - {fuzzing_mask}.[/cyan]"
-            # )
-        else:
-            fuzzing_mask = None
+                if input_ids[i, j] == fuzz_start_id:
+                    saw_start = True
+                elif input_ids[i, j] == fuzz_end_id:
+                    saw_start = False
+        fuzzing_mask = fuzzing_mask.unsqueeze(-1)
 
         use_cache = use_cache if use_cache is not None else self.config.use_cache
 
