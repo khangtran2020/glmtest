@@ -418,8 +418,6 @@ def test(
                     # check dtype of Tensor
                     for key in micro_input:
                         print(f"Key: {key}, Dtype: {micro_input[key].dtype}")
-                        # if not micro_input[key].dtype == torch.bfloat16:
-                        #     micro_input[key] = micro_input[key].to(dtype=torch.bfloat16)
 
                     if "graph" in args.baseline_prompt:
                         graph = batch["graph"]
