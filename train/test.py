@@ -261,7 +261,8 @@ def test(
                         "labels": None,
                     }
                     for key in micro_input:
-                        print(f"Key: {key}, Dtype: {micro_input[key].dtype}")
+                        if micro_input[key] is not None:
+                            print(f"Key: {key}, Dtype: {micro_input[key].dtype}")
 
                     if "graph" in args.baseline_prompt:
                         graph = batch["graph"]
