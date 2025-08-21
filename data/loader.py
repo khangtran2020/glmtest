@@ -64,8 +64,8 @@ class GLMFDataset(Dataset):
                     mask=active_node,
                     n_hops=self.n_hops,
                 )
-                print(
-                    f"dtype of graph features before to bfloat16: {graph[key].ndata['feat'].dtype}"
+                graph[key].ndata["feat"] = (
+                    graph[key].ndata["feat"].to(dtype=torch.bfloat16)
                 )
 
         if self.testing == False:
