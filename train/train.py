@@ -215,6 +215,7 @@ def train_single_gpu_accelerate(
     model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
     global_step = 0
     previous_checkpoint_step = -1
+    best_val_loss = 10000.0
 
     if continue_training == False:
         optimizer.zero_grad()
@@ -391,6 +392,33 @@ def train_single_gpu_accelerate(
                         console.log(
                             f"Validation loss: {val_loss:.4f} at step {global_step}"
                         )
+                        if val_loss < best_val_loss:
+                            best_val_loss = val_loss
+                            console.log(
+                                f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
+                            )
+                            checkpoint_dir = os.path.join(
+                                save_path,
+                                f"best_model",
+                            )
+                            if model.config.use_lora == True:
+                                model.llm_model = model.llm_model.merge_and_unload()
+                                model.config.use_lora = False
+                            unwrapped_model = accelerator.unwrap_model(model)
+                            torch.save(
+                                unwrapped_model.state_dict(),
+                                os.path.join(checkpoint_dir, "model_weight.pt"),
+                            )
+                            tokenizer.save_pretrained(checkpoint_dir)
+
+                            if accelerator.is_main_process:
+                                accelerator.print(
+                                    f"Saving best checkpoint to {checkpoint_dir}"
+                                )
+
+                            del unwrapped_model
+                            del checkpoint_dir
+                            gc.collect()
 
                 if ((continue_training == True) and (global_step > start_step)) or (
                     continue_training == False
@@ -561,6 +589,7 @@ def train_multi_gpu_accelerate(
 
     global_step = 0
     previous_checkpoint_step = -1
+    best_val_loss = 10000.0
 
     with Progress(
         SpinnerColumn(),  # Shows a spinner
@@ -812,6 +841,33 @@ def train_multi_gpu_accelerate(
                         console.log(
                             f"Validation loss: {val_loss:.4f} at step {global_step}"
                         )
+
+                        if val_loss < best_val_loss:
+                            best_val_loss = val_loss
+                            console.log(
+                                f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
+                            )
+                            checkpoint_dir = os.path.join(
+                                save_path,
+                                f"best_model",
+                            )
+                            unwrapped_model = accelerator.unwrap_model(model)
+                            if unwrapped_model.config.use_lora == True:
+                                unwrapped_model.llm_model = (
+                                    unwrapped_model.llm_model.merge_and_unload()
+                                )
+                                unwrapped_model.config.use_lora = False
+                            torch.save(
+                                unwrapped_model.state_dict(),
+                                os.path.join(checkpoint_dir, "model_weight.pt"),
+                            )
+                            tokenizer.save_pretrained(checkpoint_dir)
+                            accelerator.print(
+                                f"Saving best checkpoint to {checkpoint_dir}"
+                            )
+                            del unwrapped_model
+                            del checkpoint_dir
+                            gc.collect()
                     model.train()
 
             if accelerator.is_main_process:
