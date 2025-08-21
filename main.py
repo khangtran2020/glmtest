@@ -449,6 +449,7 @@ def main() -> None:
                 if use_lora:
                     model.llm_model = model.llm_model.merge_and_unload()
 
+        model = model.to(dtype=torch.bfloat16)
         console.log(f"Model is loaded to device: {model.device}")
         test(args=args, dataset=dataset, model=model, console=console)
 
