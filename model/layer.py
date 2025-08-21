@@ -329,6 +329,8 @@ class GLMFFuzzingLayer(Module):
                 kappa=kappa,
                 delta=delta,
             )
+            for param in self.nvib_layer.parameters():
+                param = param.to(dtype=llm_dtype)
 
     def forward(
         self,
