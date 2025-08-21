@@ -92,7 +92,7 @@ class GLMFDataset(Dataset):
                 "input": tokenized,
                 "graph": graph,  # Should be a dictionary of graph structures
                 "graph_mask": (
-                    torch.tensor(graph_mask, dtype=torch.float)
+                    torch.tensor(graph_mask, dtype=torch.bfloat16)
                     if graph_mask is not None
                     else None
                 ),
@@ -114,7 +114,7 @@ class GLMFDataset(Dataset):
                 "input": tokenized,
                 "graph": graph,
                 "graph_mask": (
-                    torch.tensor(graph_mask, dtype=torch.float)
+                    torch.tensor(graph_mask, dtype=torch.bfloat16)
                     if graph_mask is not None
                     else None
                 ),
