@@ -65,7 +65,7 @@ class GLMFDataset(Dataset):
                     n_hops=self.n_hops,
                 )
                 graph[key].ndata["feat"] = (
-                    graph[key].ndata["feat"].to(dtype=torch.bfloat16)
+                    graph[key].ndata["feat"].to(dtype=torch.float32)
                 )
 
         if self.testing == False:
@@ -95,7 +95,7 @@ class GLMFDataset(Dataset):
                 "input": tokenized,
                 "graph": graph,  # Should be a dictionary of graph structures
                 "graph_mask": (
-                    torch.tensor(graph_mask, dtype=torch.bfloat16)
+                    torch.tensor(graph_mask, dtype=torch.float32)
                     if graph_mask is not None
                     else None
                 ),
@@ -117,7 +117,7 @@ class GLMFDataset(Dataset):
                 "input": tokenized,
                 "graph": graph,
                 "graph_mask": (
-                    torch.tensor(graph_mask, dtype=torch.bfloat16)
+                    torch.tensor(graph_mask, dtype=torch.float32)
                     if graph_mask is not None
                     else None
                 ),
