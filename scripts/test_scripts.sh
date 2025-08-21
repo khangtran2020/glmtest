@@ -16,6 +16,8 @@ num_train_epochs=3
 gnn_hidden_size=16
 lora_rank=32
 model_weight_path="" # set the trained model weight
+start_fuzz_layer_index=7
+end_fuzz_layer_index=8
 
 # Check if nvidia-smi is available
 if ! command -v nvidia-smi &> /dev/null; then
@@ -43,7 +45,10 @@ elif [ "$gpu_count" -eq 1 ]; then
         --n_hidden $gnn_hidden_size \
         --use_accelerate \
         --graph_sampling \
-        --model_weight_path $model_weight_path
+        --model_weight_path $model_weight_path # \
+        # --fuzz_model \
+        # --start_fuzz_layer_index $start_fuzz_layer_index \
+        # --end_fuzz_layer_index $end_fuzz_layer_index \ # uncomment if you want fuzzing model
 else
     accelerate launch --debug --num_processes "$gpu_count"  main.py --mode test \
         --seed 42 \
@@ -58,7 +63,10 @@ else
         --n_hidden $gnn_hidden_size \
         --use_accelerate \
         --graph_sampling \
-        --model_weight_path $model_weight_path
+        --model_weight_path $model_weight_path # \
+        # --fuzz_model \
+        # --start_fuzz_layer_index $start_fuzz_layer_index \
+        # --end_fuzz_layer_index $end_fuzz_layer_index \ # uncomment if you want fuzzing model
 fi
 
 
