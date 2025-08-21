@@ -450,12 +450,6 @@ def main() -> None:
                     model.llm_model = model.llm_model.merge_and_unload()
 
         # model = model.to(dtype=torch.float)
-        console.log(
-            f"Model is loaded to device: {model.device} - with type {model.dtype}"
-        )
-        for name, param in model.named_parameters():
-            console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
-
         # unifying dtype to avoid errors
         for n, p in model.named_parameters():
             if args.dtype == "bf16":
@@ -464,6 +458,12 @@ def main() -> None:
             elif args.dtype == "fp16":
                 if p.dtype != torch.float16:
                     p.data = p.data.to(torch.float16)
+
+        console.log(
+            f"Model is loaded to device: {model.device} - with type {model.dtype}"
+        )
+        for name, param in model.named_parameters():
+            console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
 
         test(args=args, dataset=dataset, model=model, console=console)
 
