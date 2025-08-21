@@ -101,7 +101,7 @@ class GLMFDataset(Dataset):
             prompt = sample["prompt"]
             uuid = sample["uuid"]
 
-            tokenized = self.tokenize(prompt, num_gpu=self.num_gpus)
+            tokenized, pad_size = self.tokenize(prompt, num_gpu=self.num_gpus)
             input_ids = tokenized["input_ids"]
 
             if (self.baseline_prompt in ["graph", "graph_tr"]) and (

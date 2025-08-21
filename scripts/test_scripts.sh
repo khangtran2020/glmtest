@@ -44,6 +44,7 @@ elif [ "$gpu_count" -eq 1 ]; then
         --n_hidden $gnn_hidden_size \
         --use_accelerate \
         --graph_sampling \
+        --num_gpu 1 \
         --model_weight_path $model_weight_path # \
         # --fuzz_model \
         # --start_fuzz_layer_index $start_fuzz_layer_index \
@@ -62,6 +63,7 @@ else
         --n_hidden $gnn_hidden_size \
         --use_accelerate \
         --graph_sampling \
+        --num_gpu "$gpu_count" \
         --model_weight_path $model_weight_path # \
         # --fuzz_model \
         # --start_fuzz_layer_index $start_fuzz_layer_index \

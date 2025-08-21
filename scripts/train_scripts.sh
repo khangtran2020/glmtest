@@ -48,6 +48,7 @@ elif [ "$gpu_count" -eq 1 ]; then
         --overwrite_output_dir \
         --do_train \
         --do_eval \
+        --num_gpu 1 \
         --n_hidden $gnn_hidden_size \
         --learning_rate $learning_rate \
         --max_grad_norm $max_grad_norm \
@@ -80,6 +81,7 @@ else
         --overwrite_output_dir \
         --do_train \
         --do_eval \
+        --num_gpu "$gpu_count" \
         --n_hidden $gnn_hidden_size \
         --learning_rate $learning_rate \
         --max_grad_norm $max_grad_norm \
