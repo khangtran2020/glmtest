@@ -18,6 +18,7 @@ class GLMFDataset(Dataset):
         n_hops: int = 2,
         testing: bool = False,
         num_gpus: int = 1,
+        dtype: str = "bf16",
         logger=None,
     ):
         self.data = data
@@ -30,6 +31,7 @@ class GLMFDataset(Dataset):
         self.testing = testing
         self.num_gpus = num_gpus
         self.logger = logger
+        self.dtype = dtype
         self.index_to_key_dict = dict(zip(range(len(self.data)), self.data.keys()))
 
         if self.logger is not None:
@@ -54,7 +56,11 @@ class GLMFDataset(Dataset):
             else None
         )
         graph_mask = (
-            torch.Tensor(sample["mask"]) if sample["mask"] is not None else None
+            torch.Tensor(sample["mask"]).to(
+                dtype=torch.bfloat16 if self.dtype == "bf16" else torch.float16
+            )
+            if sample["mask"] is not None
+            else None
         )
 
         if graph is not None:
@@ -65,7 +71,9 @@ class GLMFDataset(Dataset):
                     n_hops=self.n_hops,
                 )
                 graph[key].ndata["feat"] = (
-                    graph[key].ndata["feat"].to(dtype=torch.float32)
+                    graph[key]
+                    .ndata["feat"]
+                    .to(dtype=torch.bfloat16 if self.dtype == "bf16" else torch.float16)
                 )
 
         if self.testing == False:
@@ -94,11 +102,7 @@ class GLMFDataset(Dataset):
                 "text": full_text,
                 "input": tokenized,
                 "graph": graph,  # Should be a dictionary of graph structures
-                "graph_mask": (
-                    torch.tensor(graph_mask, dtype=torch.float32)
-                    if graph_mask is not None
-                    else None
-                ),
+                "graph_mask": (graph_mask if graph_mask is not None else None),
             }
         else:
             prompt = sample["prompt"]
@@ -116,11 +120,7 @@ class GLMFDataset(Dataset):
                 "text": prompt,
                 "input": tokenized,
                 "graph": graph,
-                "graph_mask": (
-                    torch.tensor(graph_mask, dtype=torch.float32)
-                    if graph_mask is not None
-                    else None
-                ),
+                "graph_mask": (graph_mask if graph_mask is not None else None),
             }
             return (uuid, batch)
 
