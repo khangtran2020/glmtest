@@ -323,7 +323,7 @@ class GLMFFuzzingLayer(Module):
                 dtype=dtype,
                 kappa=kappa,
                 delta=delta,
-            )
+            ).to(llm_layer.dtype)
 
     def forward(
         self,
