@@ -401,6 +401,8 @@ def train_single_gpu_accelerate(
                                 save_path,
                                 f"best_model",
                             )
+                            if not os.path.exists(checkpoint_dir):
+                                os.makedirs(checkpoint_dir, exist_ok=True)
                             if model.config.use_lora == True:
                                 model.llm_model = model.llm_model.merge_and_unload()
                                 model.config.use_lora = False
@@ -851,6 +853,9 @@ def train_multi_gpu_accelerate(
                                 save_path,
                                 f"best_model",
                             )
+
+                            if not os.path.exists(checkpoint_dir):
+                                os.makedirs(checkpoint_dir, exist_ok=True)
                             unwrapped_model = accelerator.unwrap_model(model)
                             if unwrapped_model.config.use_lora == True:
                                 unwrapped_model.llm_model = (
