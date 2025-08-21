@@ -63,7 +63,7 @@ class GLMFDataset(Dataset):
                     graph=graph[key],
                     mask=active_node,
                     n_hops=self.n_hops,
-                ).to(dtype=torch.bfloat16)
+                ).to(device="cpu", dtype=torch.bfloat16)
 
         if self.testing == False:
             full_text = sample["full_text"]
