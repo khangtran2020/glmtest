@@ -401,11 +401,20 @@ def test(
                         "attention_mask": batch_input["attention_mask"].to(device),
                         "labels": None,
                     }
+
+                    # check dtype of Tensor
+                    for key in micro_input:
+                        print(f"Key: {key}, Dtype: {micro_input[key].dtype}")
+                        # if not micro_input[key].dtype == torch.bfloat16:
+                        #     micro_input[key] = micro_input[key].to(dtype=torch.bfloat16)
+
                     if "graph" in args.baseline_prompt:
                         graph = batch["graph"]
                         for key in GRAPH_KEYS:
                             if key in graph.keys():
                                 graph[key] = graph[key].to(device)
+                                # check dtype of graph
+
                         graph_mask = batch["graph_mask"].to(device)
                         graph_token_index = torch.where(
                             micro_input["input_ids"] == config.graph_token_id[1]
