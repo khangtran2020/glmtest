@@ -63,7 +63,10 @@ class GLMFDataset(Dataset):
                     graph=graph[key],
                     mask=active_node,
                     n_hops=self.n_hops,
-                ).to(device="cpu", dtype=torch.bfloat16)
+                )
+                print(
+                    f"dtype of graph features before to bfloat16: {graph[key].ndata['feat'].dtype}"
+                )
 
         if self.testing == False:
             full_text = sample["full_text"]
