@@ -456,6 +456,15 @@ def main() -> None:
         for name, param in model.named_parameters():
             console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
 
+        # unifying dtype to avoid errors
+        for n, p in model.named_parameters():
+            if args.dtype == "bf16":
+                if p.dtype != torch.bfloat16:
+                    p.data = p.data.to(torch.bfloat16)
+            elif args.dtype == "fp16":
+                if p.dtype != torch.float16:
+                    p.data = p.data.to(torch.float16)
+
         test(args=args, dataset=dataset, model=model, console=console)
 
     elif args.mode == "metric":
