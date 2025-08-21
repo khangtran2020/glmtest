@@ -407,6 +407,10 @@ class GAT(nn.Module):
 
         h = x
         for i in range(0, self.n_layers):
+            # check dtype of h and layer
+            print(
+                f"Layer {i} - h dtype: {h.dtype}, layer dtype: {self.layers[i].dtype}"
+            )
             h = self.layers[i](g, h)
             h = self.activation(h)
             h = h.flatten(1)
