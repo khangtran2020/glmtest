@@ -312,6 +312,11 @@ class GLMFFuzzingLayer(Module):
         super(GLMFFuzzingLayer, self).__init__()
         self.llm_layer = llm_layer
         self.is_fuzz = is_fuzz
+        # take dtype from llm_layer
+        for param in self.llm_layer.parameters():
+            llm_dtype = param.dtype
+            break
+
         if self.is_fuzz:
             self.nvib_layer = NVIBTransformerLayer(
                 d_model=d_model,
@@ -320,10 +325,10 @@ class GLMFFuzzingLayer(Module):
                 dropout=dropout,
                 activation=activation,
                 device=device,
-                dtype=dtype,
+                dtype=llm_dtype,
                 kappa=kappa,
                 delta=delta,
-            ).to(llm_layer.dtype)
+            )
 
     def forward(
         self,
