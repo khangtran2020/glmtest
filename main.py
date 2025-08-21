@@ -453,6 +453,9 @@ def main() -> None:
         console.log(
             f"Model is loaded to device: {model.device} - with type {model.dtype}"
         )
+        for name, param in model.named_parameters():
+            console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
+
         test(args=args, dataset=dataset, model=model, console=console)
 
     elif args.mode == "metric":
