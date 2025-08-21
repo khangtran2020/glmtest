@@ -61,6 +61,7 @@ def test(
             debug=args.debug,
             n_hops=dataset.n_hops,
             testing=True,
+            dtype=args.dtype,
             num_gpus=args.num_gpu,
         )
     else:
@@ -71,6 +72,7 @@ def test(
             debug=args.debug,
             n_hops=dataset.n_hops,
             testing=True,
+            dtype=args.dtype,
             num_gpus=args.num_gpu,
         )
         te_proj_dataset = GLMFDataset(
@@ -80,6 +82,7 @@ def test(
             debug=args.debug,
             n_hops=dataset.n_hops,
             testing=True,
+            dtype=args.dtype,
             num_gpus=args.num_gpu,
         )
     tokenizer = dataset.llm_tokenizer

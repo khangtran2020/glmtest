@@ -187,6 +187,7 @@ def train_single_gpu_accelerate(
         max_seq_length=args.max_seq_length,
         debug=args.debug,
         n_hops=dataset.n_hops,
+        dtype=args.dtype,
         num_gpus=args.num_gpu,
         logger=console,
     )
@@ -196,6 +197,7 @@ def train_single_gpu_accelerate(
         max_seq_length=args.max_seq_length,
         debug=args.debug,
         n_hops=dataset.n_hops,
+        dtype=args.dtype,
         num_gpus=args.num_gpu,
         logger=console,
     )
@@ -495,6 +497,7 @@ def train_multi_gpu_accelerate(
         debug=args.debug,
         n_hops=dataset.n_hops,
         logger=console,
+        dtype=args.dtype,
         num_gpus=args.num_gpu,
     )
     va_dataset = GLMFDataset(
@@ -504,6 +507,7 @@ def train_multi_gpu_accelerate(
         debug=args.debug,
         n_hops=dataset.n_hops,
         logger=console,
+        dtype=args.dtype,
         num_gpus=args.num_gpu,
     )
     dataloader_params = {
