@@ -142,7 +142,9 @@ class GLMFDataset(Dataset):
                 .to(result["input_ids"].device)
             )
 
-            result["input_ids"] = torch.cat((pad_tensor, result["input_ids"]), dim=1)
+            result["input_ids"] = torch.cat(
+                (pad_tensor, result["input_ids"]), dim=1
+            ).to(dtype=torch.bfloat16)
 
             attention_tensor = torch.tensor(
                 [[0] * pad_tensor.shape[1]],
@@ -152,7 +154,7 @@ class GLMFDataset(Dataset):
 
             result["attention_mask"] = torch.cat(
                 [attention_tensor, result["attention_mask"]], dim=1
-            )
+            ).to(dtype=torch.bfloat16)
             pad_size = pad_tensor.shape[1]
 
         # Use clone() to make a copy of the tensor for labels.
