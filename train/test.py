@@ -260,6 +260,9 @@ def test(
                         "attention_mask": batch_input["attention_mask"].to(device),
                         "labels": None,
                     }
+                    for key in micro_input:
+                        print(f"Key: {key}, Dtype: {micro_input[key].dtype}")
+
                     if "graph" in args.baseline_prompt:
                         graph = batch["graph"]
                         for key in GRAPH_KEYS:
