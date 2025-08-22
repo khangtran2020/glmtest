@@ -405,12 +405,6 @@ def train_single_gpu_accelerate(
                                 os.makedirs(checkpoint_dir, exist_ok=True)
 
                             unwrapped_model = accelerator.unwrap_model(model)
-                            if unwrapped_model.config.use_lora == True:
-                                unwrapped_model.llm_model = (
-                                    unwrapped_model.llm_model.merge_and_unload()
-                                )
-                                unwrapped_model.config.use_lora = False
-
                             torch.save(
                                 unwrapped_model.state_dict(),
                                 os.path.join(checkpoint_dir, "model_weight.pt"),
@@ -437,13 +431,27 @@ def train_single_gpu_accelerate(
                         description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
                     )
 
-    if model.config.use_lora == True:
-        model.llm_model = model.llm_model.merge_and_unload()
-        model.config.use_lora = False
-        console.log("[blue]Merged LoRA weights into the base model[/blue]")
-
     accelerator.wait_for_everyone()
     unwrapped_model = accelerator.unwrap_model(model)
+
+    # load best model for final evaluation
+    best_model_path = os.path.join(save_path, "best_model", "model_weight.pt")
+    if os.path.exists(best_model_path):
+        console.log(f"Loading best model from {best_model_path} for final evaluation")
+        state_dict = torch.load(best_model_path, map_location="cpu")
+        missing_keys, unexpected_keys = unwrapped_model.load_state_dict(
+            state_dict, strict=False
+        )
+        if len(missing_keys) > 0:
+            console.log(f"Missing keys when loading best model: {missing_keys}")
+        if len(unexpected_keys) > 0:
+            console.log(f"Unexpected keys when loading best model: {unexpected_keys}")
+        console.log("Best model loaded successfully")
+
+    if unwrapped_model.config.use_lora == True:
+        unwrapped_model.llm_model = unwrapped_model.llm_model.merge_and_unload()
+        unwrapped_model.config.use_lora = False
+        console.log("[blue]Merged LoRA weights into the base model[/blue]")
 
     final_model_path = os.path.join(save_path, "final_model")
     console.log(f"Saving final model to {final_model_path}...")
@@ -862,11 +870,11 @@ def train_multi_gpu_accelerate(
                                 os.makedirs(checkpoint_dir, exist_ok=True)
 
                             unwrapped_model = accelerator.unwrap_model(model)
-                            if unwrapped_model.config.use_lora == True:
-                                unwrapped_model.llm_model = (
-                                    unwrapped_model.llm_model.merge_and_unload()
-                                )
-                                unwrapped_model.config.use_lora = False
+                            # if unwrapped_model.config.use_lora == True:
+                            #     unwrapped_model.llm_model = (
+                            #         unwrapped_model.llm_model.merge_and_unload()
+                            #     )
+                            #     unwrapped_model.config.use_lora = False
                             torch.save(
                                 unwrapped_model.state_dict(),
                                 os.path.join(checkpoint_dir, "model_weight.pt"),
@@ -903,6 +911,22 @@ def train_multi_gpu_accelerate(
             os.makedirs(final_model_path, exist_ok=True)
 
         unwrapped_model = accelerator.unwrap_model(model)
+        best_model_path = os.path.join(save_path, "best_model", "model_weight.pt")
+        if os.path.exists(best_model_path):
+            console.log(
+                f"Loading best model from {best_model_path} for final evaluation"
+            )
+            state_dict = torch.load(best_model_path, map_location="cpu")
+            missing_keys, unexpected_keys = unwrapped_model.load_state_dict(
+                state_dict, strict=False
+            )
+            if len(missing_keys) > 0:
+                console.log(f"Missing keys when loading best model: {missing_keys}")
+            if len(unexpected_keys) > 0:
+                console.log(
+                    f"Unexpected keys when loading best model: {unexpected_keys}"
+                )
+            console.log("Best model loaded successfully")
 
         if unwrapped_model.config.use_lora == True:
             unwrapped_model.llm_model = unwrapped_model.llm_model.merge_and_unload()
