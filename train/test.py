@@ -190,7 +190,7 @@ def test(
                         progress.update(
                             test_task,
                             advance=1,
-                            description=f"Testing... {idx}/{len(te_proj_dataset)} - {avg_time:.2f}s for 1 sample",
+                            description=f"Testing... {idx}/{len(te_dataset)} - {avg_time:.2f}s for 1 sample",
                         )
                     else:
                         with torch.autocast(device_type="cuda", dtype=torch.float16):
