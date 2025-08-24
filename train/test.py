@@ -416,8 +416,8 @@ def test(
                     }
 
                     # check dtype of Tensor
-                    for key in micro_input:
-                        print(f"Key: {key}, Dtype: {micro_input[key].dtype}")
+                    # for key in micro_input:
+                    #     print(f"Key: {key}, Dtype: {micro_input[key].dtype}")
 
                     if "graph" in args.baseline_prompt:
                         graph = batch["graph"]
@@ -448,16 +448,15 @@ def test(
                     )
 
                     if args.num_gpu == 1:
-                        with torch.autocast(device_type="cuda", dtype=torch.float16):
-                            outputs = model.generate(
-                                inputs=micro_input["input_ids"],
-                                graph=graph,
-                                graph_mask=graph_mask,
-                                graph_token_index=graph_token_index,
-                                max_new_tokens=args.max_new_tokens,
-                                do_sample=False,
-                                use_cache=True,
-                            )
+                        outputs = model.generate(
+                            inputs=micro_input["input_ids"],
+                            graph=graph,
+                            graph_mask=graph_mask,
+                            graph_token_index=graph_token_index,
+                            max_new_tokens=args.max_new_tokens,
+                            do_sample=False,
+                            use_cache=True,
+                        )
                         out_text = tokenizer.batch_decode(
                             outputs[:, micro_input["input_ids"].size(1) :],
                             skip_special_tokens=True,
