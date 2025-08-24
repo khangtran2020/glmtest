@@ -439,6 +439,7 @@ def main() -> None:
             ]
 
         # take .pt file from the model_weight_path
+        console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
         for file in os.listdir(args.model_weight_path):
             if file.endswith(".pt"):
                 state_dict = torch.load(
