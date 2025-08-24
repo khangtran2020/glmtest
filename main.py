@@ -448,6 +448,7 @@ def main() -> None:
                 model.load_state_dict(state_dict)
                 if use_lora:
                     model.llm_model = model.llm_model.merge_and_unload()
+                console.log(f"Model weights loaded from {file}")
 
         # model = model.to(dtype=torch.float)
         # unifying dtype to avoid errors
