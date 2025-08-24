@@ -310,7 +310,7 @@ def test(
                             )
                         out_text = tokenizer.batch_decode(
                             outputs[:, micro_input["input_ids"].size(1) :],
-                            skip_special_tokens=True,
+                            skip_special_tokens=False if args.fuzz_model else True,
                         )[0]
 
                         console.log(
@@ -414,17 +414,15 @@ def test(
                         "attention_mask": batch_input["attention_mask"].to(device),
                         "labels": None,
                     }
-
-                    # check dtype of Tensor
-                    # for key in micro_input:
-                    #     print(f"Key: {key}, Dtype: {micro_input[key].dtype}")
+                    for key in micro_input:
+                        if micro_input[key] is not None:
+                            print(f"Key: {key}, Dtype: {micro_input[key].dtype}")
 
                     if "graph" in args.baseline_prompt:
                         graph = batch["graph"]
                         for key in GRAPH_KEYS:
                             if key in graph.keys():
                                 graph[key] = graph[key].to(device)
-                                # check dtype of graph
 
                         graph_mask = batch["graph_mask"].to(device)
                         graph_token_index = torch.where(
@@ -448,18 +446,19 @@ def test(
                     )
 
                     if args.num_gpu == 1:
-                        outputs = model.generate(
-                            inputs=micro_input["input_ids"],
-                            graph=graph,
-                            graph_mask=graph_mask,
-                            graph_token_index=graph_token_index,
-                            max_new_tokens=args.max_new_tokens,
-                            do_sample=False,
-                            use_cache=True,
-                        )
+                        with torch.autocast(device_type="cuda", dtype=torch.float16):
+                            outputs = model.generate(
+                                inputs=micro_input["input_ids"],
+                                graph=graph,
+                                graph_mask=graph_mask,
+                                graph_token_index=graph_token_index,
+                                max_new_tokens=args.max_new_tokens,
+                                do_sample=False,
+                                use_cache=True,
+                            )
                         out_text = tokenizer.batch_decode(
                             outputs[:, micro_input["input_ids"].size(1) :],
-                            skip_special_tokens=True,
+                            skip_special_tokens=False if args.fuzz_model else True,
                         )[0]
 
                         # print(f"Generated text - {uuid}: {out_text}")
