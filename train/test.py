@@ -229,6 +229,25 @@ def test(
                                 advance=1,
                                 description=f"Testing... {idx}/{len(te_dataset)} - {avg_time:.2f}s for 1 sample",
                             )
+        if args.num_gpu == 1:
+            console.log("Done Testing on train dataset finished.")
+            save_dir = os.path.join(args.gen_dir, f"{args.name}_ontrain.json")
+            with console.status("Saving results..."):
+                # save generated text to jsonl file
+                with open(save_dir, "w", encoding="utf-8") as f:
+                    # save as json file
+                    json.dump(generated_text, f, ensure_ascii=False, indent=4)
+        else:
+            console.log(
+                "Done Testing on train dataset finished. Results saved in the main process only."
+            )
+            save_dir = os.path.join(args.gen_dir, f"{args.name}_ontrain.json")
+            if accelerator.is_main_process:
+                with console.status("Saving results..."):
+                    # save generated text to jsonl file
+                    with open(save_dir, "w", encoding="utf-8") as f:
+                        # save as json file
+                        json.dump(generated_text, f, ensure_ascii=False, indent=4)
     else:
         # Test projects
         with Progress(
