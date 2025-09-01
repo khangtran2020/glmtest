@@ -296,7 +296,7 @@ def main() -> None:
         for name, param in model.named_parameters():
             if param.requires_grad:
                 console.log(
-                    f"[blye]{name}: {param.numel()} parameters, shape={tuple(param.shape)}[/blue]"
+                    f"[blue]{name}: {param.numel()} parameters, shape={tuple(param.shape)}[/blue]"
                 )
                 total_params += param.numel()
 
