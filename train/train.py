@@ -302,6 +302,17 @@ def train_single_gpu_accelerate(
                             loss = outputs.loss
                             accelerator.backward(loss)
 
+                            # compute the gradient norm of the nvib layer
+                            if args.fuzz_model:
+                                with torch.no_grad():
+                                    for name, param in model.named_parameters():
+                                        if "nvib_layer" in name and param.requires_grad:
+                                            if param.grad is not None:
+                                                grad_norm = param.grad.norm(2).item()
+                                                console.log(
+                                                    f"Step {global_step}: Gradient norm of {name}: {grad_norm:.4f}"
+                                                )
+
                             if accelerator.sync_gradients:
                                 accelerator.clip_grad_norm_(model.parameters(), 1.0)
                                 optimizer.step()
@@ -718,6 +729,16 @@ def train_multi_gpu_accelerate(
                         #     print(
                         #         f"Step {global_step} - for rank {local_rank}: gradient norm: {grad_norm:.4f}\n\n\n"
                         #     )
+
+                        if args.fuzz_model:
+                            with torch.no_grad():
+                                for name, param in model.named_parameters():
+                                    if "nvib_layer" in name and param.requires_grad:
+                                        if param.grad is not None:
+                                            grad_norm = param.grad.norm(2).item()
+                                            console.log(
+                                                f"Step {global_step} - rank {local_rank}: Gradient norm of {name}: {grad_norm:.4f}"
+                                            )
 
                         if accelerator.sync_gradients:
                             accelerator.wait_for_everyone()
