@@ -921,11 +921,14 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                 num_items_in_batch=None,
                 ignore_index=-100,
             )
-            loss = (
-                loss
-                + self.kl_g_reg * kl_g_total.mean()
-                + self.kl_d_reg * kl_d_total.mean()
-            )
+            if isinstance(kl_g_total, torch.Tensor) and isinstance(
+                kl_d_total, torch.Tensor
+            ):
+                loss = (
+                    loss
+                    + self.kl_g_reg * kl_g_total.mean()
+                    + self.kl_d_reg * kl_d_total.mean()
+                )
 
         return CausalLMOutputWithPast(
             loss=loss,
