@@ -297,6 +297,18 @@ def main() -> None:
         )
         lr_scheduler = CosineAnnealingLR(optimizer, T_max=100, eta_min=5e-8)
 
+        num_params = 0
+        for i, param_group in enumerate(optimizer.param_groups):
+            group_params = sum(
+                p.numel() for p in param_group["params"] if p.requires_grad
+            )
+            num_params += group_params
+            console.log(f"[cyan]Param group {i}: {group_params} parameters[/cyan]")
+
+        console.log(
+            f"[yellow]Total parameters tracked by optimizer: {num_params}[/yellow]"
+        )
+
         if args.continue_training:
             assert (
                 args.checkpoint_path is not None
