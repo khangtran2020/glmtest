@@ -367,6 +367,11 @@ def add_training_group(group):
         action="store_true",
         help="Train with accelerate",
     )
+    group.add_argument(
+        "--only_nvib",
+        action="store_true",
+        help="Train only the NVIB layers",
+    )
 
 
 def parse_args():

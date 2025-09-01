@@ -235,6 +235,18 @@ def main() -> None:
                 kl_d_reg=args.kl_d_reg,
             )
 
+            if args.only_nvib:
+
+                # freeze all params first
+                for param in model.parameters():
+                    param.requires_grad = False
+
+                # unfreeze NVIB params
+                for name, param in model.named_parameters():
+                    if "nvib_layer" in name:
+                        param.requires_grad = True
+                        console.log(f"Parameter {name} is set to be trainable.")
+
         else:
             config = GLMFModelConfig(
                 llm_model=args.llm_model,
