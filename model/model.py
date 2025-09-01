@@ -921,6 +921,9 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                 num_items_in_batch=None,
                 ignore_index=-100,
             )
+            pprint(
+                f"[yellow]Step {step} - rank {self.rank}[/yellow]: [cyan]loss: {loss}[/cyan]"
+            )
             if isinstance(kl_g_total, torch.Tensor) and isinstance(
                 kl_d_total, torch.Tensor
             ):
@@ -928,6 +931,9 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                     loss
                     + self.kl_g_reg * kl_g_total.mean()
                     + self.kl_d_reg * kl_d_total.mean()
+                )
+                pprint(
+                    f"[yellow]Step {step} - rank {self.rank}[/yellow]: [red]total loss: {loss}[/red]"
                 )
 
         return CausalLMOutputWithPast(
