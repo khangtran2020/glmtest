@@ -393,6 +393,18 @@ class GLMFFuzzingLayer(Module):
         hidden_states = fuzzing_mask * nvib_hidden_states + (
             (1 - fuzzing_mask) * llm_hidden_state[0]
         )
+
+        # Combine the two hidden states
+        # debugging
+        # Get where fuzzing_mask is 1 and check the outcome at those positions
+        index_fuzz = (fuzzing_mask == 1).nonzero(as_tuple=True)[0]
+        pprint(f"[green]Fuzzing positions: {index_fuzz}[/green]")
+        pprint(f"[green]LLM hidden states: {llm_hidden_state[0]}[/green]")
+        pprint(
+            f"[green]NVIB hidden states: {nvib_hidden_states[:,index_fuzz,:]}[/green]"
+        )
+        pprint(f"[green]Fuzzed hidden states: {hidden_states[:,index_fuzz,:]}[/green]")
+
         attention_out_ = (
             (llm_hidden_state[1], attention_out) if output_attentions else None
         )
