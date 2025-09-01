@@ -292,6 +292,18 @@ def main() -> None:
                 f"Special tokens added to tokenizer and model: {model.config.graph_token_id}"
             )
 
+        total_params = 0
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                console.log(
+                    f"[blye]{name}: {param.numel()} parameters, shape={tuple(param.shape)}[/blue]"
+                )
+                total_params += param.numel()
+
+        console.log(
+            f"[green]Total trainable parameters from model: {total_params}[/green]"
+        )
+
         optimizer = AdamW(
             filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
         )
