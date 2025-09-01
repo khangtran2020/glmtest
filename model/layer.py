@@ -397,7 +397,7 @@ class GLMFFuzzingLayer(Module):
         # Combine the two hidden states
         # debugging
         # Get where fuzzing_mask is 1 and check the outcome at those positions
-        index_fuzz = (fuzzing_mask == 1).nonzero(as_tuple=True)[0]
+        index_fuzz = (fuzzing_mask[0] == 1).nonzero(as_tuple=True)[0]
         pprint(f"[green]Fuzzing positions: {index_fuzz}[/green]")
         pprint(f"[green]LLM hidden states: {llm_hidden_state[0]}[/green]")
         pprint(
