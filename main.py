@@ -292,6 +292,15 @@ def main() -> None:
                 f"Special tokens added to tokenizer and model: {model.config.graph_token_id}"
             )
 
+        if args.model_weight_path is not None:
+            for file in os.listdir(args.model_weight_path):
+                if file.endswith(".pt"):
+                    state_dict = torch.load(
+                        os.path.join(args.model_weight_path, file),
+                        map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+                    )
+                    model.load_state_dict(state_dict)
+
         total_params = 0
         for name, param in model.named_parameters():
             if param.requires_grad:
