@@ -910,16 +910,12 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
 
         loss = None
         if labels is not None:
-            logits = logits.float()
-            logits = logits.view(-1, self.config.vocab_size)
-            labels = labels.view(-1)
-            labels = labels.to(logits.device)
-            loss = fixed_cross_entropy(
-                logits,
-                labels,
-                num_items_in_batch=None,
-                ignore_index=-100,
+            loss = self.loss_function(
+                logits=logits,
+                labels=labels,
+                vocab_size=self.config.vocab_size,
             )
+
             pprint(
                 f"[yellow]Step {step} - rank {self.rank}[/yellow]: [cyan]loss: {loss}[/cyan]"
             )
