@@ -659,7 +659,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         if glmf_model is not None:
             # If a GLMFModelForCausalLM is provided, use its configuration
             # config = glmf_model.config
-            self.glmf_model = glmf_model
+            # self.glmf_model = glmf_model
             self.gnn = glmf_model.gnn
             self.llm_model = glmf_model.llm_model
             self.rotary_emb = self.llm_model.model.rotary_emb
