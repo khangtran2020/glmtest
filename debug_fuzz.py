@@ -457,6 +457,7 @@ def main() -> None:
                 del graph_mask, graph
             gc.collect()
             torch.cuda.empty_cache()
+            global_step += 1
 
         if accelerator.sync_gradients:
             accelerator.clip_grad_norm_(model.parameters(), 1.0)
