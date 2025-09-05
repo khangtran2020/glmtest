@@ -244,7 +244,7 @@ def main() -> None:
     for name, param in glmf_model.named_parameters():
         if param.requires_grad:
             console.log(
-                f"[blue]{name}: {param.numel()} parameters, shape={tuple(param.shape)}[/blue]"
+                f"[green]{name}: {param.numel()} parameters, shape={tuple(param.shape)}[/green]"
             )
             total_params_glmf_model += param.numel()
 
