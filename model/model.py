@@ -800,7 +800,6 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             for j in range(input_ids.shape[1]):
                 if saw_start:
                     fuzzing_mask[i, j] = 1
-
                 if input_ids[i, j] == fuzz_start_id:
                     saw_start = True
                 elif input_ids[i, j] == fuzz_end_id:
