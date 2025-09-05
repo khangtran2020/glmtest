@@ -306,7 +306,7 @@ def main() -> None:
     tokenizer = dataset.llm_tokenizer
     device = accelerator.device
     accelerator.print(f"Using {accelerator.num_processes} devices")
-    accelerator.print(f"Mixed precision: {"bf16"}")
+    accelerator.print(f"Mixed precision: bf16")
 
     tr_dataset = GLMFDataset(
         data=dataset.train_data,
@@ -337,12 +337,15 @@ def main() -> None:
 
     device = accelerator.device
     config = model.config
-    model, optimizer_model, lr_scheduler_model = accelerator.prepare(model, optimizer_model, lr_scheduler_model)
-    glmf_model, optimizer_glmf_model, lr_scheduler_glmf_model = accelerator.prepare(glmf_model, optimizer_glmf_model, lr_scheduler_glmf_model)
+    model, optimizer_model, lr_scheduler_model = accelerator.prepare(
+        model, optimizer_model, lr_scheduler_model
+    )
+    glmf_model, optimizer_glmf_model, lr_scheduler_glmf_model = accelerator.prepare(
+        glmf_model, optimizer_glmf_model, lr_scheduler_glmf_model
+    )
     global_step = 0
     previous_checkpoint_step = -1
     best_val_loss = 10000.0
-
 
     glmf_model.train()
     model.train()
@@ -469,7 +472,6 @@ def main() -> None:
                     )
             break
 
-    
     # Check save model process
     accelerator.wait_for_everyone()
     unwrapped_model = accelerator.unwrap_model(model)
@@ -477,7 +479,9 @@ def main() -> None:
 
     if unwrapped_model.config.use_lora == True:
         unwrapped_model.llm_model = unwrapped_model.llm_model.merge_and_unload()
-        unwrapped_glmf_model.llm_model = unwrapped_glmf_model.llm_model.merge_and_unload()
+        unwrapped_glmf_model.llm_model = (
+            unwrapped_glmf_model.llm_model.merge_and_unload()
+        )
 
     # Logs model and glmf_model parameter norms before saving
     for name, param in unwrapped_model.named_parameters():
