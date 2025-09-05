@@ -394,7 +394,7 @@ def main() -> None:
                 loss_model = outputs_model.loss
 
                 console.log(
-                    f"[blue]Step {step}, Micro-batch {i+1}/{batch_size}[/blue], [yellow]Loss model: {loss_model.item():.4f}[/yellow], [yellow]Logits model: {logits_model[:, -1, :5]}[yellow]"
+                    f"[blue]Step {step}, Micro-batch {i+1}/{batch_size}[/blue], [yellow]Loss model: {loss_model.item():.4f}[/yellow], [yellow]Logits model: {logits_model}[yellow]"
                 )
                 accelerator.backward(loss_model)
 
@@ -414,7 +414,7 @@ def main() -> None:
                 logits_glmf_model = outputs_glmf_model.logits
 
                 console.log(
-                    f"[green]Step {step}, Micro-batch {i+1}/{batch_size}[/green], [yellow]Loss GLMF model: {loss_glmf_model.item():.4f}[/yellow], [yellow]Logits GLMF model: {logits_glmf_model[:, -1, :5]}[yellow]"
+                    f"[green]Step {step}, Micro-batch {i+1}/{batch_size}[/green], [yellow]Loss GLMF model: {loss_glmf_model.item():.4f}[/yellow], [yellow]Logits GLMF model: {logits_glmf_model}[yellow]"
                 )
                 accelerator.backward(loss_glmf_model)
                 logits_glmf_model = logits_glmf_model.to("cpu")
