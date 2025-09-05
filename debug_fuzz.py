@@ -1,4 +1,5 @@
 import os
+import gc
 import torch
 import warnings
 from copy import deepcopy
@@ -389,6 +390,18 @@ def main() -> None:
                     graph_mask=graph_mask,
                     graph_token_index=graph_token_index,
                 )
+                logits_model = outputs_model.logits
+                loss_model = outputs_model.loss
+
+                console.log(
+                    f"[blue]Step {step}, Micro-batch {i+1}/{batch_size}[/blue], [yellow]Loss model: {loss_model.item():.4f}[/yellow], [yellow]Logits model: {logits_model[:, -1, :5]}[yellow]"
+                )
+                accelerator.backward(loss_model)
+
+                logits_model = logits_model.to("cpu")
+                loss_model = loss_model.to("cpu")
+                outputs_model.logits = outputs_model.logits.to("cpu")
+                del outputs_model, logits_model, loss_model
 
                 outputs_glmf_model = glmf_model(
                     **micro_input,
@@ -397,22 +410,17 @@ def main() -> None:
                     graph_mask=graph_mask,
                     graph_token_index=graph_token_index,
                 )
-
-                loss_model = outputs_model.loss
                 loss_glmf_model = outputs_glmf_model.loss
-
-                logits_model = outputs_model.logits
                 logits_glmf_model = outputs_glmf_model.logits
 
                 console.log(
-                    f"[blue]Step {step}, Micro-batch {i+1}/{batch_size}[/blue], [green]Loss model: {loss_model.item():.4f}[/green], [yellow]Loss glmf_model: {loss_glmf_model.item():.4f}[yellow]"
+                    f"[green]Step {step}, Micro-batch {i+1}/{batch_size}[/green], [yellow]Loss GLMF model: {loss_glmf_model.item():.4f}[/yellow], [yellow]Logits GLMF model: {logits_glmf_model[:, -1, :5]}[yellow]"
                 )
-                console.log(
-                    f"[blue]Step {step}, Micro-batch {i+1}/{batch_size}[/blue], [green]Logits model: {logits_model[:, -1, :5]}[/green], [yellow]Logits glmf_model: {logits_glmf_model[:, -1, :5]}[yellow]"
-                )
-
-                accelerator.backward(loss_model)
                 accelerator.backward(loss_glmf_model)
+                logits_glmf_model = logits_glmf_model.to("cpu")
+                loss_glmf_model = loss_glmf_model.to("cpu")
+                outputs_glmf_model.logits = outputs_glmf_model.logits.to("cpu")
+                del outputs_glmf_model, logits_glmf_model, loss_glmf_model
 
                 # Check gradients
                 for name, param in model.named_parameters():
@@ -437,6 +445,18 @@ def main() -> None:
                         console.log(
                             f"[green] At step {global_step}, glmf_model parameter {name} has grad norm {grad_norm:.4f}[/green]"
                         )
+
+            for key in micro_input.keys():
+                micro_input[key] = micro_input[key].to("cpu")
+            if "graph" in args.baseline_prompt:
+                for key in GRAPH_KEYS:
+                    if key in graph.keys():
+                        graph[key] = graph[key].to("cpu")
+                        graph.pop(key, None)
+                graph_mask = graph_mask.to("cpu")
+                del graph_mask, graph
+            gc.collect()
+            torch.cuda.empty_cache()
 
         if accelerator.sync_gradients:
             accelerator.clip_grad_norm_(model.parameters(), 1.0)
