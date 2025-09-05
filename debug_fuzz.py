@@ -443,7 +443,7 @@ def main() -> None:
                                 f"[red]NaN gradient detected in glmf_model parameter {name} at step {global_step}[/red]"
                             )
                         console.log(
-                            f"[green] At step {global_step}, glmf_model parameter {name} has grad norm {grad_norm:.4f}[/green]"
+                            f"[blue]At step {global_step}, glmf_model parameter {name} has grad norm {grad_norm:.4f}[/blue]"
                         )
 
             for key in micro_input.keys():
