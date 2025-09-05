@@ -167,6 +167,7 @@ def main() -> None:
             layer_indices = [
                 i for i in range(args.start_fuzz_layer_index, args.end_fuzz_layer_index)
             ]
+
             glmf_model = GLMFModelForCausalLM(
                 config=glmf_model_config,
                 tokenizer=dataset.llm_tokenizer,
@@ -302,7 +303,7 @@ def main() -> None:
                     model.load_state_dict(state_dict)
 
         total_params = 0
-        for name, param in model.named_parameters():
+        for name, param in model.llm_model.base_model.model.model.named_parameters():
             if param.requires_grad:
                 console.log(
                     f"[blue]{name}: {param.numel()} parameters, shape={tuple(param.shape)}[/blue]"
