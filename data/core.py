@@ -156,6 +156,7 @@ class Data(object):
         max_tokens: int = 4096,
         n_hops: int = 2,
         gnn_mode: str = "node",
+        data_fuzz: bool = False,
     ) -> None:
         self.name = name  # name of the data
         self.path = path  # path of the raw data
@@ -173,6 +174,7 @@ class Data(object):
         self.n_hops = n_hops
         self.max_tokens = max_tokens
         self.gnn_mode = gnn_mode
+        self.data_fuzz = data_fuzz
 
     def crawl(self) -> None:
         """
@@ -626,7 +628,8 @@ class Data(object):
 
                     for testcase in dat["test_cases"].keys():
                         test_code = dat["test_cases"][testcase]["test_case"]
-                        test_code = self.add_fuzz_tags(test_code)
+                        if self.data_fuzz:
+                            test_code = self.add_fuzz_tags(test_code)
                         if test_code == "N/A":
                             num_discarded += 1
                             continue

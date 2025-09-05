@@ -174,7 +174,7 @@ def test(
                             )
                         out_text = tokenizer.batch_decode(
                             outputs[:, micro_input["input_ids"].size(1) :],
-                            skip_special_tokens=True,
+                            skip_special_tokens=False if args.data_fuzz else True,
                         )[0]
                         # print(f"Generated text - {uuid}: {out_text}")
                         if args.debug and accelerator.is_main_process:
@@ -212,7 +212,7 @@ def test(
                         if accelerator.is_main_process:
                             out_text = tokenizer.batch_decode(
                                 outputs[:, micro_input["input_ids"].size(1) :],
-                                skip_special_tokens=True,
+                                skip_special_tokens=False if args.data_fuzz else True,
                             )[0]
 
                             console.log(
@@ -329,7 +329,7 @@ def test(
                             )
                         out_text = tokenizer.batch_decode(
                             outputs[:, micro_input["input_ids"].size(1) :],
-                            skip_special_tokens=False if args.fuzz_model else True,
+                            skip_special_tokens=False if args.data_fuzz else True,
                         )[0]
 
                         console.log(
@@ -366,7 +366,7 @@ def test(
                         if accelerator.is_main_process:
                             out_text = tokenizer.batch_decode(
                                 outputs[:, micro_input["input_ids"].size(1) :],
-                                skip_special_tokens=True,
+                                skip_special_tokens=False if args.data_fuzz else True,
                             )[0]
 
                             console.log(
@@ -516,7 +516,7 @@ def test(
                         if accelerator.is_main_process:
                             out_text = tokenizer.batch_decode(
                                 outputs[:, micro_input["input_ids"].size(1) :],
-                                skip_special_tokens=True,
+                                skip_special_tokens=False if args.fuzz_model else True,
                             )[0]
 
                             console.log(
