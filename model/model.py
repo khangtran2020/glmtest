@@ -12,7 +12,7 @@ from transformers.modeling_utils import PreTrainedModel
 from transformers.configuration_utils import PretrainedConfig
 from transformers.generation.utils import GenerationMixin
 from transformers.modeling_outputs import CausalLMOutputWithPast
-from transformers.cache_utils import Cache
+from transformers.cache_utils import Cache, DynamicCache
 import torch.distributed as dist
 from transformers.models.auto.configuration_auto import CONFIG_MAPPING
 from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING
@@ -817,6 +817,12 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                 "You must specify exactly one of input_ids or inputs_embeds"
             )
 
+        # TODO (joao): remove this exception in v4.56 -- it exists for users that try to pass a legacy cache
+        if not isinstance(past_key_values, (type(None), Cache)):
+            raise ValueError(
+                "The `past_key_values` should be either a `Cache` object or `None`."
+            )
+
         inputs_embeds = self.extract_embedding(
             input_ids=input_ids,
             graph=graph,
@@ -824,6 +830,9 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             graph_mask=graph_mask,
             graph_token_index=graph_token_index,
         )
+
+        if use_cache and past_key_values is None:
+            past_key_values = DynamicCache()
 
         if position_ids is None:
             position_ids = (
