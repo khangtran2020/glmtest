@@ -116,9 +116,9 @@ class NVIBTransformerLayer(Module):
         latent_dict["memory_key_padding_mask"] = latent_dict[
             "memory_key_padding_mask"
         ].transpose(1, 0)
-        pprint(
-            f"[magenta]latent_dict['memory_key_padding_mask'] shape: {latent_dict['memory_key_padding_mask'].shape}[/magenta]"
-        )
+        # pprint(
+        #     f"[magenta]latent_dict['memory_key_padding_mask'] shape: {latent_dict['memory_key_padding_mask'].shape}[/magenta]"
+        # )
 
         if self.use_cache:
             alpha = latent_dict["alpha"]
@@ -130,16 +130,20 @@ class NVIBTransformerLayer(Module):
             fuzzing_mask.transpose(1, 0) if fuzzing_mask is not None else None
         )
 
-        kl_g = self.nvib_layer.kl_gaussian(
-            mu=latent_dict["mu"],
-            logvar=latent_dict["logvar"],
-            alpha=latent_dict["alpha"],
-            memory_key_padding_mask=latent_dict["memory_key_padding_mask"],
-        )
-        kl_d = self.nvib_layer.kl_dirichlet(
-            alpha=latent_dict["alpha"],
-            memory_key_padding_mask=latent_dict["memory_key_padding_mask"],
-        )
+        if not self.use_cache:
+            kl_g = self.nvib_layer.kl_gaussian(
+                mu=latent_dict["mu"],
+                logvar=latent_dict["logvar"],
+                alpha=latent_dict["alpha"],
+                memory_key_padding_mask=latent_dict["memory_key_padding_mask"],
+            )
+            kl_d = self.nvib_layer.kl_dirichlet(
+                alpha=latent_dict["alpha"],
+                memory_key_padding_mask=latent_dict["memory_key_padding_mask"],
+            )
+        else:
+            kl_g = torch.tensor(0.0, device=x.device)
+            kl_d = torch.tensor(0.0, device=x.device)
         return x, attention, kl_g, kl_d, latent_dict
 
     # self-attention block
