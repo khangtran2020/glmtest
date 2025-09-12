@@ -67,6 +67,7 @@ class NVIBTransformerLayer(Module):
 
         self.use_cache = use_cache
         if use_cache:
+            pprint(f"[bold yellow]Using cache in NVIBTransformerLayer[/bold yellow]")
             self.past_key = None
             self.past_value = None
 
@@ -82,7 +83,6 @@ class NVIBTransformerLayer(Module):
         src_key_padding_mask: Optional[Tensor] = None,
         latent_dict=None,
         fuzzing_mask: Optional[Tensor] = None,
-        past_key_value: Optional[Cache] = None,
     ) -> Tensor:
 
         x = src
