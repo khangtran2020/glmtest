@@ -733,6 +733,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                     dim_feedforward=self.config.n_hidden,
                     dropout=self.config.dropout,
                     is_fuzz=True,
+                    use_cache=False if self.is_training else True,
                 )
             )
 

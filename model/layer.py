@@ -10,7 +10,7 @@ from torch import Tensor
 from torch.nn.modules import Dropout, LayerNorm, Linear, Module
 from torch.nn.modules.transformer import _get_activation_fn, _get_clones
 from torch.nn import Module, Linear, Dropout, LayerNorm
-from transformers import Cache
+from transformers.cache_utils import Cache
 from rich import print as pprint
 
 # typings
@@ -31,6 +31,7 @@ class NVIBTransformerLayer(Module):
         kappa=1.0,
         delta=1.0,
         layer_norm_eps: float = 1e-5,
+        use_cache: bool = False,
     ) -> None:
         factory_kwargs = {"device": device, "dtype": dtype}
         super(NVIBTransformerLayer, self).__init__()
@@ -64,6 +65,11 @@ class NVIBTransformerLayer(Module):
             self.activation_relu_or_gelu = 0
         self.activation = activation
 
+        self.use_cache = use_cache
+        if use_cache:
+            self.past_key = None
+            self.past_value = None
+
     def __setstate__(self, state):
         super(NVIBTransformerLayer, self).__setstate__(state)
         if not hasattr(self, "activation"):
@@ -76,127 +82,28 @@ class NVIBTransformerLayer(Module):
         src_key_padding_mask: Optional[Tensor] = None,
         latent_dict=None,
         fuzzing_mask: Optional[Tensor] = None,
+        past_key_value: Optional[Cache] = None,
     ) -> Tensor:
 
-        if src_key_padding_mask is not None:
-            _skpm_dtype = src_key_padding_mask.dtype
-            if _skpm_dtype != torch.bool and not torch.is_floating_point(
-                src_key_padding_mask
-            ):
-                raise AssertionError(
-                    "only bool and floating types of key_padding_mask are supported"
-                )
-        # see Fig. 1 of https://arxiv.org/pdf/2002.04745v1.pdf
-        why_not_sparsity_fast_path = ""
-        if not src.dim() == 3:
-            why_not_sparsity_fast_path = (
-                f"input not batched; expected src.dim() of 3 but got {src.dim()}"
-            )
-        elif self.training:
-            why_not_sparsity_fast_path = "training is enabled"
-        elif not self.self_attn.batch_first:
-            why_not_sparsity_fast_path = "self_attn.batch_first was not True"
-        elif not self.self_attn._qkv_same_embed_dim:
-            why_not_sparsity_fast_path = "self_attn._qkv_same_embed_dim was not True"
-        elif not self.activation_relu_or_gelu:
-            why_not_sparsity_fast_path = "activation_relu_or_gelu was not True"
-        elif not (self.norm1.eps == self.norm2.eps):
-            why_not_sparsity_fast_path = "norm1.eps is not equal to norm2.eps"
-        elif src_mask is not None:
-            why_not_sparsity_fast_path = "src_mask is not supported for fastpath"
-        elif src.is_nested and src_key_padding_mask is not None:
-            why_not_sparsity_fast_path = "src_key_padding_mask is not supported with NestedTensor input for fastpath"
-        elif self.self_attn.num_heads % 2 == 1:
-            why_not_sparsity_fast_path = "num_head is odd"
-        elif torch.is_autocast_enabled():
-            why_not_sparsity_fast_path = "autocast is enabled"
-
-        if not why_not_sparsity_fast_path:
-            tensor_args = (
-                src,
-                self.self_attn.in_proj_weight,
-                self.self_attn.in_proj_bias,
-                self.self_attn.out_proj.weight,
-                self.self_attn.out_proj.bias,
-                self.norm1.weight,
-                self.norm1.bias,
-                self.norm2.weight,
-                self.norm2.bias,
-                self.linear1.weight,
-                self.linear1.bias,
-                self.linear2.weight,
-                self.linear2.bias,
-            )
-
-            # We have to use list comprehensions below because TorchScript does not support
-            # generator expressions.
-            if torch.overrides.has_torch_function(tensor_args):
-                why_not_sparsity_fast_path = "some Tensor argument has_torch_function"
-            elif not all((x.is_cuda or "cpu" in str(x.device)) for x in tensor_args):
-                why_not_sparsity_fast_path = (
-                    "some Tensor argument is neither CUDA nor CPU"
-                )
-            elif torch.is_grad_enabled() and any(x.requires_grad for x in tensor_args):
-                why_not_sparsity_fast_path = (
-                    "grad is enabled and at least one of query or the "
-                    "input/output projection weights or biases requires_grad"
-                )
-
-            if not why_not_sparsity_fast_path:
-                return torch._transformer_encoder_layer_fwd(
-                    src,
-                    self.self_attn.embed_dim,
-                    self.self_attn.num_heads,
-                    self.self_attn.in_proj_weight,
-                    self.self_attn.in_proj_bias,
-                    self.self_attn.out_proj.weight,
-                    self.self_attn.out_proj.bias,
-                    self.activation_relu_or_gelu == 2,
-                    self.norm_first,
-                    self.norm1.eps,
-                    self.norm1.weight,
-                    self.norm1.bias,
-                    self.norm2.weight,
-                    self.norm2.bias,
-                    self.linear1.weight,
-                    self.linear1.bias,
-                    self.linear2.weight,
-                    self.linear2.bias,
-                    # TODO: if src_mask and src_key_padding_mask merge to single 4-dim mask
-                    src_mask if src_mask is not None else src_key_padding_mask,
-                    (
-                        1
-                        if src_key_padding_mask is not None
-                        else 0 if src_mask is not None else None
-                    ),
-                )
-
         x = src
-        # Check nan in the input
         if torch.isnan(x).any():
-            print("NaN detected in input x")
-            pprint(x)
-        # Alpha skip
+            raise ValueError("NaN detected in the input to NVIBTransformerLayer")
+
         if latent_dict is not None:
             alpha_skip = latent_dict["alpha"]
         else:
             alpha_skip = None
 
-        # Nvib latent dictionary
-        # pprint(f"[blue]Masking value: {src_mask}, {src_key_padding_mask}[/blue]")
         out, attention, latent_dict = self._sa_block(
-            x, src_mask, src_key_padding_mask, alpha_skip
+            x,
+            src_mask,
+            src_key_padding_mask,
+            alpha_skip,
         )
         x = x + out
         x = x + self._ff_block(self.norm2(x))
 
         # Calculate KL divergence
-        for key in latent_dict.keys():
-            if isinstance(latent_dict[key], Tensor):
-                print(f"{key} shape:", latent_dict[key].shape)
-            elif isinstance(latent_dict[key], tuple):
-                print(f"{key} shape:", tuple(t.shape for t in latent_dict[key]))
-
         latent_dict["memory_key_padding_mask"] = latent_dict[
             "memory_key_padding_mask"
         ].transpose(1, 0)
@@ -222,6 +129,7 @@ class NVIBTransformerLayer(Module):
         attn_mask: Optional[Tensor],
         key_padding_mask: Optional[Tensor],
         alpha_skip=None,
+        position_emebddings: Optional[Tensor] = None,
     ) -> Tensor:
         # Note query does not include the prior
 
@@ -229,11 +137,25 @@ class NVIBTransformerLayer(Module):
         query = x
         key = latent_dict["z"]
         value = latent_dict["z"]
+
+        if self.use_cache:
+
+            if self.past_key is not None and self.past_value is not None:
+                key = torch.cat([self.past_key, key], dim=1)
+                value = torch.cat([self.past_value, value], dim=1)
+            self.past_key = key.clone()
+            self.past_value = value.clone()
+
+            # debugging shape
+            pprint(f"[yellow]Key shape: {key.shape}[/yellow]")
+            pprint(f"[cyan]Value shape: {value.shape}[/cyan]")
+
         x, attention = self.self_attn(
             query,
             key,
             value,
             attn_mask=attn_mask,
+            position_emebddings=position_emebddings,
             key_padding_mask=latent_dict["memory_key_padding_mask"],
             need_weights=True,
         )
@@ -308,6 +230,7 @@ class GLMFFuzzingLayer(Module):
         kappa=1.0,
         delta=1.0,
         is_fuzz: bool = False,
+        use_cache: bool = False,
     ) -> None:
         super(GLMFFuzzingLayer, self).__init__()
         self.llm_layer = llm_layer
@@ -324,6 +247,7 @@ class GLMFFuzzingLayer(Module):
                 dtype=dtype,
                 kappa=kappa,
                 delta=delta,
+                use_cache=use_cache,
             )
 
     def forward(
