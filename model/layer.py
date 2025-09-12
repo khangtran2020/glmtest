@@ -183,6 +183,9 @@ class NVIBTransformerLayer(Module):
             # debugging shape
             pprint(f"[yellow]Key shape: {key.shape}[/yellow]")
             pprint(f"[cyan]Value shape: {value.shape}[/cyan]")
+            pprint(
+                f"[magenta]latent_dict['memory_key_padding_mask'] shape: {latent_dict['memory_key_padding_mask'].shape}[/magenta]"
+            )
 
             key = (
                 key,
