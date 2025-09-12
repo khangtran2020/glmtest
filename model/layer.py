@@ -73,6 +73,7 @@ class NVIBTransformerLayer(Module):
             self.past_pi = None
             self.past_mu = None
             self.past_logvar = None
+            self.past_memory_key_padding_mask = None
 
     def __setstate__(self, state):
         super(NVIBTransformerLayer, self).__setstate__(state)
@@ -144,6 +145,7 @@ class NVIBTransformerLayer(Module):
         query = x
         key = latent_dict["z"]
         value = latent_dict["z"]
+        memory_key_padding_mask = latent_dict["memory_key_padding_mask"]
 
         if self.use_cache:
 
@@ -156,11 +158,17 @@ class NVIBTransformerLayer(Module):
                 pi = torch.cat([self.past_pi, pi], dim=1)
                 mu = torch.cat([self.past_mu, mu], dim=1)
                 logvar = torch.cat([self.past_logvar, logvar], dim=1)
+                memory_key_padding_mask = torch.cat(
+                    [self.past_memory_key_padding_mask, memory_key_padding_mask],
+                    dim=1,
+                )
             self.past_key = key.clone()
             self.past_value = value.clone()
             self.past_pi = pi.clone()
             self.past_mu = mu.clone()
             self.past_logvar = logvar.clone()
+            self.past_memory_key_padding_mask = memory_key_padding_mask.clone()
+            latent_dict["memory_key_padding_mask"] = memory_key_padding_mask
 
             # debugging shape
             pprint(f"[yellow]Key shape: {key.shape}[/yellow]")
