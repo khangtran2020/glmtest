@@ -85,6 +85,10 @@ class NVIBTransformerLayer(Module):
         fuzzing_mask: Optional[Tensor] = None,
     ) -> Tensor:
 
+        pprint(
+            f"[blue]Entering NVIBTransformerLayer forward with cache mode: {self.use_cache}[/blue]"
+        )
+
         x = src
         if torch.isnan(x).any():
             raise ValueError("NaN detected in the input to NVIBTransformerLayer")
@@ -320,13 +324,13 @@ class GLMFFuzzingLayer(Module):
         # Combine the two hidden states
         # debugging
         # Get where fuzzing_mask is 1 and check the outcome at those positions
-        index_fuzz = (fuzzing_mask[0] == 1).nonzero(as_tuple=True)[0]
-        pprint(f"[green]Fuzzing positions: {index_fuzz}[/green]")
-        pprint(f"[green]LLM hidden states: {llm_hidden_state[0]}[/green]")
-        pprint(
-            f"[green]NVIB hidden states: {nvib_hidden_states[:,index_fuzz,:]}[/green]"
-        )
-        pprint(f"[green]Fuzzed hidden states: {hidden_states[:,index_fuzz,:]}[/green]")
+        # index_fuzz = (fuzzing_mask[0] == 1).nonzero(as_tuple=True)[0]
+        # pprint(f"[green]Fuzzing positions: {index_fuzz}[/green]")
+        # pprint(f"[green]LLM hidden states: {llm_hidden_state[0]}[/green]")
+        # pprint(
+        #     f"[green]NVIB hidden states: {nvib_hidden_states[:,index_fuzz,:]}[/green]"
+        # )
+        # pprint(f"[green]Fuzzed hidden states: {hidden_states[:,index_fuzz,:]}[/green]")
 
         attention_out_ = (
             (llm_hidden_state[1], attention_out) if output_attentions else None
