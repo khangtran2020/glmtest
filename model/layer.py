@@ -118,10 +118,10 @@ class NVIBTransformerLayer(Module):
         ].transpose(1, 0)
         alpha = latent_dict["alpha"]
         if self.use_cache:
+            pprint(
+                f"[bold yellow]Using past alpha in NVIBTransformerLayer, shape of alpha: {alpha.size()}[/bold yellow]"
+            )
             if self.past_alpha is not None:
-                print(
-                    f"[bold yellow]Using past alpha in NVIBTransformerLayer, shape of alpha: {alpha.size()}[/bold yellow]"
-                )
                 alpha = torch.cat([self.past_alpha, alpha], dim=0)
             self.past_alpha = alpha.clone()
         latent_dict["alpha"] = alpha
