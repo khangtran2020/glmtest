@@ -122,7 +122,7 @@ class NVIBTransformerLayer(Module):
                 f"[bold yellow]Using past alpha in NVIBTransformerLayer, shape of alpha: {alpha.size()}[/bold yellow]"
             )
             if self.past_alpha is not None:
-                alpha = torch.cat([self.past_alpha, alpha], dim=0)
+                alpha = torch.cat([self.past_alpha, alpha], dim=1)
             self.past_alpha = alpha.clone()
         latent_dict["alpha"] = alpha
         latent_dict["fuzzing_mask"] = (
