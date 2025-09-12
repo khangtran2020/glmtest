@@ -116,18 +116,16 @@ class NVIBTransformerLayer(Module):
         latent_dict["memory_key_padding_mask"] = latent_dict[
             "memory_key_padding_mask"
         ].transpose(1, 0)
-        alpha = latent_dict["alpha"]
         if self.use_cache:
-            pprint(
-                f"[bold yellow]Using past alpha in NVIBTransformerLayer, shape of alpha: {alpha.size()}[/bold yellow]"
-            )
+            alpha = latent_dict["alpha"]
             if self.past_alpha is not None:
                 alpha = torch.cat([self.past_alpha, alpha], dim=1)
             self.past_alpha = alpha.clone()
-        latent_dict["alpha"] = alpha
+
         latent_dict["fuzzing_mask"] = (
             fuzzing_mask.transpose(1, 0) if fuzzing_mask is not None else None
         )
+
         kl_g = self.nvib_layer.kl_gaussian(
             mu=latent_dict["mu"],
             logvar=latent_dict["logvar"],
@@ -179,6 +177,8 @@ class NVIBTransformerLayer(Module):
             self.past_logvar = logvar.clone()
             self.past_memory_key_padding_mask = memory_key_padding_mask.clone()
             latent_dict["memory_key_padding_mask"] = memory_key_padding_mask
+            latent_dict["mu"] = mu.clone()
+            latent_dict["logvar"] = logvar.clone()
 
             # debugging shape
             pprint(f"[yellow]Key shape: {key.shape}[/yellow]")
