@@ -162,6 +162,10 @@ class NVIBTransformerLayer(Module):
             self.past_mu = mu.clone()
             self.past_logvar = logvar.clone()
 
+            # debugging shape
+            pprint(f"[yellow]Key shape: {key.shape}[/yellow]")
+            pprint(f"[cyan]Value shape: {value.shape}[/cyan]")
+
             key = (
                 key,
                 pi,
@@ -174,10 +178,6 @@ class NVIBTransformerLayer(Module):
                 mu,
                 logvar,
             )
-
-            # debugging shape
-            pprint(f"[yellow]Key shape: {key.shape}[/yellow]")
-            pprint(f"[cyan]Value shape: {value.shape}[/cyan]")
 
         x, attention = self.self_attn(
             query,
