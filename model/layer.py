@@ -155,7 +155,6 @@ class NVIBTransformerLayer(Module):
             key,
             value,
             attn_mask=attn_mask,
-            position_emebddings=position_emebddings,
             key_padding_mask=latent_dict["memory_key_padding_mask"],
             need_weights=True,
         )
