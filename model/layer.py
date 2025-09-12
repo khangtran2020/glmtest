@@ -74,6 +74,7 @@ class NVIBTransformerLayer(Module):
             self.past_mu = None
             self.past_logvar = None
             self.past_memory_key_padding_mask = None
+            self.past_alpha = None
 
     def __setstate__(self, state):
         super(NVIBTransformerLayer, self).__setstate__(state)
@@ -115,6 +116,12 @@ class NVIBTransformerLayer(Module):
         latent_dict["memory_key_padding_mask"] = latent_dict[
             "memory_key_padding_mask"
         ].transpose(1, 0)
+        alpha = latent_dict["alpha"]
+        if self.use_cache:
+            if self.past_alpha is not None:
+                alpha = torch.cat([self.past_alpha, alpha], dim=0)
+            self.past_alpha = alpha.clone()
+        latent_dict["alpha"] = alpha
         latent_dict["fuzzing_mask"] = (
             fuzzing_mask.transpose(1, 0) if fuzzing_mask is not None else None
         )
