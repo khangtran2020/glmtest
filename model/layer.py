@@ -70,6 +70,9 @@ class NVIBTransformerLayer(Module):
             pprint(f"[bold yellow]Using cache in NVIBTransformerLayer[/bold yellow]")
             self.past_key = None
             self.past_value = None
+            self.past_pi = None
+            self.past_mu = None
+            self.past_logvar = None
 
     def __setstate__(self, state):
         super(NVIBTransformerLayer, self).__setstate__(state)
@@ -144,11 +147,33 @@ class NVIBTransformerLayer(Module):
 
         if self.use_cache:
 
+            (key, pi, mu, logvar) = key  # key is in shape [batch, seq, features]
+            (value, pi, mu, logvar) = value  # value is in shape [batch, seq, features]
+
             if self.past_key is not None and self.past_value is not None:
                 key = torch.cat([self.past_key, key], dim=1)
                 value = torch.cat([self.past_value, value], dim=1)
+                pi = torch.cat([self.past_pi, pi], dim=1)
+                mu = torch.cat([self.past_mu, mu], dim=1)
+                logvar = torch.cat([self.past_logvar, logvar], dim=1)
             self.past_key = key.clone()
             self.past_value = value.clone()
+            self.past_pi = pi.clone()
+            self.past_mu = mu.clone()
+            self.past_logvar = logvar.clone()
+
+            key = (
+                key,
+                pi,
+                mu,
+                logvar,
+            )
+            value = (
+                value,
+                pi,
+                mu,
+                logvar,
+            )
 
             # debugging shape
             pprint(f"[yellow]Key shape: {key.shape}[/yellow]")
