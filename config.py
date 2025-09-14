@@ -312,7 +312,7 @@ def add_training_group(group):
     )
     group.add_argument(
         "--max_new_tokens",
-        type=float,
+        type=int,
         help="max new tokens to generate",
         default=512,
     )
