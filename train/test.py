@@ -989,13 +989,15 @@ def generate_fuzz(
     do_sample: bool = False,
     max_seq_len: Optional[int] = None,
 ):
+
+    batch_size = inputs_embeds.shape[0]
+    device = inputs_embeds.device
+
     position_ids = (
         torch.arange(inputs_embeds.shape[1])
         .unsqueeze(0)
         .expand(inputs_embeds.shape[0], -1)
-    )
-    batch_size = inputs_embeds.shape[0]
-    device = inputs_embeds.device
+    ).to(device)
 
     # Keep track of which sequences are finished
     finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
