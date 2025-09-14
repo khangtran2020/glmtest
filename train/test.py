@@ -1083,6 +1083,7 @@ def generate_fuzz(
                     torch.cuda.empty_cache()
 
             pred = pred.masked_fill(finished, tokenizer.pad_token_id)
+            pprint(f"Device of pred: {pred.device}")
             generated_ids = torch.cat([generated_ids, pred], dim=1)
 
             # Update the fuzzing mask to not fuzz the generated token
@@ -1095,8 +1096,10 @@ def generate_fuzz(
                     if saw_start:
                         fuzzing_mask[i, j] = 1
                     if generated_ids[i, j] == fuzz_start_id:
+                        pprint(f"[red]Found fuzzing start at position {j}[/red]")
                         saw_start = True
                     elif generated_ids[i, j] == fuzz_end_id:
+                        pprint(f"[red]Found fuzzing end at position {j}[/red]")
                         saw_start = False
 
             pprint(f"[blue]Fuzzing mask updated: {fuzzing_mask.size()}[/blue]")
