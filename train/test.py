@@ -1003,22 +1003,13 @@ def generate_fuzz(
     finished = torch.zeros(batch_size, dtype=torch.bool, device="cpu")
 
     past_key_values = DynamicCache()
-    past_seen_tokens = (
-        past_key_values.get_seq_length() if past_key_values is not None else 0
-    )
     fuzz_start_id = tokenizer.convert_tokens_to_ids(FUZZ_START_TOKEN)
     fuzz_end_id = tokenizer.convert_tokens_to_ids(FUZZ_END_TOKEN)
-
-    cache_position = torch.arange(
-        past_seen_tokens,
-        past_seen_tokens + inputs_embeds.shape[1],
-        device=inputs_embeds.device,
-    )
 
     generated_ids = inputs_ids.clone().to("cpu")
 
     current_length = inputs_embeds.shape[1]
-    fuzzing_mask = torch.zeros(inputs_ids.shape, device=inputs_ids.device)
+    fuzzing_mask = torch.zeros(inputs_ids.shape, device="cpu")
 
     pprint(f"[green]Shape of fuzzing mask initialized: {fuzzing_mask.size()}[/green]")
 
@@ -1034,7 +1025,7 @@ def generate_fuzz(
                 outputs = model.forward(
                     inputs_embeds=inputs_embeds,
                     position_ids=position_ids,
-                    fuzzing_mask=fuzzing_mask.unsqueeze(-1),
+                    fuzzing_mask=fuzzing_mask.unsqueeze(-1).to(device),
                     past_key_values=past_key_values,
                 )
                 logits = outputs.logits
@@ -1069,7 +1060,7 @@ def generate_fuzz(
                         inputs_embeds=generated_embeddings,
                         past_key_values=past_key_values,
                         position_ids=None,
-                        fuzzing_mask=fuzzing_mask.unsqueeze(-1),
+                        fuzzing_mask=fuzzing_mask.unsqueeze(-1).to(device),
                     )
                     logits = outputs.logits
                     past_key_values = outputs.past_key_values
@@ -1098,7 +1089,7 @@ def generate_fuzz(
 
             # Update the fuzzing mask to not fuzz the generated token
             fuzzing_mask = torch.cat(
-                [fuzzing_mask, torch.zeros((batch_size, 1), device=device)], dim=1
+                [fuzzing_mask, torch.zeros((batch_size, 1), device="cpu")], dim=1
             )
             for i in range(generated_ids.shape[0]):
                 saw_start = False
