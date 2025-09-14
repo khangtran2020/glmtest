@@ -964,7 +964,10 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         inputs_embeds: torch.Tensor = None,
     ) -> torch.Tensor:
         if inputs_embeds is None:
-            inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
+            inputs_embeds = self.llm_model.get_input_embeddings()(
+                input_ids.to(self.llm_model.device)
+            )
+            input_ids = input_ids.to("cpu")
 
         if (
             (graph is not None)
