@@ -1054,12 +1054,16 @@ def generate_fuzz(
             else:
                 if accelerator.is_main_process:
 
-                    generated_embeddings = model.extract_embedding(
-                        input_ids=generated_ids[:, current_length - 1],
-                        graph=None,
-                        graph_mask=None,
-                        graph_token_index=None,
-                    ).unsqueeze(0)
+                    generated_embeddings = (
+                        model.extract_embedding(
+                            input_ids=generated_ids[:, current_length - 1],
+                            graph=None,
+                            graph_mask=None,
+                            graph_token_index=None,
+                        )
+                        .unsqueeze(0)
+                        .to(device)
+                    )
 
                     outputs = model.llm_model.forward(
                         inputs_embeds=generated_embeddings,
@@ -1086,7 +1090,7 @@ def generate_fuzz(
 
             pred = pred.masked_fill(finished, tokenizer.pad_token_id)
             # pprint(f"Device of pred: {pred.device}")
-            generated_ids = torch.cat([generated_ids, pred], dim=1)
+            generated_ids = torch.cat([generated_ids, pred], dim=1).to("cpu")
             pred = pred.to(device)
             del pred
             gc.collect()
