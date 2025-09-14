@@ -298,6 +298,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             inputs_embeds = self.llm_model.get_input_embeddings()(
                 input_ids.to(self.llm_model.device)
             )
+            input_ids = input_ids.to("cpu")
 
         if (
             (graph is not None)
