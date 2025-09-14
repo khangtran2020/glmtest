@@ -1020,6 +1020,8 @@ def generate_fuzz(
     current_length = inputs_embeds.shape[1]
     fuzzing_mask = torch.zeros(inputs_ids.shape, device=inputs_ids.device)
 
+    pprint(f"[green]Shape of fuzzing mask initialized: {fuzzing_mask.size()}[/green]")
+
     model.eval()
     with torch.inference_mode():
 
@@ -1080,6 +1082,8 @@ def generate_fuzz(
                         saw_start = True
                     elif generated_ids[i, j] == fuzz_end_id:
                         saw_start = False
+
+            pprint(f"[blue]Fuzzing mask updated: {fuzzing_mask.size()}[/blue]")
 
             finished = finished | (pred[:, -1] == tokenizer.eos_token_id)
             current_length += 1
