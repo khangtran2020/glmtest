@@ -1042,6 +1042,14 @@ def generate_fuzz(
                     logits, temperature, top_k, top_p, do_sample
                 )
                 pred = preds[:, current_length - 1 : current_length]
+                # free memory
+                inputs_embeds = inputs_embeds.cpu()
+                position_ids = position_ids.cpu()
+                logits = logits.cpu()
+
+                del inputs_embeds, position_ids, logits, outputs
+                gc.collect()
+                torch.cuda.empty_cache()
             else:
                 if accelerator.is_main_process:
 
@@ -1065,6 +1073,14 @@ def generate_fuzz(
                         logits, temperature, top_k, top_p, do_sample
                     )
                     pred = preds[:, -1:].clone()
+
+                    # free memory
+                    generated_embeddings = generated_embeddings.cpu()
+                    logits = logits.cpu()
+
+                    del inputs_embeds, position_ids, logits, outputs
+                    gc.collect()
+                    torch.cuda.empty_cache()
 
             pred = pred.masked_fill(finished, tokenizer.pad_token_id)
             generated_ids = torch.cat([generated_ids, pred], dim=1)
