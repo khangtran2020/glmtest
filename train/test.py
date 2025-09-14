@@ -1043,11 +1043,12 @@ def generate_fuzz(
                 )
                 pred = preds[:, current_length - 1 : current_length]
                 # free memory
+                preds = preds.cpu()
                 inputs_embeds = inputs_embeds.cpu()
                 position_ids = position_ids.cpu()
                 logits = logits.cpu()
 
-                del inputs_embeds, position_ids, logits, outputs
+                del inputs_embeds, position_ids, logits, outputs, preds
                 gc.collect()
                 torch.cuda.empty_cache()
             else:
@@ -1077,14 +1078,19 @@ def generate_fuzz(
                     # free memory
                     generated_embeddings = generated_embeddings.cpu()
                     logits = logits.cpu()
+                    preds = preds.cpu()
 
-                    del generated_embeddings, logits, outputs
+                    del generated_embeddings, logits, outputs, preds
                     gc.collect()
                     torch.cuda.empty_cache()
 
             pred = pred.masked_fill(finished, tokenizer.pad_token_id)
-            pprint(f"Device of pred: {pred.device}")
+            # pprint(f"Device of pred: {pred.device}")
             generated_ids = torch.cat([generated_ids, pred], dim=1)
+            pred = pred.to(device)
+            del pred
+            gc.collect()
+            torch.cuda.empty_cache()
 
             # Update the fuzzing mask to not fuzz the generated token
             fuzzing_mask = torch.cat(
