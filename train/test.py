@@ -1110,7 +1110,7 @@ def generate_fuzz(
 
             pprint(f"[blue]Fuzzing mask updated: {fuzzing_mask.size()}[/blue]")
 
-            finished = finished | (pred[:, -1] == tokenizer.eos_token_id)
+            finished = finished | (generated_ids[:, -1] == tokenizer.eos_token_id)
             current_length += 1
             if finished.all():
                 break
