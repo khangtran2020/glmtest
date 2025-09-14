@@ -295,7 +295,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         inputs_embeds: torch.Tensor = None,
     ) -> torch.Tensor:
         if inputs_embeds is None:
-            inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
+            inputs_embeds = self.llm_model.get_input_embeddings()(
+                input_ids.to(self.llm_model.device)
+            )
 
         if (
             (graph is not None)
