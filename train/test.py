@@ -1078,7 +1078,7 @@ def generate_fuzz(
                     generated_embeddings = generated_embeddings.cpu()
                     logits = logits.cpu()
 
-                    del inputs_embeds, position_ids, logits, outputs
+                    del generated_embeddings, logits, outputs
                     gc.collect()
                     torch.cuda.empty_cache()
 
