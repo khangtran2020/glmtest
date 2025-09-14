@@ -1041,7 +1041,7 @@ def generate_fuzz(
                 preds = logits_to_prediction(
                     logits, temperature, top_k, top_p, do_sample
                 )
-                pred = pred[:, current_length - 1 : current_length]
+                pred = preds[:, current_length - 1 : current_length]
             else:
                 if accelerator.is_main_process:
 
