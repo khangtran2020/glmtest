@@ -14,6 +14,7 @@ from data.loader import GLMFDataset, collate_fn
 from model.model import GLMFModelForCausalLM, GLMFModelConfig
 from transformers import PreTrainedTokenizer
 from transformers import DynamicCache
+from utils.constant import FUZZ_START_TOKEN, FUZZ_END_TOKEN
 
 # from transformers import SinkCache
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
@@ -163,15 +164,30 @@ def test(
 
                     if args.num_gpu == 1:
                         with torch.autocast(device_type="cuda", dtype=torch.float16):
-                            outputs = model.generate(
-                                inputs=micro_input["input_ids"],
-                                graph=graph,
-                                graph_mask=graph_mask,
-                                graph_token_index=graph_token_index,
-                                max_new_tokens=args.max_new_tokens,
-                                do_sample=False,
-                                use_cache=True,
-                            )
+                            if args.fuzz_model:
+                                outputs = generate_fuzz(
+                                    inputs_ids=micro_input["input_ids"],
+                                    inputs_embeds=inputs_embeds,
+                                    model=model,
+                                    temperature=args.temp,
+                                    top_k=args.top_k,
+                                    top_p=args.top_p,
+                                    accelerator=accelerator,
+                                    tokenizer=dataset.llm_tokenizer,
+                                    max_new_tokens=args.max_new_tokens,
+                                    do_sample=False,
+                                    max_seq_len=args.max_seq_length,
+                                )
+                            else:
+                                outputs = model.generate(
+                                    inputs=micro_input["input_ids"],
+                                    graph=graph,
+                                    graph_mask=graph_mask,
+                                    graph_token_index=graph_token_index,
+                                    max_new_tokens=args.max_new_tokens,
+                                    do_sample=False,
+                                    use_cache=True,
+                                )
                         out_text = tokenizer.batch_decode(
                             outputs[:, micro_input["input_ids"].size(1) :],
                             skip_special_tokens=False if args.data_fuzz else True,
@@ -318,15 +334,30 @@ def test(
 
                     if args.num_gpu == 1:
                         with torch.autocast(device_type="cuda", dtype=torch.float16):
-                            outputs = model.generate(
-                                inputs=micro_input["input_ids"],
-                                graph=graph,
-                                graph_mask=graph_mask,
-                                graph_token_index=graph_token_index,
-                                max_new_tokens=args.max_new_tokens,
-                                do_sample=False,
-                                use_cache=True,
-                            )
+                            if args.fuzz_model:
+                                outputs = generate_fuzz(
+                                    inputs_ids=micro_input["input_ids"],
+                                    inputs_embeds=inputs_embeds,
+                                    model=model,
+                                    temperature=args.temp,
+                                    top_k=args.top_k,
+                                    top_p=args.top_p,
+                                    accelerator=accelerator,
+                                    tokenizer=dataset.llm_tokenizer,
+                                    max_new_tokens=args.max_new_tokens,
+                                    do_sample=False,
+                                    max_seq_len=args.max_seq_length,
+                                )
+                            else:
+                                outputs = model.generate(
+                                    inputs=micro_input["input_ids"],
+                                    graph=graph,
+                                    graph_mask=graph_mask,
+                                    graph_token_index=graph_token_index,
+                                    max_new_tokens=args.max_new_tokens,
+                                    do_sample=False,
+                                    use_cache=True,
+                                )
                         out_text = tokenizer.batch_decode(
                             outputs[:, micro_input["input_ids"].size(1) :],
                             skip_special_tokens=False if args.data_fuzz else True,
@@ -466,15 +497,30 @@ def test(
 
                     if args.num_gpu == 1:
                         with torch.autocast(device_type="cuda", dtype=torch.float16):
-                            outputs = model.generate(
-                                inputs=micro_input["input_ids"],
-                                graph=graph,
-                                graph_mask=graph_mask,
-                                graph_token_index=graph_token_index,
-                                max_new_tokens=args.max_new_tokens,
-                                do_sample=False,
-                                use_cache=True,
-                            )
+                            if args.fuzz_model:
+                                outputs = generate_fuzz(
+                                    inputs_ids=micro_input["input_ids"],
+                                    inputs_embeds=inputs_embeds,
+                                    model=model,
+                                    temperature=args.temp,
+                                    top_k=args.top_k,
+                                    top_p=args.top_p,
+                                    accelerator=accelerator,
+                                    tokenizer=dataset.llm_tokenizer,
+                                    max_new_tokens=args.max_new_tokens,
+                                    do_sample=False,
+                                    max_seq_len=args.max_seq_length,
+                                )
+                            else:
+                                outputs = model.generate(
+                                    inputs=micro_input["input_ids"],
+                                    graph=graph,
+                                    graph_mask=graph_mask,
+                                    graph_token_index=graph_token_index,
+                                    max_new_tokens=args.max_new_tokens,
+                                    do_sample=False,
+                                    use_cache=True,
+                                )
                         out_text = tokenizer.batch_decode(
                             outputs[:, micro_input["input_ids"].size(1) :],
                             skip_special_tokens=False if args.fuzz_model else True,
@@ -928,3 +974,114 @@ def merge_sequence_parallel_cache_optimized(
         _, _ = cache.update(k_merged, v_merged, layer_idx, cache_kwargs)
 
     return cache
+
+
+def generate_fuzz(
+    inputs_ids: torch.Tensor,
+    inputs_embeds: torch.Tensor,
+    model: GLMFModelForCausalLM,
+    temperature: float,
+    top_k: int,
+    top_p: float,
+    accelerator: Accelerator,
+    tokenizer: PreTrainedTokenizer,
+    max_new_tokens: int,
+    do_sample: bool = False,
+    max_seq_len: Optional[int] = None,
+):
+    position_ids = (
+        torch.arange(inputs_embeds.shape[1])
+        .unsqueeze(0)
+        .expand(inputs_embeds.shape[0], -1)
+    )
+    batch_size = inputs_embeds.shape[0]
+    device = inputs_embeds.device
+
+    # Keep track of which sequences are finished
+    finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
+
+    past_key_values = DynamicCache()
+    past_seen_tokens = (
+        past_key_values.get_seq_length() if past_key_values is not None else 0
+    )
+    fuzz_start_id = tokenizer.convert_tokens_to_ids(FUZZ_START_TOKEN)
+    fuzz_end_id = tokenizer.convert_tokens_to_ids(FUZZ_END_TOKEN)
+
+    cache_position = torch.arange(
+        past_seen_tokens,
+        past_seen_tokens + inputs_embeds.shape[1],
+        device=inputs_embeds.device,
+    )
+
+    generated_ids = inputs_ids.clone()
+
+    current_length = inputs_embeds.shape[1]
+    fuzzing_mask = torch.zeros(inputs_ids.shape, device=inputs_ids.device)
+
+    model.eval()
+    with torch.inference_mode():
+
+        for step in range(max_new_tokens):
+
+            if current_length >= max_seq_len:
+                break
+
+            if step == 0:
+                outputs = model.forward(
+                    inputs_embeds=inputs_embeds,
+                    position_ids=position_ids,
+                    fuzzing_mask=fuzzing_mask.unsqueeze(-1),
+                    past_key_values=past_key_values,
+                )
+                logits = outputs.logits
+                preds = logits_to_prediction(
+                    logits, temperature, top_k, top_p, do_sample
+                )
+                pred = pred[:, current_length - 1 : current_length]
+            else:
+                if accelerator.is_main_process:
+
+                    generated_embeddings = model.extract_embedding(
+                        input_ids=generated_ids[:, current_length - 1],
+                        graph=None,
+                        graph_mask=None,
+                        graph_token_index=None,
+                    ).unsqueeze(0)
+
+                    outputs = model.llm_model.forward(
+                        inputs_embeds=generated_embeddings,
+                        past_key_values=past_key_values,
+                        position_ids=None,
+                        fuzzing_mask=fuzzing_mask.unsqueeze(-1),
+                    )
+                    logits = outputs.logits
+                    past_key_values = outputs.past_key_values
+
+                    preds = logits_to_prediction(
+                        logits, temperature, top_k, top_p, do_sample
+                    )
+                    pred = preds[:, -1:].clone()
+
+            pred = pred.masked_fill(finished, tokenizer.pad_token_id)
+            generated_ids = torch.cat([generated_ids, pred], dim=1)
+
+            # Update the fuzzing mask to not fuzz the generated token
+            fuzzing_mask = torch.cat(
+                [fuzzing_mask, torch.zeros((batch_size, 1), device=device)], dim=1
+            )
+            for i in range(generated_ids.shape[0]):
+                saw_start = False
+                for j in range(generated_ids.shape[1]):
+                    if saw_start:
+                        fuzzing_mask[i, j] = 1
+                    if generated_ids[i, j] == fuzz_start_id:
+                        saw_start = True
+                    elif generated_ids[i, j] == fuzz_end_id:
+                        saw_start = False
+
+            finished = finished | (pred[:, -1] == tokenizer.eos_token_id)
+            current_length += 1
+            if finished.all():
+                break
+
+    return generated_ids

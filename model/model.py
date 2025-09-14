@@ -778,6 +778,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         cache_position: Optional[torch.LongTensor] = None,
         logits_to_keep: Union[int, torch.Tensor] = 0,
         step: int = 0,
+        fuzzing_mask: Optional[torch.Tensor] = None,
         accelerator: Optional[Accelerator] = None,
         **flash_attn_kwargs,
     ):
@@ -796,17 +797,18 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         # get token id from tokenizer
         fuzz_start_id = self.tokenizer.convert_tokens_to_ids(FUZZ_START_TOKEN)
         fuzz_end_id = self.tokenizer.convert_tokens_to_ids(FUZZ_END_TOKEN)
-        fuzzing_mask = torch.zeros(input_ids.shape, device=input_ids.device)
-        for i in range(input_ids.shape[0]):
-            saw_start = False
-            for j in range(input_ids.shape[1]):
-                if saw_start:
-                    fuzzing_mask[i, j] = 1
-                if input_ids[i, j] == fuzz_start_id:
-                    saw_start = True
-                elif input_ids[i, j] == fuzz_end_id:
-                    saw_start = False
-        fuzzing_mask = fuzzing_mask.unsqueeze(-1)
+        if fuzzing_mask is None:
+            fuzzing_mask = torch.zeros(input_ids.shape, device=input_ids.device)
+            for i in range(input_ids.shape[0]):
+                saw_start = False
+                for j in range(input_ids.shape[1]):
+                    if saw_start:
+                        fuzzing_mask[i, j] = 1
+                    if input_ids[i, j] == fuzz_start_id:
+                        saw_start = True
+                    elif input_ids[i, j] == fuzz_end_id:
+                        saw_start = False
+            fuzzing_mask = fuzzing_mask.unsqueeze(-1)
 
         use_cache = use_cache if use_cache is not None else self.config.use_cache
 

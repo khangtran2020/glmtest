@@ -116,9 +116,6 @@ class NVIBTransformerLayer(Module):
         latent_dict["memory_key_padding_mask"] = latent_dict[
             "memory_key_padding_mask"
         ].transpose(1, 0)
-        # pprint(
-        #     f"[magenta]latent_dict['memory_key_padding_mask'] shape: {latent_dict['memory_key_padding_mask'].shape}[/magenta]"
-        # )
 
         if self.use_cache:
             alpha = latent_dict["alpha"]
@@ -371,13 +368,13 @@ class GLMFFuzzingLayer(Module):
         # Combine the two hidden states
         # debugging
         # Get where fuzzing_mask is 1 and check the outcome at those positions
-        # index_fuzz = (fuzzing_mask[0] == 1).nonzero(as_tuple=True)[0]
-        # pprint(f"[green]Fuzzing positions: {index_fuzz}[/green]")
-        # pprint(f"[green]LLM hidden states: {llm_hidden_state[0]}[/green]")
-        # pprint(
-        #     f"[green]NVIB hidden states: {nvib_hidden_states[:,index_fuzz,:]}[/green]"
-        # )
-        # pprint(f"[green]Fuzzed hidden states: {hidden_states[:,index_fuzz,:]}[/green]")
+        index_fuzz = (fuzzing_mask[0] == 1).nonzero(as_tuple=True)[0]
+        pprint(f"[green]Fuzzing positions: {index_fuzz}[/green]")
+        pprint(f"[green]LLM hidden states: {llm_hidden_state[0]}[/green]")
+        pprint(
+            f"[green]NVIB hidden states: {nvib_hidden_states[:,index_fuzz,:]}[/green]"
+        )
+        pprint(f"[green]Fuzzed hidden states: {hidden_states[:,index_fuzz,:]}[/green]")
 
         attention_out_ = (
             (llm_hidden_state[1], attention_out) if output_attentions else None
