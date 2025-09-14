@@ -1000,7 +1000,7 @@ def generate_fuzz(
     ).to(device)
 
     # Keep track of which sequences are finished
-    finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
+    finished = torch.zeros(batch_size, dtype=torch.bool, device="cpu")
 
     past_key_values = DynamicCache()
     past_seen_tokens = (
@@ -1015,7 +1015,7 @@ def generate_fuzz(
         device=inputs_embeds.device,
     )
 
-    generated_ids = inputs_ids.clone()
+    generated_ids = inputs_ids.clone().to("cpu")
 
     current_length = inputs_embeds.shape[1]
     fuzzing_mask = torch.zeros(inputs_ids.shape, device=inputs_ids.device)
@@ -1088,10 +1088,10 @@ def generate_fuzz(
                     gc.collect()
                     torch.cuda.empty_cache()
 
-            pred = pred.masked_fill(finished, tokenizer.pad_token_id)
+            pred = pred.to("cpu").masked_fill(finished, tokenizer.pad_token_id)
             # pprint(f"Device of pred: {pred.device}")
             generated_ids = torch.cat([generated_ids, pred], dim=1).to("cpu")
-            pred = pred.to(device)
+            # pred = pred.to(device)
             del pred
             gc.collect()
             torch.cuda.empty_cache()
