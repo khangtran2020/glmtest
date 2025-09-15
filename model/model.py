@@ -1082,7 +1082,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                 elif input_ids[i, j] == self.fuzz_end_id:
                     saw_start = False
         # fuzzing_mask = fuzzing_mask.unsqueeze(-1)
-        pprint(f"Fuzzign mask size initialy: {fuzzing_mask.size()}")
+        # pprint(f"Fuzzign mask size initialy: {fuzzing_mask.size()}")
 
         if past_key_values is not None:
             model_inputs["past_key_values"] = past_key_values
@@ -1101,7 +1101,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                 fuzzing_mask = fuzzing_mask[:, cache_position]
 
         model_inputs["fuzzing_mask"] = fuzzing_mask.unsqueeze(-1)
-        pprint(f"Fuzzing mask: {model_inputs['fuzzing_mask'].size()}")
+        # pprint(f"Fuzzing mask: {model_inputs['fuzzing_mask'].size()}")
 
         # 3. Prepare base model inputs
         input_ids_key = (
