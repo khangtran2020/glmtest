@@ -164,30 +164,15 @@ def test(
 
                     if args.num_gpu == 1:
                         with torch.autocast(device_type="cuda", dtype=torch.float16):
-                            if args.fuzz_model:
-                                outputs = generate_fuzz(
-                                    inputs_ids=micro_input["input_ids"],
-                                    inputs_embeds=inputs_embeds,
-                                    model=model,
-                                    temperature=args.temp,
-                                    top_k=args.top_k,
-                                    top_p=args.top_p,
-                                    accelerator=accelerator,
-                                    tokenizer=dataset.llm_tokenizer,
-                                    max_new_tokens=args.max_new_tokens,
-                                    do_sample=False,
-                                    max_seq_len=args.max_seq_length,
-                                )
-                            else:
-                                outputs = model.generate(
-                                    inputs=micro_input["input_ids"],
-                                    graph=graph,
-                                    graph_mask=graph_mask,
-                                    graph_token_index=graph_token_index,
-                                    max_new_tokens=args.max_new_tokens,
-                                    do_sample=False,
-                                    use_cache=True,
-                                )
+                            outputs = model.generate(
+                                inputs=micro_input["input_ids"],
+                                graph=graph,
+                                graph_mask=graph_mask,
+                                graph_token_index=graph_token_index,
+                                max_new_tokens=args.max_new_tokens,
+                                do_sample=False,
+                                use_cache=True,
+                            )
                         out_text = tokenizer.batch_decode(
                             outputs[:, micro_input["input_ids"].size(1) :],
                             skip_special_tokens=False if args.data_fuzz else True,
@@ -334,30 +319,15 @@ def test(
 
                     if args.num_gpu == 1:
                         with torch.autocast(device_type="cuda", dtype=torch.float16):
-                            if args.fuzz_model:
-                                outputs = generate_fuzz(
-                                    inputs_ids=micro_input["input_ids"],
-                                    inputs_embeds=inputs_embeds,
-                                    model=model,
-                                    temperature=args.temp,
-                                    top_k=args.top_k,
-                                    top_p=args.top_p,
-                                    accelerator=accelerator,
-                                    tokenizer=dataset.llm_tokenizer,
-                                    max_new_tokens=args.max_new_tokens,
-                                    do_sample=False,
-                                    max_seq_len=args.max_seq_length,
-                                )
-                            else:
-                                outputs = model.generate(
-                                    inputs=micro_input["input_ids"],
-                                    graph=graph,
-                                    graph_mask=graph_mask,
-                                    graph_token_index=graph_token_index,
-                                    max_new_tokens=args.max_new_tokens,
-                                    do_sample=False,
-                                    use_cache=True,
-                                )
+                            outputs = model.generate(
+                                inputs=micro_input["input_ids"],
+                                graph=graph,
+                                graph_mask=graph_mask,
+                                graph_token_index=graph_token_index,
+                                max_new_tokens=args.max_new_tokens,
+                                do_sample=False,
+                                use_cache=True,
+                            )
                         out_text = tokenizer.batch_decode(
                             outputs[:, micro_input["input_ids"].size(1) :],
                             skip_special_tokens=False if args.data_fuzz else True,
@@ -497,30 +467,15 @@ def test(
 
                     if args.num_gpu == 1:
                         with torch.autocast(device_type="cuda", dtype=torch.float16):
-                            if args.fuzz_model:
-                                outputs = generate_fuzz(
-                                    inputs_ids=micro_input["input_ids"],
-                                    inputs_embeds=inputs_embeds,
-                                    model=model,
-                                    temperature=args.temp,
-                                    top_k=args.top_k,
-                                    top_p=args.top_p,
-                                    accelerator=accelerator,
-                                    tokenizer=dataset.llm_tokenizer,
-                                    max_new_tokens=args.max_new_tokens,
-                                    do_sample=False,
-                                    max_seq_len=args.max_seq_length,
-                                )
-                            else:
-                                outputs = model.generate(
-                                    inputs=micro_input["input_ids"],
-                                    graph=graph,
-                                    graph_mask=graph_mask,
-                                    graph_token_index=graph_token_index,
-                                    max_new_tokens=args.max_new_tokens,
-                                    do_sample=False,
-                                    use_cache=True,
-                                )
+                            outputs = model.generate(
+                                inputs=micro_input["input_ids"],
+                                graph=graph,
+                                graph_mask=graph_mask,
+                                graph_token_index=graph_token_index,
+                                max_new_tokens=args.max_new_tokens,
+                                do_sample=False,
+                                use_cache=True,
+                            )
                         out_text = tokenizer.batch_decode(
                             outputs[:, micro_input["input_ids"].size(1) :],
                             skip_special_tokens=False if args.fuzz_model else True,
