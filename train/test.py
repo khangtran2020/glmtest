@@ -11,7 +11,7 @@ from model.gnn import GRAPH_KEYS
 from tqdm import tqdm
 from rich import print as pprint
 from data.loader import GLMFDataset, collate_fn
-from model.model import GLMFModelForCausalLM, GLMFModelConfig
+from model.model import GLMFModelForCausalLM, GLMFModelConfig, GLMFModelFuzzing
 from transformers import PreTrainedTokenizer
 from transformers import DynamicCache
 from utils.constant import FUZZ_START_TOKEN, FUZZ_END_TOKEN
@@ -182,6 +182,8 @@ def test(
                                         temperature=args.temp,
                                         use_cache=True,
                                     )
+                                if isinstance(model, GLMFModelFuzzing):
+                                    model.clear_cache()
                                 out_text = tokenizer.batch_decode(
                                     outputs[:, micro_input["input_ids"].size(1) :],
                                     skip_special_tokens=(
@@ -203,6 +205,8 @@ def test(
                                     do_sample=False,
                                     use_cache=True,
                                 )
+                            if isinstance(model, GLMFModelFuzzing):
+                                model.clear_cache()
                             out_text = tokenizer.batch_decode(
                                 outputs[:, micro_input["input_ids"].size(1) :],
                                 skip_special_tokens=False if args.data_fuzz else True,
@@ -357,6 +361,8 @@ def test(
                                 do_sample=False,
                                 use_cache=True,
                             )
+                        if isinstance(model, GLMFModelFuzzing):
+                            model.clear_cache()
                         out_text = tokenizer.batch_decode(
                             outputs[:, micro_input["input_ids"].size(1) :],
                             skip_special_tokens=False if args.data_fuzz else True,
@@ -505,6 +511,8 @@ def test(
                                 do_sample=False,
                                 use_cache=True,
                             )
+                        if isinstance(model, GLMFModelFuzzing):
+                            model.clear_cache()
                         out_text = tokenizer.batch_decode(
                             outputs[:, micro_input["input_ids"].size(1) :],
                             skip_special_tokens=False if args.fuzz_model else True,

@@ -1227,3 +1227,11 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         # 8. Remove unexpected `generate` inputs (TODO @joao: fix trainer and examples)
         model_inputs.pop("labels", None)
         return model_inputs
+
+    def clear_cache(self):
+        """
+        Clear the cache of the model. This is useful when you want to reset the model's state.
+        """
+        for layer in self.layers:
+            if isinstance(layer, GLMFFuzzingLayer):
+                layer.clear_cache()

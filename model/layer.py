@@ -220,6 +220,19 @@ class NVIBTransformerLayer(Module):
         x = self.linear2(self.dropout(self.activation(self.linear1(x))))
         return self.dropout2(x)
 
+    def clear_cache(self):
+        """
+        Clear the cache of the layer. This is useful when you want to reset the layer's state.
+        """
+        if self.use_cache:
+            self.past_key = None
+            self.past_value = None
+            self.past_pi = None
+            self.past_mu = None
+            self.past_logvar = None
+            self.past_memory_key_padding_mask = None
+            self.past_alpha = None
+
 
 class GLMFFuzzingLayer(Module):
     r"""
@@ -396,3 +409,10 @@ class GLMFFuzzingLayer(Module):
             kl_d,
             latent_dict_out,
         )
+
+    def clear_cache(self):
+        """
+        Clear the cache of the layer. This is useful when you want to reset the layer's state.
+        """
+        if self.is_fuzz:
+            self.nvib_layer.clear_cache()
