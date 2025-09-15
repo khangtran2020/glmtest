@@ -163,27 +163,56 @@ def test(
                         )
 
                     if args.num_gpu == 1:
-                        with torch.autocast(device_type="cuda", dtype=torch.float16):
-                            outputs = model.generate(
-                                inputs=micro_input["input_ids"],
-                                graph=graph,
-                                graph_mask=graph_mask,
-                                graph_token_index=graph_token_index,
-                                max_new_tokens=args.max_new_tokens,
-                                do_sample=False,
-                                use_cache=True,
-                            )
-                        out_text = tokenizer.batch_decode(
-                            outputs[:, micro_input["input_ids"].size(1) :],
-                            skip_special_tokens=False if args.data_fuzz else True,
-                        )[0]
-                        # print(f"Generated text - {uuid}: {out_text}")
-                        if args.debug and accelerator.is_main_process:
-                            console.log(
-                                f"\n\n[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}\n\n"
-                            )
-
-                        generated_text[uuid] = out_text
+                        if args.fuzzing:
+                            console.log("Fuzzing mode is on during testing.")
+                            gentext = []
+                            for sample in args.num_samples_per_input:
+                                with torch.autocast(
+                                    device_type="cuda", dtype=torch.float16
+                                ):
+                                    outputs = model.generate(
+                                        inputs=micro_input["input_ids"],
+                                        graph=graph,
+                                        graph_mask=graph_mask,
+                                        graph_token_index=graph_token_index,
+                                        max_new_tokens=args.max_new_tokens,
+                                        do_sample=True,
+                                        top_k=args.top_k,
+                                        top_p=args.top_p,
+                                        temperature=args.temp,
+                                        use_cache=True,
+                                    )
+                                out_text = tokenizer.batch_decode(
+                                    outputs[:, micro_input["input_ids"].size(1) :],
+                                    skip_special_tokens=(
+                                        False if args.data_fuzz else True
+                                    ),
+                                )[0]
+                                gentext.append(out_text)
+                            generated_text[uuid] = gentext
+                        else:
+                            with torch.autocast(
+                                device_type="cuda", dtype=torch.float16
+                            ):
+                                outputs = model.generate(
+                                    inputs=micro_input["input_ids"],
+                                    graph=graph,
+                                    graph_mask=graph_mask,
+                                    graph_token_index=graph_token_index,
+                                    max_new_tokens=args.max_new_tokens,
+                                    do_sample=False,
+                                    use_cache=True,
+                                )
+                            out_text = tokenizer.batch_decode(
+                                outputs[:, micro_input["input_ids"].size(1) :],
+                                skip_special_tokens=False if args.data_fuzz else True,
+                            )[0]
+                            # print(f"Generated text - {uuid}: {out_text}")
+                            if args.debug and accelerator.is_main_process:
+                                console.log(
+                                    f"\n\n[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}\n\n"
+                                )
+                            generated_text[uuid] = out_text
                         end_time = time.time()
                         process_time = end_time - start_time
                         time_list.append(process_time)

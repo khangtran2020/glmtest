@@ -449,6 +449,7 @@ def main() -> None:
                 glmf_model_weight_path=args.model_weight_path,
                 kl_g_reg=args.kl_g_reg,
                 kl_d_reg=args.kl_d_reg,
+                fuzzing=args.fuzzing,
             )
         else:
             config = GLMFModelConfig(

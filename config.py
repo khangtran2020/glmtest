@@ -163,6 +163,17 @@ def add_model_group(group):
         help="using fuzz model",
     )
     group.add_argument(
+        "--fuzzing",
+        action="store_true",
+        help="Start fuzzing process",
+    )
+    group.add_argument(
+        "--num_samples_per_input",
+        type=int,
+        help="number of samples to fuzz per input",
+        default=10,
+    )
+    group.add_argument(
         "--start_fuzz_layer_index",
         type=int,
         help="start layer index for fuzzing",

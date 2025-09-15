@@ -32,6 +32,7 @@ class NVIBTransformerLayer(Module):
         delta=1.0,
         layer_norm_eps: float = 1e-5,
         use_cache: bool = False,
+        fuzzing: bool = False,
     ) -> None:
         factory_kwargs = {"device": device, "dtype": dtype}
         super(NVIBTransformerLayer, self).__init__()
@@ -42,8 +43,14 @@ class NVIBTransformerLayer(Module):
             kappa=kappa,
             nheads=nhead,
         )
+        self.fuzzing = fuzzing
         self.self_attn = DenoisingMultiheadAttention(
-            d_model, nhead, dropout=dropout, batch_first=True, **factory_kwargs
+            d_model,
+            nhead,
+            dropout=dropout,
+            batch_first=True,
+            fuzzing=fuzzing,
+            **factory_kwargs,
         )
 
         self.linear1 = Linear(d_model, dim_feedforward, **factory_kwargs)
@@ -278,10 +285,12 @@ class GLMFFuzzingLayer(Module):
         delta=1.0,
         is_fuzz: bool = False,
         use_cache: bool = False,
+        fuzzing: bool = False,
     ) -> None:
         super(GLMFFuzzingLayer, self).__init__()
         self.llm_layer = llm_layer
         self.is_fuzz = is_fuzz
+        self.fuzzing = fuzzing
 
         if self.is_fuzz:
             self.nvib_layer = NVIBTransformerLayer(
@@ -295,6 +304,7 @@ class GLMFFuzzingLayer(Module):
                 kappa=kappa,
                 delta=delta,
                 use_cache=use_cache,
+                fuzzing=fuzzing,
             )
 
     def forward(

@@ -647,6 +647,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         glmf_model: Optional[GLMFModelForCausalLM] = None,
         kl_g_reg: float = 0.0,
         kl_d_reg: float = 0.0,
+        fuzzing: bool = False,
         **kwargs,
     ):
 
@@ -660,6 +661,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         self.kl_g_reg = kl_g_reg
         self.kl_d_reg = kl_d_reg
         self.tokenizer = tokenizer
+        self.fuzzing = fuzzing
         self.config.vocab_size = len(tokenizer)
         self.fuzz_start_id = self.tokenizer.convert_tokens_to_ids(FUZZ_START_TOKEN)
         self.fuzz_end_id = self.tokenizer.convert_tokens_to_ids(FUZZ_END_TOKEN)
@@ -741,6 +743,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                     dim_feedforward=self.config.n_hidden,
                     dropout=self.config.dropout,
                     is_fuzz=True,
+                    fuzzing=self.fuzzing,
                     use_cache=False if self.is_training else True,
                 )
             )
