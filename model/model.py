@@ -386,6 +386,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             graph_token_indices=graph_token_indices,
         )
 
+        pprint(f"[green]Input embeds shape: {inputs_embeds.shape}[/green]")
+
         if accelerator is not None:
             accelerator.wait_for_everyone()
         if self.multi_gpu:
