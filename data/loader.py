@@ -1,5 +1,6 @@
 import json
 import torch
+from rich import print as pprint
 from data.utils import sampling_neighbor
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizer
@@ -238,6 +239,16 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
         collated_input["labels"] = pad(
             labels, target_length=max_seq_length, pad_value=-100
         ).long()
+
+        pprint(
+            f"[yellow]Collated input_ids shape: {collated_input['input_ids'].shape}[/yellow]"
+        )
+        pprint(
+            f"[yellow]Collated attention_mask shape: {collated_input['attention_mask'].shape}[/yellow]"
+        )
+        pprint(
+            f"[yellow]Collated labels shape: {collated_input['labels'].shape}[/yellow]"
+        )
 
         collated = {
             "text": [x["text"] for x in batch],
