@@ -228,7 +228,7 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
 
         for sample in batch:
             pprint(
-                f"[cyan]Sample input_ids length: {len(sample['input']['input_ids'])}[/cyan]"
+                f"[cyan]Sample input_ids length: {sample['input']['input_ids'].shape}[/cyan]"
             )
 
         input_ids = [sample["input"]["input_ids"] for sample in batch]
