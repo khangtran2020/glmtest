@@ -5,6 +5,7 @@ import wandb
 import shutil
 import transformers
 import torch.distributed as dist
+from functools import partial
 from model.gnn import GRAPH_KEYS
 from torch.utils.data import DataLoader
 from data.core import Data
@@ -40,6 +41,9 @@ def train(
     mixed_precision: str = "bf16",
     collate_fn: callable = collate_fn,
 ):
+    collate_fn_ = partial(
+        collate_fn, tokenizer=model.tokenizer, max_seq_length=args.max_seq_length
+    )
     if args.num_gpu == 1:
         console.log("Training on single GPU with mode: train_single_gpu_accelerate")
         train_single_gpu_accelerate(
@@ -53,7 +57,7 @@ def train(
             mixed_precision=mixed_precision,
             model=model,
             max_num_checkpoint=max_num_checkpoint,
-            collate_fn=collate_fn,
+            collate_fn=collate_fn_,
         )
     else:
         console.log(
@@ -70,7 +74,7 @@ def train(
             mixed_precision=mixed_precision,
             model=model,
             max_num_checkpoint=max_num_checkpoint,
-            collate_fn=collate_fn,
+            collate_fn=collate_fn_,
         )
 
 
