@@ -226,6 +226,11 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
         # print(batch)
         collated_input = {}
 
+        for sample in batch:
+            pprint(
+                f"[cyan]Sample input_ids length: {len(sample['input']['input_ids'])}[/cyan]"
+            )
+
         input_ids = [sample["input"]["input_ids"] for sample in batch]
         attention_mask = [sample["input"]["attention_mask"] for sample in batch]
         labels = [sample["input"]["labels"] for sample in batch]
