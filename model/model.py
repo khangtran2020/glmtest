@@ -301,6 +301,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         embeds = []
         if inputs_embeds is None:
+            pprint(f"[blue]Input ids shape: {input_ids.shape}[/blue]")
             input_ids = input_ids.to(self.llm_model.device)
             inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
             input_ids = input_ids.to("cpu")
