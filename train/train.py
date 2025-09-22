@@ -253,23 +253,26 @@ def train_single_gpu_accelerate(
                     )
                     continue
 
-                global_step += args.batch_size
+                global_step += 1
                 batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
 
-                for i in range(batch_size):
+                # batch_input = batch["input"].copy()
+                if "token_type_ids" in batch["input"]:
+                    batch["input"].pop("token_type_ids")
 
-                    batch_input = batch["input"].copy()
-                    if "token_type_ids" in batch_input:
-                        batch_input.pop("token_type_ids")
+                micro_input = {
+                    "input_ids": batch["input"]["input_ids"].to(device),
+                    "attention_mask": batch["input"]["attention_mask"].to(device),
+                    "labels": batch["input"]["labels"].to(device),
+                }
 
-                    micro_input = {
-                        "input_ids": batch_input["input_ids"][i].to(device),
-                        "attention_mask": batch_input["attention_mask"][i].to(device),
-                        "labels": batch_input["labels"][i].to(device),
-                    }
+                if "graph" in args.baseline_prompt:
+                    graphs = []
+                    graph_masks = []
+                    graph_token_indices = []
 
-                    if "graph" in args.baseline_prompt:
+                    for i in range(batch_size):
                         graph = batch["graph"][i]
                         for key in GRAPH_KEYS:
                             if key in graph.keys():
@@ -279,41 +282,44 @@ def train_single_gpu_accelerate(
                         graph_token_index = torch.where(
                             micro_input["input_ids"] == model.config.graph_token_id[1]
                         )[1].tolist()
-                    else:
-                        graph = None
-                        graph_mask = None
-                        graph_token_index = None
+                        graphs.append(graph)
+                        graph_masks.append(graph_mask)
+                        graph_token_indices.append(graph_token_index)
+                else:
+                    graphs = None
+                    graph_masks = None
+                    graph_token_indices = None
 
-                    with accelerator.accumulate(model):
-                        outputs = model(
-                            **micro_input,
-                            step=global_step,
-                            graph=graph,
-                            graph_mask=graph_mask,
-                            graph_token_index=graph_token_index,
-                        )
+                with accelerator.accumulate(model):
+                    outputs = model(
+                        **micro_input,
+                        step=global_step,
+                        graphs=graphs,
+                        graph_masks=graph_masks,
+                        graph_token_indices=graph_token_indices,
+                    )
 
-                        loss = outputs.loss
-                        accelerator.backward(loss)
+                    loss = outputs.loss
+                    accelerator.backward(loss)
 
-                        # compute the gradient norm of the nvib layer
-                        if args.fuzz_model:
-                            with torch.no_grad():
-                                for name, param in model.named_parameters():
-                                    if "nvib_layer" in name and param.requires_grad:
-                                        if param.grad is not None:
-                                            grad_norm = param.grad.norm(2).item()
-                                            console.log(
-                                                f"Step {global_step}: Gradient norm of {name}: {grad_norm:.4f}"
-                                            )
+                    # compute the gradient norm of the nvib layer
+                    if args.fuzz_model:
+                        with torch.no_grad():
+                            for name, param in model.named_parameters():
+                                if "nvib_layer" in name and param.requires_grad:
+                                    if param.grad is not None:
+                                        grad_norm = param.grad.norm(2).item()
+                                        console.log(
+                                            f"Step {global_step}: Gradient norm of {name}: {grad_norm:.4f}"
+                                        )
 
-                        if accelerator.sync_gradients:
-                            accelerator.clip_grad_norm_(model.parameters(), 1.0)
-                            optimizer.step()
-                            lr_scheduler.step()
-                            optimizer.zero_grad()
+                    if accelerator.sync_gradients:
+                        accelerator.clip_grad_norm_(model.parameters(), 1.0)
+                        optimizer.step()
+                        lr_scheduler.step()
+                        optimizer.zero_grad()
 
-                    batch_loss += loss.item()
+                batch_loss += loss.item()
 
                 avg_batch_loss = batch_loss / batch_size
                 ram_usage = log_ram_usage()
@@ -571,12 +577,6 @@ def train_multi_gpu_accelerate(
         va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
     )
 
-    # if accelerator.is_main_process:
-    #     # logging_train_data(
-    #     #     console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
-    #     # )
-    #     pass
-
     console.log(
         f"[green]Forward function before patching model: {transformers.modeling_flash_attention_utils._flash_attention_forward}[/green]\n\n"
     )
@@ -649,124 +649,113 @@ def train_multi_gpu_accelerate(
                 batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
 
-                # Process each sample in the batch as a micro-batch.
-                for i in range(batch_size):
+                accelerator.wait_for_everyone()
+                # batch_input = batch["input"].copy()
+                if "token_type_ids" in batch["input"]:
+                    batch["input"].pop("token_type_ids")
 
-                    accelerator.wait_for_everyone()
-                    batch_input = batch["input"].copy()
-                    if "token_type_ids" in batch_input:
-                        batch_input.pop("token_type_ids")
+                micro_input = {
+                    "input_ids": batch["input"]["input_ids"].to(device),
+                    "attention_mask": batch["input"]["attention_mask"].to(device),
+                    "labels": batch["input"]["labels"].to(device),
+                }
 
-                    micro_input = {
-                        "input_ids": batch_input["input_ids"][i].to(device),
-                        "attention_mask": batch_input["attention_mask"][i].to(device),
-                        "labels": batch_input["labels"][i].to(device),
-                    }
+                accelerator.wait_for_everyone()
 
-                    accelerator.wait_for_everyone()
-                    if "graph" in args.baseline_prompt:
+                if "graph" in args.baseline_prompt:
+                    graphs = []
+                    graph_masks = []
+                    graph_token_indices = []
+
+                    for i in range(batch_size):
                         graph = batch["graph"][i]
-                        graph_mask = batch["graph_mask"][i].to(device)
                         for key in GRAPH_KEYS:
                             if key in graph.keys():
                                 graph[key] = graph[key].to(device)
+
+                        graph_mask = batch["graph_mask"][i].to(device)
                         graph_token_index = torch.where(
-                            micro_input["input_ids"] == config.graph_token_id[1]
+                            micro_input["input_ids"] == model.config.graph_token_id[1]
                         )[1].tolist()
-                    else:
-                        graph = None
-                        graph_mask = None
-                        graph_token_index = None
+                        graphs.append(graph)
+                        graph_masks.append(graph_mask)
+                        graph_token_indices.append(graph_token_index)
+                else:
+                    graphs = None
+                    graph_masks = None
+                    graph_token_indices = None
 
-                    position_ids = (
-                        torch.arange(micro_input["input_ids"].shape[1])
-                        .unsqueeze(0)
-                        .expand(micro_input["input_ids"].shape[0], -1)
+                position_ids = (
+                    torch.arange(micro_input["input_ids"].shape[1])
+                    .unsqueeze(0)
+                    .expand(micro_input["input_ids"].shape[0], -1)
+                )
+
+                accelerator.wait_for_everyone()
+
+                with accelerator.accumulate(model):
+
+                    outputs = model(
+                        **micro_input,
+                        position_ids=position_ids.to(device),
+                        graphs=graphs,
+                        graph_masks=graph_masks,
+                        graph_token_indices=graph_token_indices,
+                        step=global_step,
+                        accelerator=accelerator,
                     )
+                    accelerator.wait_for_everyone()
+                    loss = outputs.loss
 
+                    accelerator.backward(loss)
                     accelerator.wait_for_everyone()
 
-                    with accelerator.accumulate(model):
-
-                        outputs = model(
-                            **micro_input,
-                            position_ids=position_ids.to(device),
-                            graph=graph,
-                            graph_mask=graph_mask,
-                            graph_token_index=graph_token_index,
-                            step=global_step,
-                            accelerator=accelerator,
-                        )
-                        accelerator.wait_for_everyone()
-                        loss = outputs.loss
-                        # dot = make_dot(loss, params=dict(model.named_parameters()))
-                        # dot.format = "png"
-                        # dot.render("causallm_graph")
-                        # sys.exit(0)
-                        accelerator.backward(loss)
-                        accelerator.wait_for_everyone()
-
-                        # for name, param in model.named_parameters():
-                        #     if param.requires_grad and param.grad is None:
-                        #         print(f"No grad for: {name}")
-
-                        # with torch.no_grad():
-                        #     # check gradient norms
-                        #     grad_norm = 0.0
-                        #     for name, param in model.named_parameters():
-                        #         if param.grad is not None:
-                        #             grad_norm = grad_norm + param.grad.norm(2) ** 2
-                        #     grad_norm = grad_norm.sqrt().item()
-                        #     print(
-                        #         f"Step {global_step} - for rank {local_rank}: gradient norm: {grad_norm:.4f}\n\n\n"
-                        #     )
-
-                        if args.fuzz_model:
-                            with torch.no_grad():
-                                for name, param in model.named_parameters():
-                                    if "nvib_layer" in name and param.requires_grad:
-                                        if param.grad is not None:
-                                            grad_norm = param.grad.norm(2).item()
-                                            console.log(
-                                                f"Step {global_step} - rank {local_rank}: Gradient norm of {name}: {grad_norm:.4f}"
-                                            )
-
-                        if accelerator.sync_gradients:
-                            accelerator.wait_for_everyone()
-                            accelerator.clip_grad_norm_(model.parameters(), 1.0)
-                            optimizer.step()
-                            lr_scheduler.step()
-                            optimizer.zero_grad()
-                            model.zero_grad()
-
+                    if args.fuzz_model:
                         with torch.no_grad():
-                            all_losses = accelerator.gather(loss)
-                            # fill all_losses with zero if it is NaN with torch.where
-                            all_losses = torch.where(
-                                torch.isnan(all_losses),
-                                torch.zeros_like(all_losses),
-                                all_losses,
-                            )
-                            console.log(
-                                f"Step {global_step}: gathered losses: {all_losses}"
-                            )
-                            total_loss = torch.sum(all_losses)
-                            batch_loss += total_loss.detach().float().item()
+                            for name, param in model.named_parameters():
+                                if "nvib_layer" in name and param.requires_grad:
+                                    if param.grad is not None:
+                                        grad_norm = param.grad.norm(2).item()
+                                        console.log(
+                                            f"Step {global_step} - rank {local_rank}: Gradient norm of {name}: {grad_norm:.4f}"
+                                        )
 
-                    for key in micro_input.keys():
-                        micro_input[key] = micro_input[key].to("cpu")
-                    if "graph" in args.baseline_prompt:
-                        for key in GRAPH_KEYS:
-                            if key in graph.keys():
-                                graph[key] = graph[key].to("cpu")
-                                graph.pop(key, None)
-                        graph_mask = graph_mask.to("cpu")
-                        del graph_mask, graph
-                    outputs.logits = outputs.logits.to("cpu")
-                    loss = loss.to("cpu")
-                    del outputs, loss, micro_input
-                    gc.collect()
-                    torch.cuda.empty_cache()
+                    if accelerator.sync_gradients:
+                        accelerator.wait_for_everyone()
+                        accelerator.clip_grad_norm_(model.parameters(), 1.0)
+                        optimizer.step()
+                        lr_scheduler.step()
+                        optimizer.zero_grad()
+                        model.zero_grad()
+
+                    with torch.no_grad():
+                        all_losses = accelerator.gather(loss)
+                        # fill all_losses with zero if it is NaN with torch.where
+                        all_losses = torch.where(
+                            torch.isnan(all_losses),
+                            torch.zeros_like(all_losses),
+                            all_losses,
+                        )
+                        console.log(
+                            f"Step {global_step}: gathered losses: {all_losses}"
+                        )
+                        total_loss = torch.sum(all_losses)
+                        batch_loss += total_loss.detach().float().item()
+
+                for key in micro_input.keys():
+                    micro_input[key] = micro_input[key].to("cpu")
+                if "graph" in args.baseline_prompt:
+                    for key in GRAPH_KEYS:
+                        if key in graph.keys():
+                            graph[key] = graph[key].to("cpu")
+                            graph.pop(key, None)
+                    graph_mask = graph_mask.to("cpu")
+                    del graph_mask, graph
+                outputs.logits = outputs.logits.to("cpu")
+                loss = loss.to("cpu")
+                del outputs, loss, micro_input
+                gc.collect()
+                torch.cuda.empty_cache()
 
                 avg_batch_loss = batch_loss / batch_size
                 if accelerator.is_main_process:

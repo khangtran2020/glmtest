@@ -293,36 +293,43 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
     def extract_embedding(
         self,
         input_ids: torch.Tensor,
-        graph: Optional[dict],
-        graph_mask: Optional[torch.Tensor],
-        graph_token_index: Optional[torch.LongTensor],
+        graphs: Optional[List[dict]],
+        graph_masks: Optional[List[torch.Tensor]],
+        graph_token_indices: Optional[List[torch.LongTensor]],
         inputs_embeds: torch.Tensor = None,
     ) -> torch.Tensor:
+
+        embeds = []
         if inputs_embeds is None:
             input_ids = input_ids.to(self.llm_model.device)
             inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
             input_ids = input_ids.to("cpu")
 
         if (
-            (graph is not None)
+            (graphs is not None)
             and ("graph" in self.baseline_prompt)
             and (inputs_embeds.size(1) > 1)
         ):
-            assert graph_mask is not None
-            assert graph_token_index is not None
+            assert graph_masks is not None
+            assert graph_token_indices is not None
+            batch_size = inputs_embeds.size(0)
 
-            graph_embeds = self.gnn(graph, graph_mask)
-            graph_embeds = graph_embeds.to(inputs_embeds.device)
-            assert (
-                graph_embeds.shape
-                == inputs_embeds[
-                    0, graph_token_index[0] : (graph_token_index[-1] + 1), :
-                ].shape
-            ), f"Shape mismatch in assignment: graph embedding shape {graph_embeds.shape}, input embedding shape: {inputs_embeds.shape}, graph_token_index: {len(graph_token_index)}!"
-
-            inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :] = (
-                graph_embeds.to(inputs_embeds.dtype)
-            )
+            for i in range(batch_size):
+                graph = graphs[i]
+                graph_mask = graph_masks[i].to(self.llm_model.device)
+                graph_embeds = self.gnn(graph, graph_mask)
+                graph_embeds = graph_embeds.to(inputs_embeds.device)
+                assert (
+                    graph_embeds.shape
+                    == inputs_embeds[
+                        0,
+                        graph_token_indices[i][0] : (graph_token_indices[i][-1] + 1),
+                        :,
+                    ].shape
+                ), f"Shape mismatch in assignment: graph embedding shape {graph_embeds.shape}, input embedding shape: {inputs_embeds.shape}, graph_token_index: {len(graph_token_indices[i])}!"
+                inputs_embeds[
+                    i, graph_token_indices[i][0] : (graph_token_indices[i][-1] + 1), :
+                ] = graph_embeds.to(inputs_embeds.dtype)
         else:
             if self.is_training:
                 inputs_embeds = inputs_embeds.requires_grad_(True)
@@ -333,9 +340,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         self,
         input_ids: Optional[torch.LongTensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
-        graph: Optional[dict] = None,
-        graph_mask: Optional[torch.Tensor] = None,
-        graph_token_index: Optional[torch.LongTensor] = None,
+        graphs: Optional[List[dict]] = None,
+        graph_masks: Optional[List[torch.Tensor]] = None,
+        graph_token_indices: Optional[List[torch.LongTensor]] = None,
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[Union[Cache, List[torch.FloatTensor]]] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
@@ -373,10 +380,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         inputs_embeds = self.extract_embedding(
             input_ids=input_ids,
-            graph=graph,
+            graphs=graphs,
             inputs_embeds=inputs_embeds,
-            graph_mask=graph_mask,
-            graph_token_index=graph_token_index,
+            graph_masks=graph_masks,
+            graph_token_indices=graph_token_indices,
         )
 
         if accelerator is not None:
@@ -774,10 +781,10 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         self,
         input_ids: Optional[torch.LongTensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
-        graph: Optional[dict] = None,
-        graph_mask: Optional[torch.Tensor] = None,
+        graphs: Optional[dict] = None,
+        graph_masks: Optional[torch.Tensor] = None,
         # fuzzing_mask: Optional[torch.Tensor] = None,
-        graph_token_index: Optional[torch.LongTensor] = None,
+        graph_token_indices: Optional[torch.LongTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[Union[Cache, List[torch.FloatTensor]]] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
@@ -838,10 +845,10 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
 
         inputs_embeds = self.extract_embedding(
             input_ids=input_ids,
-            graph=graph,
+            graphs=graphs,
             inputs_embeds=inputs_embeds,
-            graph_mask=graph_mask,
-            graph_token_index=graph_token_index,
+            graph_masks=graph_masks,
+            graph_token_indices=graph_token_indices,
         )
 
         if use_cache and past_key_values is None:
@@ -964,36 +971,43 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
     def extract_embedding(
         self,
         input_ids: torch.Tensor,
-        graph: Optional[dict],
-        graph_mask: Optional[torch.Tensor],
-        graph_token_index: Optional[torch.LongTensor],
+        graphs: Optional[List[dict]],
+        graph_masks: Optional[List[torch.Tensor]],
+        graph_token_indices: Optional[List[torch.LongTensor]],
         inputs_embeds: torch.Tensor = None,
     ) -> torch.Tensor:
+
+        embeds = []
         if inputs_embeds is None:
             input_ids = input_ids.to(self.llm_model.device)
             inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
             input_ids = input_ids.to("cpu")
 
         if (
-            (graph is not None)
+            (graphs is not None)
             and ("graph" in self.baseline_prompt)
             and (inputs_embeds.size(1) > 1)
         ):
-            assert graph_mask is not None
-            assert graph_token_index is not None
+            assert graph_masks is not None
+            assert graph_token_indices is not None
+            batch_size = inputs_embeds.size(0)
 
-            graph_embeds = self.gnn(graph, graph_mask)
-            graph_embeds = graph_embeds.to(inputs_embeds.device)
-            assert (
-                graph_embeds.shape
-                == inputs_embeds[
-                    0, graph_token_index[0] : (graph_token_index[-1] + 1), :
-                ].shape
-            ), f"Shape mismatch in assignment: graph embedding shape {graph_embeds.shape}, input embedding shape: {inputs_embeds.shape}, graph_token_index: {len(graph_token_index)}!"
-
-            inputs_embeds[0, graph_token_index[0] : (graph_token_index[-1] + 1), :] = (
-                graph_embeds
-            )
+            for i in range(batch_size):
+                graph = graphs[i]
+                graph_mask = graph_masks[i].to(self.llm_model.device)
+                graph_embeds = self.gnn(graph, graph_mask)
+                graph_embeds = graph_embeds.to(inputs_embeds.device)
+                assert (
+                    graph_embeds.shape
+                    == inputs_embeds[
+                        0,
+                        graph_token_indices[i][0] : (graph_token_indices[i][-1] + 1),
+                        :,
+                    ].shape
+                ), f"Shape mismatch in assignment: graph embedding shape {graph_embeds.shape}, input embedding shape: {inputs_embeds.shape}, graph_token_index: {len(graph_token_indices[i])}!"
+                inputs_embeds[
+                    i, graph_token_indices[i][0] : (graph_token_indices[i][-1] + 1), :
+                ] = graph_embeds.to(inputs_embeds.dtype)
         else:
             if self.is_training:
                 inputs_embeds = inputs_embeds.requires_grad_(True)

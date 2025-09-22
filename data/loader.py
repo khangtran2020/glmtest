@@ -165,22 +165,85 @@ class GLMFDataset(Dataset):
         return result, pad_size
 
 
-def collate_fn(batch) -> dict:
+def pad_to_length(
+    input_tensor: torch.Tensor, target_length: int, pad_value: int
+) -> torch.Tensor:
+
+    # check dimention of input tensor.
+    # If dimention is 1, pad in the dimention 0, else pad in the dimention 1.
+
+    num_dims = len(input_tensor.shape)
+    if num_dims == 1:
+        current_length = input_tensor.size(0)
+        if current_length < target_length:
+            padding = torch.full(
+                (target_length - current_length,),
+                pad_value,
+                dtype=input_tensor.dtype,
+                device=input_tensor.device,
+            )
+            input_tensor = torch.cat([input_tensor, padding], dim=0)
+    else:
+        current_length = input_tensor.size(1)
+        if current_length < target_length:
+            padding = torch.full(
+                (input_tensor.size(0), target_length - current_length),
+                pad_value,
+                dtype=input_tensor.dtype,
+                device=input_tensor.device,
+            )
+            input_tensor = torch.cat([input_tensor, padding], dim=1)
+    return input_tensor
+
+
+def pad(
+    input_tensors: List[torch.Tensor], target_length: int, pad_value: int
+) -> torch.Tensor:
+    num_dims = len(input_tensors[0].shape)
+    if num_dims == 1:
+        max_length = max(tensor.size(0) for tensor in input_tensors)
+    else:
+        max_length = max(tensor.size(1) for tensor in input_tensors)
+    target_length = min(max_length, target_length)
+    if num_dims == 1:
+        padded_tensors = [
+            pad_to_length(tensor, target_length, pad_value) for tensor in input_tensors
+        ]
+    else:
+        padded_tensors = [
+            pad_to_length(tensor, target_length, pad_value).unsqueeze(dim=0)
+            for tensor in input_tensors
+        ]
+    input_tensor = torch.stack(padded_tensors)
+    return input_tensor
+
+
+def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> dict:
 
     # check if batch is tuple
     if not isinstance(batch[0], tuple):
         # print(batch)
         collated_input = {}
-        for key in batch[0]["input"]:
-            # Stack the tensors corresponding to the same key across the batch
-            collated_input[key] = torch.stack(
-                [sample["input"][key] for sample in batch]
-            )
+
+        input_ids = [sample["input"]["input_ids"] for sample in batch]
+        attention_mask = [sample["input"]["attention_mask"] for sample in batch]
+        labels = [sample["input"]["labels"] for sample in batch]
+
+        collated_input["input_ids"] = pad(
+            input_ids, target_length=max_seq_length, pad_value=tokenizer.pad_token_id
+        )
+        collated_input["attention_mask"] = pad(
+            attention_mask, target_length=max_seq_length, pad_value=0
+        )
+        collated_input["labels"] = pad(
+            labels, target_length=max_seq_length, pad_value=-100
+        ).long()
+
         collated = {
             "text": [x["text"] for x in batch],
             "input": collated_input,
             "graph_mask": (
-                torch.stack([x["graph_mask"] for x in batch])
+                [x["graph_mask"] for x in batch]
                 if batch[0]["graph_mask"] is not None
                 else None
             ),
@@ -191,17 +254,26 @@ def collate_fn(batch) -> dict:
         return collated
     else:
         uuid, batch = batch
-        collated_input = {}
-        for key in batch[0]["input"]:
-            # Stack the tensors corresponding to the same key across the batch
-            collated_input[key] = torch.stack(
-                [sample["input"][key] for sample in batch]
-            )
+
+        input_ids = [sample["input"]["input_ids"] for sample in batch]
+        attention_mask = [sample["input"]["attention_mask"] for sample in batch]
+        labels = [sample["input"]["labels"] for sample in batch]
+
+        collated_input["input_ids"] = pad(
+            input_ids, target_length=max_seq_length, pad_value=tokenizer.pad_token_id
+        )
+        collated_input["attention_mask"] = pad(
+            attention_mask, target_length=max_seq_length, pad_value=0
+        )
+        collated_input["labels"] = pad(
+            labels, target_length=max_seq_length, pad_value=-100
+        ).long()
+
         collated = {
             "text": [x["text"] for x in batch],
             "input": collated_input,
             "graph_mask": (
-                torch.stack([x["graph_mask"] for x in batch])
+                [x["graph_mask"] for x in batch]
                 if batch[0]["graph_mask"] is not None
                 else None
             ),
