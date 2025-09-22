@@ -205,6 +205,7 @@ def pad(
         max_length = max(tensor.size(0) for tensor in input_tensors)
     else:
         max_length = max(tensor.size(1) for tensor in input_tensors)
+    pprint(f"[blue]Max length in batch: {max_length}[/blue]")
     target_length = min(max_length, target_length)
     if num_dims == 1:
         padded_tensors = [
@@ -226,10 +227,10 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
         # print(batch)
         collated_input = {}
 
-        for sample in batch:
-            pprint(
-                f"[cyan]Sample input_ids length: {sample['input']['input_ids'].shape}[/cyan]"
-            )
+        # for sample in batch:
+        #     pprint(
+        #         f"[cyan]Sample input_ids length: {sample['input']['input_ids'].shape}[/cyan]"
+        #     )
 
         input_ids = [sample["input"]["input_ids"] for sample in batch]
         attention_mask = [sample["input"]["attention_mask"] for sample in batch]
