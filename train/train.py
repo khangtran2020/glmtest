@@ -42,7 +42,7 @@ def train(
     collate_fn: callable = collate_fn,
 ):
     collate_fn_ = partial(
-        collate_fn, tokenizer=model.tokenizer, max_seq_length=args.max_seq_length
+        collate_fn, tokenizer=dataset.llm_tokenizer, max_seq_length=args.max_seq_length
     )
     if args.num_gpu == 1:
         console.log("Training on single GPU with mode: train_single_gpu_accelerate")
