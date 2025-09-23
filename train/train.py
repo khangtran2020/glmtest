@@ -680,7 +680,8 @@ def train_multi_gpu_accelerate(
 
                         graph_mask = batch["graph_mask"][i].to(device)
                         graph_token_index = torch.where(
-                            micro_input["input_ids"] == model.config.graph_token_id[1]
+                            micro_input["input_ids"][i]
+                            == model.config.graph_token_id[1]
                         )[1].tolist()
                         graphs.append(graph)
                         graph_masks.append(graph_mask)
