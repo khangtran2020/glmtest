@@ -284,7 +284,7 @@ def train_single_gpu_accelerate(
 
                         graph_mask = batch["graph_mask"][i].to(device)
                         console.log(
-                            f"micro_input['input_ids'][i]: {micro_input['input_ids'][i].size()}"
+                            f"torch where: {torch.where(micro_input['input_ids'][i] == model.config.graph_token_id[1])}"
                         )
                         graph_token_index = torch.where(
                             micro_input["input_ids"][i]
