@@ -283,13 +283,13 @@ def train_single_gpu_accelerate(
                                 graph[key] = graph[key].to(device)
 
                         graph_mask = batch["graph_mask"][i].to(device)
-                        console.log(
-                            f"torch where: {torch.where(micro_input['input_ids'][i] == model.config.graph_token_id[1])}"
-                        )
+                        # console.log(
+                        #     f"torch where: {torch.where(micro_input['input_ids'][i] == model.config.graph_token_id[1])}"
+                        # )
                         graph_token_index = torch.where(
                             micro_input["input_ids"][i]
                             == model.config.graph_token_id[1]
-                        )[1].tolist()
+                        )[0].tolist()
                         graphs.append(graph)
                         graph_masks.append(graph_mask)
                         graph_token_indices.append(graph_token_index)
