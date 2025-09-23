@@ -327,13 +327,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                         graph_token_indices[i][0] : (graph_token_indices[i][-1] + 1),
                         :,
                     ].shape
-                ), f"Shape mismatch in assignment: graph embedding shape {graph_embeds.shape}, input embedding shape: {inputs_embeds[
-                        i,
-                        graph_token_indices[i][0] : (graph_token_indices[i][-1] + 1),
-                        :,
-                    ].shape}, graph_token_index: {len(graph_token_indices[i])}!"
+                ), f"Shape mismatch in assignment: graph embedding shape {graph_embeds.shape}, input embedding shape: {inputs_embeds[i, graph_token_indices[i][0] : graph_token_indices[i][-1] + 1, :].shape}, graph_token_index: {len(graph_token_indices[i])}!"
                 inputs_embeds[
-                    i, graph_token_indices[i][0] : (graph_token_indices[i][-1] + 1), :
+                    i, graph_token_indices[i][0] : graph_token_indices[i][-1] + 1, :
                 ] = graph_embeds.to(inputs_embeds.dtype)
         else:
             if self.is_training:
