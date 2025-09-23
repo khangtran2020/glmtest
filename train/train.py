@@ -578,7 +578,7 @@ def train_multi_gpu_accelerate(
 
     tr_loader = DataLoader(tr_dataset, **dataloader_params)
     va_loader = DataLoader(
-        va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
+        va_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn
     )
 
     console.log(
