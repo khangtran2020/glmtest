@@ -166,58 +166,35 @@ class GLMFDataset(Dataset):
         return result, pad_size
 
 
-def pad_to_length(
-    input_tensor: torch.Tensor, target_length: int, pad_value: int
-) -> torch.Tensor:
-
-    # check dimention of input tensor.
-    # If dimention is 1, pad in the dimention 0, else pad in the dimention 1.
-
-    num_dims = len(input_tensor.shape)
-    if num_dims == 1:
-        current_length = input_tensor.size(0)
-        if current_length < target_length:
-            padding = torch.full(
-                (target_length - current_length,),
-                pad_value,
-                dtype=input_tensor.dtype,
-                device=input_tensor.device,
-            )
-            input_tensor = torch.cat([input_tensor, padding], dim=0)
-    else:
-        current_length = input_tensor.size(1)
-        if current_length < target_length:
-            padding = torch.full(
-                (input_tensor.size(0), target_length - current_length),
-                pad_value,
-                dtype=input_tensor.dtype,
-                device=input_tensor.device,
-            )
-            input_tensor = torch.cat([input_tensor, padding], dim=1)
-    return input_tensor
-
-
 def pad(
-    input_tensors: List[torch.Tensor], target_length: int, pad_value: int
+    input_tensors: List[torch.Tensor],
+    pad_value: int,
+    padding_side: str = "right",
 ) -> torch.Tensor:
     num_dims = len(input_tensors[0].shape)
     if num_dims == 1:
         max_length = max(tensor.size(0) for tensor in input_tensors)
     else:
-        max_length = max(tensor.size(1) for tensor in input_tensors)
-    pprint(f"[blue]Max length in batch: {max_length}[/blue]")
-    target_length = min(max_length, target_length)
-    if num_dims == 1:
-        padded_tensors = [
-            pad_to_length(tensor, target_length, pad_value) for tensor in input_tensors
-        ]
-    else:
-        padded_tensors = [
-            pad_to_length(tensor, target_length, pad_value).unsqueeze(dim=0)
-            for tensor in input_tensors
-        ]
-    input_tensor = torch.stack(padded_tensors)
-    return input_tensor
+        input_tensors = [tensor.squeeze(0) for tensor in input_tensors]
+        max_length = max(tensor.size(0) for tensor in input_tensors)
+
+    padded_tensors = torch.full(
+        (len(input_tensors), max_length), pad_value, dtype=input_tensors[0].dtype
+    )
+    for i, tensor in enumerate(input_tensors):
+        if padding_side == "left":
+            seq_start = max_length - tensor.shape[0]
+        elif padding_side == "right":
+            seq_start = 0
+        else:
+            raise ValueError("padding_side must be 'left' or 'right'")
+
+        # Define the slices
+        seq_slice = slice(seq_start, seq_start + tensor.shape[0])
+        slices = (seq_slice,) + tuple(slice(0, s) for s in tensor.shape[1:])
+        padded_tensors[i][slices] = tensor
+
+    return padded_tensors
 
 
 def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> dict:
