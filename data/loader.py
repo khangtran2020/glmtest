@@ -213,15 +213,9 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
         attention_mask = [sample["input"]["attention_mask"] for sample in batch]
         labels = [sample["input"]["labels"] for sample in batch]
 
-        collated_input["input_ids"] = pad(
-            input_ids, target_length=max_seq_length, pad_value=tokenizer.pad_token_id
-        )
-        collated_input["attention_mask"] = pad(
-            attention_mask, target_length=max_seq_length, pad_value=0
-        )
-        collated_input["labels"] = pad(
-            labels, target_length=max_seq_length, pad_value=-100
-        ).long()
+        collated_input["input_ids"] = pad(input_ids, pad_value=tokenizer.pad_token_id)
+        collated_input["attention_mask"] = pad(attention_mask, pad_value=0)
+        collated_input["labels"] = pad(labels, pad_value=-100).long()
 
         pprint(
             f"[yellow]Collated input_ids shape: {collated_input['input_ids'].shape}[/yellow]"
@@ -253,15 +247,9 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
         attention_mask = [sample["input"]["attention_mask"] for sample in batch]
         labels = [sample["input"]["labels"] for sample in batch]
 
-        collated_input["input_ids"] = pad(
-            input_ids, target_length=max_seq_length, pad_value=tokenizer.pad_token_id
-        )
-        collated_input["attention_mask"] = pad(
-            attention_mask, target_length=max_seq_length, pad_value=0
-        )
-        collated_input["labels"] = pad(
-            labels, target_length=max_seq_length, pad_value=-100
-        ).long()
+        collated_input["input_ids"] = pad(input_ids, pad_value=tokenizer.pad_token_id)
+        collated_input["attention_mask"] = pad(attention_mask, pad_value=0)
+        collated_input["labels"] = pad(labels, pad_value=-100).long()
 
         collated = {
             "text": [x["text"] for x in batch],
