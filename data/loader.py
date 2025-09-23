@@ -169,7 +169,7 @@ class GLMFDataset(Dataset):
 def pad(
     input_tensors: List[torch.Tensor],
     pad_value: int,
-    padding_side: str = "right",
+    padding_side: str = "left",
 ) -> torch.Tensor:
     num_dims = len(input_tensors[0].shape)
     if num_dims == 1:
