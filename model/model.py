@@ -840,7 +840,6 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                 "You must specify exactly one of input_ids or inputs_embeds"
             )
 
-        # TODO (joao): remove this exception in v4.56 -- it exists for users that try to pass a legacy cache
         if not isinstance(past_key_values, (type(None), Cache)):
             raise ValueError(
                 "The `past_key_values` should be either a `Cache` object or `None`."

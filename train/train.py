@@ -161,7 +161,6 @@ def train_single_gpu_accelerate(
         if continue_training == False:
             shutil.rmtree(save_path)
             os.makedirs(save_path, exist_ok=True)
-    # Initialize W&B run if main process
     accelerator.init_trackers(
         project_name="GLMFuzz",
         config={
@@ -307,24 +306,15 @@ def train_single_gpu_accelerate(
                     loss = outputs.loss
                     accelerator.backward(loss)
 
-                    if args.fuzz_model:
-                        with torch.no_grad():
-                            for name, param in model.named_parameters():
-                                if "nvib_layer" in name and param.requires_grad:
-                                    if param.grad is not None:
-                                        grad_norm = param.grad.norm(2).item()
-                                        console.log(
-                                            f"Step {global_step}: Gradient norm of {name}: {grad_norm:.4f}"
-                                        )
-
                     if accelerator.sync_gradients:
-                        accelerator.clip_grad_norm_(model.parameters(), 1.0)
+                        accelerator.clip_grad_norm_(
+                            model.parameters(),
+                        )
                         optimizer.step()
                         lr_scheduler.step()
                         optimizer.zero_grad()
 
                 batch_loss += loss.item()
-
                 avg_batch_loss = batch_loss / batch_size
                 ram_usage = log_ram_usage()
                 progress.update(
@@ -390,7 +380,10 @@ def train_single_gpu_accelerate(
                     if accelerator.is_main_process:
                         accelerator.print(f"Saving checkpoint to {checkpoint_dir}")
 
-                if global_step % args.validating_steps == 0:
+                if (
+                    accelerator.sync_gradients
+                    and global_step % args.validating_steps == 0
+                ):
                     val_loss = validate(
                         args=args,
                         loader=va_loader,
