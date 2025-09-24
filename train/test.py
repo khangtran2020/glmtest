@@ -565,6 +565,16 @@ def eval_bleu_score(
     console.log(f"[green]CodeBleu Score: {codeBleu/i}[/green]")
 
 
+def logging_gpu_usage(step: int, console: Console):
+    gpu_memory = torch.cuda.memory_allocated() / (1024**3)
+    gpu_reserved = torch.cuda.memory_reserved() / (1024**3)
+    gpu_free = torch.cuda.memory_reserved() - torch.cuda.memory_allocated()
+    gpu_free = gpu_free / (1024**3)
+    console.log(
+        f"[blue]At step {step} - GPU memory allocated: {gpu_memory:.2f} GB, GPU memory reserved: {gpu_reserved:.2f} GB, GPU memory free: {gpu_free:.2f} GB[/blue]"
+    )
+
+
 def validate(
     args: Namespace,
     loader: DataLoader,
@@ -656,6 +666,8 @@ def validate(
                 del outputs, loss, micro_input
                 gc.collect()
                 torch.cuda.empty_cache()
+
+                logging_gpu_usage(step=step, console=console)
 
             except torch.cuda.OutOfMemoryError as e:
                 tqdm.write(
