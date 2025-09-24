@@ -308,7 +308,7 @@ def train_single_gpu_accelerate(
 
                     if accelerator.sync_gradients:
                         accelerator.clip_grad_norm_(
-                            model.parameters(),
+                            model.parameters(), args.max_grad_norm
                         )
                         optimizer.step()
                         lr_scheduler.step()
@@ -724,7 +724,9 @@ def train_multi_gpu_accelerate(
 
                     if accelerator.sync_gradients:
                         accelerator.wait_for_everyone()
-                        accelerator.clip_grad_norm_(model.parameters(), 1.0)
+                        accelerator.clip_grad_norm_(
+                            model.parameters(), args.max_grad_norm
+                        )
                         optimizer.step()
                         lr_scheduler.step()
                         optimizer.zero_grad()
