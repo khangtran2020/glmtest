@@ -299,7 +299,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         inputs_embeds: torch.Tensor = None,
     ) -> torch.Tensor:
 
-        embeds = []
+        # embeds = []
         if inputs_embeds is None:
             # pprint(f"[blue]Input ids shape: {input_ids.shape}[/blue]")
             input_ids = input_ids.to(self.llm_model.device)

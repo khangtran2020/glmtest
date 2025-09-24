@@ -85,7 +85,7 @@ def main() -> None:
         return
 
     dataset.prepare_data()
-    dataset.train_test_split(val_split=1000, test_split=200)
+    dataset.train_test_split(val_split=200, test_split=200)
 
     console.log(f"Broadcasted args and dataset to all processes.")
 
