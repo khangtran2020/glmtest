@@ -399,32 +399,33 @@ def train_single_gpu_accelerate(
                         f"Validation loss: {val_loss:.4f} at step {global_step}"
                     )
                     if val_loss < best_val_loss:
-                        best_val_loss = val_loss
-                        console.log(
-                            f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
-                        )
-                        checkpoint_dir = os.path.join(
-                            save_path,
-                            f"best_model",
-                        )
-                        if not os.path.exists(checkpoint_dir):
-                            os.makedirs(checkpoint_dir, exist_ok=True)
+                        pass
+                        # best_val_loss = val_loss
+                        # console.log(
+                        #     f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
+                        # )
+                        # checkpoint_dir = os.path.join(
+                        #     save_path,
+                        #     f"best_model",
+                        # )
+                        # if not os.path.exists(checkpoint_dir):
+                        #     os.makedirs(checkpoint_dir, exist_ok=True)
 
-                        unwrapped_model = accelerator.unwrap_model(model)
-                        torch.save(
-                            unwrapped_model.state_dict(),
-                            os.path.join(checkpoint_dir, "model_weight.pt"),
-                        )
-                        tokenizer.save_pretrained(checkpoint_dir)
+                        # unwrapped_model = accelerator.unwrap_model(model)
+                        # torch.save(
+                        #     unwrapped_model.state_dict(),
+                        #     os.path.join(checkpoint_dir, "model_weight.pt"),
+                        # )
+                        # tokenizer.save_pretrained(checkpoint_dir)
 
-                        if accelerator.is_main_process:
-                            accelerator.print(
-                                f"Saving best checkpoint to {checkpoint_dir}"
-                            )
+                        # if accelerator.is_main_process:
+                        #     accelerator.print(
+                        #         f"Saving best checkpoint to {checkpoint_dir}"
+                        #     )
 
-                        del unwrapped_model
-                        del checkpoint_dir
-                        gc.collect()
+                        # del unwrapped_model
+                        # del checkpoint_dir
+                        # gc.collect()
 
             if ((continue_training == True) and (global_step > start_step)) or (
                 continue_training == False
