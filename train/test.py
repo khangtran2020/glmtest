@@ -654,6 +654,8 @@ def validate(
                 else:
                     batch_loss += loss.detach().float().item()
 
+                logging_gpu_usage(step=step, console=console)
+
                 for key in micro_input.keys():
                     micro_input[key] = micro_input[key].to("cpu")
                 if "graph" in args.baseline_prompt:
@@ -668,8 +670,6 @@ def validate(
                 del outputs, loss, micro_input
                 gc.collect()
                 torch.cuda.empty_cache()
-
-                logging_gpu_usage(step=step, console=console)
 
             except torch.cuda.OutOfMemoryError as e:
                 tqdm.write(
