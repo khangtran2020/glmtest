@@ -385,6 +385,9 @@ def train_single_gpu_accelerate(
                     accelerator.sync_gradients
                     and global_step % args.validating_steps == 0
                 ):
+                    console.log(
+                        f"[green]Before validation: {torch.cuda.memory_allocated()}[/green]"
+                    )
                     val_loss = validate(
                         args=args,
                         loader=va_loader,
@@ -428,6 +431,9 @@ def train_single_gpu_accelerate(
 
                     gc.collect()
                     torch.cuda.empty_cache()
+                    console.log(
+                        f"[blue]After validation: {torch.cuda.memory_allocated()}[/blue]"
+                    )
 
             if ((continue_training == True) and (global_step > start_step)) or (
                 continue_training == False
