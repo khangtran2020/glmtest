@@ -574,6 +574,7 @@ def validate(
     progress: Progress,
     console: Console,
     accelerator: Accelerator,
+    multi_gpu: bool = False,
 ):
     model.eval()
     if config is None:
@@ -633,10 +634,13 @@ def validate(
                     graph_token_indices=graph_token_indices,
                 )
                 loss = outputs.loss
-                all_losses = accelerator.gather(loss)
-                all_losses = torch.where(torch.isnan(all_losses), 0.0, all_losses)
-                total_loss = torch.sum(all_losses)
-                batch_loss += total_loss.detach().float().item()
+                if multi_gpu:
+                    all_losses = accelerator.gather(loss)
+                    all_losses = torch.where(torch.isnan(all_losses), 0.0, all_losses)
+                    total_loss = torch.sum(all_losses)
+                    batch_loss += total_loss.detach().float().item()
+                else:
+                    batch_loss += loss.detach().float().item()
 
                 for key in micro_input.keys():
                     micro_input[key] = micro_input[key].to("cpu")

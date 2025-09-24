@@ -131,6 +131,16 @@ def logging_train_data(
     )
 
 
+def logging_gpu_usage(step: int, console: Console):
+    gpu_memory = torch.cuda.memory_allocated() / (1024**3)
+    gpu_reserved = torch.cuda.memory_reserved() / (1024**3)
+    gpu_free = torch.cuda.memory_reserved() - torch.cuda.memory_allocated()
+    gpu_free = gpu_free / (1024**3)
+    console.log(
+        f"[blue]At step {step} - GPU memory allocated: {gpu_memory:.2f} GB, GPU memory reserved: {gpu_reserved:.2f} GB, GPU memory free: {gpu_free:.2f} GB[/blue]"
+    )
+
+
 def train_single_gpu_accelerate(
     args: Namespace,
     dataset: Data,
@@ -306,13 +316,12 @@ def train_single_gpu_accelerate(
                     loss = outputs.loss
                     accelerator.backward(loss)
 
-                    if accelerator.sync_gradients:
-                        accelerator.clip_grad_norm_(
-                            model.parameters(), args.max_grad_norm
-                        )
-                        optimizer.step()
-                        lr_scheduler.step()
-                        optimizer.zero_grad()
+                if accelerator.sync_gradients:
+                    accelerator.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+                    optimizer.step()
+                    lr_scheduler.step()
+                    optimizer.zero_grad()
+                logging_gpu_usage(step=global_step, console=console)
 
                 batch_loss += loss.item()
                 avg_batch_loss = batch_loss / batch_size
@@ -721,39 +730,35 @@ def train_multi_gpu_accelerate(
                     accelerator.backward(loss)
                     accelerator.wait_for_everyone()
 
-                    if args.fuzz_model:
-                        with torch.no_grad():
-                            for name, param in model.named_parameters():
-                                if "nvib_layer" in name and param.requires_grad:
-                                    if param.grad is not None:
-                                        grad_norm = param.grad.norm(2).item()
-                                        console.log(
-                                            f"Step {global_step} - rank {local_rank}: Gradient norm of {name}: {grad_norm:.4f}"
-                                        )
-
-                    if accelerator.sync_gradients:
-                        accelerator.wait_for_everyone()
-                        accelerator.clip_grad_norm_(
-                            model.parameters(), args.max_grad_norm
-                        )
-                        optimizer.step()
-                        lr_scheduler.step()
-                        optimizer.zero_grad()
-                        model.zero_grad()
-
+                if args.fuzz_model:
                     with torch.no_grad():
-                        all_losses = accelerator.gather(loss)
-                        # fill all_losses with zero if it is NaN with torch.where
-                        all_losses = torch.where(
-                            torch.isnan(all_losses),
-                            torch.zeros_like(all_losses),
-                            all_losses,
-                        )
-                        console.log(
-                            f"Step {global_step}: gathered losses: {all_losses}"
-                        )
-                        total_loss = torch.sum(all_losses)
-                        batch_loss += total_loss.detach().float().item()
+                        for name, param in model.named_parameters():
+                            if "nvib_layer" in name and param.requires_grad:
+                                if param.grad is not None:
+                                    grad_norm = param.grad.norm(2).item()
+                                    console.log(
+                                        f"Step {global_step} - rank {local_rank}: Gradient norm of {name}: {grad_norm:.4f}"
+                                    )
+
+                if accelerator.sync_gradients:
+                    accelerator.wait_for_everyone()
+                    accelerator.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+                    optimizer.step()
+                    lr_scheduler.step()
+                    optimizer.zero_grad()
+                    model.zero_grad()
+
+                with torch.no_grad():
+                    all_losses = accelerator.gather(loss)
+                    # fill all_losses with zero if it is NaN with torch.where
+                    all_losses = torch.where(
+                        torch.isnan(all_losses),
+                        torch.zeros_like(all_losses),
+                        all_losses,
+                    )
+                    console.log(f"Step {global_step}: gathered losses: {all_losses}")
+                    total_loss = torch.sum(all_losses)
+                    batch_loss += total_loss.detach().float().item()
 
                 for key in micro_input.keys():
                     micro_input[key] = micro_input[key].to("cpu")
