@@ -301,7 +301,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         embeds = []
         if inputs_embeds is None:
-            pprint(f"[blue]Input ids shape: {input_ids.shape}[/blue]")
+            # pprint(f"[blue]Input ids shape: {input_ids.shape}[/blue]")
             input_ids = input_ids.to(self.llm_model.device)
             inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
             input_ids = input_ids.to("cpu")
@@ -387,7 +387,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             graph_token_indices=graph_token_indices,
         )
 
-        pprint(f"[green]Input embeds shape: {inputs_embeds.shape}[/green]")
+        # pprint(f"[green]Input embeds shape: {inputs_embeds.shape}[/green]")
 
         if accelerator is not None:
             accelerator.wait_for_everyone()
