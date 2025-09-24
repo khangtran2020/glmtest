@@ -1,3 +1,5 @@
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
 #!/bin/bash
 
 checkpoint_path="" # set this if continue training.

@@ -219,7 +219,7 @@ def train_single_gpu_accelerate(
         tr_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn
     )
     va_loader = DataLoader(
-        va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
+        va_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn
     )
     logging_train_data(
         console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
@@ -909,7 +909,7 @@ def train_multi_gpu_accelerate(
                             del unwrapped_model
                             del checkpoint_dir
                             gc.collect()
-                    model.train()
+                    # model.train()
 
                 if args.debug:
                     # only run 1 step in debug mode
