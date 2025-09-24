@@ -283,9 +283,6 @@ def train_single_gpu_accelerate(
                                 graph[key] = graph[key].to(device)
 
                         graph_mask = batch["graph_mask"][i].to(device)
-                        # console.log(
-                        #     f"torch where: {torch.where(micro_input['input_ids'][i] == model.config.graph_token_id[1])}"
-                        # )
                         graph_token_index = torch.where(
                             micro_input["input_ids"][i]
                             == model.config.graph_token_id[1]
@@ -310,7 +307,6 @@ def train_single_gpu_accelerate(
                     loss = outputs.loss
                     accelerator.backward(loss)
 
-                    # compute the gradient norm of the nvib layer
                     if args.fuzz_model:
                         with torch.no_grad():
                             for name, param in model.named_parameters():
@@ -342,12 +338,13 @@ def train_single_gpu_accelerate(
                 for key in micro_input.keys():
                     micro_input[key] = micro_input[key].to("cpu")
                 if "graph" in args.baseline_prompt:
-                    for key in GRAPH_KEYS:
-                        if key in graph.keys():
-                            graph[key] = graph[key].to("cpu")
-                            graph.pop(key, None)
-                    graph_mask = graph_mask.to("cpu")
-                    del graph_mask, graph
+                    for graph in graphs:
+                        for key in GRAPH_KEYS:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to("cpu")
+                                graph.pop(key, None)
+                    graph_masks = [graph_mask.to("cpu") for graph_mask in graph_masks]
+                    del graph_masks, graphs
                 outputs.logits = outputs.logits.to("cpu")
                 loss = loss.to("cpu")
                 del outputs, loss, micro_input
@@ -757,12 +754,13 @@ def train_multi_gpu_accelerate(
                 for key in micro_input.keys():
                     micro_input[key] = micro_input[key].to("cpu")
                 if "graph" in args.baseline_prompt:
-                    for key in GRAPH_KEYS:
-                        if key in graph.keys():
-                            graph[key] = graph[key].to("cpu")
-                            graph.pop(key, None)
-                    graph_mask = graph_mask.to("cpu")
-                    del graph_mask, graph
+                    for graph in graphs:
+                        for key in GRAPH_KEYS:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to("cpu")
+                                graph.pop(key, None)
+                    graph_masks = [graph_mask.to("cpu") for graph_mask in graph_masks]
+                    del graph_masks, graphs
                 outputs.logits = outputs.logits.to("cpu")
                 loss = loss.to("cpu")
                 del outputs, loss, micro_input

@@ -99,6 +99,9 @@ def test(
         console.log("Testing...")
 
     if args.test_on_train:
+        loader = DataLoader(
+            te_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn
+        )
         with Progress(
             SpinnerColumn(),  # Shows a spinner
             TextColumn(
@@ -115,12 +118,13 @@ def test(
             with torch.no_grad():
                 generated_text = {}
                 time_list = []
-                for idx in range(len(te_dataset)):
+                for uuid, batch in loader:
                     start_time = time.time()
-                    uuid, batch = te_dataset[idx]
+                    # uuid, batch = te_dataset[idx]
                     console.log(f"Testing {uuid} - {idx}/{len(te_dataset)}")
-                    batch_input = batch["input"].copy()
-                    if "token_type_ids" in batch_input:
+                    batch_size = batch["input"]["input_ids"].size(0)
+                    # batch_input = batch["input"].copy()
+                    if "token_type_ids" in batch["input"]:
                         batch_input.pop("token_type_ids")
 
                     if args.debug and accelerator.is_main_process:
@@ -131,23 +135,33 @@ def test(
                             f"[yellow]================ Example tokenized ================[/yellow]\n {batch_input['input_ids'].squeeze(0).tolist()}\n\n[yellow]================ End of example tokenized ================[/yellow]"
                         )
                     micro_input = {
-                        "input_ids": batch_input["input_ids"].to(device),
-                        "attention_mask": batch_input["attention_mask"].to(device),
+                        "input_ids": batch["input"]["input_ids"].to(device),
+                        "attention_mask": batch["input"]["attention_mask"].to(device),
                         "labels": None,
                     }
                     if "graph" in args.baseline_prompt:
-                        graph = batch["graph"]
-                        for key in GRAPH_KEYS:
-                            if key in graph.keys():
-                                graph[key] = graph[key].to(device)
-                        graph_mask = batch["graph_mask"].to(device)
-                        graph_token_index = torch.where(
-                            micro_input["input_ids"] == config.graph_token_id[1]
-                        )[1].tolist()
+                        graphs = []
+                        graph_masks = []
+                        graph_token_indices = []
+
+                        for i in range(batch_size):
+                            graph = batch["graph"][i]
+                            for key in GRAPH_KEYS:
+                                if key in graph.keys():
+                                    graph[key] = graph[key].to(device)
+
+                            graph_mask = batch["graph_mask"][i].to(device)
+                            graph_token_index = torch.where(
+                                micro_input["input_ids"][i]
+                                == model.config.graph_token_id[1]
+                            )[0].tolist()
+                            graphs.append(graph)
+                            graph_masks.append(graph_mask)
+                            graph_token_indices.append(graph_token_index)
                     else:
-                        graph = None
-                        graph_mask = None
-                        graph_token_index = None
+                        graphs = None
+                        graph_masks = None
+                        graph_token_indices = None
 
                     inputs_embeds = model.extract_embedding(
                         input_ids=micro_input["input_ids"],
@@ -171,7 +185,8 @@ def test(
                                     device_type="cuda", dtype=torch.float16
                                 ):
                                     outputs = model.generate(
-                                        inputs=micro_input["input_ids"],
+                                        inputs_embeds=inputs_embeds,
+                                        attention_mask=micro_input["attention_mask"],
                                         graph=graph,
                                         graph_mask=graph_mask,
                                         graph_token_index=graph_token_index,
@@ -197,7 +212,8 @@ def test(
                                 device_type="cuda", dtype=torch.float16
                             ):
                                 outputs = model.generate(
-                                    inputs=micro_input["input_ids"],
+                                    inputs_embeds=inputs_embeds,
+                                    attention_mask=micro_input["attention_mask"],
                                     graph=graph,
                                     graph_mask=graph_mask,
                                     graph_token_index=graph_token_index,

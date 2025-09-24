@@ -217,16 +217,6 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
         collated_input["attention_mask"] = pad(attention_mask, pad_value=0)
         collated_input["labels"] = pad(labels, pad_value=-100).long()
 
-        pprint(
-            f"[yellow]Collated input_ids shape: {collated_input['input_ids'].shape}[/yellow]"
-        )
-        pprint(
-            f"[yellow]Collated attention_mask shape: {collated_input['attention_mask'].shape}[/yellow]"
-        )
-        pprint(
-            f"[yellow]Collated labels shape: {collated_input['labels'].shape}[/yellow]"
-        )
-
         collated = {
             "text": [x["text"] for x in batch],
             "input": collated_input,
@@ -241,7 +231,8 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
         }
         return collated
     else:
-        uuid, batch = batch
+        uuid = [sample[0] for sample in batch]
+        batch = [sample[1] for sample in batch]
 
         input_ids = [sample["input"]["input_ids"] for sample in batch]
         attention_mask = [sample["input"]["attention_mask"] for sample in batch]
@@ -263,4 +254,4 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
                 [x["graph"] for x in batch] if batch[0]["graph"] is not None else None
             ),
         }
-        return collated
+        return uuid, collated
