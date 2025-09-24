@@ -566,12 +566,14 @@ def eval_bleu_score(
 
 
 def logging_gpu_usage(step: int, console: Console):
+    torch.cuda.reset_peak_memory_stats()
     gpu_memory = torch.cuda.memory_allocated() / (1024**3)
     gpu_reserved = torch.cuda.memory_reserved() / (1024**3)
+    peak_memory = torch.cuda.max_memory_allocated() / (1024**3)
     gpu_free = torch.cuda.memory_reserved() - torch.cuda.memory_allocated()
     gpu_free = gpu_free / (1024**3)
     pprint(
-        f"[blue]At step {step} - GPU memory allocated: {gpu_memory:.2f} GB, GPU memory reserved: {gpu_reserved:.2f} GB, GPU memory free: {gpu_free:.2f} GB[/blue]"
+        f"[blue]At step {step} - GPU memory allocated: {gpu_memory:.2f} GB, GPU memory reserved: {gpu_reserved:.2f} GB, Peak memory usage: {peak_memory:.2f}[/blue]"
     )
 
 

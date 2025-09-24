@@ -5,6 +5,7 @@ import wandb
 import shutil
 import transformers
 import torch.distributed as dist
+from rich import print as pprint
 from functools import partial
 from model.gnn import GRAPH_KEYS
 from torch.utils.data import DataLoader
@@ -136,7 +137,7 @@ def logging_gpu_usage(step: int, console: Console):
     gpu_reserved = torch.cuda.memory_reserved() / (1024**3)
     gpu_free = torch.cuda.memory_reserved() - torch.cuda.memory_allocated()
     gpu_free = gpu_free / (1024**3)
-    console.log(
+    pprint(
         f"[blue]At step {step} - GPU memory allocated: {gpu_memory:.2f} GB, GPU memory reserved: {gpu_reserved:.2f} GB, GPU memory free: {gpu_free:.2f} GB[/blue]"
     )
 
@@ -218,7 +219,7 @@ def train_single_gpu_accelerate(
         tr_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn
     )
     va_loader = DataLoader(
-        va_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn
+        va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
     )
     logging_train_data(
         console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
@@ -350,6 +351,7 @@ def train_single_gpu_accelerate(
                 del outputs, loss, micro_input
                 gc.collect()
                 torch.cuda.empty_cache()
+                torch.cuda.synchronize()
 
                 if global_step % args.logging_steps == 0:
                     current_lr = lr_scheduler.get_last_lr()[0]
@@ -440,6 +442,7 @@ def train_single_gpu_accelerate(
 
                     gc.collect()
                     torch.cuda.empty_cache()
+                    torch.cuda.synchronize()
                     console.log(
                         f"[blue]After validation: {torch.cuda.memory_allocated()}[/blue]"
                     )
