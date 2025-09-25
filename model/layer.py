@@ -74,7 +74,7 @@ class NVIBTransformerLayer(Module):
 
         self.use_cache = use_cache
         if use_cache:
-            pprint(f"[bold yellow]Using cache in NVIBTransformerLayer[/bold yellow]")
+            # pprint(f"[bold yellow]Using cache in NVIBTransformerLayer[/bold yellow]")
             self.past_key = None
             self.past_value = None
             self.past_pi = None
