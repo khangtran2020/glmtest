@@ -99,7 +99,7 @@ class NVIBTransformerLayer(Module):
 
         x = src
         pprint(
-            f"[blue]Nvib input shape - src: {src.size()} - src_mask: {src_mask.size()} - src_key_padding_mask: {src_key_padding_mask.size()} - fuzzing_mask: {fuzzing_mask.size()} [/blue]"
+            f"[blue]Nvib input shape - src: {src.size()} - src_mask: {src_mask.size() if src_mask is not None else None} - src_key_padding_mask: {src_key_padding_mask.size() if src_key_padding_mask is not None else None} - fuzzing_mask: {fuzzing_mask.size() if fuzzing_mask is not None else None} [/blue]"
         )
 
         if torch.isnan(x).any():
