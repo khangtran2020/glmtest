@@ -97,11 +97,11 @@ class NVIBTransformerLayer(Module):
         fuzzing_mask: Optional[Tensor] = None,
     ) -> Tensor:
 
+        x = src
         pprint(
-            f"[blue]Entering NVIBTransformerLayer forward with cache mode: {self.use_cache}[/blue]"
+            f"[blue]Nvib input shape - src: {src.size()} - src_mask: {src_mask.size()} - src_key_padding_mask: {src_key_padding_mask.size()} - fuzzing_mask: {fuzzing_mask.size()} [/blue]"
         )
 
-        x = src
         if torch.isnan(x).any():
             raise ValueError("NaN detected in the input to NVIBTransformerLayer")
 
