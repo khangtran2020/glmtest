@@ -127,7 +127,7 @@ def test(
                 for uuid, batch in loader:
                     start_time = time.time()
                     # uuid, batch = te_dataset[idx]
-                    console.log(f"Testing {uuid} - {idx}/{len(te_dataset)}")
+                    # console.log(f"Testing {uuid} - {idx}/{len(te_dataset)}")
                     batch_size = batch["input"]["input_ids"].size(0)
                     # batch_input = batch["input"].copy()
                     if "token_type_ids" in batch["input"]:
