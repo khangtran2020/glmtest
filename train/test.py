@@ -27,6 +27,7 @@ from train.utils import (
 from torch.utils.data import DataLoader
 import torch.distributed as dist
 from accelerate import Accelerator
+from functools import partial
 
 # typing
 from argparse import Namespace
@@ -42,7 +43,9 @@ def test(
     config: GLMFModelConfig = None,
     mixed_precision: str = "bf16",
 ):
-
+    collate_fn_ = partial(
+        collate_fn, tokenizer=dataset.llm_tokenizer, max_seq_length=args.max_seq_length
+    )
     accelerator = Accelerator(
         mixed_precision=mixed_precision,
         log_with="wandb",
@@ -100,7 +103,10 @@ def test(
 
     if args.test_on_train:
         loader = DataLoader(
-            te_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn
+            te_dataset,
+            batch_size=args.batch_size,
+            shuffle=False,
+            collate_fn=collate_fn_,
         )
         with Progress(
             SpinnerColumn(),  # Shows a spinner
@@ -253,7 +259,7 @@ def test(
             te_proj_dataset,
             batch_size=args.batch_size,
             shuffle=False,
-            collate_fn=collate_fn,
+            collate_fn=collate_fn_,
         )
         with Progress(
             SpinnerColumn(),  # Shows a spinner
@@ -375,7 +381,7 @@ def test(
             te_mod_dataset,
             batch_size=args.batch_size,
             shuffle=False,
-            collate_fn=collate_fn,
+            collate_fn=collate_fn_,
         )
         with Progress(
             SpinnerColumn(),  # Shows a spinner
