@@ -436,97 +436,46 @@ def test(
                         f"Inputs embeds shape: {inputs_embeds.shape} | Graph token index: {len(graph_token_index)}"
                     )
 
-                    if args.num_gpu == 1:
-                        with torch.autocast(device_type="cuda", dtype=torch.float16):
-                            outputs = model.generate(
-                                inputs=micro_input["input_ids"],
-                                graph=graph,
-                                graph_mask=graph_mask,
-                                graph_token_index=graph_token_index,
-                                max_new_tokens=args.max_new_tokens,
-                                do_sample=False,
-                                use_cache=True,
-                            )
-                        if isinstance(model, GLMFModelFuzzing):
-                            model.clear_cache()
-                        out_text = tokenizer.batch_decode(
-                            outputs[:, micro_input["input_ids"].size(1) :],
-                            skip_special_tokens=False if args.fuzz_model else True,
-                        )[0]
-
-                        # print(f"Generated text - {uuid}: {out_text}")
-                        console.log(
-                            f"[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}"
+                    with torch.autocast(device_type="cuda", dtype=torch.float16):
+                        outputs = model.generate(
+                            inputs=micro_input["input_ids"],
+                            graph=graph,
+                            graph_mask=graph_mask,
+                            graph_token_index=graph_token_index,
+                            max_new_tokens=args.max_new_tokens,
+                            do_sample=False,
+                            use_cache=True,
                         )
+                    if isinstance(model, GLMFModelFuzzing):
+                        model.clear_cache()
+                    out_text = tokenizer.batch_decode(
+                        outputs[:, micro_input["input_ids"].size(1) :],
+                        skip_special_tokens=False if args.fuzz_model else True,
+                    )[0]
 
-                        generated_text[uuid] = out_text
-                        end_time = time.time()
-                        process_time = end_time - start_time
-                        time_list.append(process_time)
-                        avg_time = sum(time_list) / len(time_list)
-                        progress.update(
-                            test_task,
-                            advance=1,
-                            description=f"Testing... {idx}/{len(te_proj_dataset)} - {avg_time:.2f}s for 1 sample",
-                        )
-                    else:
-                        with torch.autocast(device_type="cuda", dtype=torch.float16):
-                            outputs = generate(
-                                inputs_ids=micro_input["input_ids"],
-                                inputs_embeds=inputs_embeds,
-                                model=model,
-                                temperature=args.temp,
-                                top_k=args.top_k,
-                                top_p=args.top_p,
-                                accelerator=accelerator,
-                                tokenizer=dataset.llm_tokenizer,
-                                max_new_tokens=args.max_new_tokens,
-                                do_sample=False,
-                                max_seq_len=args.max_seq_length,
-                                console=console,
-                                process_group=process_group,
-                            )
+                    # print(f"Generated text - {uuid}: {out_text}")
+                    console.log(
+                        f"[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}"
+                    )
 
-                        if accelerator.is_main_process:
-                            out_text = tokenizer.batch_decode(
-                                outputs[:, micro_input["input_ids"].size(1) :],
-                                skip_special_tokens=False if args.fuzz_model else True,
-                            )[0]
+                    generated_text[uuid] = out_text
+                    end_time = time.time()
+                    process_time = end_time - start_time
+                    time_list.append(process_time)
+                    avg_time = sum(time_list) / len(time_list)
+                    progress.update(
+                        test_task,
+                        advance=1,
+                        description=f"Testing... {idx}/{len(te_proj_dataset)} - {avg_time:.2f}s for 1 sample",
+                    )
 
-                            console.log(
-                                f"[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}"
-                            )
-
-                            generated_text[uuid] = out_text
-                            end_time = time.time()
-                            process_time = end_time - start_time
-                            time_list.append(process_time)
-                            avg_time = sum(time_list) / len(time_list)
-                            progress.update(
-                                test_task,
-                                advance=1,
-                                description=f"Testing... {idx}/{len(te_mod_dataset)} - {avg_time:.2f}s for 1 sample",
-                            )
-
-        if args.num_gpu == 1:
-            console.log("Done Testing Module level finished.")
-            save_dir = os.path.join(args.gen_dir, f"{args.name}_mod.json")
-            with console.status("Saving results..."):
-                # save generated text to jsonl file
-                with open(save_dir, "w", encoding="utf-8") as f:
-                    # save as json file
-                    json.dump(generated_text, f, ensure_ascii=False, indent=4)
-        else:
-            console.log(
-                "Done Testing Module level finished. Results saved in the main process only."
-            )
-            save_dir = os.path.join(args.gen_dir, f"{args.name}_mod.json")
-            if accelerator.is_main_process:
-                with console.status("Saving results..."):
-                    # save generated text to jsonl file
-                    with open(save_dir, "w", encoding="utf-8") as f:
-                        # save as json file
-                        json.dump(generated_text, f, ensure_ascii=False, indent=4)
+        console.log("Done Testing Module level finished.")
+        save_dir = os.path.join(args.gen_dir, f"{args.name}_mod.json")
+        with console.status("Saving results..."):
+            # save generated text to jsonl file
+            with open(save_dir, "w", encoding="utf-8") as f:
+                # save as json file
+                json.dump(generated_text, f, ensure_ascii=False, indent=4)
 
 
 def eval_bleu_score(
@@ -694,143 +643,143 @@ def validate(
         # model.train()
 
 
-def generate(
-    inputs_ids: torch.Tensor,
-    inputs_embeds: torch.Tensor,
-    model: GLMFModelForCausalLM,
-    temperature: float,
-    top_k: int,
-    top_p: float,
-    accelerator: Accelerator,
-    tokenizer: PreTrainedTokenizer,
-    max_new_tokens: int,
-    do_sample: bool = False,
-    console: Console = None,
-    process_group=None,
-    max_seq_len: Optional[int] = None,
-):
-    position_ids = (
-        torch.arange(inputs_embeds.shape[1])
-        .unsqueeze(0)
-        .expand(inputs_embeds.shape[0], -1)
-    )
-    original_attn_dict = patch_model(process_group=process_group)
-    batch_size = inputs_embeds.shape[0]
-    device = inputs_embeds.device
+# def generate(
+#     inputs_ids: torch.Tensor,
+#     inputs_embeds: torch.Tensor,
+#     model: GLMFModelForCausalLM,
+#     temperature: float,
+#     top_k: int,
+#     top_p: float,
+#     accelerator: Accelerator,
+#     tokenizer: PreTrainedTokenizer,
+#     max_new_tokens: int,
+#     do_sample: bool = False,
+#     console: Console = None,
+#     process_group=None,
+#     max_seq_len: Optional[int] = None,
+# ):
+#     position_ids = (
+#         torch.arange(inputs_embeds.shape[1])
+#         .unsqueeze(0)
+#         .expand(inputs_embeds.shape[0], -1)
+#     )
+#     original_attn_dict = patch_model(process_group=process_group)
+#     batch_size = inputs_embeds.shape[0]
+#     device = inputs_embeds.device
 
-    # Keep track of which sequences are finished
-    finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
+#     # Keep track of which sequences are finished
+#     finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
 
-    past_key_values = DynamicCache()
-    past_seen_tokens = (
-        past_key_values.get_seq_length() if past_key_values is not None else 0
-    )
+#     past_key_values = DynamicCache()
+#     past_seen_tokens = (
+#         past_key_values.get_seq_length() if past_key_values is not None else 0
+#     )
 
-    cache_position = torch.arange(
-        past_seen_tokens,
-        past_seen_tokens + inputs_embeds.shape[1],
-        device=inputs_embeds.device,
-    )
+#     cache_position = torch.arange(
+#         past_seen_tokens,
+#         past_seen_tokens + inputs_embeds.shape[1],
+#         device=inputs_embeds.device,
+#     )
 
-    generated_ids = inputs_ids.clone()
+#     generated_ids = inputs_ids.clone()
 
-    current_length = inputs_embeds.shape[1]
+#     current_length = inputs_embeds.shape[1]
 
-    model.eval()
-    with torch.inference_mode():
+#     model.eval()
+#     with torch.inference_mode():
 
-        for step in range(max_new_tokens):
+#         for step in range(max_new_tokens):
 
-            if current_length >= max_seq_len:
-                break
+#             if current_length >= max_seq_len:
+#                 break
 
-            if step == 0:
+#             if step == 0:
 
-                positional_embedding = model.llm_model.model.rotary_emb(
-                    inputs_embeds, position_ids.to(inputs_embeds.device)
-                )
+#                 positional_embedding = model.llm_model.model.rotary_emb(
+#                     inputs_embeds, position_ids.to(inputs_embeds.device)
+#                 )
 
-                outputs = model.forward_llm(
-                    inputs_embeds=inputs_embeds, position_ids=position_ids
-                )
-                logits = outputs.logits
-                out_past_key_values = outputs.past_key_values
-                preds = logits_to_prediction(
-                    logits, temperature, top_k, top_p, do_sample
-                )
+#                 outputs = model.forward_llm(
+#                     inputs_embeds=inputs_embeds, position_ids=position_ids
+#                 )
+#                 logits = outputs.logits
+#                 out_past_key_values = outputs.past_key_values
+#                 preds = logits_to_prediction(
+#                     logits, temperature, top_k, top_p, do_sample
+#                 )
 
-                def undo_extract_local(gathered_value, world_size, dim=1):
-                    value_chunks = gathered_value.chunk(2 * world_size, dim=dim)
-                    reordered_chunks = [None] * (2 * world_size)
-                    for i in range(world_size):
-                        reordered_chunks[i] = value_chunks[i * 2]
-                        reordered_chunks[2 * world_size - i - 1] = value_chunks[
-                            i * 2 + 1
-                        ]
-                    return torch.cat(reordered_chunks, dim=dim)
+#                 def undo_extract_local(gathered_value, world_size, dim=1):
+#                     value_chunks = gathered_value.chunk(2 * world_size, dim=dim)
+#                     reordered_chunks = [None] * (2 * world_size)
+#                     for i in range(world_size):
+#                         reordered_chunks[i] = value_chunks[i * 2]
+#                         reordered_chunks[2 * world_size - i - 1] = value_chunks[
+#                             i * 2 + 1
+#                         ]
+#                     return torch.cat(reordered_chunks, dim=dim)
 
-                gathered_logits = accelerator.gather(preds.squeeze(0)).unsqueeze(0)
-                pred = undo_extract_local(gathered_logits, accelerator.num_processes)
-                pred = pred[:, current_length - 1 : current_length]
-                past_key_values = merge_sequence_parallel_cache_optimized(
-                    cache=past_key_values,
-                    local_outcome=out_past_key_values,
-                    cache_position=cache_position,
-                    positional_embedding=positional_embedding,
-                    accelerator=accelerator,
-                )
-            else:
-                if accelerator.is_main_process:
-                    if step == 1:
-                        revert_model_patch(original_methods=original_attn_dict)
+#                 gathered_logits = accelerator.gather(preds.squeeze(0)).unsqueeze(0)
+#                 pred = undo_extract_local(gathered_logits, accelerator.num_processes)
+#                 pred = pred[:, current_length - 1 : current_length]
+#                 past_key_values = merge_sequence_parallel_cache_optimized(
+#                     cache=past_key_values,
+#                     local_outcome=out_past_key_values,
+#                     cache_position=cache_position,
+#                     positional_embedding=positional_embedding,
+#                     accelerator=accelerator,
+#                 )
+#             else:
+#                 if accelerator.is_main_process:
+#                     if step == 1:
+#                         revert_model_patch(original_methods=original_attn_dict)
 
-                    generated_embeddings = model.extract_embedding(
-                        input_ids=generated_ids[:, current_length - 1],
-                        graph=None,
-                        graph_mask=None,
-                        graph_token_index=None,
-                    ).unsqueeze(0)
+#                     generated_embeddings = model.extract_embedding(
+#                         input_ids=generated_ids[:, current_length - 1],
+#                         graph=None,
+#                         graph_mask=None,
+#                         graph_token_index=None,
+#                     ).unsqueeze(0)
 
-                    outputs = model.llm_model.forward(
-                        inputs_embeds=generated_embeddings,
-                        past_key_values=past_key_values,
-                        position_ids=None,
-                    )
-                    logits = outputs.logits
-                    past_key_values = outputs.past_key_values
+#                     outputs = model.llm_model.forward(
+#                         inputs_embeds=generated_embeddings,
+#                         past_key_values=past_key_values,
+#                         position_ids=None,
+#                     )
+#                     logits = outputs.logits
+#                     past_key_values = outputs.past_key_values
 
-                    preds = logits_to_prediction(
-                        logits, temperature, top_k, top_p, do_sample
-                    )
-                else:
-                    # clean up everything and prepare for the next step to release RAM
-                    # move to cpu first
-                    if step == 1:
-                        inputs_embeds = inputs_embeds.cpu()
-                        position_ids = position_ids.cpu()
-                        logits = logits.cpu()
+#                     preds = logits_to_prediction(
+#                         logits, temperature, top_k, top_p, do_sample
+#                     )
+#                 else:
+#                     # clean up everything and prepare for the next step to release RAM
+#                     # move to cpu first
+#                     if step == 1:
+#                         inputs_embeds = inputs_embeds.cpu()
+#                         position_ids = position_ids.cpu()
+#                         logits = logits.cpu()
 
-                        del inputs_embeds, position_ids, logits, outputs
-                        gc.collect()
-                        torch.cuda.empty_cache()
+#                         del inputs_embeds, position_ids, logits, outputs
+#                         gc.collect()
+#                         torch.cuda.empty_cache()
 
-            accelerator.wait_for_everyone()
-            if accelerator.is_main_process:
-                pred = pred.masked_fill(finished, tokenizer.pad_token_id)
-                # print(
-                #     f"Rank {model.rank} - Step {step + 1}/{max_new_tokens} - Pred shape: {pred.shape} - Finished: {generated_ids.shape}"
-                # )
-                generated_ids = torch.cat([generated_ids, pred], dim=1)
+#             accelerator.wait_for_everyone()
+#             if accelerator.is_main_process:
+#                 pred = pred.masked_fill(finished, tokenizer.pad_token_id)
+#                 # print(
+#                 #     f"Rank {model.rank} - Step {step + 1}/{max_new_tokens} - Pred shape: {pred.shape} - Finished: {generated_ids.shape}"
+#                 # )
+#                 generated_ids = torch.cat([generated_ids, pred], dim=1)
 
-                finished = finished | (pred[:, -1] == tokenizer.eos_token_id)
-                current_length += 1
-                if finished.all():
-                    break
-    if accelerator.is_main_process:
-        return generated_ids
-    else:
-        # If not the main process, return None
-        return None
+#                 finished = finished | (pred[:, -1] == tokenizer.eos_token_id)
+#                 current_length += 1
+#                 if finished.all():
+#                     break
+#     if accelerator.is_main_process:
+#         return generated_ids
+#     else:
+#         # If not the main process, return None
+#         return None
 
 
 def logits_to_prediction(
