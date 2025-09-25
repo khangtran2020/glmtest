@@ -234,6 +234,8 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
         uuid = [sample[0] for sample in batch]
         batch = [sample[1] for sample in batch]
 
+        collated_input = {}
+
         input_ids = [sample["input"]["input_ids"] for sample in batch]
         attention_mask = [sample["input"]["attention_mask"] for sample in batch]
         labels = [sample["input"]["labels"] for sample in batch]
