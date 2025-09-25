@@ -215,9 +215,9 @@ def test(
                             outputs = model.generate(
                                 inputs_embeds=inputs_embeds,
                                 attention_mask=micro_input["attention_mask"],
-                                graph=graph,
-                                graph_mask=graph_mask,
-                                graph_token_index=graph_token_index,
+                                # graph=graph,
+                                # graph_mask=graph_mask,
+                                # graph_token_index=graph_token_index,
                                 max_new_tokens=args.max_new_tokens,
                                 do_sample=False,
                                 use_cache=True,
