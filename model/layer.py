@@ -157,11 +157,12 @@ class NVIBTransformerLayer(Module):
         attn_mask: Optional[Tensor],
         key_padding_mask: Optional[Tensor],
         alpha_skip=None,
-        position_emebddings: Optional[Tensor] = None,
     ) -> Tensor:
         # Note query does not include the prior
 
-        latent_dict = self.nvib_layer(x, key_padding_mask, alpha_skip)
+        latent_dict = self.nvib_layer(
+            encoder_output=x, mask=key_padding_mask, alpha_skip=alpha_skip
+        )
         query = x
         key = latent_dict["z"]
         value = latent_dict["z"]

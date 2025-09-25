@@ -1036,7 +1036,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                         " call `tokenizer.padding_side  = 'left'` before tokenizing the input. "
                     )
             if attention_mask is not None and 0.0 in attention_mask:
-                pprint(f"[green]Using attention mask in flash attention![/green]")
+                # pprint(f"[green]Using attention mask in flash attention![/green]")
                 return attention_mask
             return None
         else:
