@@ -171,10 +171,10 @@ def test(
 
                     inputs_embeds = model.extract_embedding(
                         input_ids=micro_input["input_ids"],
-                        graph=graph,
+                        graphs=graphs,
                         inputs_embeds=None,
-                        graph_mask=graph_mask,
-                        graph_token_index=graph_token_index,
+                        graph_masks=graph_masks,
+                        graph_token_indices=graph_token_indices,
                     )
 
                     if args.debug and accelerator.is_main_process:
