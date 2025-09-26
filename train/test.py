@@ -90,16 +90,6 @@ def test(
             num_gpus=args.num_gpu,
         )
     tokenizer = dataset.llm_tokenizer
-    if args.test_on_train:
-        console.log(
-            f"Test data: by project - {len(te_dataset)} data points (train set)"
-        )
-        console.log("Testing...")
-    else:
-        console.log(
-            f"Test data: by project - {len(te_proj_dataset)} data points, by module - {len(te_mod_dataset)} data points"
-        )
-        console.log("Testing...")
 
     if args.test_on_train:
         loader = DataLoader(
@@ -118,9 +108,7 @@ def test(
                 "[progress.percentage]{task.percentage:>3.0f}%"
             ),  # Shows percentage
         ) as progress:
-            test_task = progress.add_task(
-                "Testing on train data...", total=len(te_dataset)
-            )
+            test_task = progress.add_task("Testing on train data...", total=len(loader))
             with torch.no_grad():
                 generated_text = {}
                 time_list = []
@@ -131,14 +119,14 @@ def test(
                     batch_size = batch["input"]["input_ids"].size(0)
                     # batch_input = batch["input"].copy()
                     if "token_type_ids" in batch["input"]:
-                        batch_input.pop("token_type_ids")
+                        batch["input"].pop("token_type_ids")
 
                     if args.debug and accelerator.is_main_process:
                         console.log(
-                            f"[yellow]================ Example data point ================[/yellow]\n {batch['text']}\n\n[yellow]================ End of example data point ================[/yellow]"
+                            f"[yellow]================ Example data point ================[/yellow]\n {batch['text'][0]}\n\n[yellow]================ End of example data point ================[/yellow]"
                         )
                         console.log(
-                            f"[yellow]================ Example tokenized ================[/yellow]\n {batch_input['input_ids'].squeeze(0).tolist()}\n\n[yellow]================ End of example tokenized ================[/yellow]"
+                            f"[yellow]================ Example tokenized ================[/yellow]\n {batch["input"]['input_ids'].size()}\n\n[yellow]================ End of example tokenized ================[/yellow]"
                         )
                     micro_input = {
                         "input_ids": batch["input"]["input_ids"].to(device),
@@ -215,20 +203,19 @@ def test(
                             outputs = model.generate(
                                 inputs_embeds=inputs_embeds,
                                 attention_mask=micro_input["attention_mask"],
-                                # graph=graph,
-                                # graph_mask=graph_mask,
-                                # graph_token_index=graph_token_index,
                                 max_new_tokens=args.max_new_tokens,
                                 do_sample=False,
                                 use_cache=True,
                             )
                         if isinstance(model, GLMFModelFuzzing):
                             model.clear_cache()
+
                         out_text = tokenizer.batch_decode(
                             outputs[:, micro_input["input_ids"].size(1) :],
                             skip_special_tokens=False if args.data_fuzz else True,
                         )
-                        # print(f"Generated text - {uuid}: {out_text}")
+
+                        print(f"Generated text - {uuid}: {out_text}")
                         if args.debug and accelerator.is_main_process:
                             console.log(
                                 f"\n\n[green]Generated text - {uuid} - num out tokens: {outputs[:, micro_input['input_ids'].size(1) :].size(1)}[/green]: {out_text}\n\n"
