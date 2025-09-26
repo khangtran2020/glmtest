@@ -126,7 +126,10 @@ def test(
                             f"[yellow]================ Example data point ================[/yellow]\n {batch['text'][0]}\n\n[yellow]================ End of example data point ================[/yellow]"
                         )
                         console.log(
-                            f"[yellow]================ Example tokenized ================[/yellow]\n {batch['input']['input_ids'].size()}\n\n[yellow]================ End of example tokenized ================[/yellow]"
+                            f"[yellow]================ Example tokenized ================[/yellow]\n {batch['input']['input_ids']}\n\n[yellow]================ End of example tokenized ================[/yellow]"
+                        )
+                        console.log(
+                            f"[yellow]================ Example attention_mask ================[/yellow]\n {batch['input']['attention_mask']}\n\n[yellow]================ End of example tokenized ================[/yellow]"
                         )
                     micro_input = {
                         "input_ids": batch["input"]["input_ids"].to(device),
@@ -206,6 +209,7 @@ def test(
                                 max_new_tokens=args.max_new_tokens,
                                 do_sample=False,
                                 use_cache=True,
+                                pad_token_id=tokenizer.eos_token_id,
                             )
                         if isinstance(model, GLMFModelFuzzing):
                             model.clear_cache()
