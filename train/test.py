@@ -219,7 +219,7 @@ def test(
                             skip_special_tokens=False if args.data_fuzz else True,
                         )
 
-                        print(f"Generated text - {uuid}: {out_text}")
+                        # print(f"Generated text - {uuid}: {out_text}")
                         if args.debug and accelerator.is_main_process:
                             console.log(
                                 f"\n\n[green]Generated text - {uuid} - num out tokens: {outputs.size(1)}[/green]: {out_text}\n\n"
