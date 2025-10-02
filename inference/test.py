@@ -150,7 +150,7 @@ def generate_and_save_on_one_dataset(
         BarColumn(),  # Displays a progress bar
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),  # Shows percentage
     ) as progress:
-        test_task = progress.add_task("Testing on train data...", total=len(loader))
+        test_task = progress.add_task("Generating for one task ...", total=len(loader))
         with torch.no_grad():
             generated_text = {}
             time_list = []
@@ -248,7 +248,7 @@ def generate_and_save_on_one_dataset(
                 progress.update(
                     test_task,
                     advance=1,
-                    description=f"Testing... {idx}/{len(loader)} - {avg_time:.2f}s for 1 batch",
+                    description=f"Testing... - {avg_time:.2f}s for 1 batch",
                 )
 
     console.log("Done Testing on train dataset finished.")
