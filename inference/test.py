@@ -185,6 +185,9 @@ def generate_and_save_on_one_dataset(
                         for key in GRAPH_KEYS:
                             if key in graph.keys():
                                 graph[key] = graph[key].to(device)
+                                graph[key].ndata["feat"] = (
+                                    graph[key].ndata["feat"].to(device)
+                                )
 
                         graph_mask = batch["graph_mask"][i].to(device)
                         graph_token_index = torch.where(

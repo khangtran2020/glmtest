@@ -683,6 +683,7 @@ def main() -> None:
         for name, param in model.named_parameters():
             console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
 
+        console.log(f"[green]Using device: {device}[/green]")
         testcase_generate(
             args=args,
             dataset=dataset,

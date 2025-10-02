@@ -33,11 +33,11 @@ from argparse import Namespace
 
 def testcase_generate(
     args: Namespace,
+    device: torch.device,
     dataset: Data = None,
     model: PreTrainedModel = None,
     file_path: str = None,
     save_path: str = None,
-    device: torch.device = torch.device("cpu"),
     console: Console = None,
     mixed_precision: str = "bf16",
 ):
