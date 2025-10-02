@@ -94,7 +94,7 @@ def parse_code(code: str) -> DiGraph:
             set_of_statements.append(e[1])
         if e[1] < 0:
             if "import " not in code.split("\n")[-1 * e[1] - 1]:
-                print(e[1])
+                # print(e[1])
                 set_of_startlines.append(-1 * e[1])
             set_of_endlines.append(e[0])
 
