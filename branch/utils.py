@@ -226,6 +226,8 @@ def get_all_branch(
                 num_branch += 1
                 pprint(f"[blue]Found branch: {num_branch} - {len(branch)} [/blue]")
                 branches.append(branch[:-1])  # remove the end node
+            if num_branch >= 1000:
+                break
 
     # process async func
     if console is not None:
@@ -250,6 +252,10 @@ def get_all_branch(
                 num_branch += 1
                 pprint(f"[blue]Found branch: {num_branch} - {len(branch)}[/blue]")
                 branches.append(branch[:-1])  # remove the end node
+            if num_branch >= 1000:
+                break
+
+    pprint(f"[green]Total branches found: {num_branch}[/green]")
 
     return branches
 
