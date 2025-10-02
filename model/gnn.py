@@ -111,14 +111,14 @@ class MultiGAT(nn.Module):
                 if key == "ARGUMENT":
                     if i == 0:
                         h_overall = self.model_argument.graph_forward(
-                            g=graph_dict[key].to(self.device),
-                            x=graph_dict[key].ndata["feat"].to(self.device),
+                            g=graph_dict[key],
+                            x=graph_dict[key].ndata["feat"],
                             mask=mask,
                         )
                     else:
                         h = self.model_argument.graph_forward(
-                            g=graph_dict[key].to(self.device),
-                            x=graph_dict[key].ndata["feat"].to(self.device),
+                            g=graph_dict[key],
+                            x=graph_dict[key].ndata["feat"],
                             mask=mask,
                         )
                         h_overall = h_overall + h
@@ -126,14 +126,14 @@ class MultiGAT(nn.Module):
                 elif key == "RECEIVER":
                     if i == 0:
                         h_overall = self.model_receiver.graph_forward(
-                            g=graph_dict[key].to(self.device),
-                            x=graph_dict[key].ndata["feat"].to(self.device),
+                            g=graph_dict[key],
+                            x=graph_dict[key].ndata["feat"],
                             mask=mask,
                         )
                     else:
                         h = self.model_receiver.graph_forward(
-                            g=graph_dict[key].to(self.device),
-                            x=graph_dict[key].ndata["feat"].to(self.device),
+                            g=graph_dict[key],
+                            x=graph_dict[key].ndata["feat"],
                             mask=mask,
                         )
                         h_overall = h_overall + h
@@ -141,14 +141,14 @@ class MultiGAT(nn.Module):
                 elif key == "CALL":
                     if i == 0:
                         h_overall = self.model_call.graph_forward(
-                            g=graph_dict[key].to(self.device),
-                            x=graph_dict[key].ndata["feat"].to(self.device),
+                            g=graph_dict[key],
+                            x=graph_dict[key].ndata["feat"],
                             mask=mask,
                         )
                     else:
                         h = self.model_call.graph_forward(
-                            g=graph_dict[key].to(self.device),
-                            x=graph_dict[key].ndata["feat"].to(self.device),
+                            g=graph_dict[key],
+                            x=graph_dict[key].ndata["feat"],
                             mask=mask,
                         )
                         h_overall = h_overall + h
@@ -156,14 +156,14 @@ class MultiGAT(nn.Module):
                 elif key == "REACHING_DEF":
                     if i == 0:
                         h_overall = self.model_reaching_def.graph_forward(
-                            g=graph_dict[key].to(self.device),
-                            x=graph_dict[key].ndata["feat"].to(self.device),
+                            g=graph_dict[key],
+                            x=graph_dict[key].ndata["feat"],
                             mask=mask,
                         )
                     else:
                         h = self.model_reaching_def.graph_forward(
-                            g=graph_dict[key].to(self.device),
-                            x=graph_dict[key].ndata["feat"].to(self.device),
+                            g=graph_dict[key],
+                            x=graph_dict[key].ndata["feat"],
                             mask=mask,
                         )
                         h_overall = h_overall + h
@@ -171,14 +171,14 @@ class MultiGAT(nn.Module):
                 elif key == "CDG":
                     if i == 0:
                         h_overall = self.model_cdg.graph_forward(
-                            g=graph_dict[key].to(self.device),
-                            x=graph_dict[key].ndata["feat"].to(self.device),
+                            g=graph_dict[key],
+                            x=graph_dict[key].ndata["feat"],
                             mask=mask,
                         )
                     else:
                         h = self.model_cdg.graph_forward(
-                            g=graph_dict[key].to(self.device),
-                            x=graph_dict[key].ndata["feat"].to(self.device),
+                            g=graph_dict[key],
+                            x=graph_dict[key].ndata["feat"],
                             mask=mask,
                         )
                         h_overall = h_overall + h
@@ -186,14 +186,14 @@ class MultiGAT(nn.Module):
                 elif key == "CFG":
                     if i == 0:
                         h_overall = self.model_cfg.graph_forward(
-                            g=graph_dict[key].to(self.device),
-                            x=graph_dict[key].ndata["feat"].to(self.device),
+                            g=graph_dict[key],
+                            x=graph_dict[key].ndata["feat"],
                             mask=mask,
                         )
                     else:
                         h = self.model_cfg.graph_forward(
-                            g=graph_dict[key].to(self.device),
-                            x=graph_dict[key].ndata["feat"].to(self.device),
+                            g=graph_dict[key],
+                            x=graph_dict[key].ndata["feat"],
                             mask=mask,
                         )
                         h_overall = h_overall + h
@@ -201,14 +201,14 @@ class MultiGAT(nn.Module):
                 elif key == "AST":
                     if i == 0:
                         h_overall = self.model_ast.graph_forward(
-                            g=graph_dict[key].to(self.device),
-                            x=graph_dict[key].ndata["feat"].to(self.device),
+                            g=graph_dict[key],
+                            x=graph_dict[key].ndata["feat"],
                             mask=mask,
                         )
                     else:
                         h = self.model_ast.graph_forward(
-                            g=graph_dict[key].to(self.device),
-                            x=graph_dict[key].ndata["feat"].to(self.device),
+                            g=graph_dict[key],
+                            x=graph_dict[key].ndata["feat"],
                             mask=mask,
                         )
                         h_overall = h_overall + h
@@ -221,16 +221,16 @@ class MultiGAT(nn.Module):
                 if i == 0:
                     h_overall = (
                         self.model_argument.graph_forward(
-                            g=graph_dict[existing_key].to(self.device),
-                            x=graph_dict[existing_key].ndata["feat"].to(self.device),
+                            g=graph_dict[existing_key],
+                            x=graph_dict[existing_key].ndata["feat"],
                             mask=mask,
                         )
                         * 0
                     )
                 else:
                     h = self.model_argument.graph_forward(
-                        g=graph_dict[existing_key].to(self.device),
-                        x=graph_dict[existing_key].ndata["feat"].to(self.device),
+                        g=graph_dict[existing_key],
+                        x=graph_dict[existing_key].ndata["feat"],
                         mask=mask,
                     )
                     h_overall = h_overall + h * 0
@@ -239,16 +239,16 @@ class MultiGAT(nn.Module):
                 if i == 0:
                     h_overall = (
                         self.model_receiver.graph_forward(
-                            g=graph_dict[existing_key].to(self.device),
-                            x=graph_dict[existing_key].ndata["feat"].to(self.device),
+                            g=graph_dict[existing_key],
+                            x=graph_dict[existing_key].ndata["feat"],
                             mask=mask,
                         )
                         * 0
                     )
                 else:
                     h = self.model_receiver.graph_forward(
-                        g=graph_dict[existing_key].to(self.device),
-                        x=graph_dict[existing_key].ndata["feat"].to(self.device),
+                        g=graph_dict[existing_key],
+                        x=graph_dict[existing_key].ndata["feat"],
                         mask=mask,
                     )
                     h_overall = h_overall + h * 0
@@ -257,16 +257,16 @@ class MultiGAT(nn.Module):
                 if i == 0:
                     h_overall = (
                         self.model_call.graph_forward(
-                            g=graph_dict[existing_key].to(self.device),
-                            x=graph_dict[existing_key].ndata["feat"].to(self.device),
+                            g=graph_dict[existing_key],
+                            x=graph_dict[existing_key].ndata["feat"],
                             mask=mask,
                         )
                         * 0
                     )
                 else:
                     h = self.model_call.graph_forward(
-                        g=graph_dict[existing_key].to(self.device),
-                        x=graph_dict[existing_key].ndata["feat"].to(self.device),
+                        g=graph_dict[existing_key],
+                        x=graph_dict[existing_key].ndata["feat"],
                         mask=mask,
                     )
                     h_overall = h_overall + h * 0
@@ -274,14 +274,14 @@ class MultiGAT(nn.Module):
             elif key == "REACHING_DEF":
                 if i == 0:
                     h_overall = self.model_reaching_def.graph_forward(
-                        g=graph_dict[existing_key].to(self.device),
-                        x=graph_dict[existing_key].ndata["feat"].to(self.device),
+                        g=graph_dict[existing_key],
+                        x=graph_dict[existing_key].ndata["feat"],
                         mask=mask,
                     )
                 else:
                     h = self.model_reaching_def.graph_forward(
-                        g=graph_dict[existing_key].to(self.device),
-                        x=graph_dict[existing_key].ndata["feat"].to(self.device),
+                        g=graph_dict[existing_key],
+                        x=graph_dict[existing_key].ndata["feat"],
                         mask=mask,
                     )
                     h_overall = h_overall + h * 0
@@ -290,16 +290,16 @@ class MultiGAT(nn.Module):
                 if i == 0:
                     h_overall = (
                         self.model_cdg.graph_forward(
-                            g=graph_dict[existing_key].to(self.device),
-                            x=graph_dict[existing_key].ndata["feat"].to(self.device),
+                            g=graph_dict[existing_key],
+                            x=graph_dict[existing_key].ndata["feat"],
                             mask=mask,
                         )
                         * 0
                     )
                 else:
                     h = self.model_cdg.graph_forward(
-                        g=graph_dict[existing_key].to(self.device),
-                        x=graph_dict[existing_key].ndata["feat"].to(self.device),
+                        g=graph_dict[existing_key],
+                        x=graph_dict[existing_key].ndata["feat"],
                         mask=mask,
                     )
                     h_overall = h_overall + h * 0
@@ -308,16 +308,16 @@ class MultiGAT(nn.Module):
                 if i == 0:
                     h_overall = (
                         self.model_cfg.graph_forward(
-                            g=graph_dict[existing_key].to(self.device),
-                            x=graph_dict[existing_key].ndata["feat"].to(self.device),
+                            g=graph_dict[existing_key],
+                            x=graph_dict[existing_key].ndata["feat"],
                             mask=mask,
                         )
                         * 0
                     )
                 else:
                     h = self.model_cfg.graph_forward(
-                        g=graph_dict[existing_key].to(self.device),
-                        x=graph_dict[existing_key].ndata["feat"].to(self.device),
+                        g=graph_dict[existing_key],
+                        x=graph_dict[existing_key].ndata["feat"],
                         mask=mask,
                     )
                     h_overall = h_overall + h * 0
@@ -326,16 +326,16 @@ class MultiGAT(nn.Module):
                 if i == 0:
                     h_overall = (
                         self.model_ast.graph_forward(
-                            g=graph_dict[existing_key].to(self.device),
-                            x=graph_dict[existing_key].ndata["feat"].to(self.device),
+                            g=graph_dict[existing_key],
+                            x=graph_dict[existing_key].ndata["feat"],
                             mask=mask,
                         )
                         * 0
                     )
                 else:
                     h = self.model_ast.graph_forward(
-                        g=graph_dict[existing_key].to(self.device),
-                        x=graph_dict[existing_key].ndata["feat"].to(self.device),
+                        g=graph_dict[existing_key],
+                        x=graph_dict[existing_key].ndata["feat"],
                         mask=mask,
                     )
                     h_overall = h_overall + h * 0
