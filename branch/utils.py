@@ -224,7 +224,7 @@ def get_all_branch(
         ):
             if branch[:-1] not in branches:
                 num_branch += 1
-                pprint(f"[blue]Found branch: {num_branch}[/blue]")
+                pprint(f"[blue]Found branch: {num_branch} - {len(branch)} [/blue]")
                 branches.append(branch[:-1])  # remove the end node
 
     # process async func
@@ -248,7 +248,7 @@ def get_all_branch(
         ):
             if branch[:-1] not in branches:
                 num_branch += 1
-                pprint(f"[blue]Found branch: {num_branch}[/blue]")
+                pprint(f"[blue]Found branch: {num_branch} - {len(branch)}[/blue]")
                 branches.append(branch[:-1])  # remove the end node
 
     return branches
