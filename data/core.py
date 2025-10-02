@@ -1062,6 +1062,15 @@ class Data(object):
         # TODO: Data splitting from the splitted directory must be implemented
         if test_only:
             self.logger.log("[green]Using only the test set, no need to split[/green]")
+            test_data_by_project = self.processed_data["test_project"]
+            test_data_by_module = self.processed_data["test_module"]
+
+            self.test_data = {
+                "project": test_data_by_project,
+                "module": test_data_by_module,
+            }
+            self.logger.log("[green]Data is split![/green]")
+            self.logger.log(f"Size of Test data: {len(self.test_data)}")
         else:
             self.logger.log(
                 "[green]Splitting the data into training, validation and test sets...[/green]"
