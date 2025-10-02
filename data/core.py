@@ -1054,50 +1054,53 @@ class Data(object):
         return ast.unparse(tree)
 
     def train_test_split(
-        self, val_split: Union[float, int] = 0.1, test_split: Union[float, int] = 0.15
+        self, val_split: Union[float, int] = 0.1, test_only: bool = False
     ) -> None:
         """
         Split the data into training, validation and test sets
         """
         # TODO: Data splitting from the splitted directory must be implemented
-        self.logger.log(
-            "[green]Splitting the data into training, validation and test sets...[/green]"
-        )
-        assert self.processed_data is not None
-        # data = deepcopy(self.processed_data)
-        # np.random.shuffle(data)
-        num_val = (
-            int(val_split * len(self.processed_data))
-            if isinstance(val_split, float)
-            else val_split
-        )
-        self.logger.log(f"Number of validation data: {num_val}")
+        if test_only:
+            self.logger.log("[green]Using only the test set, no need to split[/green]")
+        else:
+            self.logger.log(
+                "[green]Splitting the data into training, validation and test sets...[/green]"
+            )
+            assert self.processed_data is not None
+            # data = deepcopy(self.processed_data)
+            # np.random.shuffle(data)
+            num_val = (
+                int(val_split * len(self.processed_data))
+                if isinstance(val_split, float)
+                else val_split
+            )
+            self.logger.log(f"Number of validation data: {num_val}")
 
-        # split train and val
-        keys_list = list(self.processed_data["train"].keys())
-        np.random.shuffle(keys_list)
-        val_keys = keys_list[:num_val]
-        train_keys = keys_list[num_val:]
+            # split train and val
+            keys_list = list(self.processed_data["train"].keys())
+            np.random.shuffle(keys_list)
+            val_keys = keys_list[:num_val]
+            train_keys = keys_list[num_val:]
 
-        train_data = {}
-        val_data = {}
-        test_data_by_project = self.processed_data["test_project"]
-        test_data_by_module = self.processed_data["test_module"]
-        for key in train_keys:
-            train_data[key] = self.processed_data["train"][key]
-        for key in val_keys:
-            val_data[key] = self.processed_data["train"][key]
+            train_data = {}
+            val_data = {}
+            test_data_by_project = self.processed_data["test_project"]
+            test_data_by_module = self.processed_data["test_module"]
+            for key in train_keys:
+                train_data[key] = self.processed_data["train"][key]
+            for key in val_keys:
+                val_data[key] = self.processed_data["train"][key]
 
-        self.train_data = train_data
-        self.val_data = val_data
-        self.test_data = {
-            "project": test_data_by_project,
-            "module": test_data_by_module,
-        }
-        self.logger.log("[green]Data is split![/green]")
-        self.logger.log(
-            f"Size of training data: {len(self.train_data)}, Validation data: {len(self.val_data)}, Test data: {len(self.test_data)}"
-        )
+            self.train_data = train_data
+            self.val_data = val_data
+            self.test_data = {
+                "project": test_data_by_project,
+                "module": test_data_by_module,
+            }
+            self.logger.log("[green]Data is split![/green]")
+            self.logger.log(
+                f"Size of training data: {len(self.train_data)}, Validation data: {len(self.val_data)}, Test data: {len(self.test_data)}"
+            )
 
     def truncate_code(self, src_code: str, branch: list) -> str:
         set_of_line = []
