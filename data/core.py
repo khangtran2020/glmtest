@@ -840,7 +840,7 @@ class Data(object):
                         if result is None:
                             num_discarded += 1
                             continue
-                        prompt, _, _ = result
+                        prompt = result
 
                         num_token = len(self.llm_tokenizer.tokenize(prompt))
                         num_tokens.append(num_token)
