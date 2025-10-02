@@ -672,10 +672,10 @@ def main() -> None:
         for n, p in model.named_parameters():
             if args.dtype == "bf16":
                 if p.dtype != torch.bfloat16:
-                    p.data = p.data.to(torch.bfloat16)
+                    p.data = p.data.to(torch.bfloat16, device=device)
             elif args.dtype == "fp16":
                 if p.dtype != torch.float16:
-                    p.data = p.data.to(torch.float16)
+                    p.data = p.data.to(torch.float16, device=device)
 
         console.log(
             f"Model is loaded to device: {model.device} - with type {model.dtype}"
