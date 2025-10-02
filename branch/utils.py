@@ -1,6 +1,8 @@
+import re
 import os
 import ast
 import networkx as nx
+from rich import print as pprint
 from copy import deepcopy
 from networkx import DiGraph
 from rich.console import Console
@@ -198,6 +200,7 @@ def get_all_branch(
     G, set_of_endline = parse_code(code=code)
 
     branches = []
+    num_branch = 0
     # process func
     if console is not None:
         console.log("Processing Function")
@@ -218,6 +221,8 @@ def get_all_branch(
             visited_nodes=[],
         ):
             if branch[:-1] not in branches:
+                num_branch += 1
+                pprint(f"[blue]Found branch: {num_branch}[/blue]")
                 branches.append(branch[:-1])  # remove the end node
 
     # process async func
@@ -240,6 +245,8 @@ def get_all_branch(
             visited_nodes=[],
         ):
             if branch[:-1] not in branches:
+                num_branch += 1
+                pprint(f"[blue]Found branch: {num_branch}[/blue]")
                 branches.append(branch[:-1])  # remove the end node
 
     return branches
@@ -297,3 +304,25 @@ def run_coverage(
             visited.append(e[1])
 
     return branches
+
+
+def merge_testcases(codes: List[str]) -> str:
+    imports = merge_imports(codes=codes)
+    function_list = []
+
+
+def extract_imports_from_code(code):
+    imports = set()
+    for line in code.split("\n"):
+        # Match 'import ...' or 'from ... import ...'
+        if re.match(r"^\s*(import|from)\s+", line):
+            imports.add(line.strip())
+    return imports
+
+
+def merge_imports(codes: List[str]):
+    all_imports = set()
+    for code in codes:
+        all_imports.update(extract_imports_from_code(code=code))
+    sorted_imports = sorted(all_imports)
+    return "\n".join(sorted_imports)
