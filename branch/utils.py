@@ -190,6 +190,8 @@ def get_all_branch(
     code: str = None, filepath: str = None, console: Console = None
 ) -> Dict:
 
+    pprint("[green]Extracting branches...[/green]")
+
     if code is None and filepath is None:
         raise ValueError("Either code or filepath must be provided.")
 
