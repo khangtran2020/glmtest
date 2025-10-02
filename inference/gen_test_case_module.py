@@ -38,9 +38,14 @@ def testcase_generate(
     save_path: str = None,
     device: torch.device = torch.device("cpu"),
     console: Console = None,
-    accelerator: Accelerator = None,
+    mixed_precision: str = "bf16",
 ):
 
+    accelerator = Accelerator(
+        mixed_precision=mixed_precision,
+        log_with="wandb",
+        project_dir=args.log_dir,
+    )
     if dataset is not None and file_path is not None:
         raise ValueError("Either dataset or file_path must be provided, but not both.")
 
