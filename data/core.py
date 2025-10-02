@@ -1101,9 +1101,13 @@ class Data(object):
 
     def truncate_code(self, src_code: str, branch: list) -> str:
         set_of_line = []
-        for item in branch:
-            set_of_line.extend(item)
-        set_of_line = sorted(list(set(set_of_line)))
+        depth = get_depth(branch)
+        if depth > 1:
+            for item in branch:
+                set_of_line.extend(item)
+            set_of_line = sorted(list(set(set_of_line)))
+        else:
+            set_of_line = sorted(list(set(branch)))
 
         code_line = src_code.split("\n")
         truncated_code = ""
