@@ -782,7 +782,7 @@ class Data(object):
                                 f"[yellow]Graph already exists for {uuid}, loading...[/yellow]"
                             )
                             # load graph
-                            graph = torch.load(graph_path)
+                            graph = self.read_graph(dat)
                         else:
                             graph = self.read_graph(dat)
                             check_graph_exist_dict = {}
