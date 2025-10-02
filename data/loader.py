@@ -50,6 +50,7 @@ class GLMFDataset(Dataset):
         with open(data_path, "r") as f:
             sample = json.load(f)
         graph_path = sample["graph_path"]
+        print("Loading graph from:", graph_path)
         graph = torch.load(graph_path) if graph_path is not None else None
         active_node = (
             torch.Tensor(sample["active_node"])
