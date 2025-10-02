@@ -19,7 +19,7 @@ from train.utils import (
     patch_model,
     save_checkpoint,
 )
-from train.test import validate
+from inference.test import validate
 from utils.utils import log_ram_usage
 
 

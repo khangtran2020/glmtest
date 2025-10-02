@@ -11,7 +11,7 @@ from rich.progress import Progress
 from rich.console import Console
 from graph.core import Graph
 from transformers import PreTrainedModel, PreTrainedTokenizer
-from branch.utils import run_coverage
+from branch.utils import run_coverage, get_all_branch
 from utils.utils import run_command, get_index_by_value
 from utils.code_analyzer import analyze_code, remove_method_from_class
 from sklearn.preprocessing import LabelEncoder
@@ -88,8 +88,6 @@ RESPONSE_BASELINE_TEMPLATE = """```json
 }}
 ```
 """
-
-import ast
 
 
 class FuzzTagTransformer(ast.NodeTransformer):
@@ -722,6 +720,164 @@ class Data(object):
                         f"Statistics of {skey}: {quartiles}, max: {max_num}, min: {min_num}, num_data: {len(graph_stats[key][skey])}"
                     )
 
+    def prepare_data_for_test_gen(self):
+        assert self.data is not None
+
+        processed_data = None
+        processed_data_file_path = os.path.join(
+            self.data_path,
+            f"{self.baseline_prompt}_{self.max_tokens}_{self.model_name}",
+            "processed_data_for_test_gen.json",
+        )
+        if os.path.exists(processed_data_file_path):
+            with open(
+                processed_data_file_path,
+                "r",
+            ) as file:
+                self.processed_data = json.load(file)
+            processed_data = True
+        else:
+            processed_data_path = os.path.join(
+                self.data_path,
+                f"raw",
+            )
+            processed_prompt_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.max_tokens}_{self.model_name}",
+            )
+
+            os.makedirs(processed_data_path, exist_ok=True)
+            os.makedirs(processed_prompt_path, exist_ok=True)
+
+        if processed_data:
+            self.logger.log("[green]Data is already processed![/green]")
+            self.logger.log(f"Size of data data: {len(self.processed_data)}")
+            return
+
+        with self.logger.status("[green]Preparing data for test gen...[/green]"):
+
+            self.processed_data = {}
+            num_tokens = []
+            num_discarded = 0
+
+            for data_n in self.data.keys():
+
+                if "test" not in data_n:
+                    continue
+
+                self.processed_data[data_n] = {}
+
+                for uuid, dat in self.data[data_n].items():
+                    with open(dat["code_path"], "r") as file:
+                        src_code = file.read()
+
+                    branches = get_all_branch(code=src_code)
+
+                    if "graph" in self.baseline_prompt:
+                        graph_name = f"{uuid}_graph.pt"
+                        graph_path = os.path.join(processed_data_path, graph_name)
+
+                        if os.path.exists(graph_path):
+                            self.logger.log(
+                                f"[yellow]Graph already exists for {uuid}, loading...[/yellow]"
+                            )
+                        else:
+                            graph = self.read_graph(dat)
+                            check_graph_exist_dict = {}
+                            graph_dict = {}
+                            for key in GRAPH_KEYS:
+                                check_graph_exist_dict[key] = False
+
+                            for key in graph.keys():
+                                if isinstance(graph[key], dgl.DGLGraph):
+                                    graph_dict[key] = graph[key]
+                                    check_graph_exist_dict[key] = True
+
+                            exist_atleast_one = False
+                            for key in check_graph_exist_dict.keys():
+                                if check_graph_exist_dict[key] == True:
+                                    exist_atleast_one = True
+                                    break
+
+                            if not exist_atleast_one:
+                                self.logger.log(
+                                    f"[red]Graph is not generated for {uuid}[/red]"
+                                )
+                                num_discarded += len(dat["test_cases"])
+                                continue
+                            torch.save(graph_dict, graph_path)
+
+                    for i, branch in enumerate(branches):
+                        mask = self.get_mask_tensor(graph=graph, branch=branch)
+                        assert len(mask.shape) == 2, f"Mask shape is {mask.shape}"
+                        active_node = get_index_by_value(a=mask[0], val=1)
+                        if active_node.size(0) == 0:
+                            self.logger.log(
+                                f"Active node empty at uuid: {uuid} for branch: {branch}"
+                            )
+                            num_discarded += 1
+                            continue
+
+                        result = self.get_prompt(
+                            src_code=src_code,
+                            testcase_out=None,
+                            mask=active_node,
+                            tokenizer=self.llm_tokenizer,
+                            branch=branch,
+                            gnn_mode=self.gnn_mode,
+                            testing=True,
+                        )
+                        if result is None:
+                            num_discarded += 1
+                            continue
+                        prompt, _, _ = result
+
+                        num_token = len(self.llm_tokenizer.tokenize(prompt))
+                        num_tokens.append(num_token)
+
+                        if "graph" in self.baseline_prompt:
+                            data = {
+                                "uuid": f"{uuid}_testcase_{i}",
+                                "prompt": prompt,
+                                "active_node": active_node.tolist(),
+                                "mask": mask.tolist(),
+                                "graph_path": graph_path,
+                            }
+                        else:
+                            data = {
+                                "uuid": f"{uuid}_testcase_{i}",
+                                "prompt": prompt,
+                                "active_node": None,
+                                "mask": None,
+                                "graph_path": None,
+                            }
+
+                        data_name = f"{uuid}_testcase_{i}.json"
+                        data_path = os.path.join(processed_prompt_path, data_name)
+                        with open(data_path, "w") as file:
+                            json.dump(data, file, indent=4)
+
+                        self.logger.log(
+                            f"Data is saved to {data_path} for uuid - {uuid}, testcase - {i}"
+                        )
+
+                        self.processed_data[data_n][f"{uuid}_testcase_{i}"] = data_path
+
+        with open(processed_data_file_path, "w") as file:
+            json.dump(self.processed_data, file, indent=4)
+
+        self.logger.log("[green]Data is ready![/green]")
+        self.logger.log(
+            f"Size of processed data: {len(self.processed_data)}, num_discarded: {num_discarded}"
+        )
+
+        quartiles = np.quantile(num_tokens, [0, 0.25, 0.5, 0.75, 1])
+        max_num_tokens = max(num_tokens)
+        min_num_tokens = min(num_tokens)
+        self.logger.log(
+            f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_tokens)}"
+        )
+
     def read_graph(self, data: dict) -> dict:
 
         graph_path = data["graph"]["src_graph_path"]
@@ -774,67 +930,107 @@ class Data(object):
         branch: List,
         tokenizer: PreTrainedTokenizer,
         gnn_mode: str = "graph",
+        testing: bool = False,
     ):
 
         # self.logger.log(
         #     f"Preparing prompts with baseline_prompt: {self.baseline_prompt}"
         # )
-        if gnn_mode == "graph":
-            graph_pad = "<|graph_pad|>"
-        else:
-            graph_pad = "<|graph_pad|>" * mask.size(0)
-        if self.baseline_prompt == "code":
-            code_line = self.generate_code_line(branch)
-            text = PROMPT_CODE.format(src_code, code_line)
-            response = RESPONSE_TEMPLATE.format(testcase_out)
-        elif self.baseline_prompt == "graph":
-            text = PROMPT_GRAPH.format(graph_pad)
-            response = RESPONSE_TEMPLATE.format(testcase_out)
-        elif self.baseline_prompt == "code_graph":
-            text = PROMPT_CODE_GRAPH.format(src_code, graph_pad)
-            response = RESPONSE_TEMPLATE.format(testcase_out)
-        elif self.baseline_prompt == "code_tr":
-            # self.logger.log("Truncating code...")
-            trucated_code = self.truncate_code(src_code=src_code, branch=branch)
-            if trucated_code is None:
-                self.logger.log("Truncated code is None")
-                return None
-            text = PROMPT_CODE_TR.format(trucated_code)
-            response = RESPONSE_TEMPLATE.format(testcase_out)
-        elif self.baseline_prompt == "graph_tr":
-            trucated_code = self.truncate_code(src_code=src_code, branch=branch)
-            text = PROMPT_CODE_GRAPH.format(trucated_code, graph_pad)
-            response = RESPONSE_TEMPLATE.format(testcase_out)
-        elif self.baseline_prompt == "code_baseline":
-            code_line = self.generate_code_line(branch)
-            text = PROMPT_COT.format(module=src_code, execution_branch=code_line)
-            response = RESPONSE_BASELINE_TEMPLATE.format(testcase_out)
+        if not testing:
+            if gnn_mode == "graph":
+                graph_pad = "<|graph_pad|>"
+            else:
+                graph_pad = "<|graph_pad|>" * mask.size(0)
+            if self.baseline_prompt == "code":
+                code_line = self.generate_code_line(branch)
+                text = PROMPT_CODE.format(src_code, code_line)
+                response = RESPONSE_TEMPLATE.format(testcase_out)
+            elif self.baseline_prompt == "graph":
+                text = PROMPT_GRAPH.format(graph_pad)
+                response = RESPONSE_TEMPLATE.format(testcase_out)
+            elif self.baseline_prompt == "code_graph":
+                text = PROMPT_CODE_GRAPH.format(src_code, graph_pad)
+                response = RESPONSE_TEMPLATE.format(testcase_out)
+            elif self.baseline_prompt == "code_tr":
+                # self.logger.log("Truncating code...")
+                trucated_code = self.truncate_code(src_code=src_code, branch=branch)
+                if trucated_code is None:
+                    self.logger.log("Truncated code is None")
+                    return None
+                text = PROMPT_CODE_TR.format(trucated_code)
+                response = RESPONSE_TEMPLATE.format(testcase_out)
+            elif self.baseline_prompt == "graph_tr":
+                trucated_code = self.truncate_code(src_code=src_code, branch=branch)
+                text = PROMPT_CODE_GRAPH.format(trucated_code, graph_pad)
+                response = RESPONSE_TEMPLATE.format(testcase_out)
+            elif self.baseline_prompt == "code_baseline":
+                code_line = self.generate_code_line(branch)
+                text = PROMPT_COT.format(module=src_code, execution_branch=code_line)
+                response = RESPONSE_BASELINE_TEMPLATE.format(testcase_out)
 
-        task_prompt = tokenizer.apply_chat_template(
-            [
-                {"role": "user", "content": text},
-                {"role": "assistant", "content": response},
-            ],
-            tokenize=False,
-        )
-
-        task_prompt_input = tokenizer.apply_chat_template(
-            [{"role": "user", "content": text}],
-            tokenize=False,
-        )
-
-        task_prompt_output = tokenizer.apply_chat_template(
-            [{"role": "assistant", "content": response}],
-            tokenize=False,
-        )
-
-        if len(self.llm_tokenizer.tokenize(task_prompt)) > self.max_tokens:
-            self.logger.log(
-                f"[red]Task is too long: {len(self.llm_tokenizer.tokenize(task_prompt))} > {self.max_tokens}[/red]"
+            task_prompt = tokenizer.apply_chat_template(
+                [
+                    {"role": "user", "content": text},
+                    {"role": "assistant", "content": response},
+                ],
+                tokenize=False,
             )
-            return None
 
-        return task_prompt_input, task_prompt_output, task_prompt
+            task_prompt_input = tokenizer.apply_chat_template(
+                [{"role": "user", "content": text}],
+                tokenize=False,
+            )
+
+            task_prompt_output = tokenizer.apply_chat_template(
+                [{"role": "assistant", "content": response}],
+                tokenize=False,
+            )
+
+            if len(self.llm_tokenizer.tokenize(task_prompt)) > self.max_tokens:
+                self.logger.log(
+                    f"[red]Task is too long: {len(self.llm_tokenizer.tokenize(task_prompt))} > {self.max_tokens}[/red]"
+                )
+                return None
+
+            return task_prompt_input, task_prompt_output, task_prompt
+        else:
+            if gnn_mode == "graph":
+                graph_pad = "<|graph_pad|>"
+            else:
+                graph_pad = "<|graph_pad|>" * mask.size(0)
+            if self.baseline_prompt == "code":
+                code_line = self.generate_code_line(branch)
+                text = PROMPT_CODE.format(src_code, code_line)
+            elif self.baseline_prompt == "graph":
+                text = PROMPT_GRAPH.format(graph_pad)
+            elif self.baseline_prompt == "code_graph":
+                text = PROMPT_CODE_GRAPH.format(src_code, graph_pad)
+            elif self.baseline_prompt == "code_tr":
+                # self.logger.log("Truncating code...")
+                trucated_code = self.truncate_code(src_code=src_code, branch=branch)
+                if trucated_code is None:
+                    self.logger.log("Truncated code is None")
+                    return None
+                text = PROMPT_CODE_TR.format(trucated_code)
+            elif self.baseline_prompt == "graph_tr":
+                trucated_code = self.truncate_code(src_code=src_code, branch=branch)
+                text = PROMPT_CODE_GRAPH.format(trucated_code, graph_pad)
+            elif self.baseline_prompt == "code_baseline":
+                code_line = self.generate_code_line(branch)
+                text = PROMPT_COT.format(module=src_code, execution_branch=code_line)
+
+            task_prompt_input = tokenizer.apply_chat_template(
+                [{"role": "user", "content": text}],
+                tokenize=False,
+            )
+
+            if len(self.llm_tokenizer.tokenize(task_prompt_input)) > self.max_tokens:
+                self.logger.log(
+                    f"[red]Task is too long: {len(self.llm_tokenizer.tokenize(task_prompt_input))} > {self.max_tokens}[/red]"
+                )
+                return None
+
+            return task_prompt_input
 
     def add_fuzz_tags(self, code: str, tag: str = "fuzz") -> str:
         try:

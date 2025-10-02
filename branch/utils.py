@@ -11,25 +11,26 @@ from utils.utils import run_command
 
 COVERAGE_TEMPLATE = """docker run --rm -v {}:/project -v {}:/test -v {}:/output -v {}:/package {} {} {}"""
 
+NODE_CONSTANT = 1e6
 
-def read_module(filepath: str, console: Console) -> str:
 
-    console.log(f"Reading code from file: {filepath}")
+def read_module(filepath: str) -> str:
+
+    # console.log(f"Reading code from file: {filepath}")
     with open(filepath, "r") as f:
         code = f.read()
         num_line = len(code.split("\n"))
 
-    return code, num_line
+    return code
 
 
-def analyze_code(code: str, console: Console) -> Tuple[Dict, Set, Set, Set]:
+def analyze_code(code: str) -> Dict:
 
     # Parse the source code into an AST
     try:
         tree = ast.parse(code)
     except Exception as e:
-        print("An error occur:", e)
-        return -1
+        raise ValueError(f"Error parsing code: {e}")
 
     # Initialize a list to store information
     analysis_results = {
@@ -38,14 +39,12 @@ def analyze_code(code: str, console: Console) -> Tuple[Dict, Set, Set, Set]:
         },
         "functions": {},
         "async_functions": {},
-        "classes": {},
     }
     for_line = []
     while_line = []
     key_start_line = []
     key_end_line = []
 
-    # Walk through each node in the AST
     for node in ast.walk(tree):
 
         if isinstance(node, ast.FunctionDef):
@@ -58,16 +57,16 @@ def analyze_code(code: str, console: Console) -> Tuple[Dict, Set, Set, Set]:
         elif isinstance(node, ast.AsyncFunctionDef):
             start_line = node.lineno
             end_line = getattr(node, "end_lineno", None)
-            analysis_results["functions"][node.name] = (start_line, end_line)
+            analysis_results["async_functions"][node.name] = (start_line, end_line)
             key_start_line.append(start_line)
             key_end_line.append(end_line)
 
-        elif isinstance(node, ast.ClassDef):
-            start_line = node.lineno
-            end_line = getattr(node, "end_lineno", None)
-            analysis_results["functions"][node.name] = (start_line, end_line)
-            key_start_line.append(start_line)
-            key_end_line.append(end_line)
+        # elif isinstance(node, ast.ClassDef):
+        #     start_line = node.lineno
+        #     end_line = getattr(node, "end_lineno", None)
+        #     analysis_results["classes"][node.name] = (start_line, end_line)
+        #     key_start_line.append(start_line)
+        #     key_end_line.append(end_line)
 
         elif isinstance(node, ast.For):
             for_line.append(node.lineno)
@@ -75,184 +74,169 @@ def analyze_code(code: str, console: Console) -> Tuple[Dict, Set, Set, Set]:
         elif isinstance(node, ast.While):
             while_line.append(node.lineno)
 
-    log_info = (
-        f"# start lines: {len(set(key_start_line))} "
-        + f"# end lines: {len(set(key_end_line))} "
-        + f"# loop lines: {len(set(for_line) + set(while_line))}"
-    )
-    console.log(log_info)
-
-    return (
-        analysis_results,
-        set(key_start_line),
-        set(key_end_line),
-        set(for_line) + set(while_line),
-    )
+    return analysis_results
 
 
-def parse_code(code: str, start_lines: Set, console: Console) -> DiGraph:
+def parse_code(code: str) -> DiGraph:
 
     parser = PythonParser(filename=None, exclude=None, text=code)
     parser.parse_source()
     arcs = parser.arcs()
+
+    set_of_statements = []
+    set_of_startlines = []
+    set_of_endlines = []
+
+    for e in arcs:
+        if e[0] > 0:
+            set_of_statements.append(e[0])
+        if e[1] > 0:
+            set_of_statements.append(e[1])
+        if e[1] < 0:
+            if "import " not in code.split("\n")[-1 * e[1] - 1]:
+                print(e[1])
+                set_of_startlines.append(-1 * e[1])
+            set_of_endlines.append(e[0])
+
+    set_of_statements = set(set_of_statements)
+    set_of_startlines = set(set_of_startlines)
+    set_of_endlines = set(set_of_endlines)
+
+    # print(set_of_endlines)
 
     G = nx.DiGraph()
     for i in parser.statements:
         G.add_node(i)
 
     for e in arcs:
-        if e[1] > 0:
-            if e[1] not in start_lines:
+        if (e[1] > 0) and (e[1] not in set_of_startlines):
+            line = code.split("\n")[e[1] - 1]
+            if len(line) != len(line.lstrip()):
                 G.add_edge(*e)
-        else:
-            G.add_edge(e[0], 10000 + e[1] * -1)
 
-    log_info = f"# arcs: {len(arcs)}"
-    console.log(log_info)
-    return G
+    # merge with the first statement
+    sorted_statements = sorted(list(set_of_statements))
+    for i in set_of_startlines:
+        for j in sorted_statements:
+            if j > i:
+                G.add_edge(i, j)
+                break
+
+    # handle try except
+    # Find try and except blocks
+    tree = ast.parse(code)
+    try_blocks = []
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Try):
+            block_info = {"try": node.lineno, "excepts": []}
+            for handler in node.handlers:
+                end_line = getattr(handler, "end_lineno", None)
+                block_info["excepts"].append((handler.lineno, end_line))
+            try_blocks.append(block_info)
+
+    # Add edges from each line between try and the first except to except blocks
+    for block in try_blocks:
+        try_start = block["try"]
+        except_starts = [ex[0] for ex in block["excepts"]]
+
+        # Find the first except that comes after the try
+        first_except = None
+        for ex_start in except_starts:
+            if ex_start > try_start:
+                first_except = ex_start
+                break
+
+        if first_except is not None:
+            for line in sorted_statements:
+                if try_start < line < first_except:
+                    for ex_start, _ in block["excepts"]:
+                        G.add_edge(line, ex_start)
+    return G, sorted(list(set_of_endlines))
 
 
 def DFS_branch(
     G: DiGraph,
     node: int,
-    visited_nodes: List = [],
-    current_path: List = [],
-    end_node: int = None,
-    found_path: List = [],
-    loop_list: Union[List, Set] = [],
-) -> List:
+    end_nodes: List[int],
+    current_path: List[int],
+    visited_nodes: List[int],
+):
 
-    # Mark node as visited
-    if node == end_node:
-        found_path.append(deepcopy(current_path))
-        print(found_path)
-
-    visited_nodes[node] += 1
     current_path.append(node)
+    visited_nodes.append(node)
 
-    # process something with current_node
-    print("Processing current node:", node, end_node)
-
-    for neighbor_node in G.neighbors(node):
-
-        if visited_nodes[neighbor_node] == 0:
-            DFS_branch(
-                G=G,
-                node=neighbor_node,
-                current_path=current_path,
-                visited_nodes=visited_nodes,
-                end_node=end_node,
-                found_path=found_path,
-                loop_list=loop_list,
-            )
-        else:
-            if (neighbor_node in loop_list) and (visited_nodes[neighbor_node] == 1):
-                DFS_branch(
+    if node in end_nodes:
+        yield current_path + [node]
+    else:
+        for neighbor in G.neighbors(node):
+            # check if this neighbor is the start of a block
+            if neighbor not in visited_nodes:
+                yield from DFS_branch(
                     G=G,
-                    node=neighbor_node,
+                    node=neighbor,
+                    end_nodes=end_nodes,
                     current_path=current_path,
                     visited_nodes=visited_nodes,
-                    end_node=end_node,
-                    found_path=found_path,
-                    loop_list=loop_list,
                 )
 
     current_path.pop()
-    visited_nodes[node] -= 1
-    return found_path
+    visited_nodes.pop()
 
 
-def process_item(
-    item_name: str,
-    item_type: str,
-    line_dict: Dict,
-    loop_line: Union[Set, List],
-    G: DiGraph,
-    console: Console,
-) -> List:
-    start_line, end_line = line_dict[item_type][item_name]
-    subloop = [
-        line for line in loop_line if (line >= start_line) and (line <= end_line)
-    ]
+def get_all_branch(
+    code: str = None, filepath: str = None, console: Console = None
+) -> Dict:
 
-    statement = [
-        node for node in G.nodes() if (node >= start_line) and (node <= end_line)
-    ]
+    if code is None and filepath is None:
+        raise ValueError("Either code or filepath must be provided.")
 
-    statement.append(10000 + start_line)
-    statement.sort()
-    G_sub = G.subgraph(nodes=statement).copy()
-    if G_sub.has_edge(start_line, statement[1]) == False:
-        G_sub.add_edge(start_line, statement[1])
+    if code is None and filepath is not None:
+        code = read_module(filepath=filepath)
 
-    visited = [0] * 20000
-    found_path = DFS_branch(
-        G=G_sub,
-        node=start_line,
-        visited_nodes=visited,
-        current_path=[],
-        end_node=10000 + start_line,
-        found_path=[],
-        loop_list=subloop,
-    )
+    line_dict = analyze_code(code=code)
+    G, set_of_endline = parse_code(code=code)
 
-    log_info = f"Found: {len(found_path)} branches for {item_type}: {item_name}"
-    console.log(log_info)
-    return found_path
-
-
-def get_all_branch(filepath: str, console: Console):
-
-    code, num_line = read_module(filepath=filepath, console=console)
-    line_dict, start_line, end_line, loop_line = analyze_code(
-        code=code, console=console
-    )
-    G = parse_code(code=code, start_lines=start_line, console=console)
-
-    res_dict = {"func": {}, "async_func": {}, "class": {}}
-
+    branches = []
     # process func
-    console.log("Processing Function")
-    item_type = "func"
+    if console is not None:
+        console.log("Processing Function")
     for func_name in line_dict["functions"].keys():
-        found_branch = process_item(
-            item_name=func_name,
-            item_type=item_type,
-            line_dict=line_dict,
-            loop_line=loop_line,
+        set_of_end = [
+            e
+            for e in set_of_endline
+            if e > line_dict["functions"][func_name][0]
+            and e <= line_dict["functions"][func_name][1]
+        ]
+        for branch in DFS_branch(
             G=G,
-            console=console,
-        )
-        res_dict["func"][func_name] = found_branch
+            node=line_dict["functions"][func_name][0],
+            end_nodes=set_of_end,
+            current_path=[],
+            visited_nodes=[],
+        ):
+            branches.append(branch[:-1])  # remove the end node
 
     # process async func
-    console.log("Processing Async Function")
-    item_type = "async_func"
+    if console is not None:
+        console.log("Processing Async Function")
     for func_name in line_dict["async_functions"].keys():
-        found_branch = process_item(
-            item_name=func_name,
-            item_type=item_type,
-            line_dict=line_dict,
-            loop_line=loop_line,
+        set_of_end = [
+            e
+            for e in set_of_endline
+            if e > line_dict["functions"][func_name][0]
+            and e <= line_dict["functions"][func_name][1]
+        ]
+        for branch in DFS_branch(
             G=G,
-            console=console,
-        )
-        res_dict["async_func"][func_name] = found_branch
+            node=line_dict["async_functions"][func_name][0],
+            end_nodes=set_of_end,
+            current_path=[],
+            visited_nodes=[],
+        ):
+            branches.append(branch[:-1])  # remove the end node
 
-    # process class
-    console.log("Processing Classes")
-    item_type = "class"
-    for func_name in line_dict["classes"].keys():
-        found_branch = process_item(
-            item_name=func_name,
-            item_type=item_type,
-            line_dict=line_dict,
-            loop_line=loop_line,
-            G=G,
-            console=console,
-        )
-        res_dict["class"][func_name] = found_branch
-    return res_dict
+    return branches
 
 
 def run_coverage(

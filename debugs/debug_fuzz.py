@@ -10,7 +10,7 @@ from data.utils import get_dataset
 from graph.utils import get_graph
 from train.train import train
 from model.model import GLMFModelForCausalLM, GLMFModelConfig, GLMFModelFuzzing
-from train.test import test, eval_bleu_score
+from inference.test import test, eval_bleu_score
 from train.utils import load_checkpoint
 from utils.constant import (
     GRAPH_START_TOKEN,

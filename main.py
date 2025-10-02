@@ -8,7 +8,7 @@ from data.utils import get_dataset
 from graph.utils import get_graph
 from train.train import train
 from model.model import GLMFModelForCausalLM, GLMFModelConfig, GLMFModelFuzzing
-from train.test import test, eval_bleu_score
+from inference.test import test, eval_bleu_score
 from train.utils import load_checkpoint
 from utils.constant import (
     GRAPH_START_TOKEN,
@@ -84,7 +84,12 @@ def main() -> None:
             dataset.process_raw()
         return
 
-    dataset.prepare_data()
+    if args.mode == "testgen":
+        if args.module_path is None:
+            dataset.prepare_data_for_test_gen()
+    else:
+        dataset.prepare_data()
+
     dataset.train_test_split(val_split=200, test_split=200)
 
     console.log(f"Broadcasted args and dataset to all processes.")

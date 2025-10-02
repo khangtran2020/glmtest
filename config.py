@@ -386,6 +386,16 @@ def add_training_group(group):
     )
 
 
+def add_testgen_group(group):
+
+    group.add_argument(
+        "--module_path",
+        type=str,
+        help="path to the module to generate test cases",
+        default=None,
+    )
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     general_group = parser.add_argument_group(title="General configuration")
@@ -393,11 +403,15 @@ def parse_args():
     joern_group = parser.add_argument_group(title="Joern-related configuration")
     training_group = parser.add_argument_group(title="Training-related configuration")
     model_group = parser.add_argument_group(title="Model-related configuration")
+    testgen_group = parser.add_argument_group(
+        title="Test-case generation configuration"
+    )
 
     add_joern_group(joern_group)
     add_data_group(data_group)
     add_general_group(general_group)
     add_training_group(training_group)
     add_model_group(model_group)
+    add_testgen_group(testgen_group)
 
     return parser.parse_args()
