@@ -788,8 +788,7 @@ class Data(object):
                                 f"[yellow]Graph already exists for {uuid}, loading...[/yellow]"
                             )
                             # load graph
-                            graph_path = dat["graph"]["src_graph_path"]
-                            with open(graph_path, "r") as file:
+                            with open(dat["graph"]["src_graph_path"], "r") as file:
                                 graph = json.load(file)
                         else:
                             graph = self.read_graph(dat)
