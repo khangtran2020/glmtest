@@ -12,7 +12,7 @@ from rich.console import Console
 from graph.core import Graph
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from branch.utils import run_coverage, get_all_branch
-from utils.utils import run_command, get_index_by_value
+from utils.utils import run_command, get_index_by_value, get_depth
 from utils.code_analyzer import analyze_code, remove_method_from_class
 from sklearn.preprocessing import LabelEncoder
 from copy import deepcopy
@@ -403,7 +403,13 @@ class Data(object):
     def get_mask_tensor(self, graph: Dict, branch: List) -> torch.Tensor:
 
         mask = np.zeros(len(graph["nodes"]))
-        line_list = list(set(np.concatenate(np.array(branch, dtype=object)).tolist()))
+        depth = get_depth(branch)
+        if depth > 2:
+            line_list = list(
+                set(np.concatenate(np.array(branch, dtype=object)).tolist())
+            )
+        else:
+            line_list = list(set(branch))
         for i in range(len(graph["nodes"])):
             node = graph["nodes"][i]
             if node["location"]["filename"] == "N/A":
