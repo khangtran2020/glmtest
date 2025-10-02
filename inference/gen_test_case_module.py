@@ -24,6 +24,7 @@ from sklearn.preprocessing import LabelEncoder
 from transformers import PreTrainedTokenizer, PreTrainedModel
 from branch.utils import get_all_branch
 from rich.console import Console
+from functools import partial
 
 # typing
 from typing import Dict, List
