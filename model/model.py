@@ -316,7 +316,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             batch_size = inputs_embeds.size(0)
 
             for i in range(batch_size):
-                graph = graphs[i]
+                graph = graphs[i].to(self.llm_model.device)
                 graph_mask = graph_masks[i].to(self.llm_model.device)
                 graph_embeds = self.gnn(graph, graph_mask)
                 graph_embeds = graph_embeds.to(inputs_embeds.device)
