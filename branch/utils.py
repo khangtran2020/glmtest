@@ -215,7 +215,8 @@ def get_all_branch(
             current_path=[],
             visited_nodes=[],
         ):
-            branches.append(branch[:-1])  # remove the end node
+            if branch[:-1] not in branches:
+                branches.append(branch[:-1])  # remove the end node
 
     # process async func
     if console is not None:
@@ -234,7 +235,8 @@ def get_all_branch(
             current_path=[],
             visited_nodes=[],
         ):
-            branches.append(branch[:-1])  # remove the end node
+            if branch[:-1] not in branches:
+                branches.append(branch[:-1])  # remove the end node
 
     return branches
 
