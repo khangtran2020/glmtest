@@ -86,7 +86,7 @@ def testcase_generate(
             collate_fn_=collate_fn_,
             accelerator=accelerator,
             suffix="independent_module",
-            do_save=False,
+            do_save=True,
         )
 
         project_dict = {}
@@ -143,7 +143,7 @@ def testcase_generate(
             collate_fn_=collate_fn_,
             accelerator=accelerator,
             suffix="module",
-            do_save=False,
+            do_save=True,
         )
 
         project_dict = {}
@@ -177,7 +177,7 @@ def testcase_generate(
             collate_fn_=collate_fn_,
             accelerator=accelerator,
             suffix="project",
-            do_save=False,
+            do_save=True,
         )
 
         project_dict = {}
