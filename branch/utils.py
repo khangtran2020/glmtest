@@ -331,8 +331,9 @@ def merge_testcases(codes: List[str]) -> str:
                 new_func_code = change_function_name(
                     code=func_code, old_name=func_name, new_name=new_func_name
                 )
-                function_list.append(new_func_code)
-                function_count[func_name] += 1
+                if new_func_code != "":
+                    function_list.append(new_func_code)
+                    function_count[func_name] += 1
 
     merged_code = imports + "\n\n" + "\n\n".join(function_list)
     return merged_code
@@ -376,7 +377,7 @@ def change_function_name(code: str, old_name: str, new_name: str) -> str:
     try:
         tree = ast.parse(code)
     except Exception as e:
-        raise ValueError(f"Error parsing code: {e}")
+        return ""
 
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef) and node.name == old_name:
