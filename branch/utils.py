@@ -321,6 +321,8 @@ def merge_testcases(codes: List[str]) -> str:
 
     for code in codes:
         functions = extract_functions_from_code(code=code)
+        if functions is None:
+            continue
         for func_name, func_code in functions.items():
             if func_name not in function_count.keys():
                 function_list.append(func_code)
@@ -361,7 +363,7 @@ def extract_functions_from_code(code: str) -> Dict[str, str]:
     try:
         tree = ast.parse(code)
     except Exception as e:
-        raise ValueError(f"Error parsing code: {e}")
+        return None
 
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef):
