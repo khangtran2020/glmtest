@@ -135,6 +135,7 @@ def generate_and_save_on_one_dataset(
     collate_fn_: callable,
     accelerator: Accelerator,
     suffix: str = "train",
+    do_save: bool = True,
 ):
     loader = DataLoader(
         dataset,
@@ -252,12 +253,15 @@ def generate_and_save_on_one_dataset(
                 )
 
     console.log("Done Testing on train dataset finished.")
-    save_dir = os.path.join(args.gen_dir, f"{args.name}_{suffix}.json")
-    with console.status("Saving results..."):
-        # save generated text to jsonl file
-        with open(save_dir, "w", encoding="utf-8") as f:
-            # save as json file
-            json.dump(generated_text, f, ensure_ascii=False, indent=4)
+    if do_save:
+        save_dir = os.path.join(args.gen_dir, f"{args.name}_{suffix}.json")
+        with console.status("Saving results..."):
+            # save generated text to jsonl file
+            with open(save_dir, "w", encoding="utf-8") as f:
+                # save as json file
+                json.dump(generated_text, f, ensure_ascii=False, indent=4)
+
+    return generated_text
 
 
 def eval_bleu_score(

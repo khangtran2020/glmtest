@@ -9,7 +9,7 @@ from graph.utils import get_graph
 from train.train import train
 from model.model import GLMFModelForCausalLM, GLMFModelConfig, GLMFModelFuzzing
 from inference.test import test, eval_bleu_score
-from inference.gen_test_case_module import testcase_generate
+from inference.testcase_generate import testcase_generate
 from train.utils import load_checkpoint
 from utils.constant import (
     GRAPH_START_TOKEN,

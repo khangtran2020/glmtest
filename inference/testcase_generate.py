@@ -22,9 +22,10 @@ from inference.test import generate_and_save_on_one_dataset
 from data.loader import GLMFDataset, collate_fn
 from sklearn.preprocessing import LabelEncoder
 from transformers import PreTrainedTokenizer, PreTrainedModel
-from branch.utils import get_all_branch
+from branch.utils import get_all_branch, merge_testcases
 from rich.console import Console
 from functools import partial
+from train.utils import extract_code_block
 
 # typing
 from typing import Dict, List
@@ -75,7 +76,7 @@ def testcase_generate(
             device=device,
             console=console,
         )
-        generate_and_save_on_one_dataset(
+        generated_dict = generate_and_save_on_one_dataset(
             dataset=te_dataset,
             model=model,
             args=args,
@@ -85,7 +86,29 @@ def testcase_generate(
             collate_fn_=collate_fn_,
             accelerator=accelerator,
             suffix="independent_module",
+            do_save=False,
         )
+
+        project_dict = {}
+        for k, v in generated_dict.items():
+            if k.split("_testcase_")[0] not in project_dict.keys():
+                project_dict[k.split("_testcase_")[0]] = []
+            project_dict[k.split("_testcase_")[0]].append(
+                extract_code_block(markdown=v)
+            )
+
+        generated_testsrc_dict = {}
+        for k, v in project_dict.items():
+            test_src = merge_testcases(codes=v)
+            generated_testsrc_dict[k] = test_src
+
+        # save the generated test source code
+        save_dir = os.path.join(args.gen_dir, f"{args.name}_independent_module.json")
+        with console.status("Saving results..."):
+            # save generated text to jsonl file
+            with open(save_dir, "w", encoding="utf-8") as f:
+                # save as json file
+                json.dump(generated_text, f, ensure_ascii=False, indent=4)
 
     if dataset is not None:
         # dataset.prepare_data_for_test_gen()
@@ -109,7 +132,8 @@ def testcase_generate(
             dtype=args.dtype,
             num_gpus=args.num_gpu,
         )
-        generate_and_save_on_one_dataset(
+
+        generated_dict = generate_and_save_on_one_dataset(
             dataset=te_mod_dataset,
             model=model,
             args=args,
@@ -118,9 +142,32 @@ def testcase_generate(
             tokenizer=dataset.llm_tokenizer,
             collate_fn_=collate_fn_,
             accelerator=accelerator,
-            suffix="independent_module",
+            suffix="module",
+            do_save=False,
         )
-        generate_and_save_on_one_dataset(
+
+        project_dict = {}
+        for k, v in generated_dict.items():
+            if k.split("_testcase_")[0] not in project_dict.keys():
+                project_dict[k.split("_testcase_")[0]] = []
+            project_dict[k.split("_testcase_")[0]].append(
+                extract_code_block(markdown=v)
+            )
+
+        generated_testsrc_dict = {}
+        for k, v in project_dict.items():
+            test_src = merge_testcases(codes=v)
+            generated_testsrc_dict[k] = test_src
+
+        # save the generated test source code
+        save_dir = os.path.join(
+            args.gen_dir, f"{args.name}_generated_testcase_module.json"
+        )
+        with open(save_dir, "w", encoding="utf-8") as f:
+            # save as json file
+            json.dump(generated_testsrc_dict, f, ensure_ascii=False, indent=4)
+
+        generated_dict = generate_and_save_on_one_dataset(
             dataset=te_proj_dataset,
             model=model,
             args=args,
@@ -129,8 +176,30 @@ def testcase_generate(
             tokenizer=dataset.llm_tokenizer,
             collate_fn_=collate_fn_,
             accelerator=accelerator,
-            suffix="independent_module",
+            suffix="project",
+            do_save=False,
         )
+
+        project_dict = {}
+        for k, v in generated_dict.items():
+            if k.split("_testcase_")[0] not in project_dict.keys():
+                project_dict[k.split("_testcase_")[0]] = []
+            project_dict[k.split("_testcase_")[0]].append(
+                extract_code_block(markdown=v)
+            )
+
+        generated_testsrc_dict = {}
+        for k, v in project_dict.items():
+            test_src = merge_testcases(codes=v)
+            generated_testsrc_dict[k] = test_src
+
+        # save the generated test source code
+        save_dir = os.path.join(
+            args.gen_dir, f"{args.name}_generated_testcase_project.json"
+        )
+        with open(save_dir, "w", encoding="utf-8") as f:
+            # save as json file
+            json.dump(generated_testsrc_dict, f, ensure_ascii=False, indent=4)
 
 
 def prepare_module(

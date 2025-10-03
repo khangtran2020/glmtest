@@ -317,6 +317,25 @@ def run_coverage(
 def merge_testcases(codes: List[str]) -> str:
     imports = merge_imports(codes=codes)
     function_list = []
+    function_count = {}
+
+    for code in codes:
+        functions = extract_functions_from_code(code=code)
+        for func_name, func_code in functions.items():
+            if func_name not in function_count.keys():
+                function_list.append(func_code)
+                function_count[func_name] = 1
+            else:
+                # rename function
+                new_func_name = f"{func_name}_{function_count[func_name]}"
+                new_func_code = change_function_name(
+                    code=func_code, old_name=func_name, new_name=new_func_name
+                )
+                function_list.append(new_func_code)
+                function_count[func_name] += 1
+
+    merged_code = imports + "\n\n" + "\n\n".join(function_list)
+    return merged_code
 
 
 def extract_imports_from_code(code):
@@ -334,3 +353,36 @@ def merge_imports(codes: List[str]):
         all_imports.update(extract_imports_from_code(code=code))
     sorted_imports = sorted(all_imports)
     return "\n".join(sorted_imports)
+
+
+def extract_functions_from_code(code: str) -> Dict[str, str]:
+    functions = {}
+    try:
+        tree = ast.parse(code)
+    except Exception as e:
+        raise ValueError(f"Error parsing code: {e}")
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef):
+            start_line = node.lineno
+            end_line = getattr(node, "end_lineno", None)
+            function_code = "\n".join(code.split("\n")[start_line - 1 : end_line])
+            functions[node.name] = function_code
+    return functions
+
+
+def change_function_name(code: str, old_name: str, new_name: str) -> str:
+
+    try:
+        tree = ast.parse(code)
+    except Exception as e:
+        raise ValueError(f"Error parsing code: {e}")
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == old_name:
+            node.name = new_name
+            break
+
+    ast.fix_missing_locations(node)
+    # Unparse just this function node
+    return ast.unparse(node)
