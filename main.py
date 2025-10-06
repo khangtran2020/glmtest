@@ -78,12 +78,12 @@ def main() -> None:
         ram_usage = log_ram_usage()
         console.log(f"Dataset loaded - RAM usage: {ram_usage:.2f} MB")
 
-    if args.mode == "data":
-        if args.do_crawl:
-            dataset.crawl()
-        if args.do_process_raw:
-            dataset.process_raw()
-        return
+    # if args.mode == "data":
+    #     if args.do_crawl:
+    #         dataset.crawl()
+    #     if args.do_process_raw:
+    #         dataset.process_raw()
+    #     return
 
     if args.mode == "testgen":
         if args.module_path is None:
