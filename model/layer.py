@@ -10,7 +10,7 @@ from torch import Tensor
 from torch.nn.modules import Dropout, LayerNorm, Linear, Module
 from torch.nn.modules.transformer import _get_activation_fn, _get_clones
 from torch.nn import Module, Linear, Dropout, LayerNorm
-from transformers import Cache
+from transformers.cache_utils import Cache
 from rich import print as pprint
 
 # typings
@@ -31,6 +31,8 @@ class NVIBTransformerLayer(Module):
         kappa=1.0,
         delta=1.0,
         layer_norm_eps: float = 1e-5,
+        use_cache: bool = False,
+        fuzzing: bool = False,
     ) -> None:
         factory_kwargs = {"device": device, "dtype": dtype}
         super(NVIBTransformerLayer, self).__init__()
@@ -41,8 +43,14 @@ class NVIBTransformerLayer(Module):
             kappa=kappa,
             nheads=nhead,
         )
+        self.fuzzing = fuzzing
         self.self_attn = DenoisingMultiheadAttention(
-            d_model, nhead, dropout=dropout, batch_first=True, **factory_kwargs
+            d_model,
+            nhead,
+            dropout=dropout,
+            batch_first=True,
+            fuzzing=fuzzing,
+            **factory_kwargs,
         )
 
         self.linear1 = Linear(d_model, dim_feedforward, **factory_kwargs)
@@ -50,6 +58,7 @@ class NVIBTransformerLayer(Module):
         self.linear2 = Linear(dim_feedforward, d_model, **factory_kwargs)
         self.dropout1 = Dropout(dropout)
         self.dropout2 = Dropout(dropout)
+        self.norm1 = LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
         self.norm2 = LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
 
         if isinstance(activation, str):
@@ -62,6 +71,17 @@ class NVIBTransformerLayer(Module):
         else:
             self.activation_relu_or_gelu = 0
         self.activation = activation
+
+        self.use_cache = use_cache
+        if use_cache:
+            # pprint(f"[bold yellow]Using cache in NVIBTransformerLayer[/bold yellow]")
+            self.past_key = None
+            self.past_value = None
+            self.past_pi = None
+            self.past_mu = None
+            self.past_logvar = None
+            self.past_memory_key_padding_mask = None
+            self.past_alpha = None
 
     def __setstate__(self, state):
         super(NVIBTransformerLayer, self).__setstate__(state)
@@ -77,132 +97,57 @@ class NVIBTransformerLayer(Module):
         fuzzing_mask: Optional[Tensor] = None,
     ) -> Tensor:
 
-        if src_key_padding_mask is not None:
-            _skpm_dtype = src_key_padding_mask.dtype
-            if _skpm_dtype != torch.bool and not torch.is_floating_point(
-                src_key_padding_mask
-            ):
-                raise AssertionError(
-                    "only bool and floating types of key_padding_mask are supported"
-                )
-        # see Fig. 1 of https://arxiv.org/pdf/2002.04745v1.pdf
-        why_not_sparsity_fast_path = ""
-        if not src.dim() == 3:
-            why_not_sparsity_fast_path = (
-                f"input not batched; expected src.dim() of 3 but got {src.dim()}"
-            )
-        elif self.training:
-            why_not_sparsity_fast_path = "training is enabled"
-        elif not self.self_attn.batch_first:
-            why_not_sparsity_fast_path = "self_attn.batch_first was not True"
-        elif not self.self_attn._qkv_same_embed_dim:
-            why_not_sparsity_fast_path = "self_attn._qkv_same_embed_dim was not True"
-        elif not self.activation_relu_or_gelu:
-            why_not_sparsity_fast_path = "activation_relu_or_gelu was not True"
-        elif not (self.norm1.eps == self.norm2.eps):
-            why_not_sparsity_fast_path = "norm1.eps is not equal to norm2.eps"
-        elif src_mask is not None:
-            why_not_sparsity_fast_path = "src_mask is not supported for fastpath"
-        elif src.is_nested and src_key_padding_mask is not None:
-            why_not_sparsity_fast_path = "src_key_padding_mask is not supported with NestedTensor input for fastpath"
-        elif self.self_attn.num_heads % 2 == 1:
-            why_not_sparsity_fast_path = "num_head is odd"
-        elif torch.is_autocast_enabled():
-            why_not_sparsity_fast_path = "autocast is enabled"
-
-        if not why_not_sparsity_fast_path:
-            tensor_args = (
-                src,
-                self.self_attn.in_proj_weight,
-                self.self_attn.in_proj_bias,
-                self.self_attn.out_proj.weight,
-                self.self_attn.out_proj.bias,
-                self.norm1.weight,
-                self.norm1.bias,
-                self.norm2.weight,
-                self.norm2.bias,
-                self.linear1.weight,
-                self.linear1.bias,
-                self.linear2.weight,
-                self.linear2.bias,
-            )
-
-            # We have to use list comprehensions below because TorchScript does not support
-            # generator expressions.
-            if torch.overrides.has_torch_function(tensor_args):
-                why_not_sparsity_fast_path = "some Tensor argument has_torch_function"
-            elif not all((x.is_cuda or "cpu" in str(x.device)) for x in tensor_args):
-                why_not_sparsity_fast_path = (
-                    "some Tensor argument is neither CUDA nor CPU"
-                )
-            elif torch.is_grad_enabled() and any(x.requires_grad for x in tensor_args):
-                why_not_sparsity_fast_path = (
-                    "grad is enabled and at least one of query or the "
-                    "input/output projection weights or biases requires_grad"
-                )
-
-            if not why_not_sparsity_fast_path:
-                return torch._transformer_encoder_layer_fwd(
-                    src,
-                    self.self_attn.embed_dim,
-                    self.self_attn.num_heads,
-                    self.self_attn.in_proj_weight,
-                    self.self_attn.in_proj_bias,
-                    self.self_attn.out_proj.weight,
-                    self.self_attn.out_proj.bias,
-                    self.activation_relu_or_gelu == 2,
-                    self.norm_first,
-                    self.norm1.eps,
-                    self.norm1.weight,
-                    self.norm1.bias,
-                    self.norm2.weight,
-                    self.norm2.bias,
-                    self.linear1.weight,
-                    self.linear1.bias,
-                    self.linear2.weight,
-                    self.linear2.bias,
-                    # TODO: if src_mask and src_key_padding_mask merge to single 4-dim mask
-                    src_mask if src_mask is not None else src_key_padding_mask,
-                    (
-                        1
-                        if src_key_padding_mask is not None
-                        else 0 if src_mask is not None else None
-                    ),
-                )
-
         x = src
-        # Check nan in the input
+        pprint(
+            f"[blue]Nvib input shape - src: {src.size()} - src_mask: {src_mask.size() if src_mask is not None else None} - src_key_padding_mask: {src_key_padding_mask.size() if src_key_padding_mask is not None else None} - fuzzing_mask: {fuzzing_mask.size() if fuzzing_mask is not None else None} [/blue]"
+        )
+
         if torch.isnan(x).any():
-            print("NaN detected in input x")
-            pprint(x)
-        # Alpha skip
+            raise ValueError("NaN detected in the input to NVIBTransformerLayer")
+
         if latent_dict is not None:
             alpha_skip = latent_dict["alpha"]
         else:
             alpha_skip = None
 
-        # Nvib latent dictionary
         out, attention, latent_dict = self._sa_block(
-            x, src_mask, src_key_padding_mask, alpha_skip
+            x,
+            src_mask,
+            src_key_padding_mask,
+            alpha_skip,
         )
         x = x + out
         x = x + self._ff_block(self.norm2(x))
 
         # Calculate KL divergence
-        for key in latent_dict.keys():
-            if isinstance(latent_dict[key], Tensor):
-                print(f"{key} shape:", latent_dict[key].shape)
-            elif isinstance(latent_dict[key], tuple):
-                print(f"{key} shape:", tuple(t.shape for t in latent_dict[key]))
-
         latent_dict["memory_key_padding_mask"] = latent_dict[
             "memory_key_padding_mask"
         ].transpose(1, 0)
+
+        if self.use_cache:
+            alpha = latent_dict["alpha"]
+            if self.past_alpha is not None:
+                alpha = torch.cat([self.past_alpha, alpha], dim=1)
+            self.past_alpha = alpha.clone()
+
         latent_dict["fuzzing_mask"] = (
             fuzzing_mask.transpose(1, 0) if fuzzing_mask is not None else None
         )
-        kl_g = self.nvib_layer.kl_gaussian(**latent_dict)
-        kl_d = self.nvib_layer.kl_dirichlet(**latent_dict)
+
+        if not self.use_cache:
+            kl_g = self.nvib_layer.kl_gaussian(
+                mu=latent_dict["mu"],
+                logvar=latent_dict["logvar"],
+                alpha=latent_dict["alpha"],
+                memory_key_padding_mask=latent_dict["memory_key_padding_mask"],
+            )
+            kl_d = self.nvib_layer.kl_dirichlet(
+                alpha=latent_dict["alpha"],
+                memory_key_padding_mask=latent_dict["memory_key_padding_mask"],
+            )
+        else:
+            kl_g = torch.tensor(0.0, device=x.device)
+            kl_d = torch.tensor(0.0, device=x.device)
         return x, attention, kl_g, kl_d, latent_dict
 
     # self-attention block
@@ -214,24 +159,52 @@ class NVIBTransformerLayer(Module):
         alpha_skip=None,
     ) -> Tensor:
         # Note query does not include the prior
-        latent_dict = self.nvib_layer(x, key_padding_mask, alpha_skip)
+
+        latent_dict = self.nvib_layer(
+            encoder_output=x, mask=key_padding_mask, alpha_skip=alpha_skip
+        )
         query = x
         key = latent_dict["z"]
         value = latent_dict["z"]
+        memory_key_padding_mask = latent_dict["memory_key_padding_mask"]
 
-        pprint("Latent dictionary:", latent_dict)
-        # check nan in the query, key, value
-        # if torch.isnan(query).any():
-        #     print("NaN detected in query inside _sa_block")
-        #     pprint(query)
+        if self.use_cache:
 
-        # if torch.isnan(key).any():
-        #     print("NaN detected in key inside _sa_block")
-        #     pprint(key)
+            (key, pi, mu, logvar) = key  # key is in shape [batch, seq, features]
+            (value, pi, mu, logvar) = value  # value is in shape [batch, seq, features]
 
-        # if torch.isnan(value).any():
-        #     print("NaN detected in value inside _sa_block")
-        #     pprint(value)
+            if self.past_key is not None and self.past_value is not None:
+                key = torch.cat([self.past_key, key], dim=1)
+                value = torch.cat([self.past_value, value], dim=1)
+                pi = torch.cat([self.past_pi, pi], dim=1)
+                mu = torch.cat([self.past_mu, mu], dim=1)
+                logvar = torch.cat([self.past_logvar, logvar], dim=1)
+                memory_key_padding_mask = torch.cat(
+                    [self.past_memory_key_padding_mask, memory_key_padding_mask],
+                    dim=1,
+                )
+            self.past_key = key.clone()
+            self.past_value = value.clone()
+            self.past_pi = pi.clone()
+            self.past_mu = mu.clone()
+            self.past_logvar = logvar.clone()
+            self.past_memory_key_padding_mask = memory_key_padding_mask.clone()
+            latent_dict["memory_key_padding_mask"] = memory_key_padding_mask
+            latent_dict["mu"] = mu.clone()
+            latent_dict["logvar"] = logvar.clone()
+
+            key = (
+                key,
+                pi,
+                mu,
+                logvar,
+            )
+            value = (
+                value,
+                pi,
+                mu,
+                logvar,
+            )
 
         x, attention = self.self_attn(
             query,
@@ -247,6 +220,19 @@ class NVIBTransformerLayer(Module):
     def _ff_block(self, x: Tensor) -> Tensor:
         x = self.linear2(self.dropout(self.activation(self.linear1(x))))
         return self.dropout2(x)
+
+    def clear_cache(self):
+        """
+        Clear the cache of the layer. This is useful when you want to reset the layer's state.
+        """
+        if self.use_cache:
+            self.past_key = None
+            self.past_value = None
+            self.past_pi = None
+            self.past_mu = None
+            self.past_logvar = None
+            self.past_memory_key_padding_mask = None
+            self.past_alpha = None
 
 
 class GLMFFuzzingLayer(Module):
@@ -312,10 +298,14 @@ class GLMFFuzzingLayer(Module):
         kappa=1.0,
         delta=1.0,
         is_fuzz: bool = False,
+        use_cache: bool = False,
+        fuzzing: bool = False,
     ) -> None:
         super(GLMFFuzzingLayer, self).__init__()
         self.llm_layer = llm_layer
         self.is_fuzz = is_fuzz
+        self.fuzzing = fuzzing
+
         if self.is_fuzz:
             self.nvib_layer = NVIBTransformerLayer(
                 d_model=d_model,
@@ -327,6 +317,8 @@ class GLMFFuzzingLayer(Module):
                 dtype=dtype,
                 kappa=kappa,
                 delta=delta,
+                use_cache=use_cache,
+                fuzzing=fuzzing,
             )
 
     def forward(
@@ -375,26 +367,39 @@ class GLMFFuzzingLayer(Module):
                 hidden_states,
                 src_key_padding_mask=src_key_padding_mask,
                 latent_dict=latent_dict,
+                fuzzing_mask=fuzzing_mask,
             )
         )
 
         # Check nan in the outcome
         if torch.isnan(nvib_hidden_states).any():
-            print("NaN detected in nvib_hidden_states")
+            raise ("NaN detected in nvib_hidden_states")
             pprint(nvib_hidden_states)
         if torch.isnan(attention_out).any():
-            print("NaN detected in attention_out")
+            raise ("NaN detected in attention_out")
             pprint(attention_out)
         if torch.isnan(kl_g).any():
-            print("NaN detected in kl_g")
+            raise ("NaN detected in kl_g")
             pprint(kl_g)
         if torch.isnan(kl_d).any():
-            print("NaN detected in kl_d")
+            raise ("NaN detected in kl_d")
             pprint(kl_d)
 
         hidden_states = fuzzing_mask * nvib_hidden_states + (
             (1 - fuzzing_mask) * llm_hidden_state[0]
         )
+
+        # Combine the two hidden states
+        # debugging
+        # Get where fuzzing_mask is 1 and check the outcome at those positions
+        index_fuzz = (fuzzing_mask[0] == 1).nonzero(as_tuple=True)[0]
+        pprint(f"[green]Fuzzing positions: {index_fuzz}[/green]")
+        pprint(f"[green]LLM hidden states: {llm_hidden_state[0]}[/green]")
+        pprint(
+            f"[green]NVIB hidden states: {nvib_hidden_states[:,index_fuzz,:]}[/green]"
+        )
+        pprint(f"[green]Fuzzed hidden states: {hidden_states[:,index_fuzz,:]}[/green]")
+
         attention_out_ = (
             (llm_hidden_state[1], attention_out) if output_attentions else None
         )
@@ -405,3 +410,10 @@ class GLMFFuzzingLayer(Module):
             kl_d,
             latent_dict_out,
         )
+
+    def clear_cache(self):
+        """
+        Clear the cache of the layer. This is useful when you want to reset the layer's state.
+        """
+        if self.is_fuzz:
+            self.nvib_layer.clear_cache()

@@ -5,6 +5,8 @@ import wandb
 import shutil
 import transformers
 import torch.distributed as dist
+from rich import print as pprint
+from functools import partial
 from model.gnn import GRAPH_KEYS
 from torch.utils.data import DataLoader
 from data.core import Data
@@ -17,7 +19,7 @@ from train.utils import (
     patch_model,
     save_checkpoint,
 )
-from train.test import validate
+from inference.test import validate
 from utils.utils import log_ram_usage
 
 
@@ -40,6 +42,9 @@ def train(
     mixed_precision: str = "bf16",
     collate_fn: callable = collate_fn,
 ):
+    collate_fn_ = partial(
+        collate_fn, tokenizer=dataset.llm_tokenizer, max_seq_length=args.max_seq_length
+    )
     if args.num_gpu == 1:
         console.log("Training on single GPU with mode: train_single_gpu_accelerate")
         train_single_gpu_accelerate(
@@ -53,7 +58,7 @@ def train(
             mixed_precision=mixed_precision,
             model=model,
             max_num_checkpoint=max_num_checkpoint,
-            collate_fn=collate_fn,
+            collate_fn=collate_fn_,
         )
     else:
         console.log(
@@ -70,7 +75,7 @@ def train(
             mixed_precision=mixed_precision,
             model=model,
             max_num_checkpoint=max_num_checkpoint,
-            collate_fn=collate_fn,
+            collate_fn=collate_fn_,
         )
 
 
@@ -127,6 +132,16 @@ def logging_train_data(
     )
 
 
+def logging_gpu_usage(step: int, console: Console):
+    gpu_memory = torch.cuda.memory_allocated() / (1024**3)
+    gpu_reserved = torch.cuda.memory_reserved() / (1024**3)
+    gpu_free = torch.cuda.memory_reserved() - torch.cuda.memory_allocated()
+    gpu_free = gpu_free / (1024**3)
+    pprint(
+        f"[blue]At step {step} - GPU memory allocated: {gpu_memory:.2f} GB, GPU memory reserved: {gpu_reserved:.2f} GB, GPU memory free: {gpu_free:.2f} GB[/blue]"
+    )
+
+
 def train_single_gpu_accelerate(
     args: Namespace,
     dataset: Data,
@@ -157,7 +172,6 @@ def train_single_gpu_accelerate(
         if continue_training == False:
             shutil.rmtree(save_path)
             os.makedirs(save_path, exist_ok=True)
-    # Initialize W&B run if main process
     accelerator.init_trackers(
         project_name="GLMFuzz",
         config={
@@ -187,6 +201,7 @@ def train_single_gpu_accelerate(
         max_seq_length=args.max_seq_length,
         debug=args.debug,
         n_hops=dataset.n_hops,
+        dtype=args.dtype,
         num_gpus=args.num_gpu,
         logger=console,
     )
@@ -196,14 +211,15 @@ def train_single_gpu_accelerate(
         max_seq_length=args.max_seq_length,
         debug=args.debug,
         n_hops=dataset.n_hops,
+        dtype=args.dtype,
         num_gpus=args.num_gpu,
         logger=console,
     )
     tr_loader = DataLoader(
-        tr_dataset, batch_size=1, shuffle=True, collate_fn=collate_fn
+        tr_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn
     )
     va_loader = DataLoader(
-        va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
+        va_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn
     )
     logging_train_data(
         console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
@@ -213,6 +229,7 @@ def train_single_gpu_accelerate(
     model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
     global_step = 0
     previous_checkpoint_step = -1
+    best_val_loss = 10000.0
 
     if continue_training == False:
         optimizer.zero_grad()
@@ -250,23 +267,26 @@ def train_single_gpu_accelerate(
                     )
                     continue
 
-                global_step += args.batch_size
+                global_step += 1
                 batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
 
-                for i in range(batch_size):
+                # batch_input = batch["input"].copy()
+                if "token_type_ids" in batch["input"]:
+                    batch["input"].pop("token_type_ids")
 
-                    batch_input = batch["input"].copy()
-                    if "token_type_ids" in batch_input:
-                        batch_input.pop("token_type_ids")
+                micro_input = {
+                    "input_ids": batch["input"]["input_ids"].to(device),
+                    "attention_mask": batch["input"]["attention_mask"].to(device),
+                    "labels": batch["input"]["labels"].to(device),
+                }
 
-                    micro_input = {
-                        "input_ids": batch_input["input_ids"][i].to(device),
-                        "attention_mask": batch_input["attention_mask"][i].to(device),
-                        "labels": batch_input["labels"][i].to(device),
-                    }
+                if "graph" in args.baseline_prompt:
+                    graphs = []
+                    graph_masks = []
+                    graph_token_indices = []
 
-                    if "graph" in args.baseline_prompt:
+                    for i in range(batch_size):
                         graph = batch["graph"][i]
                         for key in GRAPH_KEYS:
                             if key in graph.keys():
@@ -274,32 +294,37 @@ def train_single_gpu_accelerate(
 
                         graph_mask = batch["graph_mask"][i].to(device)
                         graph_token_index = torch.where(
-                            micro_input["input_ids"] == model.config.graph_token_id[1]
-                        )[1].tolist()
-                    else:
-                        graph = None
-                        graph_mask = None
-                        graph_token_index = None
+                            micro_input["input_ids"][i]
+                            == model.config.graph_token_id[1]
+                        )[0].tolist()
+                        graphs.append(graph)
+                        graph_masks.append(graph_mask)
+                        graph_token_indices.append(graph_token_index)
+                else:
+                    graphs = None
+                    graph_masks = None
+                    graph_token_indices = None
 
-                    with accelerator.accumulate(model):
-                        outputs = model(
-                            **micro_input,
-                            graph=graph,
-                            graph_mask=graph_mask,
-                            graph_token_index=graph_token_index,
-                        )
+                with accelerator.accumulate(model):
+                    outputs = model(
+                        **micro_input,
+                        step=global_step,
+                        graphs=graphs,
+                        graph_masks=graph_masks,
+                        graph_token_indices=graph_token_indices,
+                    )
 
-                        loss = outputs.loss
-                        accelerator.backward(loss)
+                    loss = outputs.loss
+                    accelerator.backward(loss)
 
-                        if accelerator.sync_gradients:
-                            accelerator.clip_grad_norm_(model.parameters(), 1.0)
-                            optimizer.step()
-                            lr_scheduler.step()
-                            optimizer.zero_grad()
+                if accelerator.sync_gradients:
+                    accelerator.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+                    optimizer.step()
+                    lr_scheduler.step()
+                    optimizer.zero_grad()
+                logging_gpu_usage(step=global_step, console=console)
 
-                    batch_loss += loss.item()
-
+                batch_loss += loss.item()
                 avg_batch_loss = batch_loss / batch_size
                 ram_usage = log_ram_usage()
                 progress.update(
@@ -312,18 +337,21 @@ def train_single_gpu_accelerate(
 
                 for key in micro_input.keys():
                     micro_input[key] = micro_input[key].to("cpu")
+
                 if "graph" in args.baseline_prompt:
-                    for key in GRAPH_KEYS:
-                        if key in graph.keys():
-                            graph[key] = graph[key].to("cpu")
-                            graph.pop(key, None)
-                    graph_mask = graph_mask.to("cpu")
-                    del graph_mask, graph
+                    for graph in graphs:
+                        for key in GRAPH_KEYS:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to("cpu")
+                                graph.pop(key, None)
+                    graph_masks = [graph_mask.to("cpu") for graph_mask in graph_masks]
+                    del graph_masks, graphs
                 outputs.logits = outputs.logits.to("cpu")
                 loss = loss.to("cpu")
                 del outputs, loss, micro_input
                 gc.collect()
                 torch.cuda.empty_cache()
+                torch.cuda.synchronize()
 
                 if global_step % args.logging_steps == 0:
                     current_lr = lr_scheduler.get_last_lr()[0]
@@ -364,7 +392,13 @@ def train_single_gpu_accelerate(
                     if accelerator.is_main_process:
                         accelerator.print(f"Saving checkpoint to {checkpoint_dir}")
 
-                if global_step % args.validating_steps == 0:
+                if (
+                    accelerator.sync_gradients
+                    and global_step % args.validating_steps == 0
+                ):
+                    console.log(
+                        f"[green]Before validation: {torch.cuda.memory_allocated()}[/green]"
+                    )
                     val_loss = validate(
                         args=args,
                         loader=va_loader,
@@ -379,6 +413,39 @@ def train_single_gpu_accelerate(
                     console.log(
                         f"Validation loss: {val_loss:.4f} at step {global_step}"
                     )
+                    if val_loss < best_val_loss:
+                        # pass
+                        best_val_loss = val_loss
+                        console.log(
+                            f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
+                        )
+                        checkpoint_dir = os.path.join(
+                            save_path,
+                            f"best_model",
+                        )
+                        if not os.path.exists(checkpoint_dir):
+                            os.makedirs(checkpoint_dir, exist_ok=True)
+
+                        model = model.to("cpu")
+                        unwrapped_model = accelerator.unwrap_model(model).to("cpu")
+                        torch.save(
+                            unwrapped_model.state_dict(),
+                            os.path.join(checkpoint_dir, "model_weight.pt"),
+                        )
+                        tokenizer.save_pretrained(checkpoint_dir)
+                        accelerator.print(f"Saving best checkpoint to {checkpoint_dir}")
+                        model = model.to(device)
+
+                        del unwrapped_model
+                        del checkpoint_dir
+                        gc.collect()
+
+                    gc.collect()
+                    torch.cuda.empty_cache()
+                    torch.cuda.synchronize()
+                    console.log(
+                        f"[blue]After validation: {torch.cuda.memory_allocated()}[/blue]"
+                    )
 
             if ((continue_training == True) and (global_step > start_step)) or (
                 continue_training == False
@@ -391,12 +458,27 @@ def train_single_gpu_accelerate(
                     description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
                 )
 
-    if model.config.use_lora == True:
-        model.llm_model = model.llm_model.merge_and_unload()
-        model.config.use_lora = False
-
     accelerator.wait_for_everyone()
     unwrapped_model = accelerator.unwrap_model(model)
+
+    # load best model for final evaluation
+    best_model_path = os.path.join(save_path, "best_model", "model_weight.pt")
+    if os.path.exists(best_model_path):
+        console.log(f"Loading best model from {best_model_path} for final evaluation")
+        state_dict = torch.load(best_model_path, map_location="cpu")
+        missing_keys, unexpected_keys = unwrapped_model.load_state_dict(
+            state_dict, strict=False
+        )
+        if len(missing_keys) > 0:
+            console.log(f"Missing keys when loading best model: {missing_keys}")
+        if len(unexpected_keys) > 0:
+            console.log(f"Unexpected keys when loading best model: {unexpected_keys}")
+        console.log("Best model loaded successfully")
+
+    if unwrapped_model.config.use_lora == True:
+        unwrapped_model.llm_model = unwrapped_model.llm_model.merge_and_unload()
+        unwrapped_model.config.use_lora = False
+        console.log("[blue]Merged LoRA weights into the base model[/blue]")
 
     final_model_path = os.path.join(save_path, "final_model")
     console.log(f"Saving final model to {final_model_path}...")
@@ -484,6 +566,7 @@ def train_multi_gpu_accelerate(
         debug=args.debug,
         n_hops=dataset.n_hops,
         logger=console,
+        dtype=args.dtype,
         num_gpus=args.num_gpu,
     )
     va_dataset = GLMFDataset(
@@ -493,6 +576,7 @@ def train_multi_gpu_accelerate(
         debug=args.debug,
         n_hops=dataset.n_hops,
         logger=console,
+        dtype=args.dtype,
         num_gpus=args.num_gpu,
     )
     dataloader_params = {
@@ -509,14 +593,8 @@ def train_multi_gpu_accelerate(
 
     tr_loader = DataLoader(tr_dataset, **dataloader_params)
     va_loader = DataLoader(
-        va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
+        va_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn
     )
-
-    # if accelerator.is_main_process:
-    #     # logging_train_data(
-    #     #     console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
-    #     # )
-    #     pass
 
     console.log(
         f"[green]Forward function before patching model: {transformers.modeling_flash_attention_utils._flash_attention_forward}[/green]\n\n"
@@ -546,6 +624,7 @@ def train_multi_gpu_accelerate(
 
     global_step = 0
     previous_checkpoint_step = -1
+    best_val_loss = 10000.0
 
     with Progress(
         SpinnerColumn(),  # Shows a spinner
@@ -589,114 +668,116 @@ def train_multi_gpu_accelerate(
                 batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
 
-                # Process each sample in the batch as a micro-batch.
-                for i in range(batch_size):
+                accelerator.wait_for_everyone()
+                # batch_input = batch["input"].copy()
+                if "token_type_ids" in batch["input"]:
+                    batch["input"].pop("token_type_ids")
 
-                    accelerator.wait_for_everyone()
-                    batch_input = batch["input"].copy()
-                    if "token_type_ids" in batch_input:
-                        batch_input.pop("token_type_ids")
+                micro_input = {
+                    "input_ids": batch["input"]["input_ids"].to(device),
+                    "attention_mask": batch["input"]["attention_mask"].to(device),
+                    "labels": batch["input"]["labels"].to(device),
+                }
 
-                    micro_input = {
-                        "input_ids": batch_input["input_ids"][i].to(device),
-                        "attention_mask": batch_input["attention_mask"][i].to(device),
-                        "labels": batch_input["labels"][i].to(device),
-                    }
+                accelerator.wait_for_everyone()
 
-                    accelerator.wait_for_everyone()
-                    if "graph" in args.baseline_prompt:
+                if "graph" in args.baseline_prompt:
+                    graphs = []
+                    graph_masks = []
+                    graph_token_indices = []
+
+                    for i in range(batch_size):
                         graph = batch["graph"][i]
-                        graph_mask = batch["graph_mask"][i].to(device)
                         for key in GRAPH_KEYS:
                             if key in graph.keys():
                                 graph[key] = graph[key].to(device)
+
+                        graph_mask = batch["graph_mask"][i].to(device)
+                        # console.log(
+                        #     f"torch where: {torch.where(micro_input['input_ids'][i] == model.config.graph_token_id[1])}"
+                        # )
                         graph_token_index = torch.where(
-                            micro_input["input_ids"] == config.graph_token_id[1]
-                        )[1].tolist()
-                    else:
-                        graph = None
-                        graph_mask = None
-                        graph_token_index = None
+                            micro_input["input_ids"][i]
+                            == model.config.graph_token_id[1]
+                        )[0].tolist()
+                        graphs.append(graph)
+                        graph_masks.append(graph_mask)
+                        graph_token_indices.append(graph_token_index)
+                else:
+                    graphs = None
+                    graph_masks = None
+                    graph_token_indices = None
 
-                    position_ids = (
-                        torch.arange(micro_input["input_ids"].shape[1])
-                        .unsqueeze(0)
-                        .expand(micro_input["input_ids"].shape[0], -1)
+                position_ids = (
+                    torch.arange(micro_input["input_ids"].shape[1])
+                    .unsqueeze(0)
+                    .expand(micro_input["input_ids"].shape[0], -1)
+                )
+
+                accelerator.wait_for_everyone()
+
+                with accelerator.accumulate(model):
+
+                    outputs = model(
+                        **micro_input,
+                        position_ids=position_ids.to(device),
+                        graphs=graphs,
+                        graph_masks=graph_masks,
+                        graph_token_indices=graph_token_indices,
+                        step=global_step,
+                        accelerator=accelerator,
                     )
+                    accelerator.wait_for_everyone()
+                    loss = outputs.loss
 
+                    accelerator.backward(loss)
                     accelerator.wait_for_everyone()
 
-                    with accelerator.accumulate(model):
+                if args.fuzz_model:
+                    with torch.no_grad():
+                        for name, param in model.named_parameters():
+                            if "nvib_layer" in name and param.requires_grad:
+                                if param.grad is not None:
+                                    grad_norm = param.grad.norm(2).item()
+                                    console.log(
+                                        f"Step {global_step} - rank {local_rank}: Gradient norm of {name}: {grad_norm:.4f}"
+                                    )
 
-                        outputs = model(
-                            **micro_input,
-                            position_ids=position_ids.to(device),
-                            graph=graph,
-                            graph_mask=graph_mask,
-                            graph_token_index=graph_token_index,
-                            step=global_step,
-                            accelerator=accelerator,
-                        )
-                        accelerator.wait_for_everyone()
-                        loss = outputs.loss
-                        # dot = make_dot(loss, params=dict(model.named_parameters()))
-                        # dot.format = "png"
-                        # dot.render("causallm_graph")
-                        # sys.exit(0)
-                        accelerator.backward(loss)
-                        accelerator.wait_for_everyone()
+                if accelerator.sync_gradients:
+                    accelerator.wait_for_everyone()
+                    accelerator.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+                    optimizer.step()
+                    lr_scheduler.step()
+                    optimizer.zero_grad()
+                    model.zero_grad()
 
-                        # for name, param in model.named_parameters():
-                        #     if param.requires_grad and param.grad is None:
-                        #         print(f"No grad for: {name}")
+                with torch.no_grad():
+                    all_losses = accelerator.gather(loss)
+                    # fill all_losses with zero if it is NaN with torch.where
+                    all_losses = torch.where(
+                        torch.isnan(all_losses),
+                        torch.zeros_like(all_losses),
+                        all_losses,
+                    )
+                    console.log(f"Step {global_step}: gathered losses: {all_losses}")
+                    total_loss = torch.sum(all_losses)
+                    batch_loss += total_loss.detach().float().item()
 
-                        # with torch.no_grad():
-                        #     # check gradient norms
-                        #     grad_norm = 0.0
-                        #     for name, param in model.named_parameters():
-                        #         if param.grad is not None:
-                        #             grad_norm = grad_norm + param.grad.norm(2) ** 2
-                        #     grad_norm = grad_norm.sqrt().item()
-                        #     print(
-                        #         f"Step {global_step} - for rank {local_rank}: gradient norm: {grad_norm:.4f}\n\n\n"
-                        #     )
-
-                        if accelerator.sync_gradients:
-                            accelerator.wait_for_everyone()
-                            accelerator.clip_grad_norm_(model.parameters(), 1.0)
-                            optimizer.step()
-                            lr_scheduler.step()
-                            optimizer.zero_grad()
-                            model.zero_grad()
-
-                        with torch.no_grad():
-                            all_losses = accelerator.gather(loss)
-                            # fill all_losses with zero if it is NaN with torch.where
-                            all_losses = torch.where(
-                                torch.isnan(all_losses),
-                                torch.zeros_like(all_losses),
-                                all_losses,
-                            )
-                            console.log(
-                                f"Step {global_step}: gathered losses: {all_losses}"
-                            )
-                            total_loss = torch.sum(all_losses)
-                            batch_loss += total_loss.detach().float().item()
-
-                    for key in micro_input.keys():
-                        micro_input[key] = micro_input[key].to("cpu")
-                    if "graph" in args.baseline_prompt:
+                for key in micro_input.keys():
+                    micro_input[key] = micro_input[key].to("cpu")
+                if "graph" in args.baseline_prompt:
+                    for graph in graphs:
                         for key in GRAPH_KEYS:
                             if key in graph.keys():
                                 graph[key] = graph[key].to("cpu")
                                 graph.pop(key, None)
-                        graph_mask = graph_mask.to("cpu")
-                        del graph_mask, graph
-                    outputs.logits = outputs.logits.to("cpu")
-                    loss = loss.to("cpu")
-                    del outputs, loss, micro_input
-                    gc.collect()
-                    torch.cuda.empty_cache()
+                    graph_masks = [graph_mask.to("cpu") for graph_mask in graph_masks]
+                    del graph_masks, graphs
+                outputs.logits = outputs.logits.to("cpu")
+                loss = loss.to("cpu")
+                del outputs, loss, micro_input
+                gc.collect()
+                torch.cuda.empty_cache()
 
                 avg_batch_loss = batch_loss / batch_size
                 if accelerator.is_main_process:
@@ -797,7 +878,42 @@ def train_multi_gpu_accelerate(
                         console.log(
                             f"Validation loss: {val_loss:.4f} at step {global_step}"
                         )
-                    model.train()
+
+                        if val_loss < best_val_loss:
+                            best_val_loss = val_loss
+                            console.log(
+                                f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
+                            )
+                            checkpoint_dir = os.path.join(
+                                save_path,
+                                f"best_model",
+                            )
+
+                            if not os.path.exists(checkpoint_dir):
+                                os.makedirs(checkpoint_dir, exist_ok=True)
+
+                            unwrapped_model = accelerator.unwrap_model(model)
+                            # if unwrapped_model.config.use_lora == True:
+                            #     unwrapped_model.llm_model = (
+                            #         unwrapped_model.llm_model.merge_and_unload()
+                            #     )
+                            #     unwrapped_model.config.use_lora = False
+                            torch.save(
+                                unwrapped_model.state_dict(),
+                                os.path.join(checkpoint_dir, "model_weight.pt"),
+                            )
+                            tokenizer.save_pretrained(checkpoint_dir)
+                            accelerator.print(
+                                f"Saving best checkpoint to {checkpoint_dir}"
+                            )
+                            del unwrapped_model
+                            del checkpoint_dir
+                            gc.collect()
+                    # model.train()
+
+                if args.debug:
+                    # only run 1 step in debug mode
+                    break
 
             if accelerator.is_main_process:
                 if ((continue_training == True) and (global_step > start_step)) or (
@@ -811,6 +927,10 @@ def train_multi_gpu_accelerate(
                         description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
                     )
 
+            if args.debug:
+                # only run 1 step in debug mode
+                break
+
     accelerator.wait_for_everyone()
 
     if accelerator.is_main_process:
@@ -822,6 +942,22 @@ def train_multi_gpu_accelerate(
             os.makedirs(final_model_path, exist_ok=True)
 
         unwrapped_model = accelerator.unwrap_model(model)
+        best_model_path = os.path.join(save_path, "best_model", "model_weight.pt")
+        if os.path.exists(best_model_path):
+            console.log(
+                f"Loading best model from {best_model_path} for final evaluation"
+            )
+            state_dict = torch.load(best_model_path, map_location="cpu")
+            missing_keys, unexpected_keys = unwrapped_model.load_state_dict(
+                state_dict, strict=False
+            )
+            if len(missing_keys) > 0:
+                console.log(f"Missing keys when loading best model: {missing_keys}")
+            if len(unexpected_keys) > 0:
+                console.log(
+                    f"Unexpected keys when loading best model: {unexpected_keys}"
+                )
+            console.log("Best model loaded successfully")
 
         if unwrapped_model.config.use_lora == True:
             unwrapped_model.llm_model = unwrapped_model.llm_model.merge_and_unload()

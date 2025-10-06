@@ -386,3 +386,10 @@ def log_ram_usage():
     rss_mb = rss_bytes / 1024**2
     # console.log(f"[Step {step}] RAM usage: {rss_mb:.1f} MB")
     return rss_mb
+
+
+def get_depth(lst):
+    if isinstance(lst, list) and lst:
+        return 1 + max(get_depth(item) for item in lst)
+    else:
+        return 0

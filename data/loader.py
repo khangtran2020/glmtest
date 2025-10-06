@@ -1,5 +1,6 @@
 import json
 import torch
+from rich import print as pprint
 from data.utils import sampling_neighbor
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizer
@@ -18,6 +19,7 @@ class GLMFDataset(Dataset):
         n_hops: int = 2,
         testing: bool = False,
         num_gpus: int = 1,
+        dtype: str = "bf16",
         logger=None,
     ):
         self.data = data
@@ -30,6 +32,7 @@ class GLMFDataset(Dataset):
         self.testing = testing
         self.num_gpus = num_gpus
         self.logger = logger
+        self.dtype = dtype
         self.index_to_key_dict = dict(zip(range(len(self.data)), self.data.keys()))
 
         if self.logger is not None:
@@ -47,6 +50,7 @@ class GLMFDataset(Dataset):
         with open(data_path, "r") as f:
             sample = json.load(f)
         graph_path = sample["graph_path"]
+        # print("Loading graph from:", graph_path)
         graph = torch.load(graph_path) if graph_path is not None else None
         active_node = (
             torch.Tensor(sample["active_node"])
@@ -54,7 +58,11 @@ class GLMFDataset(Dataset):
             else None
         )
         graph_mask = (
-            torch.Tensor(sample["mask"]) if sample["mask"] is not None else None
+            torch.Tensor(sample["mask"]).to(
+                dtype=torch.bfloat16 if self.dtype == "bf16" else torch.float16
+            )
+            if sample["mask"] is not None
+            else None
         )
 
         if graph is not None:
@@ -63,6 +71,11 @@ class GLMFDataset(Dataset):
                     graph=graph[key],
                     mask=active_node,
                     n_hops=self.n_hops,
+                )
+                graph[key].ndata["feat"] = (
+                    graph[key]
+                    .ndata["feat"]
+                    .to(dtype=torch.bfloat16 if self.dtype == "bf16" else torch.float16)
                 )
 
         if self.testing == False:
@@ -91,17 +104,13 @@ class GLMFDataset(Dataset):
                 "text": full_text,
                 "input": tokenized,
                 "graph": graph,  # Should be a dictionary of graph structures
-                "graph_mask": (
-                    torch.tensor(graph_mask, dtype=torch.float)
-                    if graph_mask is not None
-                    else None
-                ),
+                "graph_mask": (graph_mask if graph_mask is not None else None),
             }
         else:
             prompt = sample["prompt"]
             uuid = sample["uuid"]
 
-            tokenized = self.tokenize(prompt, num_gpu=self.num_gpus)
+            tokenized, pad_size = self.tokenize(prompt, num_gpu=self.num_gpus)
             input_ids = tokenized["input_ids"]
 
             if (self.baseline_prompt in ["graph", "graph_tr"]) and (
@@ -113,11 +122,7 @@ class GLMFDataset(Dataset):
                 "text": prompt,
                 "input": tokenized,
                 "graph": graph,
-                "graph_mask": (
-                    torch.tensor(graph_mask, dtype=torch.float)
-                    if graph_mask is not None
-                    else None
-                ),
+                "graph_mask": (graph_mask if graph_mask is not None else None),
             }
             return (uuid, batch)
 
@@ -142,7 +147,9 @@ class GLMFDataset(Dataset):
                 .to(result["input_ids"].device)
             )
 
-            result["input_ids"] = torch.cat((pad_tensor, result["input_ids"]), dim=1)
+            result["input_ids"] = torch.cat(
+                (pad_tensor, result["input_ids"]), dim=1
+            ).to(dtype=torch.bfloat16)
 
             attention_tensor = torch.tensor(
                 [[0] * pad_tensor.shape[1]],
@@ -152,7 +159,7 @@ class GLMFDataset(Dataset):
 
             result["attention_mask"] = torch.cat(
                 [attention_tensor, result["attention_mask"]], dim=1
-            )
+            ).to(dtype=torch.bfloat16)
             pad_size = pad_tensor.shape[1]
 
         # Use clone() to make a copy of the tensor for labels.
@@ -160,22 +167,62 @@ class GLMFDataset(Dataset):
         return result, pad_size
 
 
-def collate_fn(batch) -> dict:
+def pad(
+    input_tensors: List[torch.Tensor],
+    pad_value: int,
+    padding_side: str = "left",
+) -> torch.Tensor:
+    num_dims = len(input_tensors[0].shape)
+    if num_dims == 1:
+        max_length = max(tensor.size(0) for tensor in input_tensors)
+    else:
+        input_tensors = [tensor.squeeze(0) for tensor in input_tensors]
+        max_length = max(tensor.size(0) for tensor in input_tensors)
+
+    padded_tensors = torch.full(
+        (len(input_tensors), max_length), pad_value, dtype=input_tensors[0].dtype
+    )
+    for i, tensor in enumerate(input_tensors):
+        if padding_side == "left":
+            seq_start = max_length - tensor.shape[0]
+        elif padding_side == "right":
+            seq_start = 0
+        else:
+            raise ValueError("padding_side must be 'left' or 'right'")
+
+        # Define the slices
+        seq_slice = slice(seq_start, seq_start + tensor.shape[0])
+        slices = (seq_slice,) + tuple(slice(0, s) for s in tensor.shape[1:])
+        padded_tensors[i][slices] = tensor
+
+    return padded_tensors
+
+
+def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> dict:
 
     # check if batch is tuple
     if not isinstance(batch[0], tuple):
         # print(batch)
         collated_input = {}
-        for key in batch[0]["input"]:
-            # Stack the tensors corresponding to the same key across the batch
-            collated_input[key] = torch.stack(
-                [sample["input"][key] for sample in batch]
-            )
+
+        # for sample in batch:
+        #     pprint(
+        #         f"[cyan]Sample input_ids length: {sample['input']['input_ids'].shape}[/cyan]"
+        #     )
+
+        input_ids = [sample["input"]["input_ids"] for sample in batch]
+        attention_mask = [sample["input"]["attention_mask"] for sample in batch]
+        labels = [sample["input"]["labels"] for sample in batch]
+
+        collated_input["input_ids"] = pad(input_ids, pad_value=tokenizer.pad_token_id)
+        collated_input["attention_mask"] = pad(attention_mask, pad_value=0)
+        collated_input["labels"] = pad(labels, pad_value=-100).long()
+
         collated = {
             "text": [x["text"] for x in batch],
             "input": collated_input,
             "graph_mask": (
-                torch.stack([x["graph_mask"] for x in batch])
+                [x["graph_mask"] for x in batch]
                 if batch[0]["graph_mask"] is not None
                 else None
             ),
@@ -185,18 +232,24 @@ def collate_fn(batch) -> dict:
         }
         return collated
     else:
-        uuid, batch = batch
+        uuid = [sample[0] for sample in batch]
+        batch = [sample[1] for sample in batch]
+
         collated_input = {}
-        for key in batch[0]["input"]:
-            # Stack the tensors corresponding to the same key across the batch
-            collated_input[key] = torch.stack(
-                [sample["input"][key] for sample in batch]
-            )
+
+        input_ids = [sample["input"]["input_ids"] for sample in batch]
+        attention_mask = [sample["input"]["attention_mask"] for sample in batch]
+        labels = [sample["input"]["labels"] for sample in batch]
+
+        collated_input["input_ids"] = pad(input_ids, pad_value=tokenizer.pad_token_id)
+        collated_input["attention_mask"] = pad(attention_mask, pad_value=0)
+        collated_input["labels"] = pad(labels, pad_value=-100).long()
+
         collated = {
             "text": [x["text"] for x in batch],
             "input": collated_input,
             "graph_mask": (
-                torch.stack([x["graph_mask"] for x in batch])
+                [x["graph_mask"] for x in batch]
                 if batch[0]["graph_mask"] is not None
                 else None
             ),
@@ -204,4 +257,4 @@ def collate_fn(batch) -> dict:
                 [x["graph"] for x in batch] if batch[0]["graph"] is not None else None
             ),
         }
-        return collated
+        return uuid, collated

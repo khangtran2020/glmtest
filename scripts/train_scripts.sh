@@ -1,3 +1,5 @@
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
 #!/bin/bash
 
 checkpoint_path="" # set this if continue training.
@@ -15,6 +17,8 @@ max_grad_norm=3.0
 num_train_epochs=3
 gnn_hidden_size=16
 lora_rank=32
+start_fuzz_layer_index=7
+end_fuzz_layer_index=8
 
 # Check if nvidia-smi is available
 if ! command -v nvidia-smi &> /dev/null; then
@@ -46,6 +50,7 @@ elif [ "$gpu_count" -eq 1 ]; then
         --overwrite_output_dir \
         --do_train \
         --do_eval \
+        --num_gpu 1 \
         --n_hidden $gnn_hidden_size \
         --learning_rate $learning_rate \
         --max_grad_norm $max_grad_norm \
@@ -55,7 +60,9 @@ elif [ "$gpu_count" -eq 1 ]; then
         --lora_r $lora_rank \
         --use_accelerate \
         --graph_sampling # \
-        # --fuzz_model # uncomment if you want fuzzing model
+        # --fuzz_model \
+        # --start_fuzz_layer_index $start_fuzz_layer_index \
+        # --end_fuzz_layer_index $end_fuzz_layer_index \ # uncomment if you want fuzzing model
         # --continue_training \
         # --checkpoint_path $checkpoint_path # uncomment if you want to continue training
 else
@@ -76,6 +83,7 @@ else
         --overwrite_output_dir \
         --do_train \
         --do_eval \
+        --num_gpu "$gpu_count" \
         --n_hidden $gnn_hidden_size \
         --learning_rate $learning_rate \
         --max_grad_norm $max_grad_norm \
@@ -85,7 +93,9 @@ else
         --lora_r $lora_rank \
         --use_accelerate \
         --graph_sampling \
-        --fuzz_model #
+        # --fuzz_model \
+        # --start_fuzz_layer_index $start_fuzz_layer_index \
+        # --end_fuzz_layer_index $end_fuzz_layer_index \ # uncomment if you want fuzzing model
         # --continue_training \
         # --checkpoint_path $checkpoint_path # uncomment if you want to continue training
 fi

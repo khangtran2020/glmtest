@@ -52,6 +52,7 @@ def add_data_group(group):
     group.add_argument(
         "--raw_overwrite", action="store_true", help="overwrite the raw data"
     )
+    group.add_argument("--data_fuzz", action="store_true", help="using fuzz data")
 
 
 def add_joern_group(group):
@@ -160,6 +161,17 @@ def add_model_group(group):
         "--fuzz_model",
         action="store_true",
         help="using fuzz model",
+    )
+    group.add_argument(
+        "--fuzzing",
+        action="store_true",
+        help="Start fuzzing process",
+    )
+    group.add_argument(
+        "--num_samples_per_input",
+        type=int,
+        help="number of samples to fuzz per input",
+        default=10,
     )
     group.add_argument(
         "--start_fuzz_layer_index",
@@ -311,7 +323,7 @@ def add_training_group(group):
     )
     group.add_argument(
         "--max_new_tokens",
-        type=float,
+        type=int,
         help="max new tokens to generate",
         default=512,
     )
@@ -367,6 +379,21 @@ def add_training_group(group):
         action="store_true",
         help="Train with accelerate",
     )
+    group.add_argument(
+        "--only_nvib",
+        action="store_true",
+        help="Train only the NVIB layers",
+    )
+
+
+def add_testgen_group(group):
+
+    group.add_argument(
+        "--module_path",
+        type=str,
+        help="path to the module to generate test cases",
+        default=None,
+    )
 
 
 def parse_args():
@@ -376,11 +403,15 @@ def parse_args():
     joern_group = parser.add_argument_group(title="Joern-related configuration")
     training_group = parser.add_argument_group(title="Training-related configuration")
     model_group = parser.add_argument_group(title="Model-related configuration")
+    testgen_group = parser.add_argument_group(
+        title="Test-case generation configuration"
+    )
 
     add_joern_group(joern_group)
     add_data_group(data_group)
     add_general_group(general_group)
     add_training_group(training_group)
     add_model_group(model_group)
+    add_testgen_group(testgen_group)
 
     return parser.parse_args()
