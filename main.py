@@ -313,9 +313,9 @@ def main() -> None:
         total_params = 0
         for name, param in model.llm_model.base_model.model.model.named_parameters():
             if param.requires_grad:
-                console.log(
-                    f"[blue]{name}: {param.numel()} parameters, shape={tuple(param.shape)}[/blue]"
-                )
+                # console.log(
+                #     f"[blue]{name}: {param.numel()} parameters, shape={tuple(param.shape)}[/blue]"
+                # )
                 total_params += param.numel()
 
         console.log(

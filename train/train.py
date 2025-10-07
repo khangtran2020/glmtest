@@ -608,7 +608,7 @@ def train_multi_gpu_accelerate(
     config = model.config
     model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
 
-    console.log(f"Model prepared with accelerator: {model}")
+    # console.log(f"Model prepared with accelerator: {model}")
 
     if accelerator.is_main_process:
         accelerator.print(f"***** Running training *****")
