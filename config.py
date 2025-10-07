@@ -394,6 +394,11 @@ def add_testgen_group(group):
         help="path to the module to generate test cases",
         default=None,
     )
+    group.add_argument(
+        "--do_generate",
+        action="store_true",
+        help="generate test cases for the model",
+    )
 
 
 def parse_args():

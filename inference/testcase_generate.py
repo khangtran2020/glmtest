@@ -41,6 +41,7 @@ def testcase_generate(
     save_path: str = None,
     console: Console = None,
     mixed_precision: str = "bf16",
+    do_generate: bool = True,
 ):
 
     accelerator = Accelerator(
@@ -133,52 +134,81 @@ def testcase_generate(
             num_gpus=args.num_gpu,
         )
 
-        generated_dict = generate_and_save_on_one_dataset(
-            dataset=te_mod_dataset,
-            model=model,
-            args=args,
-            console=console,
-            device=device,
-            tokenizer=dataset.llm_tokenizer,
-            collate_fn_=collate_fn_,
-            accelerator=accelerator,
-            suffix="module",
-            do_save=True,
-        )
+        if do_generate:
+            generated_dict = generate_and_save_on_one_dataset(
+                dataset=te_mod_dataset,
+                model=model,
+                args=args,
+                console=console,
+                device=device,
+                tokenizer=dataset.llm_tokenizer,
+                collate_fn_=collate_fn_,
+                accelerator=accelerator,
+                suffix="module",
+                do_save=True,
+            )
+        else:
+            if os.path.exists(os.path.join(args.gen_dir, f"{args.name}_module.json")):
+                with open(
+                    os.path.join(args.gen_dir, f"{args.name}_module.json"), "r"
+                ) as f:
+                    generated_dict = json.load(f)
+            else:
+                generated_dict = None
 
-        project_dict = {}
-        for k, v in generated_dict.items():
-            if k.split("_testcase_")[0] not in project_dict.keys():
-                project_dict[k.split("_testcase_")[0]] = []
-            project_dict[k.split("_testcase_")[0]].append(
-                extract_code_block(markdown=v)
+        if generated_dict is not None:
+            project_dict = {}
+            for k, v in generated_dict.items():
+                if k.split("_testcase_")[0] not in project_dict.keys():
+                    project_dict[k.split("_testcase_")[0]] = []
+                project_dict[k.split("_testcase_")[0]].append(
+                    extract_code_block(markdown=v)
+                )
+
+            generated_testsrc_dict = {}
+            for k, v in project_dict.items():
+                test_src = merge_testcases(codes=v)
+                generated_testsrc_dict[k] = test_src
+
+            # save the generated test source code
+            save_dir = os.path.join(
+                args.gen_dir, f"{args.name}_generated_testcase_module.json"
+            )
+            with open(save_dir, "w", encoding="utf-8") as f:
+                # save as json file
+                json.dump(generated_testsrc_dict, f, ensure_ascii=False, indent=4)
+        else:
+            console.log(
+                f"[red]No generated test cases found for modules. Please check the path {os.path.join(args.gen_dir, f'{args.name}_module.json')}[/red]"
             )
 
-        generated_testsrc_dict = {}
-        for k, v in project_dict.items():
-            test_src = merge_testcases(codes=v)
-            generated_testsrc_dict[k] = test_src
+        if do_generate:
+            generated_dict = generate_and_save_on_one_dataset(
+                dataset=te_proj_dataset,
+                model=model,
+                args=args,
+                console=console,
+                device=device,
+                tokenizer=dataset.llm_tokenizer,
+                collate_fn_=collate_fn_,
+                accelerator=accelerator,
+                suffix="project",
+                do_save=True,
+            )
+        else:
+            if os.path.exists(os.path.join(args.gen_dir, f"{args.name}_project.json")):
+                with open(
+                    os.path.join(args.gen_dir, f"{args.name}_project.json"), "r"
+                ) as f:
+                    generated_dict = json.load(f)
+            else:
+                generated_dict = None
 
-        # save the generated test source code
-        save_dir = os.path.join(
-            args.gen_dir, f"{args.name}_generated_testcase_module.json"
-        )
-        with open(save_dir, "w", encoding="utf-8") as f:
-            # save as json file
-            json.dump(generated_testsrc_dict, f, ensure_ascii=False, indent=4)
-
-        generated_dict = generate_and_save_on_one_dataset(
-            dataset=te_proj_dataset,
-            model=model,
-            args=args,
-            console=console,
-            device=device,
-            tokenizer=dataset.llm_tokenizer,
-            collate_fn_=collate_fn_,
-            accelerator=accelerator,
-            suffix="project",
-            do_save=True,
-        )
+        if generated_dict is None:
+            console.log(
+                f"[red]No generated test cases found for projects. Please check the path {os.path.join(args.gen_dir, f'{args.name}_project.json')}[/red]"
+            )
+            return
 
         project_dict = {}
         for k, v in generated_dict.items():

@@ -696,6 +696,7 @@ def main() -> None:
             model=model,
             device=device,
             console=console,
+            do_generate=args.do_generate,
         )
 
 
