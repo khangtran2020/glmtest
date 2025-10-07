@@ -315,47 +315,94 @@ def run_coverage(
 
 
 def merge_testcases(codes: List[str]) -> str:
-    imports = merge_imports(codes=codes)
-    function_list = []
-    function_count = {}
+    imports = merge_imports_ast(codes=codes)
+    body_code = ""
 
     for code in codes:
-        functions = extract_functions_from_code(code=code)
-        if functions is None:
-            continue
-        for func_name, func_code in functions.items():
-            if func_name not in function_count.keys():
-                function_list.append(func_code)
-                function_count[func_name] = 1
-            else:
-                # rename function
-                new_func_name = f"{func_name}_{function_count[func_name]}"
-                new_func_code = change_function_name(
-                    code=func_code, old_name=func_name, new_name=new_func_name
-                )
-                if new_func_code != "":
-                    function_list.append(new_func_code)
-                    function_count[func_name] += 1
+        body_code += remove_imports(code=code) + "\n\n"
 
-    merged_code = imports + "\n\n" + "\n\n".join(function_list)
+    merged_code = imports + "\n\n" + body_code
     return merged_code
 
 
-def extract_imports_from_code(code):
+def remove_imports(code: str) -> str:
+    try:
+        tree = ast.parse(code)
+    except Exception as e:
+        return code  # Return original code if parsing fails
+
+    # Remove Import and ImportFrom nodes from the top-level body
+    new_body = [
+        node for node in tree.body if not isinstance(node, (ast.Import, ast.ImportFrom))
+    ]
+    tree.body = new_body
+
+    # Unparse the modified AST back to code (Python 3.9+)
+    return ast.unparse(tree)
+
+
+def extract_imports_with_ast(code: str):
     imports = set()
-    for line in code.split("\n"):
-        # Match 'import ...' or 'from ... import ...'
-        if re.match(r"^\s*(import|from)\s+", line):
-            imports.add(line.strip())
+    import_from_dict = {}
+    try:
+        tree = ast.parse(code)
+    except Exception as e:
+        return imports
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.asname:
+                    imports.add(f"import {alias.name} as {alias.asname}")
+                else:
+                    imports.add(f"import {alias.name}")
+        elif isinstance(node, ast.ImportFrom):
+            # Handle relative imports
+            if node.module is None and node.level > 0:
+                module_prefix = "." * node.level
+            else:
+                module_prefix = "." * node.level + (node.module or "")
+
+            if module_prefix not in import_from_dict.keys():
+                import_from_dict[module_prefix] = []
+
+            for alias in node.names:
+                if alias.asname:
+                    imports.add(
+                        f"from {module_prefix} import {alias.name} as {alias.asname}"
+                    )
+                else:
+                    import_from_dict[module_prefix].append(alias.name)
+    for module_prefix in import_from_dict.keys():
+        list_of_import = import_from_dict[module_prefix]
+        import_line = ", ".join(list_of_import)
+        imports.add(f"from {module_prefix} import {import_line}")
     return imports
 
 
-def merge_imports(codes: List[str]):
+def merge_imports_ast(codes: list):
     all_imports = set()
     for code in codes:
-        all_imports.update(extract_imports_from_code(code=code))
+        all_imports.update(extract_imports_with_ast(code))
     sorted_imports = sorted(all_imports)
     return "\n".join(sorted_imports)
+
+
+# def extract_imports_from_code(code):
+#     imports = set()
+#     for line in code.split("\n"):
+#         # Match 'import ...' or 'from ... import ...'
+#         if re.match(r"^\s*(import|from)\s+", line):
+#             imports.add(line.strip())
+#     return imports
+
+
+# def merge_imports(codes: List[str]):
+#     all_imports = set()
+#     for code in codes:
+#         all_imports.update(extract_imports_from_code(code=code))
+#     sorted_imports = sorted(all_imports)
+#     return "\n".join(sorted_imports)
 
 
 def extract_functions_from_code(code: str) -> Dict[str, str]:
