@@ -1127,11 +1127,7 @@ class Data(object):
             assert self.processed_data is not None
             # data = deepcopy(self.processed_data)
             # np.random.shuffle(data)
-            num_val = (
-                int(val_split * len(self.processed_data))
-                if isinstance(val_split, float)
-                else val_split
-            )
+            num_val = val_split
             self.logger.log(f"Number of validation data: {num_val}")
 
             # split train and val
