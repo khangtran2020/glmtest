@@ -638,11 +638,11 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         )
 
     def init_for_train(self, tokenizer: PreTrainedTokenizer):
-        if self.is_training:
-            self.llm_model.resize_token_embeddings(len(tokenizer))
-            self.config.vocab_size = len(tokenizer)
-        else:
-            self.llm_model.resize_token_embeddings(len(tokenizer))
+
+        # if self.is_training:
+        self.is_training = True
+        self.llm_model.resize_token_embeddings(len(tokenizer))
+        self.config.vocab_size = len(tokenizer)
 
         lora_config = LoraConfig(
             r=self.config.lora_r,
