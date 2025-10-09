@@ -195,6 +195,7 @@ def main() -> None:
                         state_dict = torch.load(
                             os.path.join(args.model_weight_path, file),
                             map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+                            weights_only=True,
                         )
                         glmf_model.load_state_dict(state_dict)
 
@@ -289,6 +290,7 @@ def main() -> None:
                         state_dict = torch.load(
                             os.path.join(args.model_weight_path, file),
                             map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+                            weights_only=True,
                         )
                         model.load_state_dict(state_dict)
                         console.log(
