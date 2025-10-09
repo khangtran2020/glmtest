@@ -254,34 +254,36 @@ def main() -> None:
                         console.log(f"Parameter {name} is set to be trainable.")
 
         else:
-            config = GLMFModelConfig(
-                llm_model=args.llm_model,
-                use_lora=args.use_lora,
-                dtype=args.dtype,
-                mode=args.gnn_mode,
-                in_feats=args.in_feats,
-                n_hidden=args.n_hidden,
-                n_layers=args.n_layers,
-                num_head=args.num_head,
-                dropout=args.dropout,
-                lora_r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                lora_target_modules=args.lora_target_modules,
-                device_map="cuda" if torch.cuda.is_available() else "cpu",
-            )
-
-            model = GLMFModelForCausalLM(
-                config=config,
-                tokenizer=dataset.llm_tokenizer,
-                baseline_prompt=args.baseline_prompt,
-                multi_gpu=True if args.num_gpu > 1 else False,
-                debug=args.debug,
-                rank=local_rank,
-                is_training=True,
-            )
 
             if args.model_weight_path is not None:
+
+                config = GLMFModelConfig(
+                    llm_model=args.llm_model,
+                    use_lora=False,
+                    dtype=args.dtype,
+                    mode=args.gnn_mode,
+                    in_feats=args.in_feats,
+                    n_hidden=args.n_hidden,
+                    n_layers=args.n_layers,
+                    num_head=args.num_head,
+                    dropout=args.dropout,
+                    lora_r=args.lora_r,
+                    lora_alpha=args.lora_alpha,
+                    lora_dropout=args.lora_dropout,
+                    lora_target_modules=args.lora_target_modules,
+                    device_map="cuda" if torch.cuda.is_available() else "cpu",
+                )
+
+                model = GLMFModelForCausalLM(
+                    config=config,
+                    tokenizer=dataset.llm_tokenizer,
+                    baseline_prompt=args.baseline_prompt,
+                    multi_gpu=True if args.num_gpu > 1 else False,
+                    debug=args.debug,
+                    rank=local_rank,
+                    is_training=False,
+                )
+
                 for file in os.listdir(args.model_weight_path):
                     if file.endswith(".pt"):
                         state_dict = torch.load(
@@ -292,6 +294,34 @@ def main() -> None:
                         console.log(
                             f"[red]Model weights loaded from {os.path.join(args.model_weight_path, file)}[/red]"
                         )
+                model.init_for_train(tokenizer=dataset.llm_tokenizer)
+
+            else:
+                config = GLMFModelConfig(
+                    llm_model=args.llm_model,
+                    use_lora=args.use_lora,
+                    dtype=args.dtype,
+                    mode=args.gnn_mode,
+                    in_feats=args.in_feats,
+                    n_hidden=args.n_hidden,
+                    n_layers=args.n_layers,
+                    num_head=args.num_head,
+                    dropout=args.dropout,
+                    lora_r=args.lora_r,
+                    lora_alpha=args.lora_alpha,
+                    lora_dropout=args.lora_dropout,
+                    lora_target_modules=args.lora_target_modules,
+                    device_map="cuda" if torch.cuda.is_available() else "cpu",
+                )
+                model = GLMFModelForCausalLM(
+                    config=config,
+                    tokenizer=dataset.llm_tokenizer,
+                    baseline_prompt=args.baseline_prompt,
+                    multi_gpu=True if args.num_gpu > 1 else False,
+                    debug=args.debug,
+                    rank=local_rank,
+                    is_training=True,
+                )
 
             model.llm_model.gradient_checkpointing_enable()
             model.config.graph_token_id = [

@@ -634,6 +634,23 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             attentions=outputs.attentions,
         )
 
+    def init_for_train(self, tokenizer: PreTrainedTokenizer):
+        if self.is_training:
+            self.llm_model.resize_token_embeddings(len(tokenizer))
+            self.config.vocab_size = len(tokenizer)
+        else:
+            self.llm_model.resize_token_embeddings(len(tokenizer))
+
+        lora_config = LoraConfig(
+            r=self.config.lora_r,
+            lora_alpha=self.config.lora_alpha,
+            target_modules=self.config.lora_target_modules,
+            lora_dropout=self.config.lora_dropout,
+            bias="none",
+            task_type=TaskType.CAUSAL_LM,
+        )
+        self.llm_model = get_peft_model(self.llm_model, lora_config)
+
 
 CONFIG_MAPPING.register(key="glmf", value=GLMFModelConfig)
 MODEL_FOR_CAUSAL_LM_MAPPING.register(key=GLMFModelConfig, value=GLMFModelForCausalLM)
