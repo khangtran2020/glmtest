@@ -78,13 +78,6 @@ def main() -> None:
         ram_usage = log_ram_usage()
         console.log(f"Dataset loaded - RAM usage: {ram_usage:.2f} MB")
 
-    # if args.mode == "data":
-    #     if args.do_crawl:
-    #         dataset.crawl()
-    #     if args.do_process_raw:
-    #         dataset.process_raw()
-    #     return
-
     if args.mode == "testgen":
         if args.module_path is None:
             dataset.prepare_data_for_test_gen()
@@ -283,6 +276,15 @@ def main() -> None:
                 rank=local_rank,
                 is_training=True,
             )
+
+            if args.model_weight_path is not None:
+                for file in os.listdir(args.model_weight_path):
+                    if file.endswith(".pt"):
+                        state_dict = torch.load(
+                            os.path.join(args.model_weight_path, file),
+                            map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+                        )
+                        glmf_model.load_state_dict(state_dict)
 
             model.llm_model.gradient_checkpointing_enable()
             model.config.graph_token_id = [

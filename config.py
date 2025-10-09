@@ -53,6 +53,12 @@ def add_data_group(group):
         "--raw_overwrite", action="store_true", help="overwrite the raw data"
     )
     group.add_argument("--data_fuzz", action="store_true", help="using fuzz data")
+    group.add_argument(
+        "--repo_top",
+        type=int,
+        help="top repo to train only with dataset belongs to that repo",
+        default=-1,
+    )
 
 
 def add_joern_group(group):
