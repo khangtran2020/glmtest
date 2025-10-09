@@ -287,7 +287,7 @@ def main() -> None:
                         )
                         glmf_model.load_state_dict(state_dict)
                         console.log(
-                            f"Model weights loaded from {os.path.join(args.model_weight_path, file)}"
+                            f"[red]Model weights loaded from {os.path.join(args.model_weight_path, file)}[/red]"
                         )
 
             model.llm_model.gradient_checkpointing_enable()
