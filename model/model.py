@@ -272,20 +272,20 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if self.is_training:
             self.llm_model.resize_token_embeddings(len(tokenizer))
             self.config.vocab_size = len(tokenizer)
+            if config.use_lora:
+                lora_config = LoraConfig(
+                    r=config.lora_r,
+                    lora_alpha=config.lora_alpha,
+                    target_modules=config.lora_target_modules,
+                    lora_dropout=config.lora_dropout,
+                    bias="none",
+                    task_type=TaskType.CAUSAL_LM,
+                )
+                self.llm_model = get_peft_model(self.llm_model, lora_config)
         else:
             self.llm_model.resize_token_embeddings(len(tokenizer))
 
         # LoRA init
-        if config.use_lora:
-            lora_config = LoraConfig(
-                r=config.lora_r,
-                lora_alpha=config.lora_alpha,
-                target_modules=config.lora_target_modules,
-                lora_dropout=config.lora_dropout,
-                bias="none",
-                task_type=TaskType.CAUSAL_LM,
-            )
-            self.llm_model = get_peft_model(self.llm_model, lora_config)
 
         gc.collect()
         torch.cuda.empty_cache()
