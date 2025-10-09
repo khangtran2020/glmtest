@@ -85,6 +85,9 @@ def main() -> None:
     else:
         dataset.prepare_data()
 
+    if args.repo is not None:
+        dataset.prepare_data_by_repo()
+
     dataset.train_test_split(
         val_split=200, test_only=True if args.mode == "testgen" else False
     )
