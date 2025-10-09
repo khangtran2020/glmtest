@@ -55,7 +55,7 @@ def add_data_group(group):
     group.add_argument("--data_fuzz", action="store_true", help="using fuzz data")
     group.add_argument(
         "--repo",
-        type="str",
+        type=str,
         help="repo to use for training",
         default=None,
     )
