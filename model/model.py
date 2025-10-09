@@ -566,9 +566,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         if self.is_training:
             # print("Running in training mode.")
-            print(
-                f"Type of self.llm_model.base_model.model.model: {type(self.llm_model.base_model.model.model)}"
-            )
+            # print(
+            #     f"Type of self.llm_model.base_model.model.model: {type(self.llm_model.base_model.model.model)}"
+            # )
             outputs = self.llm_model.base_model.model.model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
