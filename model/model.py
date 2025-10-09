@@ -28,6 +28,7 @@ from peft import get_peft_model, LoraConfig, TaskType
 from peft.tuners.lora.model import LoraModel
 from utils.constant import FUZZ_START_TOKEN, FUZZ_END_TOKEN
 from transformers.utils import logging, is_torchdynamo_compiling
+from argparse import Namespace
 
 logger = logging.get_logger(__name__)
 
@@ -1256,3 +1257,7 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
         for layer in self.layers:
             if isinstance(layer, GLMFFuzzingLayer):
                 layer.clear_cache()
+
+
+def get_model(args: Namespace):
+    pass

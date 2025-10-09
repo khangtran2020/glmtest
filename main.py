@@ -285,7 +285,7 @@ def main() -> None:
                             os.path.join(args.model_weight_path, file),
                             map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
                         )
-                        glmf_model.load_state_dict(state_dict)
+                        model.load_state_dict(state_dict)
                         console.log(
                             f"[red]Model weights loaded from {os.path.join(args.model_weight_path, file)}[/red]"
                         )

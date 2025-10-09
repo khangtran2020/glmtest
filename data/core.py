@@ -500,6 +500,9 @@ class Data(object):
         )
         return nodes
 
+    def prepare_data_by_repo(self) -> None:
+        assert self.processed_data is not None
+
     def prepare_data(self) -> None:
         """
         Prepare the training data for the model
