@@ -37,7 +37,7 @@ def get_dataset(
     max_tokens: int = 512,
     raw_overwrite: bool = False,
     gnn_mode: str = "node",
-    repo_top: int = -1,
+    repo: str = None,
     **kwargs,
 ) -> Data:
 
@@ -106,7 +106,7 @@ def get_dataset(
             max_tokens=max_tokens,
             n_hops=kwargs.get("n_hops", 1),
             raw_overwrite=raw_overwrite,
-            repo_top=repo_top,
+            repo=repo,
             gnn_mode=gnn_mode,
         )
     else:

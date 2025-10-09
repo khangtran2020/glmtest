@@ -69,6 +69,7 @@ def main() -> None:
         n_hops=args.n_layers,
         max_tokens=args.max_seq_length,
         raw_overwrite=args.raw_overwrite,
+        repo=args.repo,
     )
     if dataset is None:
         console.log("Dataset not found, exiting...")
@@ -285,6 +286,9 @@ def main() -> None:
                             map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
                         )
                         glmf_model.load_state_dict(state_dict)
+                        console.log(
+                            f"Model weights loaded from {os.path.join(args.model_weight_path, file)}"
+                        )
 
             model.llm_model.gradient_checkpointing_enable()
             model.config.graph_token_id = [

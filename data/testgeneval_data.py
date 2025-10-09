@@ -32,7 +32,7 @@ class TestGenEval(Data):
         max_tokens: int = 512,
         gnn_mode: str = "node",
         raw_overwrite: bool = False,
-        repo_top: int = -1,
+        repo: str = None,
         **kwargs,
     ) -> None:
         self.name = "TestGenEval"
@@ -56,7 +56,7 @@ class TestGenEval(Data):
         self.data_path = os.path.join(path, self.name)
         self.debug = debug
         self.data = None
-        self.repo_top = repo_top
+        self.repo = repo
         self.raw_overwrite = raw_overwrite
         if not os.path.exists(self.data_path):
             os.makedirs(self.data_path)
