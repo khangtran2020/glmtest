@@ -253,9 +253,7 @@ def main() -> None:
                     if "nvib_layer" in name:
                         param.requires_grad = True
                         console.log(f"Parameter {name} is set to be trainable.")
-
         else:
-
             if args.model_weight_path is not None:
 
                 config = GLMFModelConfig(
@@ -298,7 +296,6 @@ def main() -> None:
                         )
 
                 model.init_for_train(tokenizer=dataset.llm_tokenizer)
-
                 # make the model to bf16/fp16
                 for n, p in model.named_parameters():
                     if args.dtype == "bf16":

@@ -637,7 +637,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             attentions=outputs.attentions,
         )
 
-    def init_for_train(self, tokenizer: PreTrainedTokenizer):
+    def init_for_train(self, tokenizer: PreTrainedTokenizer, rank: int):
 
         # if self.is_training:
         self.is_training = True
@@ -653,6 +653,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             task_type=TaskType.CAUSAL_LM,
         )
         self.llm_model = get_peft_model(self.llm_model, lora_config)
+        self.llm_model = self.llm_model.to(f"cuda:{rank}")
 
 
 CONFIG_MAPPING.register(key="glmf", value=GLMFModelConfig)
