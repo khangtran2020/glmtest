@@ -744,16 +744,6 @@ def train_multi_gpu_accelerate(
                     accelerator.backward(loss)
                     accelerator.wait_for_everyone()
 
-                if args.fuzz_model:
-                    with torch.no_grad():
-                        for name, param in model.named_parameters():
-                            if "nvib_layer" in name and param.requires_grad:
-                                if param.grad is not None:
-                                    grad_norm = param.grad.norm(2).item()
-                                    console.log(
-                                        f"Step {global_step} - rank {local_rank}: Gradient norm of {name}: {grad_norm:.4f}"
-                                    )
-
                 if accelerator.sync_gradients:
                     accelerator.wait_for_everyone()
                     accelerator.clip_grad_norm_(model.parameters(), args.max_grad_norm)
@@ -769,7 +759,7 @@ def train_multi_gpu_accelerate(
                         torch.isnan(all_losses),
                         torch.zeros_like(all_losses),
                         all_losses,
-                    )
+                    ).to("cpu")
                     console.log(f"Step {global_step}: gathered losses: {all_losses}")
                     total_loss = torch.sum(all_losses)
                     batch_loss += total_loss.detach().float().item()
@@ -885,41 +875,37 @@ def train_multi_gpu_accelerate(
                     accelerator.wait_for_everyone()
 
                     if accelerator.is_main_process:
-                        wandb.log({"val_loss": val_loss})
-                        console.log(
-                            f"Validation loss: {val_loss:.4f} at step {global_step}"
-                        )
-
-                        if val_loss < best_val_loss:
-                            best_val_loss = val_loss
+                        with torch.no_grad():
+                            wandb.log({"val_loss": val_loss})
                             console.log(
-                                f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
-                            )
-                            checkpoint_dir = os.path.join(
-                                save_path,
-                                f"best_model",
+                                f"Validation loss: {val_loss:.4f} at step {global_step}"
                             )
 
-                            if not os.path.exists(checkpoint_dir):
-                                os.makedirs(checkpoint_dir, exist_ok=True)
+                            if val_loss < best_val_loss:
+                                best_val_loss = val_loss
+                                console.log(
+                                    f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
+                                )
+                                checkpoint_dir = os.path.join(
+                                    save_path,
+                                    f"best_model",
+                                )
 
-                            unwrapped_model = accelerator.unwrap_model(model)
-                            # if unwrapped_model.config.use_lora == True:
-                            #     unwrapped_model.llm_model = (
-                            #         unwrapped_model.llm_model.merge_and_unload()
-                            #     )
-                            #     unwrapped_model.config.use_lora = False
-                            torch.save(
-                                unwrapped_model.state_dict(),
-                                os.path.join(checkpoint_dir, "model_weight.pt"),
-                            )
-                            tokenizer.save_pretrained(checkpoint_dir)
-                            accelerator.print(
-                                f"Saving best checkpoint to {checkpoint_dir}"
-                            )
-                            del unwrapped_model
-                            del checkpoint_dir
-                            gc.collect()
+                                if not os.path.exists(checkpoint_dir):
+                                    os.makedirs(checkpoint_dir, exist_ok=True)
+
+                                unwrapped_model = accelerator.unwrap_model(model)
+                                torch.save(
+                                    unwrapped_model.state_dict(),
+                                    os.path.join(checkpoint_dir, "model_weight.pt"),
+                                )
+                                tokenizer.save_pretrained(checkpoint_dir)
+                                accelerator.print(
+                                    f"Saving best checkpoint to {checkpoint_dir}"
+                                )
+                                del unwrapped_model
+                                del checkpoint_dir
+                                gc.collect()
                     # model.train()
 
                 if args.debug:

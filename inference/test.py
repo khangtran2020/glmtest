@@ -381,6 +381,7 @@ def validate(
                 if multi_gpu:
                     all_losses = accelerator.gather(loss)
                     all_losses = torch.where(torch.isnan(all_losses), 0.0, all_losses)
+                    all_losses = all_losses.to("cpu").detach().float()
                     total_loss = torch.sum(all_losses)
                     batch_loss += total_loss.to("cpu").detach().float().item()
                 else:
