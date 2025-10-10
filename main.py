@@ -89,7 +89,7 @@ def main() -> None:
         dataset.prepare_data_by_repo()
 
     dataset.train_test_split(
-        val_split=200, test_only=True if args.mode == "testgen" else False
+        val_split=100, test_only=True if args.mode == "testgen" else False
     )
 
     console.log(f"Broadcasted args and dataset to all processes.")
