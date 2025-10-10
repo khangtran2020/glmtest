@@ -106,6 +106,7 @@ def testcase_generate(
                         test_case=extract_code_block(markdown=v),
                         model=args.verifier_model,
                         temperature=0.2,
+                        max_tokens=2048,
                         api_key=args.verifier_api_key,
                     )
                 refactored_code = verification_result["refactored_code"]
@@ -187,6 +188,7 @@ def testcase_generate(
                             model=args.verifier_model,
                             temperature=0.2,
                             api_key=args.verifier_api_key,
+                            max_tokens=2048,
                         )
                     refactored_code = verification_result["refactored_code"]
                     project_dict[k.split("_testcase_")[0]].append(refactored_code)
