@@ -289,7 +289,7 @@ def main() -> None:
                     if file.endswith(".pt"):
                         state_dict = torch.load(
                             os.path.join(args.model_weight_path, file),
-                            map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+                            map_location="cpu",
                             weights_only=True,
                         )
                         model.load_state_dict(state_dict)
