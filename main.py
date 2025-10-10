@@ -299,6 +299,15 @@ def main() -> None:
 
                 model.init_for_train(tokenizer=dataset.llm_tokenizer)
 
+                # make the model to bf16/fp16
+                for n, p in model.named_parameters():
+                    if args.dtype == "bf16":
+                        if p.dtype != torch.bfloat16:
+                            p.data = p.data.to(torch.bfloat16)
+                    elif args.dtype == "fp16":
+                        if p.dtype != torch.float16:
+                            p.data = p.data.to(torch.float16)
+
             else:
                 config = GLMFModelConfig(
                     llm_model=args.llm_model,
@@ -343,30 +352,16 @@ def main() -> None:
                 f"Special tokens added to tokenizer and model: {model.config.graph_token_id}"
             )
 
-        # if args.model_weight_path is not None:
-        #     for file in os.listdir(args.model_weight_path):
-        #         if file.endswith(".pt"):
-        #             state_dict = torch.load(
-        #                 os.path.join(args.model_weight_path, file),
-        #                 map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-        #             )
-        #             model.load_state_dict(state_dict)
-
         total_params = 0
         for name, param in model.llm_model.base_model.model.model.named_parameters():
             if param.requires_grad:
-                # console.log(
-                #     f"[blue]{name}: {param.numel()} parameters, shape={tuple(param.shape)}[/blue]"
-                # )
                 total_params += param.numel()
 
         console.log(
             f"[green]Total trainable parameters from model: {total_params}[/green]"
         )
 
-        optimizer = AdamW(
-            filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
-        )
+        optimizer = AdamW(model.parameters(), lr=args.learning_rate)
         lr_scheduler = CosineAnnealingLR(optimizer, T_max=100, eta_min=5e-8)
 
         num_params = 0
