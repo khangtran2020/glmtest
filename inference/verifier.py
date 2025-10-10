@@ -120,67 +120,65 @@ def query_prompt(
     Raises:
         Exception: If the API call fails for any reason.
     """
-    try:
-        if isinstance(client, openai.OpenAI):
-            messages = [{"role": "user", "content": prompt}]
-            kwargs = {
-                "model": model,
-                "max_completion_tokens": max_tokens,
-                "temperature": temperature,
-                "messages": messages,
-            }
-            response = client.chat.completions.create(**kwargs)
-
-            # OpenAI's chat.completions.create returns a Completion object
-            return {
-                "success": True,
-                "content": response.choices[0].message.content,
-                "model": response.model,
-                "usage": {
-                    "input_tokens": response.usage.prompt_tokens,
-                    "output_tokens": response.usage.completion_tokens,
-                },
-                "stop_reason": response.choices[0].finish_reason,
-                "extract_content": extract_test_case(
-                    response.choices[0].message.content
-                ),
-            }
-
-        elif isinstance(client, anthropic.Anthropic):
-            # Anthropic's messages.create API
-            messages = [{"role": "user", "content": prompt}]
-            kwargs = {
-                "model": model,
-                "max_tokens": max_tokens,  # Anthropic uses max_tokens, not max_output_tokens
-                "temperature": temperature,
-                "messages": messages,
-            }
-            response = client.messages.create(**kwargs)
-
-            # Anthropic's messages.create returns a Message object
-            return {
-                "success": True,
-                "content": response.content[0].text,
-                "model": response.model,
-                "usage": {
-                    "input_tokens": response.usage.input_tokens,
-                    "output_tokens": response.usage.output_tokens,
-                },
-                "stop_reason": response.stop_reason,
-                "extract_content": extract_test_case(response.content[0].text),
-            }
-        else:
-            raise TypeError("Unsupported client type provided.")
-
-    except Exception as e:
-        print(f"An error occurred during query: {e}")
-        return {
-            "success": False,
-            "content": str(e),
+    # try:
+    if isinstance(client, openai.OpenAI):
+        messages = [{"role": "user", "content": prompt}]
+        kwargs = {
             "model": model,
-            "usage": {"input_tokens": 0, "output_tokens": 0},
-            "stop_reason": None,
+            "max_completion_tokens": max_tokens,
+            "temperature": temperature,
+            "messages": messages,
         }
+        response = client.chat.completions.create(**kwargs)
+
+        # OpenAI's chat.completions.create returns a Completion object
+        return {
+            "success": True,
+            "content": response.choices[0].message.content,
+            "model": response.model,
+            "usage": {
+                "input_tokens": response.usage.prompt_tokens,
+                "output_tokens": response.usage.completion_tokens,
+            },
+            "stop_reason": response.choices[0].finish_reason,
+            "extract_content": extract_test_case(response.choices[0].message.content),
+        }
+
+    elif isinstance(client, anthropic.Anthropic):
+        # Anthropic's messages.create API
+        messages = [{"role": "user", "content": prompt}]
+        kwargs = {
+            "model": model,
+            "max_tokens": max_tokens,  # Anthropic uses max_tokens, not max_output_tokens
+            "temperature": temperature,
+            "messages": messages,
+        }
+        response = client.messages.create(**kwargs)
+
+        # Anthropic's messages.create returns a Message object
+        return {
+            "success": True,
+            "content": response.content[0].text,
+            "model": response.model,
+            "usage": {
+                "input_tokens": response.usage.input_tokens,
+                "output_tokens": response.usage.output_tokens,
+            },
+            "stop_reason": response.stop_reason,
+            "extract_content": extract_test_case(response.content[0].text),
+        }
+    else:
+        raise TypeError("Unsupported client type provided.")
+
+    # except Exception as e:
+    #     print(f"An error occurred during query: {e}")
+    #     return {
+    #         "success": False,
+    #         "content": str(e),
+    #         "model": model,
+    #         "usage": {"input_tokens": 0, "output_tokens": 0},
+    #         "stop_reason": None,
+    #     }
 
 
 def verify_test_case(
