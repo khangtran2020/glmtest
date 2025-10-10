@@ -295,7 +295,7 @@ def main() -> None:
                             f"[red]Model weights loaded from {os.path.join(args.model_weight_path, file)}[/red]"
                         )
 
-                model.init_for_train(tokenizer=dataset.llm_tokenizer)
+                model.init_for_train(tokenizer=dataset.llm_tokenizer, rank=local_rank)
                 # make the model to bf16/fp16
                 for n, p in model.named_parameters():
                     if args.dtype == "bf16":
