@@ -406,7 +406,7 @@ def add_testgen_group(group):
         help="generate test cases for the model",
     )
     group.add_argument(
-        "verifier_model",
+        "--verifier_model",
         type=str,
         help="model to verify the test cases",
         default=None,
