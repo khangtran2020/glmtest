@@ -405,6 +405,18 @@ def add_testgen_group(group):
         action="store_true",
         help="generate test cases for the model",
     )
+    group.add_argument(
+        "verifier_model",
+        type=str,
+        help="model to verify the test cases",
+        default=None,
+    )
+    group.add_argument(
+        "--verifier_api_key",
+        type=str,
+        help="api key for the verifier model",
+        default=None,
+    )
 
 
 def parse_args():

@@ -19,6 +19,7 @@ from data.core import (
 )
 from accelerate import Accelerator
 from inference.test import generate_and_save_on_one_dataset
+from inference.verifier import verify_test_case
 from data.loader import GLMFDataset, collate_fn
 from sklearn.preprocessing import LabelEncoder
 from transformers import PreTrainedTokenizer, PreTrainedModel
@@ -94,9 +95,21 @@ def testcase_generate(
         for k, v in generated_dict.items():
             if k.split("_testcase_")[0] not in project_dict.keys():
                 project_dict[k.split("_testcase_")[0]] = []
-            project_dict[k.split("_testcase_")[0]].append(
-                extract_code_block(markdown=v)
-            )
+            if args.verifier_model is None:
+                project_dict[k.split("_testcase_")[0]].append(
+                    extract_code_block(markdown=v)
+                )
+            else:
+                # verify the test case
+                with console.status(f"Verifying test case {k}..."):
+                    verification_result = verify_test_case(
+                        test_case=extract_code_block(markdown=v),
+                        model=args.verifier_model,
+                        temperature=0.2,
+                        api_key=args.verifier_api_key,
+                    )
+                refactored_code = verification_result["refactored_code"]
+                project_dict[k.split("_testcase_")[0]].append(refactored_code)
 
         generated_testsrc_dict = {}
         for k, v in project_dict.items():
@@ -161,9 +174,22 @@ def testcase_generate(
             for k, v in generated_dict.items():
                 if k.split("_testcase_")[0] not in project_dict.keys():
                     project_dict[k.split("_testcase_")[0]] = []
-                project_dict[k.split("_testcase_")[0]].append(
-                    extract_code_block(markdown=v)
-                )
+
+                if args.verifier_model is None:
+                    project_dict[k.split("_testcase_")[0]].append(
+                        extract_code_block(markdown=v)
+                    )
+                else:
+                    # verify the test case
+                    with console.status(f"Verifying test case {k}..."):
+                        verification_result = verify_test_case(
+                            test_case=extract_code_block(markdown=v),
+                            model=args.verifier_model,
+                            temperature=0.2,
+                            api_key=args.verifier_api_key,
+                        )
+                    refactored_code = verification_result["refactored_code"]
+                    project_dict[k.split("_testcase_")[0]].append(refactored_code)
 
             generated_testsrc_dict = {}
             for k, v in project_dict.items():
