@@ -9,25 +9,26 @@ import re
 # from utils.utils import console
 from typing import List, Dict, Any, Optional, Union
 
-PROMPT_ZERO_SHOT = """Given the following Python test file. Carefully verify the correctness of the test case:
-- Check for hallucinations in the imports.
-- 
+PROMPT_VERIFY = """
+I have a test case that may contain hallucinated/unnecessary imports and compilation issues. Please:
 
-Here is the module:
+1. **Analyze the imports**: Check which models and test classes are actually used in the test code. Identify and remove all unused imports.
+
+2. **Verify compilation**: Ensure the test case will compile and run without import errors or syntax issues.
+
+3. **Refactor the imports**: Keep only the necessary imports that are actually referenced in the test code.
+
+4. **Preserve the test logic**: Do NOT change the test assertions or logic - keep them exactly as written, even if they seem incorrect. The goal is only to make the test runnable, not to fix its correctness.
+
+5. **Provide the cleaned test case**: Output the refactored code with minimal, correct imports.
+
+Here's the test case to clean:
+
 ```python
-{}
+{test_case}
 ```
 
-Here is the execution branch. The execution branch is a sequence of executable line number in the module:
-{}
-
-Just output your answer WITHOUT REASONING and ensure your response is in the following format:
-
-```json
-{{
-  "test_case": <YOUR ANSWER FOR THE TEST CASE - JUST ONLY THE EXECUTABLE PYTHON CODE>
-}}
-```
+Please show only the final cleaned test case between ```python...``` tags, without any additional explanation.
 """
 
 
@@ -46,7 +47,9 @@ def extract_test_case(raw: Union[str, dict]) -> str:
     # 2) If it's a string, strip any Markdown fences around the JSON:
     if isinstance(raw, str):
         # look for ```json … { … } … ```
-        fence = re.compile(r"```(?:json)?\s*([\s\S]*?\{[\s\S]*?\})\s*```", re.MULTILINE)
+        fence = re.compile(
+            r"```(?:python)?\s*([\s\S]*?\{[\s\S]*?\})\s*```", re.MULTILINE
+        )
         m = fence.search(raw)
         payload = m.group(1) if m else raw
 

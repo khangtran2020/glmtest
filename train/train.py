@@ -874,6 +874,13 @@ def train_multi_gpu_accelerate(
                     )
                     accelerator.wait_for_everyone()
 
+                    # check model type
+                    with torch.no_grad():
+                        for name, param in model.named_parameters():
+                            console.log(
+                                f"After validation - Parameter {name} is of dtype {param.dtype}"
+                            )
+
                     if accelerator.is_main_process:
                         with torch.no_grad():
                             wandb.log({"val_loss": val_loss})
