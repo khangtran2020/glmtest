@@ -194,6 +194,8 @@ def train_single_gpu_accelerate(
     device = accelerator.device
     accelerator.print(f"Using {accelerator.num_processes} devices")
     accelerator.print(f"Mixed precision: {mixed_precision}")
+    for name, param in model.named_parameters():
+        console.log(f"Parameter {name} is of dtype {param.dtype}")
 
     tr_dataset = GLMFDataset(
         data=dataset.train_data,
@@ -560,6 +562,10 @@ def train_multi_gpu_accelerate(
         console.log(f"Distributed type: {accelerator.distributed_type}")
         console.log(f"Number of processes: {accelerator.num_processes}")
         console.log(f"Mixed precision: {mixed_precision}")
+
+        # Check model dtype
+        for name, param in model.named_parameters():
+            console.log(f"Parameter {name} is of dtype {param.dtype}")
 
     tokenizer = dataset.llm_tokenizer
     tr_dataset = GLMFDataset(
