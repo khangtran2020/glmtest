@@ -1,9 +1,6 @@
-import json
-import ast
+import re
 import openai
 import anthropic
-import re
-
 
 # from utils.utils import console
 from typing import Dict, Any, Union
@@ -31,44 +28,12 @@ Please show only the final cleaned test case between ```python and ``` tags, wit
 """
 
 
-def extract_test_case(raw: Union[str, dict]) -> str:
-    """
-    Given either:
-      - A dict with a 'test_case' key,
-      - A JSON string (possibly wrapped in ```json …``` fences), or
-      - A Python‐literal dict string,
-    this will return the inner multi‐line code.
-    """
-    # 1) If it's already a dict, just pull it out:
-    if isinstance(raw, dict):
-        return raw["test_case"]
-
-    # 2) If it's a string, strip any Markdown fences around the JSON:
-    if isinstance(raw, str):
-        # look for ```json … { … } … ```
-        fence = re.compile(
-            r"```(?:python)?\s*([\s\S]*?\{[\s\S]*?\})\s*```", re.MULTILINE
-        )
-        m = fence.search(raw)
-        payload = m.group(1) if m else raw
-
-        # 3) Try JSON first:
-        try:
-            data = json.loads(payload)
-        except json.JSONDecodeError:
-            # 4) Fallback to Python literal (single‐ or double‐quoted):
-            try:
-                data = ast.literal_eval(payload)
-            except Exception as e:
-                raise ValueError(
-                    "Could not parse payload as JSON or Python literal"
-                ) from e
-
-        if "test_case" not in data:
-            raise KeyError("No 'test_case' key found")
-        return data["test_case"]
-
-    raise TypeError(f"Expected str or dict, got {type(raw)}")
+def extract_code_block(text: str):
+    pattern = r"```python(?:\w+)?\n([\s\S]*?)```"
+    match = re.search(pattern, text)
+    if match:
+        return match.group(1)
+    return text
 
 
 # --- Modified init_api function ---
@@ -141,7 +106,7 @@ def query_prompt(
                 "output_tokens": response.usage.completion_tokens,
             },
             "stop_reason": response.choices[0].finish_reason,
-            "extract_content": extract_test_case(response.choices[0].message.content),
+            "extract_content": extract_code_block(response.choices[0].message.content),
         }
 
     elif isinstance(client, anthropic.Anthropic):
@@ -165,7 +130,7 @@ def query_prompt(
                 "output_tokens": response.usage.output_tokens,
             },
             "stop_reason": response.stop_reason,
-            "extract_content": extract_test_case(response.content[0].text),
+            "extract_content": extract_code_block(response.content[0].text),
         }
     else:
         raise TypeError("Unsupported client type provided.")
