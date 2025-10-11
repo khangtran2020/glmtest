@@ -391,10 +391,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         )
 
         # pprint(f"[green]Input embeds shape: {inputs_embeds.shape}[/green]")
-
-        if accelerator is not None:
-            accelerator.wait_for_everyone()
         if self.multi_gpu:
+            if accelerator is not None:
+                accelerator.wait_for_everyone()
             return self.forward_llm(
                 input_ids=None,
                 inputs_embeds=inputs_embeds,
@@ -554,13 +553,14 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             accelerator.wait_for_everyone()
 
         if self.is_training:
+            print("Using training mode in forward_llm")
             outputs = self.llm_model.base_model.model.model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
                 past_key_values=past_key_values,
                 inputs_embeds=inputs_embeds,
-                use_cache=use_cache,
+                use_cache=False,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
