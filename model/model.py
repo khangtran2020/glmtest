@@ -553,6 +553,12 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             accelerator.wait_for_everyone()
 
         if self.is_training:
+            # print out the type of the models:
+
+            pprint(f"[red]model type: {self.llm_model}[/red]")
+            pprint(f"[red]model type: {self.llm_model.base_model}[/red]")
+            pprint(f"[red]model type: {self.llm_model.base_model.model}[/red]")
+            pprint(f"[red]model type: {self.llm_model.base_model.model.model}[/red]")
             outputs = self.llm_model.base_model.model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
