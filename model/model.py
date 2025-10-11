@@ -395,7 +395,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             if accelerator is not None:
                 accelerator.wait_for_everyone()
             return self.forward_llm(
-                input_ids=None,
+                input_ids=input_ids,
                 inputs_embeds=inputs_embeds,
                 position_ids=position_ids,
                 attention_mask=attention_mask,
