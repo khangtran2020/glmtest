@@ -553,10 +553,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             accelerator.wait_for_everyone()
 
         if self.is_training:
-            print(
-                f"Using training mode in forward_llm, with num hidden layers: {self.config.num_hidden_layers}"
-            )
-            outputs = self.llm_model.base_model.model.model(
+            outputs = self.llm_model.base_model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
@@ -569,7 +566,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 cache_position=cache_position,
             )
         else:
-            outputs = self.llm_model.model(
+            outputs = self.llm_model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
@@ -582,44 +579,46 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 cache_position=cache_position,
             )
 
-        hidden_states = outputs.last_hidden_state
-        print("Hidden states requires_grad:", hidden_states.requires_grad)
-        print("Hidden states grad_fn:", hidden_states.grad_fn)
+        return outputs
 
-        # # pprint(
-        # #     f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]Last hidden_states value: {hidden_states} [/cyan]\n\n\n"
-        # # )
+        # hidden_states = outputs.last_hidden_state
+        # print("Hidden states requires_grad:", hidden_states.requires_grad)
+        # print("Hidden states grad_fn:", hidden_states.grad_fn)
 
-        slice_indices = (
-            slice(-logits_to_keep, None)
-            if isinstance(logits_to_keep, int)
-            else logits_to_keep
-        )
-        logits = self.llm_model.base_model.model.lm_head(
-            hidden_states[:, slice_indices, :]
-        )
+        # # # pprint(
+        # # #     f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]Last hidden_states value: {hidden_states} [/cyan]\n\n\n"
+        # # # )
 
-        loss = None
-        if labels is not None:
-            logits = logits.float()
-            logits = logits.view(-1, self.config.vocab_size)
-            labels = labels.view(-1)
-            labels = labels.to(logits.device)
-            loss = fixed_cross_entropy(
-                logits,
-                labels,
-                num_items_in_batch=None,
-                ignore_index=ignore_index,
-                **kwargs,
-            )
+        # slice_indices = (
+        #     slice(-logits_to_keep, None)
+        #     if isinstance(logits_to_keep, int)
+        #     else logits_to_keep
+        # )
+        # logits = self.llm_model.base_model.model.lm_head(
+        #     hidden_states[:, slice_indices, :]
+        # )
 
-        return CausalLMOutputWithPast(
-            loss=loss,
-            logits=logits,
-            past_key_values=outputs.past_key_values,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
+        # loss = None
+        # if labels is not None:
+        #     logits = logits.float()
+        #     logits = logits.view(-1, self.config.vocab_size)
+        #     labels = labels.view(-1)
+        #     labels = labels.to(logits.device)
+        #     loss = fixed_cross_entropy(
+        #         logits,
+        #         labels,
+        #         num_items_in_batch=None,
+        #         ignore_index=ignore_index,
+        #         **kwargs,
+        #     )
+
+        # return CausalLMOutputWithPast(
+        #     loss=loss,
+        #     logits=logits,
+        #     past_key_values=outputs.past_key_values,
+        #     hidden_states=outputs.hidden_states,
+        #     attentions=outputs.attentions,
+        # )
 
     def init_for_train(self, tokenizer: PreTrainedTokenizer, rank: int):
 
