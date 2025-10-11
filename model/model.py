@@ -593,7 +593,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         #     )
 
         outputs = self.llm_model(
-            input_ids=input_ids,
+            input_ids=None,
             attention_mask=attention_mask,
             position_ids=position_ids,
             past_key_values=past_key_values,
