@@ -563,9 +563,9 @@ def train_multi_gpu_accelerate(
         console.log(f"Number of processes: {accelerator.num_processes}")
         console.log(f"Mixed precision: {mixed_precision}")
 
-        # Check model dtype
-        for name, param in model.named_parameters():
-            console.log(f"Parameter {name} is of dtype {param.dtype}")
+        # # Check model dtype
+        # for name, param in model.named_parameters():
+        #     console.log(f"Parameter {name} is of dtype {param.dtype}")
 
     tokenizer = dataset.llm_tokenizer
     tr_dataset = GLMFDataset(
@@ -875,12 +875,12 @@ def train_multi_gpu_accelerate(
                     accelerator.wait_for_everyone()
 
                     # check model type
-                    with torch.no_grad():
-                        if accelerator.is_main_process:
-                            for name, param in model.named_parameters():
-                                console.log(
-                                    f"After validation - Parameter {name} is of dtype {param.dtype}"
-                                )
+                    # with torch.no_grad():
+                    #     if accelerator.is_main_process:
+                    #         for name, param in model.named_parameters():
+                    #             console.log(
+                    #                 f"After validation - Parameter {name} is of dtype {param.dtype}"
+                    #             )
 
                     if accelerator.is_main_process:
                         with torch.no_grad():
