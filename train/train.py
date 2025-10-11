@@ -668,9 +668,10 @@ def train_multi_gpu_accelerate(
             # check parameter device:
             if accelerator.is_main_process:
                 for name, param in model.named_parameters():
-                    console.log(
-                        f"At epoch {epoch}, Parameter {name} is on {param.device}"
-                    )
+                    if param.requires_grad:
+                        console.log(
+                            f"At epoch {epoch}, Parameter {name} is on {param.device}"
+                        )
             sys.exit(0)
 
             for step, batch in enumerate(tr_loader):
