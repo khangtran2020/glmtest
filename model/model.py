@@ -552,45 +552,58 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if accelerator is not None:
             accelerator.wait_for_everyone()
 
-        if self.is_training:
-            # print out the type of the models:
-            if self.rank == 0:
-                pprint(f"model type self.llm_model: {self.llm_model}")
-                pprint(
-                    f"model type self.llm_model.base_model: {self.llm_model.base_model}"
-                )
-                pprint(
-                    f"model type self.llm_model.base_model.model: {self.llm_model.base_model.model}"
-                )
-                pprint(
-                    f"model type self.llm_model.base_model.model.model: {self.llm_model.base_model.model.model}"
-                )
+        # if self.is_training:
+        #     # # print out the type of the models:
+        #     # if self.rank == 0:
+        #     #     pprint(f"model type self.llm_model: {self.llm_model}")
+        #     #     pprint(
+        #     #         f"model type self.llm_model.base_model: {self.llm_model.base_model}"
+        #     #     )
+        #     #     pprint(
+        #     #         f"model type self.llm_model.base_model.model: {self.llm_model.base_model.model}"
+        #     #     )
+        #     #     pprint(
+        #     #         f"model type self.llm_model.base_model.model.model: {self.llm_model.base_model.model.model}"
+        #     #     )
 
-            outputs = self.llm_model.base_model.model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
-                past_key_values=past_key_values,
-                inputs_embeds=inputs_embeds,
-                use_cache=False,
-                output_attentions=output_attentions,
-                output_hidden_states=output_hidden_states,
-                return_dict=return_dict,
-                cache_position=cache_position,
-            )
-        else:
-            outputs = self.llm_model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
-                past_key_values=past_key_values,
-                inputs_embeds=inputs_embeds,
-                use_cache=use_cache,
-                output_attentions=output_attentions,
-                output_hidden_states=output_hidden_states,
-                return_dict=return_dict,
-                cache_position=cache_position,
-            )
+        #     outputs = self.llm_model(
+        #         input_ids=input_ids,
+        #         attention_mask=attention_mask,
+        #         position_ids=position_ids,
+        #         past_key_values=past_key_values,
+        #         inputs_embeds=inputs_embeds,
+        #         use_cache=False,
+        #         output_attentions=output_attentions,
+        #         output_hidden_states=output_hidden_states,
+        #         return_dict=return_dict,
+        #         cache_position=cache_position,
+        #     )
+        # else:
+        #     outputs = self.llm_model(
+        #         input_ids=input_ids,
+        #         attention_mask=attention_mask,
+        #         position_ids=position_ids,
+        #         past_key_values=past_key_values,
+        #         inputs_embeds=inputs_embeds,
+        #         use_cache=use_cache,
+        #         output_attentions=output_attentions,
+        #         output_hidden_states=output_hidden_states,
+        #         return_dict=return_dict,
+        #         cache_position=cache_position,
+        #     )
+
+        outputs = self.llm_model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+            inputs_embeds=inputs_embeds,
+            use_cache=False,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            cache_position=cache_position,
+        )
 
         return outputs
 
