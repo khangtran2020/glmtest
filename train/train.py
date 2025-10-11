@@ -562,9 +562,6 @@ def train_multi_gpu_accelerate(
         console.log(f"Distributed type: {accelerator.distributed_type}")
         console.log(f"Number of processes: {accelerator.num_processes}")
         console.log(f"Mixed precision: {mixed_precision}")
-        logging_train_data(
-            console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
-        )
 
         # # Check model dtype
         # for name, param in model.named_parameters():
@@ -598,6 +595,11 @@ def train_multi_gpu_accelerate(
         "pin_memory": True,
         "persistent_workers": True,
     }
+
+    if accelerator.is_main_process:
+        logging_train_data(
+            console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
+        )
 
     if not isinstance(tr_dataset, torch.utils.data.IterableDataset):
         dataloader_params["drop_last"] = True
