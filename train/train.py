@@ -744,7 +744,7 @@ def train_multi_gpu_accelerate(
                     accelerator.wait_for_everyone()
                     loss = outputs.loss
                     print(
-                        f"Process {local_rank} - Step {global_step}: loss before backward: {loss}"
+                        f"Process {local_rank} - Step {global_step}: loss before backward: {loss} - outputs {outputs}"
                     )
                     accelerator.backward(loss)
                     accelerator.wait_for_everyone()
