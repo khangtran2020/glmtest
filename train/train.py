@@ -665,15 +665,6 @@ def train_multi_gpu_accelerate(
             epoch_loss = 0.0
             num_items = 0.0
 
-            # check parameter device:
-            if accelerator.is_main_process:
-                for name, param in model.named_parameters():
-                    if param.requires_grad:
-                        console.log(
-                            f"At epoch {epoch}, Parameter {name} is on {param.device}"
-                        )
-            sys.exit(0)
-
             for step, batch in enumerate(tr_loader):
 
                 if (continue_training == True) and (global_step <= start_step):
@@ -752,9 +743,22 @@ def train_multi_gpu_accelerate(
                     )
                     accelerator.wait_for_everyone()
                     loss = outputs.loss
-
                     accelerator.backward(loss)
                     accelerator.wait_for_everyone()
+
+                    # check gradient:
+                    if accelerator.is_main_process:
+                        for name, param in model.named_parameters():
+                            if param.requires_grad:
+                                if param.grad is not None:
+                                    console.log(
+                                        f"After backward - Parameter {name} grad is {param.grad.norm().item():.4f}"
+                                    )
+                                else:
+                                    console.log(
+                                        f"After backward - Parameter {name} grad is None"
+                                    )
+                    sys.exit(0)
 
                 if accelerator.sync_gradients:
                     accelerator.wait_for_everyone()
