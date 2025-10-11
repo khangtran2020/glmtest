@@ -553,7 +553,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             accelerator.wait_for_everyone()
 
         if self.is_training:
-            print("Using training mode in forward_llm")
+            print(
+                f"Using training mode in forward_llm, with num hidden layers: {self.config.num_hidden_layers}"
+            )
             outputs = self.llm_model.base_model.model.model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
