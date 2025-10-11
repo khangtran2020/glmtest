@@ -1,5 +1,6 @@
 import os
 import gc
+import sys
 import torch
 import wandb
 import shutil
@@ -664,6 +665,14 @@ def train_multi_gpu_accelerate(
             epoch_loss = 0.0
             num_items = 0.0
 
+            # check parameter device:
+            if accelerator.is_main_process:
+                for name, param in model.named_parameters():
+                    console.log(
+                        f"At epoch {epoch}, Parameter {name} is on {param.device}"
+                    )
+            sys.exit(0)
+
             for step, batch in enumerate(tr_loader):
 
                 if (continue_training == True) and (global_step <= start_step):
@@ -707,9 +716,6 @@ def train_multi_gpu_accelerate(
                                 graph[key] = graph[key].to(device)
 
                         graph_mask = batch["graph_mask"][i].to(device)
-                        # console.log(
-                        #     f"torch where: {torch.where(micro_input['input_ids'][i] == model.config.graph_token_id[1])}"
-                        # )
                         graph_token_index = torch.where(
                             micro_input["input_ids"][i] == config.graph_token_id[1]
                         )[0].tolist()
