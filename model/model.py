@@ -553,22 +553,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if accelerator is not None:
             accelerator.wait_for_everyone()
 
-        # return self.llm_model(
-        #     input_ids=None,
-        #     attention_mask=attention_mask,
-        #     position_ids=position_ids,
-        #     past_key_values=past_key_values,
-        #     inputs_embeds=inputs_embeds,
-        #     labels=labels,
-        #     use_cache=use_cache,
-        #     cache_position=cache_position,
-        # )
-
         if self.is_training:
-            # print("Running in training mode.")
-            # print(
-            #     f"Type of self.llm_model.base_model.model.model: {type(self.llm_model.base_model.model.model)}"
-            # )
             outputs = self.llm_model.base_model.model.model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
@@ -596,8 +581,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             )
 
         hidden_states = outputs.last_hidden_state
-        # print("Hidden states requires_grad:", hidden_states.requires_grad)
-        # print("Hidden states grad_fn:", hidden_states.grad_fn)
+        print("Hidden states requires_grad:", hidden_states.requires_grad)
+        print("Hidden states grad_fn:", hidden_states.grad_fn)
 
         # # pprint(
         # #     f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]Last hidden_states value: {hidden_states} [/cyan]\n\n\n"
@@ -625,9 +610,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 ignore_index=ignore_index,
                 **kwargs,
             )
-        #     # pprint(
-        #     #     f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]loss: {loss}[/cyan], [green]logits shape: {logits}[/green], [blue]labels shape: {labels}[/blue]"
-        #     # )
 
         return CausalLMOutputWithPast(
             loss=loss,
