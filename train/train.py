@@ -739,6 +739,7 @@ def train_multi_gpu_accelerate(
                         graph_masks=graph_masks,
                         graph_token_indices=graph_token_indices,
                         step=global_step,
+                        output_hidden_states=True
                         accelerator=accelerator,
                     )
                     accelerator.wait_for_everyone()
