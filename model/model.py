@@ -554,11 +554,18 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         if self.is_training:
             # print out the type of the models:
+            if self.rank == 0:
+                pprint(f"model type self.llm_model: {self.llm_model}")
+                pprint(
+                    f"model type self.llm_model.base_model: {self.llm_model.base_model}"
+                )
+                pprint(
+                    f"model type self.llm_model.base_model.model: {self.llm_model.base_model.model}"
+                )
+                pprint(
+                    f"model type self.llm_model.base_model.model.model: {self.llm_model.base_model.model.model}"
+                )
 
-            pprint(f"[red]model type: {self.llm_model}[/red]")
-            pprint(f"[red]model type: {self.llm_model.base_model}[/red]")
-            pprint(f"[red]model type: {self.llm_model.base_model.model}[/red]")
-            pprint(f"[red]model type: {self.llm_model.base_model.model.model}[/red]")
             outputs = self.llm_model.base_model.model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
