@@ -500,6 +500,56 @@ class Data(object):
         )
         return nodes
 
+    def prepare_data_by_repo(self) -> None:
+        assert self.processed_data is not None
+
+        # take only data belong to a repo
+        train_data = (
+            self.processed_data["train"]
+            if "train" in self.processed_data.keys()
+            else None
+        )
+        test_modules = (
+            self.processed_data["test_module"]
+            if "test_module" in self.processed_data.keys()
+            else None
+        )
+        test_project = (
+            self.processed_data["test_project"]
+            if "test_project" in self.processed_data.keys()
+            else None
+        )
+
+        if train_data is not None:
+            new_train_data = {}
+            for key in train_data.keys():
+                if self.repo in key:
+                    new_train_data[key] = train_data[key]
+        else:
+            new_train_data = None
+
+        if test_modules is not None:
+            new_test_modules = {}
+            for key in test_modules.keys():
+                if self.repo in key:
+                    new_test_modules[key] = test_modules[key]
+        else:
+            new_test_modules = None
+
+        if test_project is not None:
+            new_test_project = {}
+            for key in test_project.keys():
+                if self.repo in key:
+                    new_test_project[key] = test_project[key]
+        else:
+            new_test_project = None
+
+        self.processed_data = {
+            "train": new_train_data if new_train_data is not None else {},
+            "test_module": new_test_modules if new_test_modules is not None else {},
+            "test_project": new_test_project if new_test_project is not None else {},
+        }
+
     def prepare_data(self) -> None:
         """
         Prepare the training data for the model
@@ -1077,11 +1127,7 @@ class Data(object):
             assert self.processed_data is not None
             # data = deepcopy(self.processed_data)
             # np.random.shuffle(data)
-            num_val = (
-                int(val_split * len(self.processed_data))
-                if isinstance(val_split, float)
-                else val_split
-            )
+            num_val = val_split
             self.logger.log(f"Number of validation data: {num_val}")
 
             # split train and val

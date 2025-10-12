@@ -324,8 +324,6 @@ def validate(
     multi_gpu: bool = False,
 ):
     model.eval()
-    if config is None:
-        config = model.config
     with torch.no_grad():
 
         val_loss = 0.0
@@ -363,8 +361,7 @@ def validate(
 
                         graph_mask = batch["graph_mask"][i].to(device)
                         graph_token_index = torch.where(
-                            micro_input["input_ids"][i]
-                            == model.config.graph_token_id[1]
+                            micro_input["input_ids"][i] == config.graph_token_id[1]
                         )[0].tolist()
                         graphs.append(graph)
                         graph_masks.append(graph_mask)
@@ -384,12 +381,13 @@ def validate(
                 if multi_gpu:
                     all_losses = accelerator.gather(loss)
                     all_losses = torch.where(torch.isnan(all_losses), 0.0, all_losses)
+                    all_losses = all_losses.to("cpu").detach().float()
                     total_loss = torch.sum(all_losses)
-                    batch_loss += total_loss.detach().float().item()
+                    batch_loss += total_loss.to("cpu").detach().float().item()
                 else:
-                    batch_loss += loss.detach().float().item()
+                    batch_loss += loss.to("cpu").detach().float().item()
 
-                logging_gpu_usage(step=step, console=console)
+                # logging_gpu_usage(step=step, console=console)
 
                 for key in micro_input.keys():
                     micro_input[key] = micro_input[key].to("cpu")

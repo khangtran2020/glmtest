@@ -149,7 +149,7 @@ class GLMFDataset(Dataset):
 
             result["input_ids"] = torch.cat(
                 (pad_tensor, result["input_ids"]), dim=1
-            ).to(dtype=torch.bfloat16)
+            )  # .to(dtype=torch.bfloat16)
 
             attention_tensor = torch.tensor(
                 [[0] * pad_tensor.shape[1]],

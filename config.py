@@ -53,6 +53,12 @@ def add_data_group(group):
         "--raw_overwrite", action="store_true", help="overwrite the raw data"
     )
     group.add_argument("--data_fuzz", action="store_true", help="using fuzz data")
+    group.add_argument(
+        "--repo",
+        type=str,
+        help="repo to use for training",
+        default=None,
+    )
 
 
 def add_joern_group(group):
@@ -392,6 +398,23 @@ def add_testgen_group(group):
         "--module_path",
         type=str,
         help="path to the module to generate test cases",
+        default=None,
+    )
+    group.add_argument(
+        "--do_generate",
+        action="store_true",
+        help="generate test cases for the model",
+    )
+    group.add_argument(
+        "--verifier_model",
+        type=str,
+        help="model to verify the test cases",
+        default=None,
+    )
+    group.add_argument(
+        "--verifier_api_key",
+        type=str,
+        help="api key for the verifier model",
         default=None,
     )
 

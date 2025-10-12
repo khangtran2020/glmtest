@@ -7,15 +7,10 @@ from utils.utils import print_args, seed_everything
 from data.utils import get_dataset
 from graph.utils import get_graph
 from train.train import train
-from model.model import GLMFModelForCausalLM, GLMFModelConfig, GLMFModelFuzzing
+from model.model import get_model
 from inference.test import test, eval_bleu_score
 from inference.testcase_generate import testcase_generate
 from train.utils import load_checkpoint
-from utils.constant import (
-    GRAPH_START_TOKEN,
-    GRAPH_PAD_TOKEN,
-    GRAPH_END_TOKEN,
-)
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.optim import AdamW
 from utils.utils import log_ram_usage
@@ -69,6 +64,7 @@ def main() -> None:
         n_hops=args.n_layers,
         max_tokens=args.max_seq_length,
         raw_overwrite=args.raw_overwrite,
+        repo=args.repo,
     )
     if dataset is None:
         console.log("Dataset not found, exiting...")
@@ -78,21 +74,17 @@ def main() -> None:
         ram_usage = log_ram_usage()
         console.log(f"Dataset loaded - RAM usage: {ram_usage:.2f} MB")
 
-    if args.mode == "data":
-        if args.do_crawl:
-            dataset.crawl()
-        if args.do_process_raw:
-            dataset.process_raw()
-        return
-
     if args.mode == "testgen":
         if args.module_path is None:
             dataset.prepare_data_for_test_gen()
     else:
         dataset.prepare_data()
 
+    if args.repo is not None:
+        dataset.prepare_data_by_repo()
+
     dataset.train_test_split(
-        val_split=200, test_only=True if args.mode == "testgen" else False
+        val_split=100, test_only=True if args.mode == "testgen" else False
     )
 
     console.log(f"Broadcasted args and dataset to all processes.")
@@ -148,152 +140,15 @@ def main() -> None:
             value = [dataset.llm_tokenizer.convert_tokens_to_ids(v) for v in value]
             console.log(f"[cyan]{key}[/cyan]: {value}")
 
+    model = get_model(
+        args=args,
+        console=console,
+        tokenizer=dataset.llm_tokenizer,
+        rank=local_rank,
+        device=device,
+    )
+
     if args.mode == "train":
-
-        if args.fuzz_model:
-
-            # Logging the vocabulary size of the tokenizer
-            console.log(f"[cyan]Training with fuzzing mode:[/cyan]")
-
-            glmf_model_config = GLMFModelConfig(
-                llm_model=args.llm_model,
-                use_lora=False,
-                dtype=args.dtype,
-                mode=args.gnn_mode,
-                in_feats=args.in_feats,
-                n_hidden=args.n_hidden,
-                n_layers=args.n_layers,
-                num_head=args.num_head,
-                dropout=args.dropout,
-                lora_r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                lora_target_modules=args.lora_target_modules,
-                device_map="cuda" if torch.cuda.is_available() else "cpu",
-            )
-
-            layer_indices = [
-                i for i in range(args.start_fuzz_layer_index, args.end_fuzz_layer_index)
-            ]
-
-            glmf_model = GLMFModelForCausalLM(
-                config=glmf_model_config,
-                tokenizer=dataset.llm_tokenizer,
-                baseline_prompt=args.baseline_prompt,
-                debug=args.debug,
-                rank=rank,
-                multi_gpu=True if args.num_gpu > 1 else False,
-                is_training=True,
-            )
-
-            glmf_model.config.graph_token_id = [
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
-            ]
-
-            if args.model_weight_path is not None:
-                for file in os.listdir(args.model_weight_path):
-                    if file.endswith(".pt"):
-                        state_dict = torch.load(
-                            os.path.join(args.model_weight_path, file),
-                            map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-                        )
-                        glmf_model.load_state_dict(state_dict)
-
-            config = GLMFModelConfig(
-                llm_model=args.llm_model,
-                use_lora=args.use_lora,
-                dtype=args.dtype,
-                mode=args.gnn_mode,
-                in_feats=args.in_feats,
-                n_hidden=args.n_hidden,
-                n_layers=args.n_layers,
-                num_head=args.num_head,
-                dropout=args.dropout,
-                lora_r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                lora_target_modules=args.lora_target_modules,
-                device_map="cuda" if torch.cuda.is_available() else "cpu",
-            )
-
-            config.graph_token_id = [
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
-            ]
-
-            console.log(
-                f"Config vocab size: {config.vocab_size}, "
-                f"Tokenizer vocab size: {dataset.llm_tokenizer.vocab_size}"
-            )
-
-            model = GLMFModelFuzzing(
-                config=config,
-                rank=local_rank,
-                tokenizer=dataset.llm_tokenizer,
-                baseline_prompt=args.baseline_prompt,
-                multi_gpu=True if args.num_gpu > 1 else False,
-                debug=args.debug,
-                is_training=True,
-                layer_indices=layer_indices,
-                glmf_model=glmf_model,
-                glmf_model_weight_path=args.model_weight_path,
-                kl_g_reg=args.kl_g_reg,
-                kl_d_reg=args.kl_d_reg,
-            )
-
-            if args.only_nvib:
-
-                # freeze all params first
-                for param in model.parameters():
-                    param.requires_grad = False
-
-                # unfreeze NVIB params
-                for name, param in model.named_parameters():
-                    if "nvib_layer" in name:
-                        param.requires_grad = True
-                        console.log(f"Parameter {name} is set to be trainable.")
-
-        else:
-            config = GLMFModelConfig(
-                llm_model=args.llm_model,
-                use_lora=args.use_lora,
-                dtype=args.dtype,
-                mode=args.gnn_mode,
-                in_feats=args.in_feats,
-                n_hidden=args.n_hidden,
-                n_layers=args.n_layers,
-                num_head=args.num_head,
-                dropout=args.dropout,
-                lora_r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                lora_target_modules=args.lora_target_modules,
-                device_map="cuda" if torch.cuda.is_available() else "cpu",
-            )
-
-            model = GLMFModelForCausalLM(
-                config=config,
-                tokenizer=dataset.llm_tokenizer,
-                baseline_prompt=args.baseline_prompt,
-                multi_gpu=True if args.num_gpu > 1 else False,
-                debug=args.debug,
-                rank=local_rank,
-                is_training=True,
-            )
-
-            model.llm_model.gradient_checkpointing_enable()
-            model.config.graph_token_id = [
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
-            ]
-
-            console.log(
-                f"Attention implementation of the model is: {model.llm_model.config._attn_implementation}"
-            )
 
         if args.debug:
             console.log("Model & tokenizer loaded")
@@ -301,43 +156,8 @@ def main() -> None:
                 f"Special tokens added to tokenizer and model: {model.config.graph_token_id}"
             )
 
-        if args.model_weight_path is not None:
-            for file in os.listdir(args.model_weight_path):
-                if file.endswith(".pt"):
-                    state_dict = torch.load(
-                        os.path.join(args.model_weight_path, file),
-                        map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-                    )
-                    model.load_state_dict(state_dict)
-
-        total_params = 0
-        for name, param in model.llm_model.base_model.model.model.named_parameters():
-            if param.requires_grad:
-                console.log(
-                    f"[blue]{name}: {param.numel()} parameters, shape={tuple(param.shape)}[/blue]"
-                )
-                total_params += param.numel()
-
-        console.log(
-            f"[green]Total trainable parameters from model: {total_params}[/green]"
-        )
-
-        optimizer = AdamW(
-            filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
-        )
+        optimizer = AdamW(model.parameters(), lr=args.learning_rate)
         lr_scheduler = CosineAnnealingLR(optimizer, T_max=100, eta_min=5e-8)
-
-        num_params = 0
-        for i, param_group in enumerate(optimizer.param_groups):
-            group_params = sum(
-                p.numel() for p in param_group["params"] if p.requires_grad
-            )
-            num_params += group_params
-            console.log(f"[cyan]Param group {i}: {group_params} parameters[/cyan]")
-
-        console.log(
-            f"[yellow]Total parameters tracked by optimizer: {num_params}[/yellow]"
-        )
 
         if args.continue_training:
             assert (
@@ -370,157 +190,6 @@ def main() -> None:
         )
 
     elif args.mode == "test":
-        # load model
-        assert (
-            args.model_weight_path is not None
-        ), "Model directory must be specified for testing."
-
-        if "current_checkpoint" in args.model_weight_path:
-            use_lora = True
-        else:
-            use_lora = False
-
-        if args.fuzz_model:
-
-            # Logging the vocabulary size of the tokenizer
-            console.log(f"[cyan]Testing with fuzzing mode:[/cyan]")
-
-            glmf_model_config = GLMFModelConfig(
-                llm_model=args.llm_model,
-                use_lora=False,
-                dtype=args.dtype,
-                mode=args.gnn_mode,
-                in_feats=args.in_feats,
-                n_hidden=args.n_hidden,
-                n_layers=args.n_layers,
-                num_head=args.num_head,
-                dropout=args.dropout,
-                lora_r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                lora_target_modules=args.lora_target_modules,
-                device_map="cuda" if torch.cuda.is_available() else "cpu",
-            )
-
-            layer_indices = [
-                i for i in range(args.start_fuzz_layer_index, args.end_fuzz_layer_index)
-            ]
-            glmf_model = GLMFModelForCausalLM(
-                config=glmf_model_config,
-                tokenizer=dataset.llm_tokenizer,
-                baseline_prompt=args.baseline_prompt,
-                debug=args.debug,
-                rank=rank,
-                multi_gpu=True if args.num_gpu > 1 else False,
-                is_training=False,
-            )
-
-            glmf_model.config.graph_token_id = [
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
-            ]
-
-            config = GLMFModelConfig(
-                llm_model=args.llm_model,
-                use_lora=False,
-                dtype=args.dtype,
-                mode=args.gnn_mode,
-                in_feats=args.in_feats,
-                n_hidden=args.n_hidden,
-                n_layers=args.n_layers,
-                num_head=args.num_head,
-                dropout=args.dropout,
-                lora_r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                lora_target_modules=args.lora_target_modules,
-                device_map="cuda" if torch.cuda.is_available() else "cpu",
-            )
-
-            config.graph_token_id = [
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
-            ]
-
-            model = GLMFModelFuzzing(
-                config=config,
-                rank=local_rank,
-                tokenizer=dataset.llm_tokenizer,
-                baseline_prompt=args.baseline_prompt,
-                multi_gpu=True if args.num_gpu > 1 else False,
-                debug=args.debug,
-                is_training=False,
-                layer_indices=layer_indices,
-                glmf_model=glmf_model,
-                glmf_model_weight_path=args.model_weight_path,
-                kl_g_reg=args.kl_g_reg,
-                kl_d_reg=args.kl_d_reg,
-                fuzzing=args.fuzzing,
-            )
-        else:
-            config = GLMFModelConfig(
-                llm_model=args.llm_model,
-                use_lora=use_lora,
-                dtype=args.dtype,
-                mode=args.gnn_mode,
-                in_feats=args.in_feats,
-                n_hidden=args.n_hidden,
-                n_layers=args.n_layers,
-                num_head=args.num_head,
-                dropout=args.dropout,
-                lora_r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                lora_target_modules=args.lora_target_modules,
-                device_map="cuda",
-            )
-
-            model = GLMFModelForCausalLM(
-                config=config,
-                tokenizer=dataset.llm_tokenizer,
-                baseline_prompt=args.baseline_prompt,
-                debug=args.debug,
-                rank=rank,
-                multi_gpu=True if args.num_gpu > 1 else False,
-                is_training=False,
-            )
-
-            model.config.graph_token_id = [
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
-            ]
-
-        # take .pt file from the model_weight_path
-        console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
-        for file in os.listdir(args.model_weight_path):
-            if file.endswith(".pt"):
-                state_dict = torch.load(
-                    os.path.join(args.model_weight_path, file),
-                    map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-                )
-                model.load_state_dict(state_dict)
-                if use_lora:
-                    model.llm_model = model.llm_model.merge_and_unload()
-                console.log(f"[red]Model weights loaded from {file}[/red]")
-
-        # model = model.to(dtype=torch.float)
-        # unifying dtype to avoid errors
-        for n, p in model.named_parameters():
-            if args.dtype == "bf16":
-                if p.dtype != torch.bfloat16:
-                    p.data = p.data.to(torch.bfloat16)
-            elif args.dtype == "fp16":
-                if p.dtype != torch.float16:
-                    p.data = p.data.to(torch.float16)
-
-        console.log(
-            f"Model is loaded to device: {model.device} - with type {model.dtype}"
-        )
-        for name, param in model.named_parameters():
-            console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
 
         test(args=args, dataset=dataset, model=model, console=console)
 
@@ -531,163 +200,6 @@ def main() -> None:
         eval_bleu_score(args=args, dataset=dataset, console=console)
 
     elif args.mode == "testgen":
-        # load model
-        assert (
-            args.model_weight_path is not None
-        ), "Model directory must be specified for testing."
-
-        if "current_checkpoint" in args.model_weight_path:
-            use_lora = True
-        else:
-            use_lora = False
-
-        if args.fuzz_model:
-
-            # Logging the vocabulary size of the tokenizer
-            console.log(f"[cyan]Testing with fuzzing mode:[/cyan]")
-
-            glmf_model_config = GLMFModelConfig(
-                llm_model=args.llm_model,
-                use_lora=False,
-                dtype=args.dtype,
-                mode=args.gnn_mode,
-                in_feats=args.in_feats,
-                n_hidden=args.n_hidden,
-                n_layers=args.n_layers,
-                num_head=args.num_head,
-                dropout=args.dropout,
-                lora_r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                lora_target_modules=args.lora_target_modules,
-                device_map="cuda" if torch.cuda.is_available() else "cpu",
-            )
-
-            layer_indices = [
-                i for i in range(args.start_fuzz_layer_index, args.end_fuzz_layer_index)
-            ]
-            glmf_model = GLMFModelForCausalLM(
-                config=glmf_model_config,
-                tokenizer=dataset.llm_tokenizer,
-                baseline_prompt=args.baseline_prompt,
-                debug=args.debug,
-                rank=rank,
-                multi_gpu=True if args.num_gpu > 1 else False,
-                is_training=False,
-            )
-
-            glmf_model.config.graph_token_id = [
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
-            ]
-
-            config = GLMFModelConfig(
-                llm_model=args.llm_model,
-                use_lora=False,
-                dtype=args.dtype,
-                mode=args.gnn_mode,
-                in_feats=args.in_feats,
-                n_hidden=args.n_hidden,
-                n_layers=args.n_layers,
-                num_head=args.num_head,
-                dropout=args.dropout,
-                lora_r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                lora_target_modules=args.lora_target_modules,
-                device_map="cuda" if torch.cuda.is_available() else "cpu",
-            )
-
-            config.graph_token_id = [
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
-            ]
-
-            model = GLMFModelFuzzing(
-                config=config,
-                rank=local_rank,
-                tokenizer=dataset.llm_tokenizer,
-                baseline_prompt=args.baseline_prompt,
-                multi_gpu=True if args.num_gpu > 1 else False,
-                debug=args.debug,
-                is_training=False,
-                layer_indices=layer_indices,
-                glmf_model=glmf_model,
-                glmf_model_weight_path=args.model_weight_path,
-                kl_g_reg=args.kl_g_reg,
-                kl_d_reg=args.kl_d_reg,
-                fuzzing=args.fuzzing,
-            )
-        else:
-            config = GLMFModelConfig(
-                llm_model=args.llm_model,
-                use_lora=use_lora,
-                dtype=args.dtype,
-                mode=args.gnn_mode,
-                in_feats=args.in_feats,
-                n_hidden=args.n_hidden,
-                n_layers=args.n_layers,
-                num_head=args.num_head,
-                dropout=args.dropout,
-                lora_r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                lora_target_modules=args.lora_target_modules,
-                device_map="cuda",
-            )
-
-            model = GLMFModelForCausalLM(
-                config=config,
-                tokenizer=dataset.llm_tokenizer,
-                baseline_prompt=args.baseline_prompt,
-                debug=args.debug,
-                rank=rank,
-                multi_gpu=True if args.num_gpu > 1 else False,
-                is_training=False,
-            )
-
-            model.config.graph_token_id = [
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
-                dataset.llm_tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
-            ]
-
-        # take .pt file from the model_weight_path
-        console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
-        for file in os.listdir(args.model_weight_path):
-            if file.endswith(".pt"):
-                state_dict = torch.load(
-                    os.path.join(args.model_weight_path, file),
-                    map_location=f"cuda:{rank}" if args.num_gpu >= 1 else "cpu",
-                )
-                model.load_state_dict(state_dict)
-                if use_lora:
-                    model.llm_model = model.llm_model.merge_and_unload()
-                console.log(f"[red]Model weights loaded from {file}[/red]")
-
-        # model = model.to(dtype=torch.float)
-        # unifying dtype to avoid errors
-        for n, p in model.named_parameters():
-            if args.dtype == "bf16":
-                if p.dtype != torch.bfloat16:
-                    p.data = p.data.to(torch.bfloat16)
-                if p.device != device:
-                    p.data = p.data.to(device)
-            elif args.dtype == "fp16":
-                if p.dtype != torch.float16:
-                    p.data = p.data.to(torch.float16)
-                if p.device != device:
-                    p.data = p.data.to(device)
-
-        console.log(
-            f"Model is loaded to device: {model.device} - with type {model.dtype}"
-        )
-        for name, param in model.named_parameters():
-            console.log(
-                f"[yellow]Parameter {name}, dtype: {param.dtype}, device: {param.device}[/yellow]"
-            )
 
         console.log(f"[green]Using device: {device}[/green]")
         testcase_generate(
@@ -696,6 +208,7 @@ def main() -> None:
             model=model,
             device=device,
             console=console,
+            do_generate=args.do_generate,
         )
 
 
