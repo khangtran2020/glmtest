@@ -91,7 +91,6 @@ def get_model_train(
                     state_dict = torch.load(
                         os.path.join(args.model_weight_path, file),
                         map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-                        weights_only=True,
                     )
                     glmf_model.load_state_dict(state_dict)
 
@@ -149,84 +148,34 @@ def get_model_train(
                 if "nvib_layer" in name:
                     param.requires_grad = True
                     console.log(f"Parameter {name} is set to be trainable.")
+
     else:
-        if args.model_weight_path is not None:
+        config = GLMFModelConfig(
+            llm_model=args.llm_model,
+            use_lora=args.use_lora,
+            dtype=args.dtype,
+            mode=args.gnn_mode,
+            in_feats=args.in_feats,
+            n_hidden=args.n_hidden,
+            n_layers=args.n_layers,
+            num_head=args.num_head,
+            dropout=args.dropout,
+            lora_r=args.lora_r,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            lora_target_modules=args.lora_target_modules,
+            device_map="cuda" if torch.cuda.is_available() else "cpu",
+        )
 
-            config = GLMFModelConfig(
-                llm_model=args.llm_model,
-                use_lora=False,
-                dtype=args.dtype,
-                mode=args.gnn_mode,
-                in_feats=args.in_feats,
-                n_hidden=args.n_hidden,
-                n_layers=args.n_layers,
-                num_head=args.num_head,
-                dropout=args.dropout,
-                lora_r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                lora_target_modules=args.lora_target_modules,
-                device_map="cuda" if torch.cuda.is_available() else "cpu",
-            )
-
-            model = GLMFModelForCausalLM(
-                config=config,
-                tokenizer=tokenizer,
-                baseline_prompt=args.baseline_prompt,
-                multi_gpu=True if args.num_gpu > 1 else False,
-                debug=args.debug,
-                rank=rank,
-                is_training=False,
-            )
-
-            for file in os.listdir(args.model_weight_path):
-                if file.endswith(".pt"):
-                    state_dict = torch.load(
-                        os.path.join(args.model_weight_path, file),
-                        map_location="cpu",
-                        weights_only=True,
-                    )
-                    model.load_state_dict(state_dict)
-                    console.log(
-                        f"[red]Model weights loaded from {os.path.join(args.model_weight_path, file)}[/red]"
-                    )
-
-            model.init_for_train(tokenizer=tokenizer, rank=rank)
-            # make the model to bf16/fp16
-            for n, p in model.named_parameters():
-                if args.dtype == "bf16":
-                    if p.dtype != torch.bfloat16:
-                        p.data = p.data.to(torch.bfloat16)
-                elif args.dtype == "fp16":
-                    if p.dtype != torch.float16:
-                        p.data = p.data.to(torch.float16)
-
-        else:
-            config = GLMFModelConfig(
-                llm_model=args.llm_model,
-                use_lora=args.use_lora,
-                dtype=args.dtype,
-                mode=args.gnn_mode,
-                in_feats=args.in_feats,
-                n_hidden=args.n_hidden,
-                n_layers=args.n_layers,
-                num_head=args.num_head,
-                dropout=args.dropout,
-                lora_r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                lora_target_modules=args.lora_target_modules,
-                device_map="cuda" if torch.cuda.is_available() else "cpu",
-            )
-            model = GLMFModelForCausalLM(
-                config=config,
-                tokenizer=tokenizer,
-                baseline_prompt=args.baseline_prompt,
-                multi_gpu=True if args.num_gpu > 1 else False,
-                debug=args.debug,
-                rank=rank,
-                is_training=True,
-            )
+        model = GLMFModelForCausalLM(
+            config=config,
+            tokenizer=tokenizer,
+            baseline_prompt=args.baseline_prompt,
+            multi_gpu=True if args.num_gpu > 1 else False,
+            debug=args.debug,
+            rank=rank,
+            is_training=True,
+        )
 
         model.llm_model.gradient_checkpointing_enable()
         model.config.graph_token_id = [
