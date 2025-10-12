@@ -71,19 +71,12 @@ def main() -> None:
         raw_overwrite=args.raw_overwrite,
     )
     if dataset is None:
-        console.log("Dataset not found, exiting...")
+        console.log("[red]Dataset not found, exiting...[/red]")
         return
 
     if args.debug:
         ram_usage = log_ram_usage()
         console.log(f"Dataset loaded - RAM usage: {ram_usage:.2f} MB")
-
-    # if args.mode == "data":
-    #     if args.do_crawl:
-    #         dataset.crawl()
-    #     if args.do_process_raw:
-    #         dataset.process_raw()
-    #     return
 
     if args.mode == "testgen":
         if args.module_path is None:
@@ -91,8 +84,11 @@ def main() -> None:
     else:
         dataset.prepare_data()
 
+    if args.repo is not None:
+        dataset.prepare_data_by_repo()
+
     dataset.train_test_split(
-        val_split=200, test_only=True if args.mode == "testgen" else False
+        val_split=int(100), test_only=True if args.mode == "testgen" else False
     )
 
     console.log(f"Broadcasted args and dataset to all processes.")
