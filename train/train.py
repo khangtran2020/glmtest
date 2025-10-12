@@ -744,25 +744,22 @@ def train_multi_gpu_accelerate(
                     )
                     accelerator.wait_for_everyone()
                     loss = outputs.loss
-                    print(
-                        f"Process {local_rank} - Step {global_step}: loss before backward: {loss} - outputs {outputs}"
-                    )
                     accelerator.backward(loss)
                     accelerator.wait_for_everyone()
 
-                    # check gradient:
-                    if accelerator.is_main_process:
-                        for name, param in model.named_parameters():
-                            if param.requires_grad:
-                                if param.grad is not None:
-                                    console.log(
-                                        f"After backward - Parameter {name} grad is {param.grad.norm().item():.4f}"
-                                    )
-                                else:
-                                    console.log(
-                                        f"After backward - Parameter {name} grad is None"
-                                    )
-                    sys.exit(0)
+                    # # check gradient:
+                    # if accelerator.is_main_process:
+                    #     for name, param in model.named_parameters():
+                    #         if param.requires_grad:
+                    #             if param.grad is not None:
+                    #                 console.log(
+                    #                     f"After backward - Parameter {name} grad is {param.grad.norm().item():.4f}"
+                    #                 )
+                    #             else:
+                    #                 console.log(
+                    #                     f"After backward - Parameter {name} grad is None"
+                    #                 )
+                    # sys.exit(0)
 
                 if accelerator.sync_gradients:
                     accelerator.wait_for_everyone()
