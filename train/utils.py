@@ -276,5 +276,4 @@ def extract_code_block(markdown: str) -> Optional[str]:
     match = re.search(pattern, cleaned)
     if match:
         return match.group(1)
-
-    return cleaned
+    return ""

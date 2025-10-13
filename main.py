@@ -198,30 +198,6 @@ def main() -> None:
         )
 
     elif args.mode == "test":
-        # load model
-        assert (
-            args.model_weight_path is not None
-        ), "Model directory must be specified for testing."
-
-        if "current_checkpoint" in args.model_weight_path:
-            use_lora = True
-        else:
-            use_lora = False
-
-        # take .pt file from the model_weight_path
-        console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
-        for file in os.listdir(args.model_weight_path):
-            if file.endswith(".pt"):
-                state_dict = torch.load(
-                    os.path.join(args.model_weight_path, file),
-                    map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-                )
-                model.load_state_dict(state_dict)
-                if use_lora:
-                    model.llm_model = model.llm_model.merge_and_unload()
-                console.log(f"[red]Model weights loaded from {file}[/red]")
-
-        # model = model.to(dtype=torch.float)
         # unifying dtype to avoid errors
         for n, p in model.named_parameters():
             if args.dtype == "bf16":
@@ -246,30 +222,7 @@ def main() -> None:
         eval_bleu_score(args=args, dataset=dataset, console=console)
 
     elif args.mode == "testgen":
-        # load model
-        assert (
-            args.model_weight_path is not None
-        ), "Model directory must be specified for testing."
 
-        if "current_checkpoint" in args.model_weight_path:
-            use_lora = True
-        else:
-            use_lora = False
-
-        # take .pt file from the model_weight_path
-        console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
-        for file in os.listdir(args.model_weight_path):
-            if file.endswith(".pt"):
-                state_dict = torch.load(
-                    os.path.join(args.model_weight_path, file),
-                    map_location=f"cuda:{rank}" if args.num_gpu >= 1 else "cpu",
-                )
-                model.load_state_dict(state_dict)
-                if use_lora:
-                    model.llm_model = model.llm_model.merge_and_unload()
-                console.log(f"[red]Model weights loaded from {file}[/red]")
-
-        # model = model.to(dtype=torch.float)
         # unifying dtype to avoid errors
         for n, p in model.named_parameters():
             if args.dtype == "bf16":
