@@ -224,25 +224,26 @@ def main() -> None:
     elif args.mode == "testgen":
 
         # unifying dtype to avoid errors
-        for n, p in model.named_parameters():
-            if args.dtype == "bf16":
-                if p.dtype != torch.bfloat16:
-                    p.data = p.data.to(torch.bfloat16)
-                if p.device != device:
-                    p.data = p.data.to(device)
-            elif args.dtype == "fp16":
-                if p.dtype != torch.float16:
-                    p.data = p.data.to(torch.float16)
-                if p.device != device:
-                    p.data = p.data.to(device)
+        if model is not None:
+            for n, p in model.named_parameters():
+                if args.dtype == "bf16":
+                    if p.dtype != torch.bfloat16:
+                        p.data = p.data.to(torch.bfloat16)
+                    if p.device != device:
+                        p.data = p.data.to(device)
+                elif args.dtype == "fp16":
+                    if p.dtype != torch.float16:
+                        p.data = p.data.to(torch.float16)
+                    if p.device != device:
+                        p.data = p.data.to(device)
 
-        console.log(
-            f"Model is loaded to device: {model.device} - with type {model.dtype}"
-        )
-        for name, param in model.named_parameters():
             console.log(
-                f"[yellow]Parameter {name}, dtype: {param.dtype}, device: {param.device}[/yellow]"
+                f"Model is loaded to device: {model.device} - with type {model.dtype}"
             )
+            for name, param in model.named_parameters():
+                console.log(
+                    f"[yellow]Parameter {name}, dtype: {param.dtype}, device: {param.device}[/yellow]"
+                )
 
         console.log(f"[green]Using device: {device}[/green]")
         testcase_generate(
