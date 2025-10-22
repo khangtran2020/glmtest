@@ -176,7 +176,7 @@ class TestGenEval(Data):
                         graph_path, f"{raw_data[key][NEW_KEY_ID]}_mask.pt"
                     )
                     # dat["repo"] = raw_data[key]["repo"]
-                    dat["module_path"] = raw_data[key]["code_path"]
+                    dat["module_path"] = raw_data[key]["code_file"]
 
                     if (not os.path.exists(dat["code_path"])) or (
                         os.path.exists(dat["code_path"]) and self.raw_overwrite
