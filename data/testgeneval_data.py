@@ -146,6 +146,10 @@ class TestGenEval(Data):
             with open(os.path.join(self.data_path, f"{data_n}.jsonl"), "r") as file:
                 raw_data = [json.loads(l) for l in file.readlines()]
 
+            for i, task in enumerate(raw_data):
+                if NEW_KEY_ID not in task.keys():
+                    task[NEW_KEY_ID] = i
+
             raw_data = {task[NEW_KEY_ID]: task for task in raw_data}
 
             with Progress() as progress:
