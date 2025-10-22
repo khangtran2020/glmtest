@@ -21,6 +21,28 @@ from model.gnn import GRAPH_KEYS
 # typing
 from typing import List, Union, Dict, Any
 
+SYSTEM_PROMPT = """You are an AI agent that generates executable Python test cases targeting a specific execution branch of a module.
+
+Inputs:
+- Execution branch information: the lines of code executed in the target branch.
+- Truncated module source: only the lines relevant to that branch.
+- Module path: a valid, importable path from the PYTHONPATH directory.
+- Code Property Graph (CPG) node embeddings: semantic and structural information about the code elements related to the branch.
+
+Tasks:
+1. Generate a runnable Python test file that executes the specified branch of the module.
+2. Import the module directly from the provided module path without redefining or altering it.
+3. Use the CPG embeddings and branch data to infer input values or conditions that trigger the target branch.
+4. Include meaningful assertions that confirm correct behavior and should pass for the given branch.
+5. Output only the final, runnable Python test code—no explanations or reasoning text.
+
+Requirements:
+- All imports must be valid and correspond to existing modules; do not invent or hallucinate any packages.
+- The generated test must be executable without modification.
+- Assertions must verify expected results or state changes that indicate successful branch execution.
+- Use standard testing practices (unittest, pytest, or assert statements).
+- Keep the code clear, minimal, and maintainable."""
+
 PYNGUIN_TEMPLATE = """docker run --rm -v {}:/input:ro -v {}:/output -v {}:/package:ro {} \
     --module-name {} --coverage_metrics BRANCH --maximum_search_time {} --report-dir /output --project_path /input --output-path /output --output_variables TargetModule,CoverageTimeline --assertion-generation NONE"""
 
@@ -43,15 +65,21 @@ PROMPT_GRAPH = """Generate the test case for the graph embedding of a targeted e
 {}
 """
 
-PROMPT_CODE_GRAPH = """Generate the test case for the code below and the corresponding graph embedding of a targeted execution branch:
+PROMPT_CODE_GRAPH = """Execution Branches Information (Line to Line executed):
+{execution_branch}
 
-Here is the code:
-```
-{}
-```
+Truncated Module Source:
+{truncated_module}
 
-Here is the graph embedding:
-{}
+Module Path:
+{module_path}
+
+Code Property Graph (CPG) Node Embeddings:
+{cpg_embeddings}
+
+Task:
+Generate a runnable Python test case that specifically execute the above execution branch 
+in the given module, using only valid imports and assertions that must pass.
 """
 
 RESPONSE_TEMPLATE = """Here is the test case:
@@ -402,26 +430,25 @@ class Data(object):
             print(f"An error occurred: {e}")
             return -1
 
-    def get_mask_tensor(self, graph: Dict, branch: List) -> torch.Tensor:
+    def get_mask_tensor(
+        self, graph: Dict, branch: List[List[int]]
+    ) -> List[torch.Tensor]:
 
-        mask = np.zeros(len(graph["nodes"]))
-        depth = get_depth(branch)
-        if depth > 2:
-            line_list = list(
-                set(np.concatenate(np.array(branch, dtype=object)).tolist())
-            )
-        else:
-            line_list = list(set(branch))
-        for i in range(len(graph["nodes"])):
-            node = graph["nodes"][i]
-            if node["location"]["filename"] == "N/A":
-                try:
-                    if node["properties"]["LINE_NUMBER"] in line_list:
-                        mask[i] = 1
-                except:
-                    mask[i] = 0
-        mask = torch.Tensor([mask])
-        return mask
+        all_mask = []
+        for branch_item in branch:
+            mask = np.zeros(len(graph["nodes"]))
+            line_list = list(set(branch_item))
+            for i in range(len(graph["nodes"])):
+                node = graph["nodes"][i]
+                if node["location"]["filename"] == "N/A":
+                    try:
+                        if node["properties"]["LINE_NUMBER"] in line_list:
+                            mask[i] = 1
+                    except:
+                        mask[i] = 0
+            mask = torch.Tensor([mask])
+            all_mask.append(mask)
+        return all_mask
 
     def get_node_features(self, graph: Dict) -> torch.Tensor:
         df = self.preprocess(graph)
@@ -595,20 +622,7 @@ class Data(object):
             num_tokens = []
             num_discarded = 0
 
-            if ("graph" in self.baseline_prompt) and self.debug:
-                graph_stats = {}
-                for key in GRAPH_KEYS:
-                    graph_stats[key] = {
-                        "num_nodes": [],
-                        "num_edges": [],
-                        "in_max_degrees": [],
-                        "out_max_degrees": [],
-                        "in_min_degrees": [],
-                        "out_min_degrees": [],
-                        "num_components": [],
-                    }
-
-            for data_n in self.data.keys():
+            for data_n in self.data.keys():  # train, test_module, test_project
 
                 self.processed_data[data_n] = {}
 
@@ -616,11 +630,9 @@ class Data(object):
                     with open(dat["code_path"], "r") as file:
                         src_code = file.read()
 
-                    mask = torch.load(dat["graph"]["mask_path"], weights_only=True)
-                    self.logger.log(
-                        f"Loaded mask for {uuid}: {len(mask)} and {len(dat['test_cases'])}"
-                    )
-                    assert len(mask) == len(dat["test_cases"])
+                    module_path = dat.get("module_path", "N/A")
+                    all_masks = torch.load(dat["graph"]["mask_path"], weights_only=True)
+                    assert len(all_masks) == len(dat["test_cases"])
 
                     if "graph" in self.baseline_prompt:
                         graph_name = f"{uuid}_graph.pt"
@@ -657,31 +669,6 @@ class Data(object):
                                 continue
                             torch.save(graph_dict, graph_path)
 
-                        if self.debug:
-                            gstats = self.get_graph_stats(graph_dict)
-                            for key in gstats.keys():
-                                graph_stats[key]["num_nodes"].append(
-                                    gstats[key]["num_nodes"]
-                                )
-                                graph_stats[key]["num_edges"].append(
-                                    gstats[key]["num_edges"]
-                                )
-                                graph_stats[key]["in_max_degrees"].append(
-                                    gstats[key]["in_max_degrees"]
-                                )
-                                graph_stats[key]["out_max_degrees"].append(
-                                    gstats[key]["out_max_degrees"]
-                                )
-                                graph_stats[key]["in_min_degrees"].append(
-                                    gstats[key]["in_min_degrees"]
-                                )
-                                graph_stats[key]["out_min_degrees"].append(
-                                    gstats[key]["out_min_degrees"]
-                                )
-                                graph_stats[key]["num_components"].append(
-                                    gstats[key]["num_components"]
-                                )
-
                     for testcase in dat["test_cases"].keys():
                         test_code = dat["test_cases"][testcase]["test_case"]
                         if self.data_fuzz:
@@ -690,10 +677,13 @@ class Data(object):
                             num_discarded += 1
                             continue
                         mask_key = int(testcase.split("_")[-1])
-                        branch = mask[mask_key]
+                        branch_masks: List[torch.Tensor] = all_masks[mask_key]
                         branch_line = dat["test_cases"][testcase]["branch"]
-                        active_node = get_index_by_value(a=branch[0], val=1)
-                        if active_node.size(0) == 0:
+                        active_nodes = [
+                            get_index_by_value(a=branch_masks[i][0], val=1)
+                            for i in range(len(branch_masks))
+                        ]
+                        if len(active_nodes) == 0:
                             self.logger.log(
                                 f"Active node empty at uuid: {uuid} testcase: {testcase}"
                             )
@@ -703,8 +693,9 @@ class Data(object):
                         result = self.get_prompt(
                             src_code=src_code,
                             testcase_out=test_code,
-                            mask=active_node,
+                            active_nodes=active_nodes,
                             tokenizer=self.llm_tokenizer,
+                            module_path=module_path,
                             branch=branch_line,
                             gnn_mode=self.gnn_mode,
                         )
@@ -722,8 +713,11 @@ class Data(object):
                                 "prompt": prompt,
                                 "response": response,
                                 "full_text": full_text,
-                                "active_node": active_node.tolist(),
-                                "mask": mask[mask_key].tolist(),
+                                "active_node": active_nodes,
+                                "mask": [
+                                    all_masks[mask_key][i].tolist()
+                                    for i in range(len(all_masks[mask_key]))
+                                ],
                                 "graph_path": graph_path,
                             }
                         else:
@@ -764,19 +758,6 @@ class Data(object):
         self.logger.log(
             f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_tokens)}"
         )
-
-        if "graph" in self.baseline_prompt and self.debug:
-            for key in graph_stats.keys():
-                self.logger.log(f"============= For graph {key}: =============")
-                for skey in graph_stats[key].keys():
-                    quartiles = np.quantile(
-                        graph_stats[key][skey], [0, 0.25, 0.5, 0.75, 1]
-                    )
-                    max_num = max(graph_stats[key][skey])
-                    min_num = min(graph_stats[key][skey])
-                    self.logger.log(
-                        f"Statistics of {skey}: {quartiles}, max: {max_num}, min: {min_num}, num_data: {len(graph_stats[key][skey])}"
-                    )
 
     def prepare_data_for_test_gen(self):
         assert self.data is not None
@@ -829,7 +810,10 @@ class Data(object):
                     with open(dat["code_path"], "r") as file:
                         src_code = file.read()
 
+                    module_path = dat.get("module_path", "N/A")
                     branches = get_all_branch(code=src_code)
+                    init_branch = branches[0]
+                    branches = branches[1:]
 
                     if "graph" in self.baseline_prompt:
                         graph_name = f"{uuid}_graph.pt"
@@ -869,13 +853,16 @@ class Data(object):
                             torch.save(graph_dict, graph_path)
 
                     for i, branch in enumerate(branches):
-                        mask = self.get_mask_tensor(graph=graph, branch=branch)
-                        assert len(mask.shape) == 2, f"Mask shape is {mask.shape}"
-                        active_node = get_index_by_value(a=mask[0], val=1)
-                        if active_node.size(0) == 0:
-                            self.logger.log(
-                                f"Active node empty at uuid: {uuid} for branch: {branch}"
-                            )
+                        all_mask = self.get_mask_tensor(
+                            graph=graph, branch=[init_branch] + branch
+                        )
+
+                        active_node = [
+                            get_index_by_value(a=all_mask[i][0], val=1)
+                            for i in range(len(all_mask))
+                        ]
+                        if len(active_node) == 0:
+                            self.logger.log(f"Active node empty at uuid: {uuid}")
                             num_discarded += 1
                             continue
 
@@ -884,10 +871,11 @@ class Data(object):
                             testcase_out=None,
                             mask=active_node,
                             tokenizer=self.llm_tokenizer,
-                            branch=branch,
+                            module_path=module_path,
+                            branch=[init_branch] + branch,
                             gnn_mode=self.gnn_mode,
-                            testing=True,
                         )
+
                         if result is None:
                             num_discarded += 1
                             continue
@@ -897,13 +885,15 @@ class Data(object):
                         num_tokens.append(num_token)
 
                         if "graph" in self.baseline_prompt:
+
                             data = {
                                 "uuid": f"{uuid}_testcase_{i}",
                                 "prompt": prompt,
-                                "active_node": active_node.tolist(),
-                                "mask": mask.tolist(),
+                                "active_node": active_node,
+                                "mask": all_mask,
                                 "graph_path": graph_path,
                             }
+
                         else:
                             data = {
                                 "uuid": f"{uuid}_testcase_{i}",
@@ -987,8 +977,9 @@ class Data(object):
         self,
         src_code: str,
         testcase_out: str,
-        mask: torch.Tensor,
+        active_nodes: List[torch.Tensor],
         branch: List,
+        module_path: str,
         tokenizer: PreTrainedTokenizer,
         gnn_mode: str = "graph",
         testing: bool = False,
@@ -999,9 +990,19 @@ class Data(object):
         # )
         if not testing:
             if gnn_mode == "graph":
-                graph_pad = "<|graph_pad|>"
+                graph_pad = ""
+                for i, item in enumerate(active_nodes):
+                    if i == 0:
+                        graph_pad += "Import branch: <|graph_pad|>"
+                    else:
+                        graph_pad += f"Bracnh #{i+1}: <|graph_pad|>"
             else:
-                graph_pad = "<|graph_pad|>" * mask.size(0)
+                graph_pad = ""
+                for i, item in enumerate(active_nodes):
+                    if i == 0:
+                        graph_pad += "Import branch: " + "<|graph_pad|>" * item.size(0)
+                    else:
+                        graph_pad += f"Bracnh #{i+1}: " + "<|graph_pad|>" * item.size(0)
             if self.baseline_prompt == "code":
                 code_line = self.generate_code_line(branch)
                 text = PROMPT_CODE.format(src_code, code_line)
@@ -1014,15 +1015,20 @@ class Data(object):
                 response = RESPONSE_TEMPLATE.format(testcase_out)
             elif self.baseline_prompt == "code_tr":
                 # self.logger.log("Truncating code...")
-                trucated_code = self.truncate_code(src_code=src_code, branch=branch)
-                if trucated_code is None:
+                truncated_code = self.truncate_code(src_code=src_code, branch=branch)
+                if truncated_code is None:
                     self.logger.log("Truncated code is None")
                     return None
                 text = PROMPT_CODE_TR.format(trucated_code)
                 response = RESPONSE_TEMPLATE.format(testcase_out)
             elif self.baseline_prompt == "graph_tr":
-                trucated_code = self.truncate_code(src_code=src_code, branch=branch)
-                text = PROMPT_CODE_GRAPH.format(trucated_code, graph_pad)
+                truncated_code = self.truncate_code(src_code=src_code, branch=branch)
+                branch_line = ""
+                for i, branch_item in enumerate(branch):
+                    branch_line += f"Branch #{i+1}" + "->".join(branch_item) + "\n"
+                text = PROMPT_CODE_GRAPH.format(
+                    branch_line, truncated_code, module_path, graph_pad
+                )
                 response = RESPONSE_TEMPLATE.format(testcase_out)
             elif self.baseline_prompt == "code_baseline":
                 code_line = self.generate_code_line(branch)
@@ -1031,6 +1037,7 @@ class Data(object):
 
             task_prompt = tokenizer.apply_chat_template(
                 [
+                    {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": text},
                     {"role": "assistant", "content": response},
                 ],
@@ -1038,7 +1045,10 @@ class Data(object):
             )
 
             task_prompt_input = tokenizer.apply_chat_template(
-                [{"role": "user", "content": text}],
+                [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": text},
+                ],
                 tokenize=False,
             )
 
@@ -1056,9 +1066,19 @@ class Data(object):
             return task_prompt_input, task_prompt_output, task_prompt
         else:
             if gnn_mode == "graph":
-                graph_pad = "<|graph_pad|>"
+                graph_pad = ""
+                for i, item in enumerate(active_nodes):
+                    if i == 0:
+                        graph_pad += "Import branch: <|graph_pad|>"
+                    else:
+                        graph_pad += f"Bracnh #{i+1}: <|graph_pad|>"
             else:
-                graph_pad = "<|graph_pad|>" * mask.size(0)
+                graph_pad = ""
+                for i, item in enumerate(active_nodes):
+                    if i == 0:
+                        graph_pad += "Import branch: " + "<|graph_pad|>" * item.size(0)
+                    else:
+                        graph_pad += f"Bracnh #{i+1}: " + "<|graph_pad|>" * item.size(0)
             if self.baseline_prompt == "code":
                 code_line = self.generate_code_line(branch)
                 text = PROMPT_CODE.format(src_code, code_line)
@@ -1074,14 +1094,22 @@ class Data(object):
                     return None
                 text = PROMPT_CODE_TR.format(trucated_code)
             elif self.baseline_prompt == "graph_tr":
-                trucated_code = self.truncate_code(src_code=src_code, branch=branch)
-                text = PROMPT_CODE_GRAPH.format(trucated_code, graph_pad)
+                truncated_code = self.truncate_code(src_code=src_code, branch=branch)
+                branch_line = ""
+                for i, branch_item in enumerate(branch):
+                    branch_line += f"Branch #{i+1}" + "->".join(branch_item) + "\n"
+                text = PROMPT_CODE_GRAPH.format(
+                    branch_line, truncated_code, module_path, graph_pad
+                )
             elif self.baseline_prompt == "code_baseline":
                 code_line = self.generate_code_line(branch)
                 text = PROMPT_COT.format(module=src_code, execution_branch=code_line)
 
             task_prompt_input = tokenizer.apply_chat_template(
-                [{"role": "user", "content": text}],
+                [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": text},
+                ],
                 tokenize=False,
             )
 

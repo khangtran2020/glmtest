@@ -9,6 +9,7 @@ from utils.constant import GRAPH_PAD_TOKEN
 
 
 class GLMFDataset(Dataset):
+
     def __init__(
         self,
         data: List[Dict[str, Any]],

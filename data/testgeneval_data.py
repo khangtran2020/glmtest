@@ -169,6 +169,8 @@ class TestGenEval(Data):
                     dat["graph"]["mask_path"] = os.path.join(
                         graph_path, f"{raw_data[key][NEW_KEY_ID]}_mask.pt"
                     )
+                    # dat["repo"] = raw_data[key]["repo"]
+                    dat["module_path"] = raw_data[key]["code_path"]
 
                     if (not os.path.exists(dat["code_path"])) or (
                         os.path.exists(dat["code_path"]) and self.raw_overwrite

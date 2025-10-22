@@ -70,6 +70,11 @@ def main() -> None:
         console.log("[red]Dataset not found, exiting...[/red]")
         return
 
+    if args.mode == "data":
+        dataset.process_raw()
+        console.log("Data processing completed. Exiting as mode is 'data'.")
+        return
+
     if args.debug:
         ram_usage = log_ram_usage()
         console.log(f"Dataset loaded - RAM usage: {ram_usage:.2f} MB")
