@@ -141,6 +141,10 @@ class TestGenEval(Data):
 
         data_name = ["train", "test_project", "test_module"]
         for data_n in data_name:
+
+            if not os.path.exists(os.path.join(self.data_path, f"{data_n}.jsonl")):
+                continue
+
             with open(os.path.join(self.data_path, f"{data_n}.jsonl"), "r") as file:
                 raw_data = [json.loads(l) for l in file.readlines()]
 
