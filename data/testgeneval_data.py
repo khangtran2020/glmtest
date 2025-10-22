@@ -111,9 +111,7 @@ class TestGenEval(Data):
             raise FileNotFoundError("train.jsonl not found, please crawl the data")
 
         if not os.path.exists(os.path.join(self.data_path, "test_project.jsonl")):
-            raise FileNotFoundError(
-                "test_project.jsonl not found, please crawl the data"
-            )
+            self.logger.log("test_project.jsonl not found, please crawl the data")
 
         if not os.path.exists(os.path.join(self.data_path, "test_module.jsonl")):
             raise FileNotFoundError(
