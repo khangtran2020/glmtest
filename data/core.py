@@ -66,16 +66,16 @@ PROMPT_GRAPH = """Generate the test case for the graph embedding of a targeted e
 """
 
 PROMPT_CODE_GRAPH = """Execution Branches Information (Line to Line executed):
-{execution_branch}
+{}
 
 Truncated Module Source:
-{truncated_module}
+{}
 
 Module Path:
-{module_path}
+{}
 
 Code Property Graph (CPG) Node Embeddings:
-{cpg_embeddings}
+{}
 
 Task:
 Generate a runnable Python test case that specifically execute the above execution branch 
