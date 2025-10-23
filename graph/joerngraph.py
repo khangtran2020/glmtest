@@ -77,6 +77,7 @@ class JoernGraph(Graph):
         # Export nodes
         nodes_command = 'cpg.all.map(n => Map("id" -> n.id, "label" -> n.label, "properties" -> n.properties, "location" -> n.location)).l.toJsonPretty'
         nodes_result = self.run_joern_query(nodes_command)
+        print("nodes_result:", nodes_result)
         nodes = json.loads(nodes_result)
         filtered_nodes = []
         for node in nodes:
