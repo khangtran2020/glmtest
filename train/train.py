@@ -292,7 +292,9 @@ def train_single_gpu_accelerate(
                             if key in graph.keys():
                                 graph[key] = graph[key].to(device)
 
-                        graph_mask = batch["graph_mask"][i].to(device)
+                        graph_mask = [
+                            mask.to(device) for mask in batch["graph_mask"][i]
+                        ]
                         graph_token_index = torch.where(
                             micro_input["input_ids"][i]
                             == model.config.graph_token_id[1]

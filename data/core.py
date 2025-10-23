@@ -69,7 +69,9 @@ PROMPT_CODE_GRAPH = """Execution Branches Information (Line to Line executed):
 {}
 
 Truncated Module Source:
+```
 {}
+```
 
 Module Path:
 {}
@@ -446,6 +448,8 @@ class Data(object):
                         mask[i] = 1
                 except:
                     mask[i] = 0
+            if mask.sum() == 0:
+                continue
             mask = torch.Tensor([mask])
             all_mask.append(mask)
         return all_mask
@@ -1027,8 +1031,15 @@ class Data(object):
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
                 branch_line = ""
                 for i, branch_item in enumerate(branch):
+                    if i == 0:
+                        branch_line += (
+                            f"Import branch: "
+                            + "->".join([str(item) for item in branch_item])
+                            + "\n"
+                        )
+                        continue
                     branch_line += (
-                        f"Branch #{i+1}"
+                        f"Branch #{i}: "
                         + "->".join([str(item) for item in branch_item])
                         + "\n"
                     )
