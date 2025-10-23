@@ -24,7 +24,7 @@ class JoernGraph(Graph):
     def import_code(self, code_path: str, name: str) -> None:
         query = import_code_query(os.path.abspath(code_path), name)
         result = self.client.execute(query)
-        # self.logger.log("Import code with result:" + result["stdout"])
+        self.logger.log("Import code with result:" + result["stdout"])
         return
 
     def extract_graph(self, code_path: str, save_path: str, overwrite: bool) -> None:
@@ -56,6 +56,7 @@ class JoernGraph(Graph):
         # Export edges
         edges_command = 'cpg.graph.allEdges.map(e => Map("src" -> e.src.id, "dst" -> e.dst.id, "label" -> e.label, "id" -> e.hashCode)).l.toJsonPretty'
         edges_result = self.run_joern_query(edges_command)
+        self.logger.log("Edges result:" + edges_result)
         edges = json.loads(edges_result)
         filtered_edges = []
         reachable_nodes = {}
@@ -75,9 +76,10 @@ class JoernGraph(Graph):
                 reachable_nodes[edge["dst"]] = True
 
         # Export nodes
-        nodes_command = 'cpg.all.map(n => Map("id" -> n.id, "label" -> n.label, "properties" -> n.properties, "location" -> Try(n.location).toOption.orNull)).l.toJsonPretty'
+        nodes_command = "cpg.all.l.toJsonPretty"
         nodes_result = self.run_joern_query(nodes_command)
-        self.logger.log("Nodes result: " + nodes_result)
+        self.logger.log("Nodes result:" + nodes_result)
+        # print("nodes_result:", nodes_result)
         nodes = json.loads(nodes_result)
         filtered_nodes = []
         for node in nodes:
