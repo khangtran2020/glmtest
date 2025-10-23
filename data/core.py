@@ -440,12 +440,12 @@ class Data(object):
             line_list = list(set(branch_item))
             for i in range(len(graph["nodes"])):
                 node = graph["nodes"][i]
-                if node["location"]["filename"] == "N/A":
-                    try:
-                        if node["properties"]["LINE_NUMBER"] in line_list:
-                            mask[i] = 1
-                    except:
-                        mask[i] = 0
+                # if node["location"]["filename"] == "N/A":
+                try:
+                    if node["properties"]["LINE_NUMBER"] in line_list:
+                        mask[i] = 1
+                except:
+                    mask[i] = 0
             mask = torch.Tensor([mask])
             all_mask.append(mask)
         return all_mask
