@@ -1025,7 +1025,11 @@ class Data(object):
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
                 branch_line = ""
                 for i, branch_item in enumerate(branch):
-                    branch_line += f"Branch #{i+1}" + "->".join(branch_item) + "\n"
+                    branch_line += (
+                        f"Branch #{i+1}"
+                        + "->".join([str(item) for item in branch_item])
+                        + "\n"
+                    )
                 text = PROMPT_CODE_GRAPH.format(
                     branch_line, truncated_code, module_path, graph_pad
                 )
@@ -1097,7 +1101,11 @@ class Data(object):
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
                 branch_line = ""
                 for i, branch_item in enumerate(branch):
-                    branch_line += f"Branch #{i+1}" + "->".join(branch_item) + "\n"
+                    branch_line += (
+                        f"Branch #{i+1}"
+                        + "->".join([str(item) for item in branch_item])
+                        + "\n"
+                    )
                 text = PROMPT_CODE_GRAPH.format(
                     branch_line, truncated_code, module_path, graph_pad
                 )
