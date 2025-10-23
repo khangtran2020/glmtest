@@ -81,7 +81,7 @@ class JoernGraph(Graph):
         # nodes_command = """cpg.all.id.l.toJsonPretty"""
         nodes_result = self.run_joern_query(nodes_command)
         self.logger.log("Nodes result:" + nodes_result)
-        # print("nodes_result:", nodes_result)
+        print("nodes_result:", nodes_result)
         nodes = json.loads(nodes_result)
         filtered_nodes = []
         for node in nodes:
