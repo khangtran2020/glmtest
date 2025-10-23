@@ -51,20 +51,21 @@ class GLMFDataset(Dataset):
         with open(data_path, "r") as f:
             sample = json.load(f)
         graph_path = sample["graph_path"]
-        # print("Loading graph from:", graph_path)
         graph = torch.load(graph_path) if graph_path is not None else None
-        active_node = (
-            torch.Tensor(sample["active_node"])
-            if sample["active_node"] is not None
-            else None
-        )
-        graph_mask = (
-            torch.Tensor(sample["mask"]).to(
-                dtype=torch.bfloat16 if self.dtype == "bf16" else torch.float16
-            )
-            if sample["mask"] is not None
-            else None
-        )
+
+        if sample["active_node"] is not None:
+            active_nodes = []
+            for active_node in sample["active_node"]:
+                active_nodes.append(torch.Tensor(active_node))
+        else:
+            active_nodes = None
+
+        graph_masks = []
+        if sample["mask"] is not None:
+            for mask in sample["mask"]:
+                graph_masks.append(torch.Tensor(mask))
+        else:
+            graph_masks = None
 
         if graph is not None:
             for key in graph.keys():
@@ -105,7 +106,8 @@ class GLMFDataset(Dataset):
                 "text": full_text,
                 "input": tokenized,
                 "graph": graph,  # Should be a dictionary of graph structures
-                "graph_mask": (graph_mask if graph_mask is not None else None),
+                "graph_mask": (graph_masks if graph_masks is not None else None),
+                "activate_node": (active_nodes if active_nodes is not None else None),
             }
         else:
             prompt = sample["prompt"]
@@ -123,7 +125,8 @@ class GLMFDataset(Dataset):
                 "text": prompt,
                 "input": tokenized,
                 "graph": graph,
-                "graph_mask": (graph_mask if graph_mask is not None else None),
+                "graph_mask": (graph_masks if graph_masks is not None else None),
+                "activate_node": (active_nodes if active_nodes is not None else None),
             }
             return (uuid, batch)
 
@@ -227,6 +230,11 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
                 if batch[0]["graph_mask"] is not None
                 else None
             ),
+            "active_node": (
+                [x["active_node"] for x in batch]
+                if batch[0]["active_node"] is not None
+                else None
+            ),
             "graph": (
                 [x["graph"] for x in batch] if batch[0]["graph"] is not None else None
             ),
@@ -252,6 +260,11 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
             "graph_mask": (
                 [x["graph_mask"] for x in batch]
                 if batch[0]["graph_mask"] is not None
+                else None
+            ),
+            "active_node": (
+                [x["active_node"] for x in batch]
+                if batch[0]["active_node"] is not None
                 else None
             ),
             "graph": (
