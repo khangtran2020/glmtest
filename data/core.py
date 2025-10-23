@@ -58,7 +58,7 @@ Here is the execution code lines:
 PROMPT_CODE_TR = """Generate the test case for the code snippet:
 ```
 {}
-```
+``` 
 """
 
 PROMPT_GRAPH = """Generate the test case for the graph embedding of a targeted execution branch below:
@@ -713,7 +713,9 @@ class Data(object):
                                 "prompt": prompt,
                                 "response": response,
                                 "full_text": full_text,
-                                "active_node": active_nodes,
+                                "active_node": [
+                                    active_node.tolist() for active_node in active_nodes
+                                ],
                                 "mask": [
                                     all_masks[mask_key][i].tolist()
                                     for i in range(len(all_masks[mask_key]))
