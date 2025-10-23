@@ -1151,8 +1151,16 @@ class Data(object):
         # TODO: Data splitting from the splitted directory must be implemented
         if test_only:
             self.logger.log("[green]Using only the test set, no need to split[/green]")
-            test_data_by_project = self.processed_data["test_project"]
-            test_data_by_module = self.processed_data["test_module"]
+            test_data_by_project = (
+                self.processed_data["test_project"]
+                if "test_project" in self.processed_data.keys()
+                else {}
+            )
+            test_data_by_module = (
+                self.processed_data["test_module"]
+                if "test_module" in self.processed_data.keys()
+                else {}
+            )
 
             self.test_data = {
                 "project": test_data_by_project,
@@ -1178,8 +1186,16 @@ class Data(object):
 
             train_data = {}
             val_data = {}
-            test_data_by_project = self.processed_data["test_project"]
-            test_data_by_module = self.processed_data["test_module"]
+            test_data_by_project = (
+                self.processed_data["test_project"]
+                if "test_project" in self.processed_data.keys()
+                else {}
+            )
+            test_data_by_module = (
+                self.processed_data["test_module"]
+                if "test_module" in self.processed_data.keys()
+                else {}
+            )
             for key in train_keys:
                 train_data[key] = self.processed_data["train"][key]
             for key in val_keys:
