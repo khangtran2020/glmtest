@@ -76,7 +76,8 @@ class JoernGraph(Graph):
                 reachable_nodes[edge["dst"]] = True
 
         # Export nodes
-        nodes_command = 'cpg.all.map(n => Map("id" -> n.id, "label" -> n.label, "properties" -> n.properties, "location" -> n.location)).l.toJsonPretty'
+        # nodes_command = 'cpg.all.map(n => Map("id" -> n.id, "label" -> n.label, "properties" -> n.properties, "location" -> n.location)).l.toJsonPretty'
+        nodes_command = """cpg.all.map { n => Map("id" -> n.id, "label" -> n.label, "properties" -> n.propertyMap)}.l.toJsonPretty"""
         nodes_result = self.run_joern_query(nodes_command)
         self.logger.log("Nodes result:" + nodes_result)
         # print("nodes_result:", nodes_result)
