@@ -24,7 +24,7 @@ class JoernGraph(Graph):
     def import_code(self, code_path: str, name: str) -> None:
         query = import_code_query(os.path.abspath(code_path), name)
         result = self.client.execute(query)
-        # self.logger.log("Import code with result:" + result["stdout"])
+        self.logger.log("Import code with result:" + result["stdout"])
         return
 
     def extract_graph(self, code_path: str, save_path: str, overwrite: bool) -> None:
