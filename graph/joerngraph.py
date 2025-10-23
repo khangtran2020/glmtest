@@ -56,6 +56,7 @@ class JoernGraph(Graph):
         # Export edges
         edges_command = 'cpg.graph.allEdges.map(e => Map("src" -> e.src.id, "dst" -> e.dst.id, "label" -> e.label, "id" -> e.hashCode)).l.toJsonPretty'
         edges_result = self.run_joern_query(edges_command)
+        self.logger.log("Edges result:" + edges_result)
         edges = json.loads(edges_result)
         filtered_edges = []
         reachable_nodes = {}
