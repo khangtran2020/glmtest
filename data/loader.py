@@ -68,10 +68,17 @@ class GLMFDataset(Dataset):
             graph_masks = None
 
         if graph is not None:
+            act_node = None
+            for i, active_node in enumerate(active_nodes):
+                if i == 0:
+                    act_node = active_node
+                else:
+                    act_node = torch.cat((act_node, active_node), dim=0)
+
             for key in graph.keys():
                 graph[key] = sampling_neighbor(
                     graph=graph[key],
-                    mask=active_node,
+                    mask=act_node,
                     n_hops=self.n_hops,
                 )
                 graph[key].ndata["feat"] = (
