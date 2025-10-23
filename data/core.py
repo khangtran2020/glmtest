@@ -452,6 +452,9 @@ class Data(object):
                 continue
             mask = torch.Tensor([mask])
             all_mask.append(mask)
+        if len(all_mask) == 1:
+            # only import branch
+            return None
         return all_mask
 
     def get_node_features(self, graph: Dict) -> torch.Tensor:

@@ -265,8 +265,18 @@ class TestGenEval(Data):
                         mask = self.get_mask_tensor(
                             graph=graph, branch=raw_data[key]["branches"][tkey]
                         )
+                        if mask is None:
+                            self.logger.log(
+                                f"[red]Mask is empty for {key} test case {tkey}[/red]"
+                            )
+                            continue
                         all_mask.append(mask)
                         idx += 1
+
+                    if len(all_mask) == 0:
+                        self.logger.log(f"[red]No valid test cases for {key}[/red]")
+                        continue
+
                     self.logger.log(f"Generated masks for {key}: {len(all_mask)}")
                     torch.save(all_mask, dat["graph"]["mask_path"])
                     torch.save(node_feat, dat["graph"]["node_feature_path"])
