@@ -691,11 +691,9 @@ def train_multi_gpu_accelerate(
                         for key in GRAPH_KEYS:
                             if key in graph.keys():
                                 graph[key] = graph[key].to(device)
-
-                        graph_mask = batch["graph_mask"][i].to(device)
-                        # console.log(
-                        #     f"torch where: {torch.where(micro_input['input_ids'][i] == model.config.graph_token_id[1])}"
-                        # )
+                        graph_mask = [
+                            mask.to(device) for mask in batch["graph_mask"][i]
+                        ]
                         graph_token_index = torch.where(
                             micro_input["input_ids"][i] == config.graph_token_id[1]
                         )[0].tolist()

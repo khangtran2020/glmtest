@@ -114,7 +114,7 @@ class GLMFDataset(Dataset):
                 "input": tokenized,
                 "graph": graph,  # Should be a dictionary of graph structures
                 "graph_mask": (graph_masks if graph_masks is not None else None),
-                "activate_node": (active_nodes if active_nodes is not None else None),
+                "active_nodes": (active_nodes if active_nodes is not None else None),
             }
         else:
             prompt = sample["prompt"]
@@ -133,7 +133,7 @@ class GLMFDataset(Dataset):
                 "input": tokenized,
                 "graph": graph,
                 "graph_mask": (graph_masks if graph_masks is not None else None),
-                "activate_node": (active_nodes if active_nodes is not None else None),
+                "active_nodes": (active_nodes if active_nodes is not None else None),
             }
             return (uuid, batch)
 
@@ -216,13 +216,6 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
         # print(batch)
         collated_input = {}
 
-        # for sample in batch:
-        #     pprint(
-        #         f"[cyan]Sample input_ids length: {sample['input']['input_ids'].shape}[/cyan]"
-        #     )
-
-        # pprint(f"[cyan]keys in batch: {batch[0].keys()}[/cyan]")
-
         input_ids = [sample["input"]["input_ids"] for sample in batch]
         attention_mask = [sample["input"]["attention_mask"] for sample in batch]
         labels = [sample["input"]["labels"] for sample in batch]
@@ -237,11 +230,6 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
             "graph_mask": (
                 [x["graph_mask"] for x in batch]
                 if batch[0]["graph_mask"] is not None
-                else None
-            ),
-            "active_node": (
-                [x["activate_node"] for x in batch]
-                if batch[0]["activate_node"] is not None
                 else None
             ),
             "graph": (
@@ -269,11 +257,6 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
             "graph_mask": (
                 [x["graph_mask"] for x in batch]
                 if batch[0]["graph_mask"] is not None
-                else None
-            ),
-            "active_node": (
-                [x["activate_node"] for x in batch]
-                if batch[0]["activate_node"] is not None
                 else None
             ),
             "graph": (
