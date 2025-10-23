@@ -240,8 +240,8 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
                 else None
             ),
             "active_node": (
-                [x["active_node"] for x in batch]
-                if batch[0]["active_node"] is not None
+                [x["activate_node"] for x in batch]
+                if batch[0]["activate_node"] is not None
                 else None
             ),
             "graph": (
@@ -272,8 +272,8 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
                 else None
             ),
             "active_node": (
-                [x["active_node"] for x in batch]
-                if batch[0]["active_node"] is not None
+                [x["activate_node"] for x in batch]
+                if batch[0]["activate_node"] is not None
                 else None
             ),
             "graph": (
