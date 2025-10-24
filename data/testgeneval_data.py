@@ -281,7 +281,11 @@ class TestGenEval(Data):
                             if k not in branch_to_remove
                         ]
 
-                        assert len(dat["test_cases"][nkey]["branch"]) == len(mask)
+                        assert len(dat["test_cases"][nkey]["branch"]) == len(
+                            mask
+                        ), "Mask and branch length mismatch: {} vs {}".format(
+                            len(dat["test_cases"][nkey]["branch"]), len(mask)
+                        )
 
                         all_mask.append(mask)
                         idx += 1
