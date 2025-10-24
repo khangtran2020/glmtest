@@ -276,9 +276,9 @@ class TestGenEval(Data):
                             # key_to_remove.append(nkey)
                             continue
 
-                        self.logger.log(
-                            f"Length of mask: {len(mask)}, length of branch: {len(dat['test_cases'][nkey]['branch'])}, removing branches: {branch_to_remove}"
-                        )
+                        # self.logger.log(
+                        #     f"Length of mask: {len(mask)}, length of branch: {len(dat['test_cases'][nkey]['branch'])}, removing branches: {branch_to_remove}"
+                        # )
 
                         dat["test_cases"][nkey]["branch"] = [
                             b
