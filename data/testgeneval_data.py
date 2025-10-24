@@ -244,7 +244,6 @@ class TestGenEval(Data):
 
                     all_mask = []
                     idx = 0
-                    key_to_remove = []
                     for i, tkey in enumerate(raw_data[key]["test_cases"].keys()):
                         if raw_data[key]["branches"][tkey] == []:
                             continue
