@@ -333,10 +333,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 overall_mask = None
                 for j, mask in enumerate(graph_mask):
                     if j == 0:
-                        overall_mask = mask
+                        overall_mask = mask.to(torch.bool)
                     else:
-                        overall_mask = overall_mask | mask
-
+                        overall_mask = overall_mask | mask.to(torch.bool)
+                # overall_mask = overall_mask.to()
                 overall_indices = (overall_mask == 1).nonzero(as_tuple=True)[
                     0
                 ]  # Indices of 1s
