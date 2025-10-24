@@ -329,12 +329,36 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     graph[key] = graph[key].to(self.llm_model.device)
                 graph_mask = graph_masks[i]
 
+                # merge graph_mask
+                overall_mask = None
                 for j, mask in enumerate(graph_mask):
-                    mask = mask.to(self.llm_model.device)
-                    graph_embeds = self.gnn(graph, mask)
-                    graph_embeds = graph_embeds.to(inputs_embeds.device)
-                    inputs_embeds[i, ranges[j][0] : ranges[j][1] + 1, :] = (
-                        graph_embeds.to(inputs_embeds.dtype)
+                    if j == 0:
+                        overall_mask = mask
+                    else:
+                        overall_mask = overall_mask | mask
+
+                overall_indices = (overall_mask == 1).nonzero(as_tuple=True)[
+                    0
+                ]  # Indices of 1s
+
+                # get index of node_embedding returned by GNN
+                mask_idx = []
+                for j, mask in enumerate(graph_mask):
+                    mask_indices = (mask == 1).nonzero(as_tuple=True)[0]
+                    idx_in_overall = []
+                    for k, idx in enumerate(mask_indices):
+                        if idx in overall_indices:
+                            idx_in_overall.append(k)
+                    mask_idx.append(idx_in_overall)
+
+                overall_mask = overall_mask.to(self.llm_model.device)
+                graph_embeds = self.gnn(graph, overall_mask)
+
+                for j, mask in enumerate(graph_mask):
+                    embeds = graph_embeds[mask_idx[j], :]
+                    embeds = embeds.to(inputs_embeds.device)
+                    inputs_embeds[i, ranges[j][0] : ranges[j][1] + 1, :] = embeds.to(
+                        inputs_embeds.dtype
                     )
 
         else:
