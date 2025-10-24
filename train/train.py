@@ -770,7 +770,9 @@ def train_multi_gpu_accelerate(
                             if key in graph.keys():
                                 graph[key] = graph[key].to("cpu")
                                 graph.pop(key, None)
-                    graph_masks = [graph_mask.to("cpu") for graph_mask in graph_masks]
+                    for graph_mask in graph_masks:
+                        for mask in graph_mask:
+                            mask = mask.to("cpu")
                     del graph_masks, graphs
                 outputs.logits = outputs.logits.to("cpu")
                 loss = loss.to("cpu")
