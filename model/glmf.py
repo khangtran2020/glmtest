@@ -316,10 +316,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     if j == prev + 1:
                         prev = j
                     else:
-                        ranges.append((start.item(), prev.item()))
+                        ranges.append((start, prev))
                         start = j
                         prev = j
-                ranges.append((start.item(), prev.item()))
+                ranges.append((start, prev))
                 assert len(ranges) == len(
                     graph_masks[i]
                 ), "Mismatch between graph masks and token index ranges."
