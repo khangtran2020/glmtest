@@ -239,8 +239,10 @@ class TestGenEval(Data):
                         overwrite=self.raw_overwrite,
                     )
 
+                    num_nodes = len(graph["nodes"])
                     if not os.path.exists(dat["graph"]["node_feature_path"]):
                         node_feat = self.get_node_features(graph=graph)
+                        assert node_feat.size(0) == num_nodes
 
                     all_mask = []
                     idx = 0
@@ -278,6 +280,8 @@ class TestGenEval(Data):
                             for k, b in enumerate(raw_data[key]["branches"][tkey])
                             if k not in branch_to_remove
                         ]
+
+                        assert len(dat["test_cases"][nkey]["branch"]) == len(mask)
 
                         all_mask.append(mask)
                         idx += 1
