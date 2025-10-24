@@ -55,9 +55,12 @@ class JoernGraph(Graph):
     def export_graph_data(self) -> dict:
         # Export edges
         edges_command = 'cpg.graph.allEdges.map(e => Map("src" -> e.src.id, "dst" -> e.dst.id, "label" -> e.label, "id" -> e.hashCode)).l.toJsonPretty'
-        edges_result = self.run_joern_query(edges_command)
-        # self.logger.log("Edges result:" + edges_result)
-        edges = json.loads(edges_result)
+        try:
+            edges_result = self.run_joern_query(edges_command)
+            edges = json.loads(edges_result)
+        except Exception as e:
+            self.logger.log(f"Error running edges query with error:\n" + edges_result)
+            raise e
         filtered_edges = []
         reachable_nodes = {}
         for edge in edges:
@@ -76,13 +79,13 @@ class JoernGraph(Graph):
                 reachable_nodes[edge["dst"]] = True
 
         # Export nodes
-        # nodes_command = 'cpg.all.map(n => Map("id" -> n.id, "label" -> n.label, "properties" -> n.properties, "location" -> n.location)).l.toJsonPretty'
         nodes_command = 'cpg.all.map(n => Map("id" -> n.id, "label" -> n.label, "properties" -> n.properties)).l.toJsonPretty'
-        # nodes_command = """cpg.all.id.l.toJsonPretty"""
-        nodes_result = self.run_joern_query(nodes_command)
-        # self.logger.log("Nodes result:" + nodes_result)
-        # print("nodes_result:", nodes_result)
-        nodes = json.loads(nodes_result)
+        try:
+            nodes_result = self.run_joern_query(nodes_command)
+            nodes = json.loads(nodes_result)
+        except Exception as e:
+            self.logger.log(f"Error running nodes query with error:\n" + nodes_result)
+            raise e
         filtered_nodes = []
         for node in nodes:
             if reachable_nodes.get(node["id"], False):
