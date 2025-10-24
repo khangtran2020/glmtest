@@ -438,7 +438,7 @@ class Data(object):
 
         all_mask = []
         branch_to_remove = []
-        for i, branch_item in enumerate(branch):
+        for j, branch_item in enumerate(branch):
             mask = np.zeros(len(graph["nodes"]))
             line_list = list(set(branch_item))
             for i in range(len(graph["nodes"])):
@@ -450,7 +450,7 @@ class Data(object):
                 except:
                     mask[i] = 0
             if mask.sum() == 0:
-                branch_to_remove.append(i)
+                branch_to_remove.append(j)
                 continue
             mask = torch.Tensor([mask])
             all_mask.append(mask)
