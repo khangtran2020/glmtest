@@ -244,6 +244,7 @@ class TestGenEval(Data):
 
                     all_mask = []
                     idx = 0
+                    key_to_remove = []
                     for i, tkey in enumerate(raw_data[key]["test_cases"].keys()):
                         if raw_data[key]["branches"][tkey] == []:
                             continue
@@ -262,20 +263,32 @@ class TestGenEval(Data):
                             tkey
                         ]
 
-                        mask = self.get_mask_tensor(
+                        mask, branch_to_remove = self.get_mask_tensor(
                             graph=graph, branch=raw_data[key]["branches"][tkey]
                         )
                         if mask is None:
                             self.logger.log(
                                 f"[red]Mask is empty for {key} test case {tkey}[/red]"
                             )
+                            # mark branch to be removed
+                            # key_to_remove.append(nkey)
                             continue
+
+                        dat["test_cases"][nkey]["branch"] = [
+                            b
+                            for k, b in enumerate(raw_data[key]["branches"][tkey])
+                            if k not in branch_to_remove
+                        ]
+
                         all_mask.append(mask)
                         idx += 1
 
                     if len(all_mask) == 0:
                         self.logger.log(f"[red]No valid test cases for {key}[/red]")
                         continue
+
+                    # for tkey in key_to_remove:
+                    #     dat
 
                     self.logger.log(f"Generated masks for {key}: {len(all_mask)}")
                     torch.save(all_mask, dat["graph"]["mask_path"])

@@ -437,7 +437,8 @@ class Data(object):
     ) -> List[torch.Tensor]:
 
         all_mask = []
-        for branch_item in branch:
+        branch_to_remove = []
+        for i, branch_item in enumerate(branch):
             mask = np.zeros(len(graph["nodes"]))
             line_list = list(set(branch_item))
             for i in range(len(graph["nodes"])):
@@ -449,13 +450,15 @@ class Data(object):
                 except:
                     mask[i] = 0
             if mask.sum() == 0:
+                branch_to_remove.append(i)
                 continue
             mask = torch.Tensor([mask])
             all_mask.append(mask)
+
         if len(all_mask) == 1:
             # only import branch
-            return None
-        return all_mask
+            return None, None
+        return all_mask, branch_to_remove
 
     def get_node_features(self, graph: Dict) -> torch.Tensor:
         df = self.preprocess(graph)
@@ -1002,16 +1005,20 @@ class Data(object):
                 graph_pad = ""
                 for i, item in enumerate(active_nodes):
                     if i == 0:
-                        graph_pad += "Import branch: <|graph_pad|>"
+                        graph_pad += "Import branch: <|graph_pad|>" + "\n"
                     else:
-                        graph_pad += f"Bracnh #{i+1}: <|graph_pad|>"
+                        graph_pad += f"Branch #{i+1}: <|graph_pad|>\n"
             else:
                 graph_pad = ""
                 for i, item in enumerate(active_nodes):
                     if i == 0:
-                        graph_pad += "Import branch: " + "<|graph_pad|>" * item.size(0)
+                        graph_pad += (
+                            "Import branch: " + "<|graph_pad|>" * item.size(0) + "\n"
+                        )
                     else:
-                        graph_pad += f"Bracnh #{i+1}: " + "<|graph_pad|>" * item.size(0)
+                        graph_pad += (
+                            f"Branch #{i+1}: " + "<|graph_pad|>" * item.size(0) + "\n"
+                        )
             if self.baseline_prompt == "code":
                 code_line = self.generate_code_line(branch)
                 text = PROMPT_CODE.format(src_code, code_line)
@@ -1089,16 +1096,20 @@ class Data(object):
                 graph_pad = ""
                 for i, item in enumerate(active_nodes):
                     if i == 0:
-                        graph_pad += "Import branch: <|graph_pad|>"
+                        graph_pad += "Import branch: <|graph_pad|>" + "\n"
                     else:
-                        graph_pad += f"Bracnh #{i+1}: <|graph_pad|>"
+                        graph_pad += f"Branch #{i+1}: <|graph_pad|>" + "\n"
             else:
                 graph_pad = ""
                 for i, item in enumerate(active_nodes):
                     if i == 0:
-                        graph_pad += "Import branch: " + "<|graph_pad|>" * item.size(0)
+                        graph_pad += (
+                            "Import branch: " + "<|graph_pad|>" * item.size(0) + "\n"
+                        )
                     else:
-                        graph_pad += f"Bracnh #{i+1}: " + "<|graph_pad|>" * item.size(0)
+                        graph_pad += (
+                            f"Branch #{i+1}: " + "<|graph_pad|>" * item.size(0) + "\n"
+                        )
             if self.baseline_prompt == "code":
                 code_line = self.generate_code_line(branch)
                 text = PROMPT_CODE.format(src_code, code_line)
