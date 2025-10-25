@@ -190,7 +190,9 @@ def generate_and_save_on_one_dataset(
                                     graph[key].ndata["feat"].to(device)
                                 )
 
-                        graph_mask = batch["graph_mask"][i].to(device)
+                        graph_mask = [
+                            mask.to(device) for mask in batch["graph_mask"][i]
+                        ]
                         graph_token_index = torch.where(
                             micro_input["input_ids"][i]
                             == model.config.graph_token_id[1]
@@ -359,7 +361,9 @@ def validate(
                             if key in graph.keys():
                                 graph[key] = graph[key].to(device)
 
-                        graph_mask = batch["graph_mask"][i].to(device)
+                        graph_mask = [
+                            mask.to(device) for mask in batch["graph_mask"][i]
+                        ]
                         graph_token_index = torch.where(
                             micro_input["input_ids"][i] == config.graph_token_id[1]
                         )[0].tolist()
@@ -396,7 +400,9 @@ def validate(
                             if key in graph.keys():
                                 graph[key] = graph[key].to("cpu")
                                 graph.pop(key, None)
-                    graph_masks = [graph_mask.to("cpu") for graph_mask in graph_masks]
+                    for graph_mask in graph_masks:
+                        for mask in graph_mask:
+                            mask = mask.to("cpu")
                     del graph_masks, graphs
                 loss = loss.to("cpu")
                 del outputs, loss, micro_input

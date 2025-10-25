@@ -346,7 +346,9 @@ def train_single_gpu_accelerate(
                             if key in graph.keys():
                                 graph[key] = graph[key].to("cpu")
                                 graph.pop(key, None)
-                    graph_masks = [graph_mask.to("cpu") for graph_mask in graph_masks]
+                    for graph_mask in graph_masks:
+                        for mask in graph_mask:
+                            mask = mask.to("cpu")
                     del graph_masks, graphs
                 outputs.logits = outputs.logits.to("cpu")
                 loss = loss.to("cpu")
@@ -731,16 +733,6 @@ def train_multi_gpu_accelerate(
 
                     accelerator.backward(loss)
                     accelerator.wait_for_everyone()
-
-                if args.fuzz_model:
-                    with torch.no_grad():
-                        for name, param in model.named_parameters():
-                            if "nvib_layer" in name and param.requires_grad:
-                                if param.grad is not None:
-                                    grad_norm = param.grad.norm(2).item()
-                                    console.log(
-                                        f"Step {global_step} - rank {local_rank}: Gradient norm of {name}: {grad_norm:.4f}"
-                                    )
 
                 if accelerator.sync_gradients:
                     accelerator.wait_for_everyone()
