@@ -1007,7 +1007,7 @@ class Data(object):
                     if i == 0:
                         graph_pad += "Import branch: <|graph_pad|>" + "\n"
                     else:
-                        graph_pad += f"Branch #{i+1}: <|graph_pad|>\n"
+                        graph_pad += f"Branch #{i}: <|graph_pad|>\n"
             else:
                 graph_pad = ""
                 for i, item in enumerate(active_nodes):
@@ -1017,7 +1017,7 @@ class Data(object):
                         )
                     else:
                         graph_pad += (
-                            f"Branch #{i+1}: " + "<|graph_pad|>" * item.size(0) + "\n"
+                            f"Branch #{i}: " + "<|graph_pad|>" * item.size(0) + "\n"
                         )
             if self.baseline_prompt == "code":
                 code_line = self.generate_code_line(branch)
@@ -1098,7 +1098,7 @@ class Data(object):
                     if i == 0:
                         graph_pad += "Import branch: <|graph_pad|>" + "\n"
                     else:
-                        graph_pad += f"Branch #{i+1}: <|graph_pad|>" + "\n"
+                        graph_pad += f"Branch #{i}: <|graph_pad|>" + "\n"
             else:
                 graph_pad = ""
                 for i, item in enumerate(active_nodes):
@@ -1108,7 +1108,7 @@ class Data(object):
                         )
                     else:
                         graph_pad += (
-                            f"Branch #{i+1}: " + "<|graph_pad|>" * item.size(0) + "\n"
+                            f"Branch #{i}: " + "<|graph_pad|>" * item.size(0) + "\n"
                         )
             if self.baseline_prompt == "code":
                 code_line = self.generate_code_line(branch)
