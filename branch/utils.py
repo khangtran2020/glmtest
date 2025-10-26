@@ -191,6 +191,8 @@ def get_all_branch(
 ) -> Dict:
 
     pprint("[green]Extracting branches...[/green]")
+    pprint("-------------------------")
+    pprint(f"[blue]Processing code:[/blue]\n {code}")
 
     if code is None and filepath is None:
         raise ValueError("Either code or filepath must be provided.")
@@ -224,7 +226,7 @@ def get_all_branch(
         ):
             if branch[:-1] not in branches:
                 num_branch += 1
-                pprint(f"[blue]Found branch: {num_branch} - {len(branch)} [/blue]")
+                pprint(f"[blue]Found branch: {num_branch} - {branch} [/blue]")
                 branches.append(branch[:-1])  # remove the end node
             if num_branch >= 1000:
                 break
