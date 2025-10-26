@@ -908,7 +908,7 @@ def get_all_branch(
             and e <= line_dict["functions"][func_name][1]
         ]
 
-        pprint(f"[blue]Function {func_name} has end lines: {set_of_end}[/blue]")
+        # pprint(f"[blue]Function {func_name} has end lines: {set_of_end}[/blue]")
         if len(set_of_end) == 0:
             continue
 
@@ -920,6 +920,7 @@ def get_all_branch(
             current_path=[],
             visited_nodes=[],
         ):
+            pprint(f"[green]Found branch: {branch}[/green]")
             if branch[:-1] not in batch_branches:
                 num_branch += 1
                 i += 1
