@@ -222,7 +222,12 @@ def get_all_branch(
         start_line = line_dict["functions"][func_name][0]
         end_line = line_dict["functions"][func_name][1]
         func_code = "\n".join(code.split("\n")[start_line - 1 : end_line])
-        pprint(f"[blue]Function: {func_name}[/blue], code:\n{func_code}\n")
+        pprint(f"[blue]Function: {func_name}[/blue], code:")
+        lines = func_code.split("\n")
+        for i, line in lines:
+            line = f"Line {start_line + i}: " + line
+            pprint(f"[yellow]{line}[/yellow]")
+
         for branch in DFS_branch(
             G=G,
             node=line_dict["functions"][func_name][0],
