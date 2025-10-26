@@ -612,7 +612,7 @@ def parse_code(code: str) -> DiGraph:
             continue
 
         if arc[1] < 0:
-            set_of_endlines.append(e[0])
+            set_of_endlines.append(arc[0])
 
         if arc[0] < 0:
             if arc[1] == -1 * arc[0]:
