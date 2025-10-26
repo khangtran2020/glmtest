@@ -695,6 +695,8 @@ def DFS_branch(
     current_path.append(node)
     visited_nodes.append(node)
 
+    pprint(f"[magenta]Visiting node: {node}, current path: {current_path}[/magenta]")
+
     if node in end_nodes:
         yield current_path + [node]
     else:
