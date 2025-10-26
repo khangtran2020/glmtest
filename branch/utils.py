@@ -895,6 +895,8 @@ def get_all_branch(
     branches.append(init_branch)
     line_dict = analyze_code(code=code)
 
+    pprint(f"[yellow]Extracted dict[/yellow]:\n{line_dict}")
+
     num_branch = 0
     # process func
 

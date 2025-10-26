@@ -772,6 +772,7 @@ class Data(object):
         )
 
     def prepare_data_for_test_gen(self):
+
         assert self.data is not None
 
         processed_data = None
