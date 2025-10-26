@@ -606,9 +606,14 @@ def parse_code(code: str) -> DiGraph:
             line_exclude.append(l["start_line"])
 
     clean_arcs = []
+    set_of_endlines = []
     for arc in arcs:
         if arc[1] in line_exclude:
             continue
+
+        if arc[1] < 0:
+            set_of_endlines.append(e[0])
+
         if arc[0] < 0:
             if arc[1] == -1 * arc[0]:
                 continue
@@ -621,7 +626,6 @@ def parse_code(code: str) -> DiGraph:
                 continue
             else:
                 clean_arcs.append(arc)
-
         else:
             clean_arcs.append(arc)
 
@@ -639,16 +643,11 @@ def parse_code(code: str) -> DiGraph:
     for i in parser.statements:
         G.add_node(i)
 
-    set_of_endlines = []
     for e in remain_arcs:
         if (e[1] > 0) and (e[1] not in line_exclude):
             line = code.split("\n")[e[1] - 1]
             if len(line) != len(line.lstrip()):
                 G.add_edge(*e)
-            if e[1] < 0:
-                set_of_endlines.append(e[0])
-
-    set_of_endlines = set(set_of_endlines)
 
     # handle try except
     # Find try and except blocks
@@ -681,6 +680,7 @@ def parse_code(code: str) -> DiGraph:
                     for ex_start, _ in block["excepts"]:
                         G.add_edge(line, ex_start)
 
+    set_of_endlines = set(set_of_endlines)
     return G, init_arcs, set_of_endlines
 
 
