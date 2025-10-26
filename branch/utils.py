@@ -190,9 +190,9 @@ def get_all_branch(
     code: str = None, filepath: str = None, console: Console = None
 ) -> Dict:
 
-    pprint("[green]Extracting branches...[/green]")
-    pprint("-------------------------")
-    pprint(f"[blue]Processing code:[/blue]\n {code}")
+    # pprint("[green]Extracting branches...[/green]")
+    # pprint("-------------------------")
+    # pprint(f"[blue]Processing code:[/blue]\n {code}")
 
     if code is None and filepath is None:
         raise ValueError("Either code or filepath must be provided.")
@@ -208,6 +208,7 @@ def get_all_branch(
     # process func
     if console is not None:
         console.log("Processing Function")
+
     for func_name in line_dict["functions"].keys():
         set_of_end = [
             e
@@ -217,6 +218,11 @@ def get_all_branch(
         ]
         if len(set_of_end) == 0:
             continue
+
+        start_line = line_dict["functions"][func_name][0]
+        end_line = line_dict["functions"][func_name][1]
+        func_code = "\n".join(code.split("\n")[start_line - 1 : end_line])
+        pprint(f"[blue]Function: {func_name}[/blue], code:\n{func_code}\n")
         for branch in DFS_branch(
             G=G,
             node=line_dict["functions"][func_name][0],
