@@ -224,7 +224,7 @@ def get_all_branch(
         func_code = "\n".join(code.split("\n")[start_line - 1 : end_line])
         pprint(f"[blue]Function: {func_name}[/blue], code:")
         lines = func_code.split("\n")
-        for i, line in lines:
+        for i, line in enumerate(lines):
             line = f"Line {start_line + i}: " + line
             pprint(f"[yellow]{line}[/yellow]")
 
