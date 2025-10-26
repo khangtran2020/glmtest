@@ -895,7 +895,7 @@ def get_all_branch(
     branches.append(init_branch)
     line_dict = analyze_code(code=code)
 
-    pprint(f"[yellow]Extracted dict[/yellow]:\n{line_dict}")
+    pprint(f"[orange]Extracted dict[/orange]:\n{line_dict}")
 
     num_branch = 0
     # process func
@@ -909,6 +909,8 @@ def get_all_branch(
             if e > line_dict["functions"][func_name][0]
             and e <= line_dict["functions"][func_name][1]
         ]
+
+        pprint(f"[blue]Function {func_name} has end lines: {set_of_end}[/blue]")
         if len(set_of_end) == 0:
             continue
 
