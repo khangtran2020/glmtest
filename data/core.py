@@ -819,6 +819,7 @@ class Data(object):
                 self.processed_data[data_n] = {}
 
                 for uuid, dat in self.data[data_n].items():
+
                     with open(dat["code_path"], "r") as file:
                         src_code = file.read()
 

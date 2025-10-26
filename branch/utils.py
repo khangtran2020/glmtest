@@ -597,7 +597,7 @@ def parse_code(code: str) -> DiGraph:
         elif l["kind"] == "class":
             line_exclude.append(l["start_line"])
         elif (l["kind"] == "function") or (l["kind"] == "async_function"):
-            print(l)
+            # print(l)
             if "decorators" in l.keys():
                 i = 1
                 for decor in l["decorators"]:
@@ -878,7 +878,7 @@ def get_all_branch(
     code: str = None, num_branch_limit: int = 1000, batch_size: int = 10
 ) -> Dict:
 
-    pprint("[green]Extracting branches...[/green]")
+    # pprint("[green]Extracting branches...[/green]")
 
     # Get all arcs & build graph of execution lines
     G, init_arcs, set_of_endlines = parse_code(code=code)
@@ -969,5 +969,5 @@ def get_all_branch(
         if len(batch_branches) > 0:
             branches.append(batch_branches)
 
-    pprint(f"[green]Total branches found: {num_branch}[/green]")
+    pprint(f"[blue]Total branches found: {num_branch}[/blue]")
     return branches
