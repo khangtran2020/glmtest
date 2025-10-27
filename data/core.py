@@ -901,13 +901,13 @@ class Data(object):
                             module_path=module_path,
                             branch=branch,
                             gnn_mode=self.gnn_mode,
+                            testing=True,
                         )
 
                         if result is None:
                             num_discarded += 1
                             continue
                         prompt = result
-
                         num_token = len(self.llm_tokenizer.tokenize(prompt))
                         num_tokens.append(num_token)
 
