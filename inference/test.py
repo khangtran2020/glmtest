@@ -221,6 +221,7 @@ def generate_and_save_on_one_dataset(
                     temperature=0.2,
                     top_p=0.95,
                     top_k=40,
+                    no_repeat_ngram_size=4,
                     max_new_tokens=args.max_new_tokens,
                     do_sample=True,
                     repetition_penalty=1.5,
