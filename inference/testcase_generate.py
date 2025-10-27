@@ -126,6 +126,9 @@ def testcase_generate(
                 json.dump(generated_text, f, ensure_ascii=False, indent=4)
 
     if dataset is not None:
+
+        console.log("Preparing to generate test case for predefined dataset...")
+
         # dataset.prepare_data_for_test_gen()
         te_mod_dataset = GLMFDataset(
             data=dataset.test_data["module"],
