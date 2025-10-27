@@ -161,7 +161,7 @@ def testcase_generate(
                 tokenizer=dataset.llm_tokenizer,
                 collate_fn_=collate_fn_,
                 accelerator=accelerator,
-                suffix="module",
+                suffix="module_testcase",
                 do_save=True,
             )
         else:
@@ -223,7 +223,7 @@ def testcase_generate(
                 tokenizer=dataset.llm_tokenizer,
                 collate_fn_=collate_fn_,
                 accelerator=accelerator,
-                suffix="project",
+                suffix="project_testcase",
                 do_save=True,
             )
         else:
