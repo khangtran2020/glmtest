@@ -826,8 +826,8 @@ class Data(object):
 
                     module_path = dat.get("module_path", "N/A")
                     branches = get_all_branch(code=src_code)
-                    init_branch = branches[0]
-                    branches = branches[1:]
+                    # init_branch = branches[0]
+                    # branches = branches[1:]
 
                     if "graph" in self.baseline_prompt:
                         graph_name = f"{uuid}_graph.pt"
@@ -867,15 +867,28 @@ class Data(object):
                             torch.save(graph_dict, graph_path)
 
                     for i, branch in enumerate(branches):
-                        all_mask = self.get_mask_tensor(
-                            graph=graph, branch=[init_branch] + branch
+
+                        all_masks, branch_to_remove = self.get_mask_tensor(
+                            graph=graph, branch=branch
                         )
 
-                        active_node = [
-                            get_index_by_value(a=all_mask[i][0], val=1)
-                            for i in range(len(all_mask))
+                        if all_masks is None:
+                            self.logger.log(
+                                f"Only import branch at uuid: {uuid}, testcase: {i}"
+                            )
+                            num_discarded += 1
+                            continue
+
+                        branch = [
+                            b for k, b in enumerate(branch) if k not in branch_to_remove
                         ]
-                        if len(active_node) == 0:
+
+                        active_nodes = [
+                            get_index_by_value(a=all_masks[j][0], val=1)
+                            for j in range(len(all_masks))
+                        ]
+
+                        if len(active_nodes) == 0:
                             self.logger.log(f"Active node empty at uuid: {uuid}")
                             num_discarded += 1
                             continue
@@ -883,10 +896,10 @@ class Data(object):
                         result = self.get_prompt(
                             src_code=src_code,
                             testcase_out=None,
-                            mask=active_node,
+                            active_nodes=active_nodes,
                             tokenizer=self.llm_tokenizer,
                             module_path=module_path,
-                            branch=[init_branch] + branch,
+                            branch=branch,
                             gnn_mode=self.gnn_mode,
                         )
 
@@ -903,8 +916,12 @@ class Data(object):
                             data = {
                                 "uuid": f"{uuid}_testcase_{i}",
                                 "prompt": prompt,
-                                "active_node": active_node,
-                                "mask": all_mask,
+                                "active_node": [
+                                    active_node.tolist() for active_node in active_nodes
+                                ],
+                                "mask": [
+                                    all_masks[i].tolist() for i in range(len(all_masks))
+                                ],
                                 "graph_path": graph_path,
                             }
 
