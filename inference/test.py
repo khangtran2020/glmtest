@@ -13,8 +13,7 @@ from rich import print as pprint
 from data.core import Data
 from data.loader import GLMFDataset, collate_fn
 from model.model import GLMFModelForCausalLM, GLMFModelConfig, GLMFModelFuzzing
-from transformers import PreTrainedTokenizer
-from transformers import DynamicCache
+from transformers import PreTrainedTokenizer, DynamicCache, GenerationConfig
 from utils.constant import FUZZ_START_TOKEN, FUZZ_END_TOKEN
 
 # from transformers import SinkCache
@@ -218,13 +217,20 @@ def generate_and_save_on_one_dataset(
                         f"Inputs embeds shape: {inputs_embeds.shape} | Graph token index: {len(graph_token_index)}"
                     )
 
+                generation_config = GenerationConfig(
+                    temperature=0.2,
+                    top_p=0.95,
+                    top_k=40,
+                    max_output_tokens=args.max_new_tokens,
+                    do_sample=True,
+                    repetition_penalty=1.5,
+                )
+
                 with torch.autocast(device_type="cuda", dtype=torch.float16):
                     outputs = model.generate(
                         inputs_embeds=inputs_embeds,
                         attention_mask=micro_input["attention_mask"],
-                        max_new_tokens=args.max_new_tokens,
-                        do_sample=False,
-                        use_cache=True,
+                        generation_config=generation_config,
                         pad_token_id=tokenizer.eos_token_id,
                     )
                 if isinstance(model, GLMFModelFuzzing):
