@@ -242,7 +242,7 @@ def generate_and_save_on_one_dataset(
                     )
 
                 for i, idx in enumerate(uuid):
-                    generated_text[idx] = out_text[i]
+                    generated_text[idx] = extract_code_block(out_text[i])
 
                 end_time = time.time()
                 process_time = end_time - start_time
