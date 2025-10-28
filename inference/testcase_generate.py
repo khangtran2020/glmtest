@@ -202,10 +202,10 @@ def testcase_generate(
                     refactored_code = verification_result["refactored_code"]
                     project_dict[k.split("_testcase_")[0]].append(refactored_code)
 
-            generated_testsrc_dict = {}
-            for k, v in project_dict.items():
-                test_src = merge_testcases(codes=v)
-                generated_testsrc_dict[k] = test_src
+            # generated_testsrc_dict = {}
+            # for k, v in project_dict.items():
+            #     test_src = merge_testcases(codes=v)
+            #     generated_testsrc_dict[k] = test_src
 
             # save the generated test source code
             save_dir = os.path.join(
@@ -213,7 +213,7 @@ def testcase_generate(
             )
             with open(save_dir, "w", encoding="utf-8") as f:
                 # save as json file
-                json.dump(generated_testsrc_dict, f, ensure_ascii=False, indent=4)
+                json.dump(project_dict, f, ensure_ascii=False, indent=4)
         else:
             console.log(
                 f"[red]No generated test cases found for modules. Please check the path {os.path.join(args.gen_dir, f'{args.name}_module.json')}[/red]"
@@ -261,18 +261,12 @@ def testcase_generate(
                 extract_code_block(markdown=v)
             )
 
-        generated_testsrc_dict = {}
-        for k, v in project_dict.items():
-            test_src = merge_testcases(codes=v)
-            generated_testsrc_dict[k] = test_src
-
-        # save the generated test source code
         save_dir = os.path.join(
             args.gen_dir, f"{args.name}_generated_testcase_project.json"
         )
         with open(save_dir, "w", encoding="utf-8") as f:
             # save as json file
-            json.dump(generated_testsrc_dict, f, ensure_ascii=False, indent=4)
+            json.dump(project_dict, f, ensure_ascii=False, indent=4)
 
 
 def prepare_module(
