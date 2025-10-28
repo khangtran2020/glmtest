@@ -145,10 +145,11 @@ def generate_and_save_on_one_dataset(
     generated_text = {}
     processed_instance_id = []
     if do_save:
-        save_dir = os.path.join(args.gen_dir, f"{args.name}_{suffix}.jsonl")
+        save_dir_text = os.path.join(args.gen_dir, f"{args.name}_text_{suffix}.jsonl")
+        save_dir_code = os.path.join(args.gen_dir, f"{args.name}_code_{suffix}.jsonl")
         # create an empty file if not exists
-        if os.path.exists(save_dir):
-            with open(save_dir, "r", encoding="utf-8") as f:
+        if os.path.exists(save_dir_text):
+            with open(save_dir_text, "r", encoding="utf-8") as f:
                 for line in f.readlines():
                     instance = json.loads(line)
                     processed_instance_id.extend(list(instance.keys()))
@@ -334,9 +335,18 @@ def generate_and_save_on_one_dataset(
                 if do_save:
                     with console.status("Saving results..."):
                         # append generated text to jsonl file
-                        with open(save_dir, "a", encoding="utf-8") as f:
+                        with open(save_dir_text, "a", encoding="utf-8") as f:
                             for i, idx in enumerate(uuid):
                                 instance_data = {idx: out_text[i]}
+                                f.write(
+                                    json.dumps(instance_data, ensure_ascii=False) + "\n"
+                                )
+
+                        with open(save_dir_text, "a", encoding="utf-8") as f:
+                            for i, idx in enumerate(uuid):
+                                instance_data = {
+                                    idx: extract_code_block(markdown=out_text[i])
+                                }
                                 f.write(
                                     json.dumps(instance_data, ensure_ascii=False) + "\n"
                                 )
