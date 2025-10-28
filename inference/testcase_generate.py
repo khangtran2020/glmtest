@@ -165,11 +165,17 @@ def testcase_generate(
                 do_save=True,
             )
         else:
-            if os.path.exists(os.path.join(args.gen_dir, f"{args.name}_module.json")):
+            generated_dict = None
+            if os.path.exists(os.path.join(args.gen_dir, f"{args.name}_module.jsonl")):
                 with open(
-                    os.path.join(args.gen_dir, f"{args.name}_module.json"), "r"
+                    os.path.join(args.gen_dir, f"{args.name}_module.jsonl"), "r"
                 ) as f:
-                    generated_dict = json.load(f)
+                    for line in f.readlines():
+                        instance = json.loads(line)
+                        if generated_dict is None:
+                            generated_dict = instance
+                        else:
+                            generated_dict.update(instance)
             else:
                 generated_dict = None
 
@@ -227,11 +233,17 @@ def testcase_generate(
                 do_save=True,
             )
         else:
-            if os.path.exists(os.path.join(args.gen_dir, f"{args.name}_project.json")):
+            generated_dict = None
+            if os.path.exists(os.path.join(args.gen_dir, f"{args.name}_project.jsonl")):
                 with open(
-                    os.path.join(args.gen_dir, f"{args.name}_project.json"), "r"
+                    os.path.join(args.gen_dir, f"{args.name}_project.jsonl"), "r"
                 ) as f:
-                    generated_dict = json.load(f)
+                    for line in f.readlines():
+                        instance = json.loads(line)
+                        if generated_dict is None:
+                            generated_dict = instance
+                        else:
+                            generated_dict.update(instance)
             else:
                 generated_dict = None
 

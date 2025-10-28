@@ -142,17 +142,17 @@ def generate_and_save_on_one_dataset(
         shuffle=False,
         collate_fn=collate_fn_,
     )
-
+    generated_text = {}
     processed_instance_id = []
     if do_save:
-        save_dir = os.path.join(args.gen_dir, f"{args.name}_{suffix}.json")
+        save_dir = os.path.join(args.gen_dir, f"{args.name}_{suffix}.jsonl")
         # create an empty file if not exists
         if os.path.exists(save_dir):
-            save_dir = os.path.join(args.gen_dir, f"{args.name}_{suffix}.json")
             with open(save_dir, "r", encoding="utf-8") as f:
                 for line in f.readlines():
                     instance = json.loads(line)
                     processed_instance_id.extend(list(instance.keys()))
+                    generated_text.update(instance)
 
     with Progress(
         SpinnerColumn(),  # Shows a spinner
@@ -164,7 +164,6 @@ def generate_and_save_on_one_dataset(
     ) as progress:
         test_task = progress.add_task("Generating for one task ...", total=len(loader))
         with torch.no_grad():
-            generated_text = {}
             time_list = []
             for uuid, batch in loader:
 
@@ -175,6 +174,7 @@ def generate_and_save_on_one_dataset(
                         for i, idx in enumerate(uuid)
                         if idx not in processed_instance_id
                     ]
+
                     if len(filtered_indices) == 0:
                         progress.update(test_task, advance=1)
                         continue
