@@ -142,6 +142,18 @@ def generate_and_save_on_one_dataset(
         shuffle=False,
         collate_fn=collate_fn_,
     )
+
+    processed_instance_id = []
+    if do_save:
+        save_dir = os.path.join(args.gen_dir, f"{args.name}_{suffix}.json")
+        # create an empty file if not exists
+        if os.path.exists(save_dir):
+            save_dir = os.path.join(args.gen_dir, f"{args.name}_{suffix}.json")
+            with open(save_dir, "r", encoding="utf-8") as f:
+                for line in f.readlines():
+                    instance = json.loads(line)
+                    processed_instance_id.extend(list(instance.keys()))
+
     with Progress(
         SpinnerColumn(),  # Shows a spinner
         TextColumn(
@@ -155,6 +167,53 @@ def generate_and_save_on_one_dataset(
             generated_text = {}
             time_list = []
             for uuid, batch in loader:
+
+                # skip already processed instances
+                if do_save:
+                    filtered_indices = [
+                        i
+                        for i, idx in enumerate(uuid)
+                        if idx not in processed_instance_id
+                    ]
+                    if len(filtered_indices) == 0:
+                        progress.update(test_task, advance=1)
+                        continue
+
+                    batch["text"] = [
+                        text
+                        for i, text in enumerate(batch["text"])
+                        if i in filtered_indices
+                    ]
+                    batch["graph_mask"] = (
+                        [
+                            graph_mask
+                            for i, graph_mask in enumerate(batch["graph_mask"])
+                            if i in filtered_indices
+                        ]
+                        if batch["graph_mask"] is not None
+                        else None
+                    )
+                    batch["graph"] = (
+                        [
+                            graph
+                            for i, graph in enumerate(batch["graph"])
+                            if i in filtered_indices
+                        ]
+                        if batch["graph"] is not None
+                        else None
+                    )
+                    collated_input_filtered = {}
+                    for key in batch["input"].keys():
+                        item = batch["input"][key]
+                        if isinstance(item, torch.Tensor):
+                            collated_input_filtered[key] = item[filtered_indices]
+                        else:
+                            collated_input_filtered[key] = [
+                                item[i] for i in filtered_indices
+                            ]
+
+                    uuid = [idx for i, idx in enumerate(uuid) if i in filtered_indices]
+
                 start_time = time.time()
                 batch_size = batch["input"]["input_ids"].size(0)
                 if "token_type_ids" in batch["input"]:
@@ -272,6 +331,16 @@ def generate_and_save_on_one_dataset(
                 for i, idx in enumerate(uuid):
                     generated_text[idx] = out_text[i]
 
+                if do_save:
+                    with console.status("Saving results..."):
+                        # append generated text to jsonl file
+                        with open(save_dir, "a", encoding="utf-8") as f:
+                            for i, idx in enumerate(uuid):
+                                instance_data = {idx: out_text[i]}
+                                f.write(
+                                    json.dumps(instance_data, ensure_ascii=False) + "\n"
+                                )
+
                 end_time = time.time()
                 process_time = end_time - start_time
                 time_list.append(process_time)
@@ -283,14 +352,6 @@ def generate_and_save_on_one_dataset(
                 )
 
     console.log("Done Testing on train dataset finished.")
-    if do_save:
-        save_dir = os.path.join(args.gen_dir, f"{args.name}_{suffix}.json")
-        with console.status("Saving results..."):
-            # save generated text to jsonl file
-            with open(save_dir, "w", encoding="utf-8") as f:
-                # save as json file
-                json.dump(generated_text, f, ensure_ascii=False, indent=4)
-
     return generated_text
 
 
