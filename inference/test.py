@@ -283,8 +283,8 @@ def generate_and_save_on_one_dataset(
                     top_k=40,
                     no_repeat_ngram_size=3,
                     max_new_tokens=args.max_new_tokens,
-                    do_sample=True,
-                    repetition_penalty=1.1,
+                    do_sample=False,
+                    repetition_penalty=1.5,
                 )
 
                 with torch.autocast(device_type="cuda", dtype=torch.float16):
