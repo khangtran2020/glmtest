@@ -218,13 +218,13 @@ def generate_and_save_on_one_dataset(
                     )
 
                 generation_config = GenerationConfig(
-                    temperature=0.2,
+                    temperature=args.temp,
                     top_p=0.95,
                     top_k=40,
-                    no_repeat_ngram_size=4,
+                    no_repeat_ngram_size=3,
                     max_new_tokens=args.max_new_tokens,
                     do_sample=True,
-                    repetition_penalty=1.5,
+                    repetition_penalty=1.1,
                 )
 
                 with torch.autocast(device_type="cuda", dtype=torch.float16):
