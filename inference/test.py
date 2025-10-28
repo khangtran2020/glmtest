@@ -234,6 +234,7 @@ def generate_and_save_on_one_dataset(
                         generation_config=generation_config,
                         pad_token_id=tokenizer.eos_token_id,
                     )
+
                 if isinstance(model, GLMFModelFuzzing):
                     model.clear_cache()
 
@@ -241,6 +242,26 @@ def generate_and_save_on_one_dataset(
                     outputs,
                     skip_special_tokens=False if args.data_fuzz else True,
                 )
+
+                # Clear memory
+
+                for key in micro_input.keys():
+                    if micro_input[key] is not None:
+                        micro_input[key] = micro_input[key].to("cpu")
+                if "graph" in args.baseline_prompt:
+                    for graph in graphs:
+                        for key in GRAPH_KEYS:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to("cpu")
+                                graph.pop(key, None)
+                    for graph_mask in graph_masks:
+                        for mask in graph_mask:
+                            mask = mask.to("cpu")
+                    del graph_masks, graphs
+
+                del outputs, micro_input
+                gc.collect()
+                torch.cuda.empty_cache()
 
                 # print(f"Generated text - {uuid}: {out_text}")
                 if args.debug and accelerator.is_main_process:
