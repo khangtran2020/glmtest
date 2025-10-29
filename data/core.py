@@ -598,7 +598,7 @@ class Data(object):
         processed_data = None
         processed_data_file_path = os.path.join(
             self.data_path,
-            f"{self.baseline_prompt}_{self.max_tokens}_{self.model_name}",
+            f"{self.baseline_prompt}_{self.max_tokens}_{self.llm_model_name}",
             "processed_data.json",
         )
         if os.path.exists(processed_data_file_path):
