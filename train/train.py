@@ -531,10 +531,8 @@ def train_multi_gpu_accelerate(
         log_with="wandb",
         project_dir=args.log_dir,
     )
-    process_group = dist.group.WORLD
-    local_rank = model.rank
-    # console.log(f"Local rank: {local_rank} of the training process")
 
+    process_group = dist.group.WORLD
     if accelerator.is_main_process:
         accelerator.init_trackers(
             project_name="GLMFuzz",
@@ -599,33 +597,12 @@ def train_multi_gpu_accelerate(
     va_loader = DataLoader(
         va_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn
     )
-
-    console.log(
-        f"[green]Forward function before patching model: {transformers.modeling_flash_attention_utils._flash_attention_forward}[/green]\n\n"
-    )
     patch_model(process_group=process_group)
-    console.log(
-        f"[cyan]Forward function after patching model: {transformers.modeling_flash_attention_utils._flash_attention_forward}[/cyan]\n\n"
-    )
-    console.log("Model patched with ring attention")
     device = accelerator.device
     config = model.config
     model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
 
     # console.log(f"Model prepared with accelerator: {model}")
-
-    if accelerator.is_main_process:
-        accelerator.print(f"***** Running training *****")
-        accelerator.print(f"  Num examples = {len(tr_dataset)}")
-        accelerator.print(f"  Instantaneous batch size per device = {args.batch_size}")
-        accelerator.print(
-            f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}"
-        )
-        accelerator.print(f"  Total train batch size = {args.batch_size}")
-        accelerator.print(
-            f"  Total optimization steps = {args.num_train_epochs * len(tr_loader)}"
-        )
-
     global_step = 0
     previous_checkpoint_step = -1
     best_val_loss = 10000.0
@@ -644,27 +621,31 @@ def train_multi_gpu_accelerate(
             train_task = progress.add_task("Training...", total=args.num_train_epochs)
 
         for epoch in range(args.num_train_epochs):
+
             model.train()
             if accelerator.is_main_process:
                 train_epoch_task = progress.add_task(
                     f"Epoch {epoch + 1}/{args.num_train_epochs}",
                     total=len(tr_loader),
                 )
-
             epoch_loss = 0.0
             num_items = 0.0
 
             for step, batch in enumerate(tr_loader):
 
                 if (continue_training == True) and (global_step <= start_step):
+
                     global_step += args.batch_size
                     ram_usage = log_ram_usage()
+
                     if accelerator.is_main_process:
+
                         progress.update(
                             train_epoch_task,
                             advance=1,
                             description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
                         )
+
                     continue
 
                 accelerator.wait_for_everyone()
@@ -673,7 +654,7 @@ def train_multi_gpu_accelerate(
                 batch_size = batch["input"]["input_ids"].size(0)
 
                 accelerator.wait_for_everyone()
-                # batch_input = batch["input"].copy()
+
                 if "token_type_ids" in batch["input"]:
                     batch["input"].pop("token_type_ids")
 
@@ -730,11 +711,11 @@ def train_multi_gpu_accelerate(
                     )
                     accelerator.wait_for_everyone()
                     loss = outputs.loss
-
                     accelerator.backward(loss)
                     accelerator.wait_for_everyone()
 
                 if accelerator.sync_gradients:
+
                     accelerator.wait_for_everyone()
                     accelerator.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                     optimizer.step()
@@ -744,18 +725,17 @@ def train_multi_gpu_accelerate(
 
                 with torch.no_grad():
                     all_losses = accelerator.gather(loss)
-                    # fill all_losses with zero if it is NaN with torch.where
                     all_losses = torch.where(
                         torch.isnan(all_losses),
                         torch.zeros_like(all_losses),
                         all_losses,
                     )
-                    console.log(f"Step {global_step}: gathered losses: {all_losses}")
                     total_loss = torch.sum(all_losses)
                     batch_loss += total_loss.detach().float().item()
 
                 for key in micro_input.keys():
                     micro_input[key] = micro_input[key].to("cpu")
+
                 if "graph" in args.baseline_prompt:
                     for graph in graphs:
                         for key in GRAPH_KEYS:
