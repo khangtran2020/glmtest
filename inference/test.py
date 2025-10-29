@@ -342,6 +342,8 @@ def generate_and_save_on_one_dataset(
 
                         with open(save_dir_code, "a", encoding="utf-8") as f:
                             for i, idx in enumerate(uuid):
+                                if extract_code_block(text=out_text[i]) == "":
+                                    continue
                                 instance_data = {
                                     idx: extract_code_block(text=out_text[i])
                                 }
