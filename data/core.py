@@ -21,27 +21,7 @@ from model.gnn import GRAPH_KEYS
 # typing
 from typing import List, Union, Dict, Any
 
-SYSTEM_PROMPT = """You are an AI agent that generates executable Python test cases targeting a specific execution branch of a module.
-
-Inputs:
-- Execution branch information: the lines of code executed in the target branch.
-- Truncated module source: only the lines relevant to that branch.
-- Module path: a valid, importable path from the PYTHONPATH directory.
-- Code Property Graph (CPG) node embeddings: semantic and structural information about the code elements related to the branch.
-
-Tasks:
-1. Generate a runnable Python test file that executes the specified branch of the module.
-2. Import the module directly from the provided module path without redefining or altering it.
-3. Use the CPG embeddings and branch data to infer input values or conditions that trigger the target branch.
-4. Include meaningful assertions that confirm correct behavior and should pass for the given branch.
-5. Output only the final, runnable Python test code—no explanations or reasoning text.
-
-Requirements:
-- All imports must be valid and correspond to existing modules; do not invent or hallucinate any packages.
-- The generated test must be executable without modification.
-- Assertions must verify expected results or state changes that indicate successful branch execution.
-- Use standard testing practices (unittest, pytest, or assert statements).
-- Keep the code clear, minimal, and maintainable."""
+# INSTRUCTION_PROMPT = """"""
 
 PYNGUIN_TEMPLATE = """docker run --rm -v {}:/input:ro -v {}:/output -v {}:/package:ro {} \
     --module-name {} --coverage_metrics BRANCH --maximum_search_time {} --report-dir /output --project_path /input --output-path /output --output_variables TargetModule,CoverageTimeline --assertion-generation NONE"""
@@ -55,39 +35,76 @@ Here is the execution code lines:
 {}
 """
 
-PROMPT_CODE_TR = """Generate the test case for the code snippet:
+PROMPT_CODE_TR = """## Instruction: You are an AI agent that generates executable Python test cases targeting a specific execution branch of a module.
+
+Inputs:
+- Execution branch information: the lines of code executed in the target branch.
+- Truncated module source: only the lines relevant to that branch.
+- Module path: a valid, importable path from the PYTHONPATH directory.
+
+Tasks:
+1. Generate a runnable Python test file that executes the specified branch of the module.
+2. Include meaningful assertions that confirm correct behavior and should pass for the given branch.
+3. Output only the final, runnable Python test code—no explanations or reasoning text.
+
+Requirements:
+- The generated code must be executable without modification and placed between <code> and </code> tags.
+- Use standard testing practices (unittest, pytest, or assert statements).
+
+## Inputs:
+### Execution Branches Information (Line to Line executed):
+{}
+
+### Truncated Module Source:
 ```
 {}
-``` 
+```
+
+### Module Path:
+{}
 """
 
 PROMPT_GRAPH = """Generate the test case for the graph embedding of a targeted execution branch below:
 {}
 """
 
-PROMPT_CODE_GRAPH = """Execution Branches Information (Line to Line executed):
+PROMPT_CODE_GRAPH = """## Instruction: You are an AI agent that generates executable Python test cases targeting a specific execution branch of a module.
+
+Inputs:
+- Execution branch information: the lines of code executed in the target branch.
+- Truncated module source: only the lines relevant to that branch.
+- Module path: a valid, importable path from the PYTHONPATH directory.
+- Code Property Graph (CPG) node embeddings: semantic and structural information about the code elements related to the branch.
+
+Tasks:
+1. Generate a runnable Python test file that executes the specified branch of the module.
+2. Include meaningful assertions that confirm correct behavior and should pass for the given branch.
+3. Output only the final, runnable Python test code—no explanations or reasoning text.
+
+Requirements:
+- The generated code must be executable without modification and placed between <code> and </code> tags.
+- Use standard testing practices (unittest, pytest, or assert statements).
+
+## Inputs:
+### Execution Branches Information (Line to Line executed):
 {}
 
-Truncated Module Source:
+### Truncated Module Source:
 ```
 {}
 ```
 
-Module Path:
+### Module Path:
 {}
 
-Code Property Graph (CPG) Node Embeddings:
+### CPG Node Embeddings:
 {}
-
-Task:
-Generate a runnable Python test case that specifically execute the above execution branch 
-in the given module, using only valid imports and assertions that must pass.
 """
 
 RESPONSE_TEMPLATE = """Here is the test case:
-```
+<code>
 {}
-```
+</code>
 """
 
 PROMPT_COT = """Generate a test case for the following module such that:
@@ -1051,12 +1068,26 @@ class Data(object):
                 text = PROMPT_CODE_GRAPH.format(src_code, graph_pad)
                 response = RESPONSE_TEMPLATE.format(testcase_out)
             elif self.baseline_prompt == "code_tr":
+                branch_line = ""
+                for i, branch_item in enumerate(branch):
+                    if i == 0:
+                        branch_line += (
+                            f"Import branch: "
+                            + "->".join([str(item) for item in branch_item])
+                            + "\n"
+                        )
+                        continue
+                    branch_line += (
+                        f"Branch #{i}: "
+                        + "->".join([str(item) for item in branch_item])
+                        + "\n"
+                    )
                 # self.logger.log("Truncating code...")
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
                 if truncated_code is None:
                     self.logger.log("Truncated code is None")
                     return None
-                text = PROMPT_CODE_TR.format(trucated_code)
+                text = PROMPT_CODE_TR.format(branch_line, trucated_code, module_path)
                 response = RESPONSE_TEMPLATE.format(testcase_out)
             elif self.baseline_prompt == "graph_tr":
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
@@ -1085,7 +1116,6 @@ class Data(object):
 
             task_prompt = tokenizer.apply_chat_template(
                 [
-                    {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": text},
                     {"role": "assistant", "content": response},
                 ],
@@ -1094,7 +1124,6 @@ class Data(object):
 
             task_prompt_input = tokenizer.apply_chat_template(
                 [
-                    {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": text},
                 ],
                 tokenize=False,
@@ -1163,7 +1192,6 @@ class Data(object):
 
             task_prompt_input = tokenizer.apply_chat_template(
                 [
-                    {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": text},
                 ],
                 tokenize=False,
