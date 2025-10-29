@@ -342,10 +342,10 @@ def generate_and_save_on_one_dataset(
                                     json.dumps(instance_data, ensure_ascii=False) + "\n"
                                 )
 
-                        with open(save_dir_text, "a", encoding="utf-8") as f:
+                        with open(save_dir_code, "a", encoding="utf-8") as f:
                             for i, idx in enumerate(uuid):
                                 instance_data = {
-                                    idx: extract_code_block(markdown=out_text[i])
+                                    idx: extract_code_block(text=out_text[i])
                                 }
                                 f.write(
                                     json.dumps(instance_data, ensure_ascii=False) + "\n"

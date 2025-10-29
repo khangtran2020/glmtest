@@ -269,11 +269,18 @@ def load_checkpoint(
     return checkpoint
 
 
-def extract_code_block(markdown: str) -> Optional[str]:
-    cleaned = re.sub(r"<\|/?fuzz\|>", "", markdown)
+def extract_code_block(text):
+    """
+    Extracts all code blocks enclosed in triple backticks from a string.
+    Returns a list of code block strings (without the backticks).
+    """
 
-    pattern = r"```(?:\w+)?\n([\s\S]*?)```"
-    match = re.search(pattern, cleaned)
-    if match:
-        return match.group(1)
-    return ""
+    # Regex:
+    # ``` (optional language identifier) newline
+    # (capture everything until next ``` )
+    pattern = r"```(?:[a-zA-Z0-9_+-]*)\n(.*?)```"
+    extracted = re.findall(pattern, text, flags=re.DOTALL)
+    if len(extracted) != 0:
+        return extracted[0]
+    else:
+        return ""
