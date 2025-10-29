@@ -378,23 +378,59 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
             batch_size = inputs_embeds.size(0)
 
             for i in range(batch_size):
+
+                graph_token_index = graph_token_indices[i]
+                ranges = []
+                start = graph_token_index[0]
+                prev = graph_token_index[0]
+
+                for j in graph_token_index[1:]:
+                    if j == prev + 1:
+                        prev = j
+                    else:
+                        ranges.append((start, prev))
+                        start = j
+                        prev = j
+                ranges.append((start, prev))
+                assert len(ranges) == len(
+                    graph_masks[i]
+                ), "Mismatch between graph masks and token index ranges."
+
                 graph = graphs[i]
                 for key in graph.keys():
                     graph[key] = graph[key].to(self.llm_model.device)
-                graph_mask = graph_masks[i].to(self.llm_model.device)
-                graph_embeds = self.gnn(graph, graph_mask)
-                graph_embeds = graph_embeds.to(inputs_embeds.device)
-                assert (
-                    graph_embeds.shape
-                    == inputs_embeds[
-                        0,
-                        graph_token_indices[i][0] : (graph_token_indices[i][-1] + 1),
-                        :,
-                    ].shape
-                ), f"Shape mismatch in assignment: graph embedding shape {graph_embeds.shape}, input embedding shape: {inputs_embeds.shape}, graph_token_index: {len(graph_token_indices[i])}!"
-                inputs_embeds[
-                    i, graph_token_indices[i][0] : (graph_token_indices[i][-1] + 1), :
-                ] = graph_embeds.to(inputs_embeds.dtype)
+                graph_mask = graph_masks[i]
+
+                # merge graph_mask
+                overall_mask = None
+                for j, mask in enumerate(graph_mask):
+                    if j == 0:
+                        overall_mask = mask.to(torch.bool)
+                    else:
+                        overall_mask = overall_mask | mask.to(torch.bool)
+                # overall_mask = overall_mask.to()
+                overall_indices = (overall_mask == 1).nonzero(as_tuple=True)[
+                    0
+                ]  # Indices of 1s
+
+                # get index of node_embedding returned by GNN
+                mask_idx = []
+                for j, mask in enumerate(graph_mask):
+                    mask_indices = (mask == 1).nonzero(as_tuple=True)[0]
+                    idx_in_overall = []
+                    for k, idx in enumerate(mask_indices):
+                        if idx in overall_indices:
+                            idx_in_overall.append(k)
+                    mask_idx.append(idx_in_overall)
+
+                overall_mask = overall_mask.to(self.llm_model.device)
+                graph_embeds = self.gnn(graph, overall_mask)
+                for j, mask in enumerate(graph_mask):
+                    embeds = graph_embeds[mask_idx[j], :]
+                    embeds = embeds.to(inputs_embeds.device)
+                    inputs_embeds[i, ranges[j][0] : ranges[j][1] + 1, :] = embeds.to(
+                        inputs_embeds.dtype
+                    )
         else:
             if self.is_training:
                 inputs_embeds = inputs_embeds.requires_grad_(True)
