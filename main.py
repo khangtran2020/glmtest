@@ -55,6 +55,7 @@ def main() -> None:
         docker_image=args.docker_image,
         num_cpu=args.num_cpu,
         graph=graph,
+        llm_model_name=args.llm_model_name,
         model_name=args.model_name,
         data_max_length=args.max_seq_length,
         baseline_prompt=args.baseline_prompt,

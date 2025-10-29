@@ -174,6 +174,7 @@ class Data(object):
         graph: Graph,
         num_cpu: int,
         model_name: str,
+        llm_model_name: str,
         feat_model: PreTrainedModel = None,
         feat_tokenizer: PreTrainedTokenizer = None,
         llm_tokenizer: PreTrainedTokenizer = None,
@@ -194,6 +195,7 @@ class Data(object):
         self.num_cpu = num_cpu
         self.debug = debug
         self.model_name = model_name
+        self.llm_model_name = llm_model_name
         self.feat_model = feat_model
         self.feat_tokenizer = feat_tokenizer
         self.llm_tokenizer = llm_tokenizer
