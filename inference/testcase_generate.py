@@ -97,13 +97,13 @@ def testcase_generate(
                 project_dict[k.split("_testcase_")[0]] = []
             if args.verifier_model is None:
                 project_dict[k.split("_testcase_")[0]].append(
-                    extract_code_block(markdown=v)
+                    extract_code_block(text=v)
                 )
             else:
                 # verify the test case
                 with console.status(f"Verifying test case {k}..."):
                     verification_result = verify_test_case(
-                        test_case=extract_code_block(markdown=v),
+                        test_case=extract_code_block(text=v),
                         model=args.verifier_model,
                         temperature=0.2,
                         max_tokens=2048,
@@ -187,13 +187,13 @@ def testcase_generate(
 
                 if args.verifier_model is None:
                     project_dict[k.split("_testcase_")[0]].append(
-                        extract_code_block(markdown=v)
+                        extract_code_block(text=v)
                     )
                 else:
                     # verify the test case
                     with console.status(f"Verifying test case {k}..."):
                         verification_result = verify_test_case(
-                            test_case=extract_code_block(markdown=v),
+                            test_case=extract_code_block(text=v),
                             model=args.verifier_model,
                             temperature=0.2,
                             api_key=args.verifier_api_key,
@@ -257,9 +257,7 @@ def testcase_generate(
         for k, v in generated_dict.items():
             if k.split("_testcase_")[0] not in project_dict.keys():
                 project_dict[k.split("_testcase_")[0]] = []
-            project_dict[k.split("_testcase_")[0]].append(
-                extract_code_block(markdown=v)
-            )
+            project_dict[k.split("_testcase_")[0]].append(extract_code_block(text=v))
 
         save_dir = os.path.join(
             args.gen_dir, f"{args.name}_generated_testcase_project.json"
