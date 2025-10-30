@@ -1,10 +1,10 @@
 import os
 import gc
 import sys
+import time
 import torch
 import wandb
 import shutil
-import transformers
 import torch.distributed as dist
 from rich import print as pprint
 from functools import partial
@@ -834,7 +834,10 @@ def train_multi_gpu_accelerate(
                         accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
                         del unwrapped_model
 
-                if global_step % args.validating_steps == 0:
+                if (
+                    global_step % args.validating_steps == 0
+                    and accelerator.sync_gradients
+                ):
                     accelerator.wait_for_everyone()
                     val_loss = validate(
                         args=args,
@@ -884,7 +887,23 @@ def train_multi_gpu_accelerate(
                             del unwrapped_model
                             del checkpoint_dir
                             gc.collect()
+
+                    # move model to cpu to save GPU memory, delete cache, then move back to device
+                    # idling to reduce ram usage
+                    rank = accelerator.process_index
+                    wait_time = rank * 30
+                    console.log(
+                        f"[blue]Process {rank} waiting for {wait_time} seconds before moving model to CPU to reduce GPU memory usage[/blue]"
+                    )
+                    time.sleep(wait_time)
+                    for n, p in model.named_parameters():
+                        p.data = p.data.to("cpu")
+
+                    gc.collect()
+                    torch.cuda.empty_cache()
                     # model.train()
+                    for n, p in model.named_parameters():
+                        p.data = p.data.to(device)
 
                 if args.debug:
                     # only run 1 step in debug mode
