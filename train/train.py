@@ -1,5 +1,6 @@
 import os
 import gc
+import sys
 import torch
 import wandb
 import shutil
@@ -903,7 +904,7 @@ def train_multi_gpu_accelerate(
 
             if args.debug:
                 # only run 1 step in debug mode
-                break
+                sys.exit(0)
 
     accelerator.wait_for_everyone()
 
