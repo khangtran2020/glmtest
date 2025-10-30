@@ -334,6 +334,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 graph = graphs[i]
                 for key in graph.keys():
                     graph[key] = graph[key].to(self.llm_model.device)
+                    if self.rank == 0 and self.debug:
+                        pprint(
+                            f"[blue][debug] sample {i} graph key {key} num nodes: {graph[key].ndata['feat'].size()}[/blue]"
+                        )
 
                 graph_mask = graph_masks[i]
                 overall_mask = None  # merge graph_mask
@@ -361,6 +365,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
                 overall_mask = overall_mask.to(self.llm_model.device)
                 graph_embeds = self.gnn(graph, overall_mask)
+                if self.rank == 0 and self.debug:
+                    pprint(
+                        f"[blue][debug] sample {i} graph_embeds: {graph_embeds.size()}[/blue]"
+                    )
 
                 for j, mask in enumerate(graph_mask):
                     embeds = graph_embeds[mask_idx[j], :]
