@@ -356,7 +356,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 # get index of node_embedding returned by GNN
                 mask_idx = []
                 for j, mask in enumerate(graph_mask):
-                    mask_indices = (mask == 1).nonzero(as_tuple=True)[0]
+                    mask_indices = (mask[0] == 1).nonzero(as_tuple=True)[0]
                     pprint(
                         f"[blue][debug] sample {i} mask_indices {j}: {mask_indices}[/blue]"
                     )
