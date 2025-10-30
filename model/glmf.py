@@ -346,7 +346,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 overall_indices = (overall_mask[0] == 1).nonzero(as_tuple=True)[0]
                 if self.rank == 0 and self.debug:
                     pprint(
-                        f"[blue][debug] sample {i} overall_indices: {overall_indices}[/blue]"
+                        f"[blue][debug] sample {i} overall_indices: {overall_indices}, {overall_indices.size()}[/blue]"
                     )
 
                 # get index of node_embedding returned by GNN
