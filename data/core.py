@@ -24,21 +24,18 @@ from typing import List, Union, Dict, Any
 SYSTEM_PROMPT = """You are an AI agent that generates executable Python test cases targeting a specific execution branch of a module.
 
 Inputs:
-- Execution branch information: the lines of code executed in the target branch.
+- Execution branch information: the lines of the target module executed.
 - Truncated module source: only the lines relevant to that branch.
 - Module path: a valid, importable path from the PYTHONPATH directory.
-- Code Property Graph (CPG) node embeddings (Optional): semantic and structural information about the code elements related to the branch.
+- Code Property Graph (CPG) embeddings (Optional): semantic and structural information about the code elements related to the branch.
 
 Tasks:
 1. Generate a runnable Python test file that executes the specified branch of the module.
-2. Import the module directly from the provided module path without redefining or altering it.
-3. Use the CPG embeddings and branch data (if provided) to infer input values or conditions that trigger the target branch.
-4. Include meaningful assertions that confirm correct behavior and should pass for the given branch.
-5. Output only the final, runnable Python test code—no explanations or reasoning text.
+2. Include meaningful assertions that confirm correct behavior and should pass for the given branch.
+3. Output only the final, runnable Python test code—no explanations or reasoning text.
 
 Requirements:
 - All imports must be valid and correspond to existing modules; do not invent or hallucinate any packages.
-- The generated test must be executable without modification.
 - Use standard testing practices (unittest, pytest, or assert statements).
 - Keep the code clear, minimal, and maintainable."""
 
@@ -54,43 +51,49 @@ Here is the execution code lines:
 {}
 """
 
-PROMPT_CODE_TR = """Truncated Module Source:
+PROMPT_CODE_TR = """## Inputs:
+
+### Execution Branches Information (Line to Line executed):
+{}
+
+### Truncated Module Source:
 ```
 {}
-``` 
+```
 
-Task:
-Generate a runnable Python test case that specifically execute the above execution branch 
-in the given module, using only valid imports and assertions that must pass.
+### Module Path:
+{}
+
+### Task: Generate a runnable Python test case that specifically execute the above execution branch in the given module, using only valid imports and assertions that must pass.
 """
 
 PROMPT_GRAPH = """Generate the test case for the graph embedding of a targeted execution branch below:
 {}
 """
 
-PROMPT_CODE_GRAPH = """Execution Branches Information (Line to Line executed):
+PROMPT_CODE_GRAPH = """## Inputs:
+
+### Execution Branches Information (Line to Line executed):
 {}
 
-Truncated Module Source:
+### Truncated Module Source:
 ```
 {}
 ```
 
-Module Path:
+### Module Path:
 {}
 
-Code Property Graph (CPG) Node Embeddings:
+### Code Property Graph (CPG) Node Embeddings:
 {}
 
-Task:
-Generate a runnable Python test case that specifically execute the above execution branch 
-in the given module, using only valid imports and assertions that must pass.
+### Task: Generate a runnable Python test case that specifically execute the above execution branch in the given module, using only valid imports and assertions that must pass.
 """
 
 RESPONSE_TEMPLATE = """Here is the test case:
-```
+<code>
 {}
-```
+</code>
 """
 
 PROMPT_COT = """Generate a test case for the following module such that:
@@ -1055,11 +1058,25 @@ class Data(object):
                 response = RESPONSE_TEMPLATE.format(testcase_out)
             elif self.baseline_prompt == "code_tr":
                 # self.logger.log("Truncating code...")
+                branch_line = ""
+                for i, branch_item in enumerate(branch):
+                    if i == 0:
+                        branch_line += (
+                            f"Import branch: "
+                            + "->".join([str(item) for item in branch_item])
+                            + "\n"
+                        )
+                        continue
+                    branch_line += (
+                        f"Branch #{i}: "
+                        + "->".join([str(item) for item in branch_item])
+                        + "\n"
+                    )
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
                 if truncated_code is None:
                     self.logger.log("Truncated code is None")
                     return None
-                text = PROMPT_CODE_TR.format(truncated_code)
+                text = PROMPT_CODE_TR.format(branch_line, truncated_code, module_path)
                 response = RESPONSE_TEMPLATE.format(testcase_out)
             elif self.baseline_prompt == "graph_tr":
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
