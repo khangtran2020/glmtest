@@ -76,10 +76,6 @@ def main() -> None:
         console.log("Data processing completed. Exiting as mode is 'data'.")
         return
 
-    if args.debug:
-        ram_usage = log_ram_usage()
-        console.log(f"Dataset loaded - RAM usage: {ram_usage:.2f} MB")
-
     if args.mode == "testgen":
         if args.module_path is None:
             dataset.prepare_data_for_test_gen()
@@ -183,10 +179,6 @@ def main() -> None:
             optimizer.load_state_dict(check_point["optimizer_state_dict"])
             lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
             start_step = check_point["global_step"]
-            if args.debug:
-                console.log(
-                    f"Checkpoint loaded from {args.checkpoint_path}, starting from step {start_step}."
-                )
         else:
             start_step = -1
 

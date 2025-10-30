@@ -746,6 +746,7 @@ def train_multi_gpu_accelerate(
                         for mask in graph_mask:
                             mask = mask.to("cpu")
                     del graph_masks, graphs
+
                 outputs.logits = outputs.logits.to("cpu")
                 loss = loss.to("cpu")
                 del outputs, loss, micro_input
