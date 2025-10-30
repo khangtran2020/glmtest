@@ -343,7 +343,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     else:
                         overall_mask = overall_mask | mask.to(torch.bool)
 
-                overall_indices = (overall_mask == 1).nonzero(as_tuple=True)[0]
+                overall_indices = (overall_mask[0] == 1).nonzero(as_tuple=True)[0]
                 if self.rank == 0 and self.debug:
                     pprint(
                         f"[blue][debug] sample {i} overall_indices: {overall_indices}[/blue]"
