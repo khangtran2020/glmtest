@@ -409,14 +409,14 @@ class GLMFModelFuzzing(GLMFModel, GenerationMixin):
                     else:
                         overall_mask = overall_mask | mask.to(torch.bool)
                 # overall_mask = overall_mask.to()
-                overall_indices = (overall_mask == 1).nonzero(as_tuple=True)[
+                overall_indices = (overall_mask[0] == 1).nonzero(as_tuple=True)[
                     0
                 ]  # Indices of 1s
 
                 # get index of node_embedding returned by GNN
                 mask_idx = []
                 for j, mask in enumerate(graph_mask):
-                    mask_indices = (mask == 1).nonzero(as_tuple=True)[0]
+                    mask_indices = (mask[0] == 1).nonzero(as_tuple=True)[0]
                     idx_in_overall = []
                     for k, idx in enumerate(mask_indices):
                         if idx in overall_indices:
