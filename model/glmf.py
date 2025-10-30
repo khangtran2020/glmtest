@@ -308,10 +308,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             for i in range(batch_size):
 
                 graph_token_index = graph_token_indices[i]
-                if self.rank == 0 and self.debug:
-                    pprint(
-                        f"[blue][debug] sample {i} graph_token_index: {graph_token_index}[/blue]"
-                    )
+                # if self.rank == 0 and self.debug:
+                #     pprint(
+                #         f"[blue][debug] sample {i} graph_token_index: {graph_token_index}[/blue]"
+                #     )
 
                 ranges = []
                 start = graph_token_index[0]
@@ -328,16 +328,16 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 assert len(ranges) == len(
                     graph_masks[i]
                 ), "Mismatch between graph masks and token index ranges."
-                if self.rank == 0 and self.debug:
-                    pprint(f"[blue][debug] sample {i} ranges: {ranges}[/blue]")
+                # if self.rank == 0 and self.debug:
+                #     pprint(f"[blue][debug] sample {i} ranges: {ranges}[/blue]")
 
                 graph = graphs[i]
                 for key in graph.keys():
                     graph[key] = graph[key].to(self.llm_model.device)
-                    if self.rank == 0 and self.debug:
-                        pprint(
-                            f"[blue][debug] sample {i} graph key {key} num nodes: {graph[key].ndata['feat'].size()}[/blue]"
-                        )
+                    # if self.rank == 0 and self.debug:
+                    #     pprint(
+                    #         f"[blue][debug] sample {i} graph key {key} num nodes: {graph[key].ndata['feat'].size()}[/blue]"
+                    #     )
 
                 graph_mask = graph_masks[i]
                 overall_mask = None  # merge graph_mask
@@ -348,18 +348,18 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                         overall_mask = overall_mask | mask.to(torch.bool)
 
                 overall_indices = (overall_mask[0] == 1).nonzero(as_tuple=True)[0]
-                if self.rank == 0 and self.debug:
-                    pprint(
-                        f"[blue][debug] sample {i} overall_indices: {overall_indices}, {overall_indices.size()}[/blue]"
-                    )
+                # if self.rank == 0 and self.debug:
+                #     pprint(
+                #         f"[blue][debug] sample {i} overall_indices: {overall_indices}, {overall_indices.size()}[/blue]"
+                #     )
 
                 # get index of node_embedding returned by GNN
                 mask_idx = []
                 for j, mask in enumerate(graph_mask):
                     mask_indices = (mask[0] == 1).nonzero(as_tuple=True)[0]
-                    pprint(
-                        f"[blue][debug] sample {i} mask_indices {j}: {mask_indices}[/blue]"
-                    )
+                    # pprint(
+                    #     f"[blue][debug] sample {i} mask_indices {j}: {mask_indices}[/blue]"
+                    # )
                     idx_in_overall = []
                     for k, idx in enumerate(mask_indices):
                         if idx in overall_indices:
@@ -368,10 +368,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
                 overall_mask = overall_mask.to(self.llm_model.device)
                 graph_embeds = self.gnn(graph, overall_mask)
-                if self.rank == 0 and self.debug:
-                    pprint(
-                        f"[blue][debug] sample {i} graph_embeds: {graph_embeds.size()}[/blue]"
-                    )
+                # if self.rank == 0 and self.debug:
+                #     pprint(
+                #         f"[blue][debug] sample {i} graph_embeds: {graph_embeds.size()}[/blue]"
+                #     )
 
                 for j, mask in enumerate(graph_mask):
                     embeds = graph_embeds[mask_idx[j], :]
