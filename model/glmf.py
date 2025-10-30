@@ -308,9 +308,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             for i in range(batch_size):
 
                 graph_token_index = graph_token_indices[i]
-                pprint(
-                    f"[blue][debug] sample {i} graph_token_index: {graph_token_index}[/blue]"
-                )
+                if self.rank == 0 and self.debug:
+                    pprint(
+                        f"[blue][debug] sample {i} graph_token_index: {graph_token_index}[/blue]"
+                    )
 
                 ranges = []
                 start = graph_token_index[0]
@@ -327,7 +328,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 assert len(ranges) == len(
                     graph_masks[i]
                 ), "Mismatch between graph masks and token index ranges."
-                pprint(f"[blue][debug] sample {i} ranges: {ranges}[/blue]")
+                if self.rank == 0 and self.debug:
+                    pprint(f"[blue][debug] sample {i} ranges: {ranges}[/blue]")
 
                 graph = graphs[i]
                 for key in graph.keys():
@@ -342,9 +344,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                         overall_mask = overall_mask | mask.to(torch.bool)
 
                 overall_indices = (overall_mask == 1).nonzero(as_tuple=True)[0]
-                pprint(
-                    f"[blue][debug] sample {i} overall_indices: {overall_indices}[/blue]"
-                )
+                if self.rank == 0 and self.debug:
+                    pprint(
+                        f"[blue][debug] sample {i} overall_indices: {overall_indices}[/blue]"
+                    )
 
                 # get index of node_embedding returned by GNN
                 mask_idx = []
