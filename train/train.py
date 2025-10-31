@@ -660,32 +660,24 @@ def train_multi_gpu_accelerate(
                     batch["input"].pop("token_type_ids")
 
                 micro_input = {
-                    "input_ids": batch["input"]["input_ids"].to(device),
-                    "attention_mask": batch["input"]["attention_mask"].to(device),
-                    "labels": batch["input"]["labels"].to(device),
+                    "input_ids": batch["input"]["input_ids"],
+                    "attention_mask": batch["input"]["attention_mask"],
+                    "labels": batch["input"]["labels"],
                 }
 
                 accelerator.wait_for_everyone()
 
                 if "graph" in args.baseline_prompt:
-                    graphs = []
-                    graph_masks = []
+                    graphs = batch["graph"]
+                    graph_masks = batch["graph_mask"]
                     graph_token_indices = []
 
                     for i in range(batch_size):
-                        graph = batch["graph"][i]
-                        for key in GRAPH_KEYS:
-                            if key in graph.keys():
-                                graph[key] = graph[key].to(device)
-                        graph_mask = [
-                            mask.to(device) for mask in batch["graph_mask"][i]
-                        ]
                         graph_token_index = torch.where(
                             micro_input["input_ids"][i] == config.graph_token_id[1]
                         )[0].tolist()
-                        graphs.append(graph)
-                        graph_masks.append(graph_mask)
                         graph_token_indices.append(graph_token_index)
+
                 else:
                     graphs = None
                     graph_masks = None
@@ -710,6 +702,7 @@ def train_multi_gpu_accelerate(
                         step=global_step,
                         accelerator=accelerator,
                     )
+
                     accelerator.wait_for_everyone()
                     loss = outputs.loss
                     accelerator.backward(loss)
@@ -818,7 +811,7 @@ def train_multi_gpu_accelerate(
                                 ],
                                 key=os.path.getctime,
                             )
-                            print(f"Removing oldest checkpoint: {oldest_checkpoint}")
+                            # print(f"Removing oldest checkpoint: {oldest_checkpoint}")
                             shutil.rmtree(oldest_checkpoint)
 
                         unwrapped_model = accelerator.unwrap_model(model)

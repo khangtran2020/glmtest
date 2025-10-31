@@ -308,15 +308,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             for i in range(batch_size):
 
                 graph_token_index = graph_token_indices[i]
-                # if self.rank == 0 and self.debug:
-                #     pprint(
-                #         f"[blue][debug] sample {i} graph_token_index: {graph_token_index}[/blue]"
-                #     )
-
                 ranges = []
                 start = graph_token_index[0]
                 prev = graph_token_index[0]
-
                 for j in graph_token_index[1:]:
                     if j == prev + 1:
                         prev = j
@@ -328,8 +322,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 assert len(ranges) == len(
                     graph_masks[i]
                 ), "Mismatch between graph masks and token index ranges."
-                # if self.rank == 0 and self.debug:
-                #     pprint(f"[blue][debug] sample {i} ranges: {ranges}[/blue]")
 
                 graph = graphs[i]
                 for key in graph.keys():
@@ -375,6 +367,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
                 for j, mask in enumerate(graph_mask):
                     embeds = graph_embeds[mask_idx[j], :]
+                    assert embeds.size(0) == len(mask_idx[j])
                     embeds = embeds.to(inputs_embeds.device)
                     inputs_embeds[i, ranges[j][0] : ranges[j][1] + 1, :] = embeds.to(
                         inputs_embeds.dtype

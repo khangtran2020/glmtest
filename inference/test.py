@@ -444,31 +444,23 @@ def validate(
                 if "token_type_ids" in batch["input"]:
                     batch["input"].pop("token_type_ids")
                 micro_input = {
-                    "input_ids": batch["input"]["input_ids"].to(device),
-                    "attention_mask": batch["input"]["attention_mask"].to(device),
-                    "labels": batch["input"]["labels"].to(device),
+                    "input_ids": batch["input"]["input_ids"],
+                    "attention_mask": batch["input"]["attention_mask"],
+                    "labels": batch["input"]["labels"],
                 }
 
                 if "graph" in args.baseline_prompt:
-                    graphs = []
-                    graph_masks = []
+                    graphs = batch["graph"]
+                    graph_masks = batch["graph_mask"]
                     graph_token_indices = []
-
                     for i in range(batch_size):
-                        graph = batch["graph"][i]
-                        for key in GRAPH_KEYS:
-                            if key in graph.keys():
-                                graph[key] = graph[key].to(device)
-
-                        graph_mask = [
-                            mask.to(device) for mask in batch["graph_mask"][i]
-                        ]
                         graph_token_index = torch.where(
                             micro_input["input_ids"][i] == config.graph_token_id[1]
                         )[0].tolist()
                         graphs.append(graph)
                         graph_masks.append(graph_mask)
                         graph_token_indices.append(graph_token_index)
+
                 else:
                     graphs = None
                     graph_masks = None
