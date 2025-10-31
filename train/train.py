@@ -863,19 +863,17 @@ def train_multi_gpu_accelerate(
                             if not os.path.exists(checkpoint_dir):
                                 os.makedirs(checkpoint_dir, exist_ok=True)
 
+                            for n, p in model.named_parameters():
+                                p.data = p.data.to("cpu")
+
                             unwrapped_model = accelerator.unwrap_model(model)
-                            # if unwrapped_model.config.use_lora == True:
-                            #     unwrapped_model.llm_model = (
-                            #         unwrapped_model.llm_model.merge_and_unload()
-                            #     )
-                            #     unwrapped_model.config.use_lora = False
                             torch.save(
                                 unwrapped_model.state_dict(),
                                 os.path.join(checkpoint_dir, "model_weight.pt"),
                             )
                             tokenizer.save_pretrained(checkpoint_dir)
-                            accelerator.print(
-                                f"Saving best checkpoint to {checkpoint_dir}"
+                            console.log(
+                                f"[green]Saved best checkpoint to {checkpoint_dir}[/green]"
                             )
                             del unwrapped_model
                             del checkpoint_dir
@@ -897,6 +895,7 @@ def train_multi_gpu_accelerate(
                     # model.train()
                     for n, p in model.named_parameters():
                         p.data = p.data.to(device)
+                    accelerator.wait_for_everyone()
 
                 if args.debug:
                     # only run 1 step in debug mode
