@@ -485,9 +485,10 @@ def validate(
                     all_losses = accelerator.gather(loss)
                     all_losses = torch.where(torch.isnan(all_losses), 0.0, all_losses)
                     total_loss = torch.sum(all_losses)
-                    batch_loss += total_loss.detach().float().item()
+                    batch_loss += total_loss.item()
+                    del all_losses, total_loss
                 else:
-                    batch_loss += loss.detach().float().item()
+                    batch_loss += loss.item()
 
                 logging_gpu_usage(step=step, console=console)
 
@@ -503,6 +504,10 @@ def validate(
                         for mask in graph_mask:
                             mask = mask.to("cpu")
                     del graph_masks, graphs
+                    for graph_token_index in graph_token_indices:
+                        graph_token_index = graph_token_index.to("cpu")
+                        del graph_token_index
+                    del graph_masks, graphs, graph_token_indices
                 loss = loss.to("cpu")
                 del outputs, loss, micro_input
                 gc.collect()
@@ -523,6 +528,10 @@ def validate(
                 )
 
             val_loss += batch_loss
+
+            # Periodic cache clearing (every 10 batches)
+            if step % 10 == 0:
+                torch.cuda.empty_cache()
 
         if accelerator.is_main_process:
             progress.update(val_task, visible=False)
