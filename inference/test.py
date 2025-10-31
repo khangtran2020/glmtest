@@ -457,8 +457,6 @@ def validate(
                         graph_token_index = torch.where(
                             micro_input["input_ids"][i] == config.graph_token_id[1]
                         )[0].tolist()
-                        graphs.append(graph)
-                        graph_masks.append(graph_mask)
                         graph_token_indices.append(graph_token_index)
 
                 else:
