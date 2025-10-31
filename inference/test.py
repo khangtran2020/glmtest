@@ -425,6 +425,11 @@ def validate(
     multi_gpu: bool = False,
 ):
     model.eval()
+
+    console.log(
+        f"[green]Module in eval mode: model.gnn {model.gnn.training} - model.llm {model.llm_model.training} [/green]"
+    )
+
     with torch.no_grad():
 
         val_loss = 0.0
