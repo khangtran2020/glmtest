@@ -757,9 +757,9 @@ def train_multi_gpu_accelerate(
                 avg_batch_loss = batch_loss / batch_size
                 if accelerator.is_main_process:
                     ram_usage = log_ram_usage()
-                    console.log(
-                        f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
-                    )
+                    # console.log(
+                    #     f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
+                    # )
                     progress.update(
                         train_epoch_task,
                         advance=1,
