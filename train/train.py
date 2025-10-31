@@ -738,9 +738,6 @@ def train_multi_gpu_accelerate(
                     micro_input[key] = micro_input[key].to("cpu")
 
                 if "graph" in args.baseline_prompt:
-                    for graph_token_index in graph_token_indices:
-                        graph_token_index = graph_token_index.to("cpu")
-                        del graph_token_index
                     for graph in graphs:
                         for key in GRAPH_KEYS:
                             if key in graph.keys():
@@ -753,7 +750,7 @@ def train_multi_gpu_accelerate(
 
                 outputs.logits = outputs.logits.to("cpu")
                 loss = loss.to("cpu")
-                del outputs, loss, micro_input
+                del outputs, loss, micro_input, batch
                 gc.collect()
                 torch.cuda.empty_cache()
 

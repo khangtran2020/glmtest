@@ -503,13 +503,9 @@ def validate(
                     for graph_mask in graph_masks:
                         for mask in graph_mask:
                             mask = mask.to("cpu")
-                    del graph_masks, graphs
-                    for graph_token_index in graph_token_indices:
-                        graph_token_index = graph_token_index.to("cpu")
-                        del graph_token_index
                     del graph_masks, graphs, graph_token_indices
                 loss = loss.to("cpu")
-                del outputs, loss, micro_input
+                del outputs, loss, micro_input, batch
                 gc.collect()
                 torch.cuda.empty_cache()
 
