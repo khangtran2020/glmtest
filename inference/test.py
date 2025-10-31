@@ -1,10 +1,11 @@
 import os
 import gc
 import json
+import math
 import time
 import torch
-
-# from torch.cuda.amp import autocast
+import torch.distributed as dist
+import torch.multiprocessing as mp
 import torch.nn.functional as F
 from itertools import islice
 from model.gnn import GRAPH_KEYS
@@ -15,6 +16,7 @@ from data.loader import GLMFDataset, collate_fn
 from model.model import GLMFModelForCausalLM, GLMFModelConfig, GLMFModelFuzzing
 from transformers import PreTrainedTokenizer, DynamicCache, GenerationConfig
 from utils.constant import FUZZ_START_TOKEN, FUZZ_END_TOKEN
+from model.model import get_model
 
 # from transformers import SinkCache
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
@@ -33,6 +35,214 @@ from functools import partial
 from argparse import Namespace
 from rich.console import Console
 from typing import Optional
+
+
+def split_list(lst, n):
+    """Split a list into n (roughly) equal-sized chunks"""
+    chunk_size = math.ceil(len(lst) / n)
+    return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
+
+
+def get_chunk(lst, n, k):
+    """Get the k-th chunk from a list split into n chunks"""
+    chunks = split_list(lst, n)
+    return chunks[k] if k < len(chunks) else []
+
+
+def setup_distributed(rank, world_size, master_port=None):
+    """Initialize distributed processing"""
+    import random
+    import time
+    import socket
+
+    os.environ["MASTER_ADDR"] = "localhost"
+
+    # Use provided port or find a free one
+    if master_port is None:
+        # Find a free port
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("", 0))
+            master_port = s.getsockname()[1]
+
+    os.environ["MASTER_PORT"] = str(master_port)
+
+    print(f"[GPU {rank}] Setting up distributed processing on port {master_port}")
+
+    try:
+        # Add timeout to prevent hanging
+        dist.init_process_group(
+            backend="nccl",
+            rank=rank,
+            world_size=world_size,
+            timeout=(
+                torch.distributed.default_pg_timeout
+                if hasattr(torch.distributed, "default_pg_timeout")
+                else None
+            ),
+        )
+        torch.cuda.set_device(rank)
+        print(f"[GPU {rank}] Distributed setup successful")
+    except Exception as e:
+        print(f"[GPU {rank}] Failed to setup distributed processing: {e}")
+        print(f"[GPU {rank}] This usually indicates a distributed processing issue")
+        raise
+
+
+def cleanup_distributed():
+    """Clean up distributed processing"""
+    try:
+        if dist.is_initialized():
+            dist.destroy_process_group()
+    except Exception as e:
+        print(f"Warning: Failed to cleanup distributed process group: {e}")
+
+
+def eval_model_worker(rank, world_size, args, console, dataset, suffix: str):
+    """Worker function for each GPU"""
+    try:
+        # Setup distributed processing only for multi-GPU
+        if world_size > 1:
+            setup_distributed(rank, world_size, args.master_port)
+
+        console.log(f"[green][GPU {rank}] Initializing evaluation worker[/green]")
+        console.log(f"[GPU {rank}] Model path: {args.model_path}")
+
+        # Use the actual GPU rank directly instead of modifying CUDA_VISIBLE_DEVICES
+        device = f"cuda:{rank}"
+        torch.cuda.set_device(rank)
+
+        # Get model
+        model = get_model(
+            args=args,
+            tokenizer=dataset.llm_tokenizer,
+            rank=rank,
+            device=device,
+            console=console,
+        )
+
+        collate_fn_ = partial(
+            collate_fn,
+            tokenizer=dataset.llm_tokenizer,
+            max_seq_length=args.max_seq_length,
+        )
+
+        # unifying dtype to avoid errors
+        for n, p in model.named_parameters():
+            if args.dtype == "bf16":
+                if p.dtype != torch.bfloat16:
+                    p.data = p.data.to(torch.bfloat16)
+            elif args.dtype == "fp16":
+                if p.dtype != torch.float16:
+                    p.data = p.data.to(torch.float16)
+        print(f"[GPU {rank}] Model loaded successfully")
+
+        if args.test_on_train:
+            data = dict(islice(dataset.train_data.items(), 10))
+            keys = list(data.keys())
+        else:
+            data = dataset.test_data["module"]
+            keys = list(data.keys())
+
+        chunk = get_chunk(keys, world_size, rank)
+        print(f"[GPU {rank}] Processing {len(keys)} questions")
+
+        if len(chunk) == 0:
+            print(f"[GPU {rank}] No questions assigned, exiting")
+            return
+
+        # Create output file for this rank
+        te_dataset = GLMFDataset(
+            data=dataset.test_data["module"],
+            tokenizer=dataset.llm_tokenizer,
+            max_seq_length=args.max_seq_length,
+            debug=args.debug,
+            n_hops=dataset.n_hops,
+            testing=True,
+            dtype=args.dtype,
+            num_gpus=args.num_gpu,
+        )
+        generate_and_save_on_one_dataset(
+            dataset=te_dataset,
+            model=model,
+            args=args,
+            console=console,
+            device=device,
+            tokenizer=dataset.llm_tokenizer,
+            collate_fn_=collate_fn_,
+            suffix=f"{suffix}_part{rank}",
+        )
+
+    except Exception as e:
+        print(f"[GPU {rank}] Critical error: {e}")
+        import traceback
+
+        traceback.print_exc()
+    finally:
+        # Only cleanup distributed if we set it up
+        if world_size > 1:
+            cleanup_distributed()
+
+
+def merge_results(args, world_size, console: Console, suffix: str):
+    """Merge results from all GPUs into a single file"""
+    console.log("[green]Merging results from all GPUs...[/green]")
+    all_results = []
+    for rank in range(world_size):
+        rank_file = os.path.join(
+            args.gen_dir, f"{args.name}_code_{suffix}_part{rank}.jsonl"
+        )
+        if os.path.exists(rank_file):
+            rank_results = 0
+            with open(rank_file, "r") as f:
+                for line in f:
+                    if line.strip():
+                        result = json.loads(line)
+                        all_results.append(result)
+                        rank_results += 1
+            console.log(f"[green]Loaded {rank_results} results from GPU {rank}[/green]")
+        else:
+            console.log(
+                f"[yellow]Warning: Results file for GPU {rank} not found: {rank_file}[/yellow]"
+            )
+
+    # Write merged results
+    final_file = os.path.join(args.gen_dir, f"{args.name}_code_{suffix}.jsonl")
+    with open(final_file, "w") as f:
+        for result in all_results:
+            f.write(json.dumps(result) + "\n")
+
+    console.log(f"[blue]Merged {len(all_results)} results into {final_file}[/blue]")
+
+
+def test_on_multiple_gpus(
+    args: Namespace,
+    dataset: Data,
+    console: Console,
+):
+    """Test model using multiple GPUs with distributed processing"""
+    world_size = args.num_gpu
+    console.log(f"[green]Starting multi-GPU testing on {world_size} GPUs...[/green]")
+
+    try:
+        # Use a random port for distributed processing
+        import random
+
+        args.master_port = random.randint(10000, 60000)
+
+        mp.spawn(
+            eval_model_worker,
+            args=(world_size, args, console, dataset, "module"),
+            nprocs=world_size,
+            join=True,
+        )
+
+        # Merge results from all GPUs
+        merge_results(args, world_size, console, "module")
+    except Exception as e:
+        console.log(f"[red]Multi-GPU testing failed[/red]: {e}")
+        import traceback
+
+        traceback.print_exc()
 
 
 def test(
@@ -132,7 +342,6 @@ def generate_and_save_on_one_dataset(
     device: torch.device,
     tokenizer: PreTrainedTokenizer,
     collate_fn_: callable,
-    accelerator: Accelerator,
     suffix: str = "train",
     do_save: bool = True,
 ):
@@ -220,16 +429,6 @@ def generate_and_save_on_one_dataset(
                 if "token_type_ids" in batch["input"]:
                     batch["input"].pop("token_type_ids")
 
-                if args.debug and accelerator.is_main_process:
-                    console.log(
-                        f"[yellow]================ Example data point ================[/yellow]\n {batch['text'][0]}\n\n[yellow]================ End of example data point ================[/yellow]"
-                    )
-                    console.log(
-                        f"[yellow]================ Example tokenized ================[/yellow]\n {batch['input']['input_ids']}\n\n[yellow]================ End of example tokenized ================[/yellow]"
-                    )
-                    console.log(
-                        f"[yellow]================ Example attention_mask ================[/yellow]\n {batch['input']['attention_mask']}\n\n[yellow]================ End of example tokenized ================[/yellow]"
-                    )
                 micro_input = {
                     "input_ids": batch["input"]["input_ids"].to(device),
                     "attention_mask": batch["input"]["attention_mask"].to(device),
@@ -271,11 +470,6 @@ def generate_and_save_on_one_dataset(
                     graph_masks=graph_masks,
                     graph_token_indices=graph_token_indices,
                 )
-
-                if args.debug and accelerator.is_main_process:
-                    console.log(
-                        f"Inputs embeds shape: {inputs_embeds.shape} | Graph token index: {len(graph_token_index)}"
-                    )
 
                 generation_config = GenerationConfig(
                     temperature=args.temp,
@@ -320,12 +514,6 @@ def generate_and_save_on_one_dataset(
                 del outputs, micro_input
                 gc.collect()
                 torch.cuda.empty_cache()
-
-                # print(f"Generated text - {uuid}: {out_text}")
-                if args.debug and accelerator.is_main_process:
-                    console.log(
-                        f"\n\n[green]Generated text - {uuid} - num out tokens: {outputs.size(1)}[/green]: {out_text}\n\n"
-                    )
 
                 for i, idx in enumerate(uuid):
                     generated_text[idx] = out_text[i]
@@ -529,236 +717,3 @@ def validate(
         val_loss /= num_item
         return val_loss
         # model.train()
-
-
-def logits_to_prediction(
-    logits: torch.Tensor, temperature: float, top_k: int, top_p: float, do_sample: bool
-):
-
-    # Apply temperature scaling
-    if temperature != 0.0:
-        logits = logits / temperature
-
-    # Apply top-k filtering
-    if top_k is not None:
-        logits = _top_k_filtering(logits, top_k)
-
-    # Apply top-p (nucleus) filtering
-
-    # print(f"Using argmax for prediction: {logits.shape} - {logits}")
-
-    if do_sample:
-        probs = F.softmax(logits, dim=-1)
-        if top_p is not None:
-            probs = _top_p_filtering(probs, top_p)
-        preds = torch.multinomial(probs, num_samples=1).squeeze(1)
-    else:
-        preds = torch.argmax(logits, dim=-1)
-
-    return preds
-
-
-def _top_k_filtering(logits, top_k):
-    """Filter logits to keep only top k tokens"""
-    top_k = min(top_k, logits.size(-1))
-    indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
-    logits[indices_to_remove] = -float("inf")
-    return logits
-
-
-def _top_p_filtering(logits, top_p):
-    """Filter logits using nucleus (top-p) sampling"""
-    sorted_logits, sorted_indices = torch.sort(logits, descending=True)
-    cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
-
-    # Remove tokens with cumulative probability above the threshold
-    sorted_indices_to_remove = cumulative_probs > top_p
-    # Shift the indices to the right to keep also the first token above the threshold
-    sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
-    sorted_indices_to_remove[..., 0] = 0
-
-    # Scatter sorted tensors to original indexing
-    indices_to_remove = sorted_indices_to_remove.scatter(
-        1, sorted_indices, sorted_indices_to_remove
-    )
-    logits[indices_to_remove] = -float("inf")
-    return logits
-
-
-def merge_sequence_parallel_cache_optimized(
-    cache: DynamicCache,
-    local_outcome: tuple,
-    cache_position: torch.Tensor,
-    positional_embedding: tuple,
-    accelerator: Accelerator,
-):
-    """
-    Alternative implementation that's more memory efficient for very long sequences.
-    Only gathers when actually needed and can work with chunked processing.
-    """
-
-    # print(f"Info of local_cache: {local_cache}")
-
-    if accelerator.num_processes == 1:
-        return cache
-
-    for layer_idx in range(len(local_outcome)):
-        k_local, v_local = local_outcome[layer_idx]  # [B, H, L_local, D]
-
-        # Use accelerator's built-in gather - this handles the distributed communication
-        k_all = accelerator.gather(k_local)  # [B*world_size, H, L_local, D]
-        v_all = accelerator.gather(v_local)
-
-        B, H, L_local, D = k_local.shape
-        world_size = accelerator.num_processes
-
-        # Concatenate along sequence dimension (dim=3 after reshaping)
-        k_merged = torch.cat(
-            [k_all[i] for i in range(world_size)], dim=1
-        )  # [B, H, L_total, D]
-        v_merged = torch.cat([v_all[i] for i in range(world_size)], dim=1)
-        k_merged = k_merged.unsqueeze(0)  # [1, B*world_size, H, L_total, D]
-        v_merged = v_merged.unsqueeze(0)  # [1, B*world_size, H, L_total, D]
-
-        cos, sin = positional_embedding
-        cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
-        _, _ = cache.update(k_merged, v_merged, layer_idx, cache_kwargs)
-
-    return cache
-
-
-def generate_fuzz(
-    inputs_ids: torch.Tensor,
-    inputs_embeds: torch.Tensor,
-    model: GLMFModelForCausalLM,
-    temperature: float,
-    top_k: int,
-    top_p: float,
-    accelerator: Accelerator,
-    tokenizer: PreTrainedTokenizer,
-    max_new_tokens: int,
-    do_sample: bool = False,
-    max_seq_len: Optional[int] = None,
-):
-
-    batch_size = inputs_embeds.shape[0]
-    device = inputs_embeds.device
-
-    position_ids = (
-        torch.arange(inputs_embeds.shape[1])
-        .unsqueeze(0)
-        .expand(inputs_embeds.shape[0], -1)
-    ).to(device)
-
-    # Keep track of which sequences are finished
-    finished = torch.zeros(batch_size, dtype=torch.bool, device="cpu")
-
-    past_key_values = DynamicCache()
-    fuzz_start_id = tokenizer.convert_tokens_to_ids(FUZZ_START_TOKEN)
-    fuzz_end_id = tokenizer.convert_tokens_to_ids(FUZZ_END_TOKEN)
-
-    generated_ids = inputs_ids.clone().to("cpu")
-
-    current_length = inputs_embeds.shape[1]
-    fuzzing_mask = torch.zeros(inputs_ids.shape, device="cpu")
-
-    pprint(f"[green]Shape of fuzzing mask initialized: {fuzzing_mask.size()}[/green]")
-
-    model.eval()
-    with torch.inference_mode():
-
-        for step in range(max_new_tokens):
-
-            if current_length >= max_seq_len:
-                break
-
-            if step == 0:
-                outputs = model.forward(
-                    inputs_embeds=inputs_embeds,
-                    position_ids=position_ids,
-                    fuzzing_mask=fuzzing_mask.unsqueeze(-1).to(device),
-                    past_key_values=past_key_values,
-                )
-                logits = outputs.logits
-                preds = logits_to_prediction(
-                    logits, temperature, top_k, top_p, do_sample
-                )
-                pred = preds[:, current_length - 1 : current_length]
-                # free memory
-                preds = preds.cpu()
-                inputs_embeds = inputs_embeds.cpu()
-                position_ids = position_ids.cpu()
-                logits = logits.cpu()
-
-                del inputs_embeds, position_ids, logits, outputs, preds
-                gc.collect()
-                torch.cuda.empty_cache()
-            else:
-                if accelerator.is_main_process:
-
-                    generated_embeddings = (
-                        model.extract_embedding(
-                            input_ids=generated_ids[:, current_length - 1],
-                            graph=None,
-                            graph_mask=None,
-                            graph_token_index=None,
-                        )
-                        .unsqueeze(0)
-                        .to(device)
-                    )
-
-                    outputs = model.llm_model.forward(
-                        inputs_embeds=generated_embeddings,
-                        past_key_values=past_key_values,
-                        position_ids=None,
-                        fuzzing_mask=fuzzing_mask.unsqueeze(-1).to(device),
-                    )
-                    logits = outputs.logits
-                    past_key_values = outputs.past_key_values
-
-                    preds = logits_to_prediction(
-                        logits, temperature, top_k, top_p, do_sample
-                    )
-                    pred = preds[:, -1:].clone()
-
-                    # free memory
-                    generated_embeddings = generated_embeddings.cpu()
-                    logits = logits.cpu()
-                    preds = preds.cpu()
-
-                    del generated_embeddings, logits, outputs, preds
-                    gc.collect()
-                    torch.cuda.empty_cache()
-
-            pred = pred.to("cpu").masked_fill(finished, tokenizer.pad_token_id)
-            # pprint(f"Device of pred: {pred.device}")
-            generated_ids = torch.cat([generated_ids, pred], dim=1).to("cpu")
-            # pred = pred.to(device)
-            del pred
-            gc.collect()
-            torch.cuda.empty_cache()
-
-            # Update the fuzzing mask to not fuzz the generated token
-            fuzzing_mask = torch.cat(
-                [fuzzing_mask, torch.zeros((batch_size, 1), device="cpu")], dim=1
-            )
-            for i in range(generated_ids.shape[0]):
-                saw_start = False
-                for j in range(generated_ids.shape[1]):
-                    if saw_start:
-                        fuzzing_mask[i, j] = 1
-                    if generated_ids[i, j] == fuzz_start_id:
-                        pprint(f"[red]Found fuzzing start at position {j}[/red]")
-                        saw_start = True
-                    elif generated_ids[i, j] == fuzz_end_id:
-                        pprint(f"[red]Found fuzzing end at position {j}[/red]")
-                        saw_start = False
-
-            pprint(f"[blue]Fuzzing mask updated: {fuzzing_mask.size()}[/blue]")
-
-            finished = finished | (generated_ids[:, -1] == tokenizer.eos_token_id)
-            current_length += 1
-            if finished.all():
-                break
-
-    return generated_ids

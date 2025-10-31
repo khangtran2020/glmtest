@@ -86,7 +86,6 @@ def testcase_generate(
             device=device,
             tokenizer=dataset.llm_tokenizer,
             collate_fn_=collate_fn_,
-            accelerator=accelerator,
             suffix="independent_module",
             do_save=True,
         )
@@ -160,7 +159,6 @@ def testcase_generate(
                 device=device,
                 tokenizer=dataset.llm_tokenizer,
                 collate_fn_=collate_fn_,
-                accelerator=accelerator,
                 suffix="module_testcase",
                 do_save=True,
             )
@@ -228,7 +226,6 @@ def testcase_generate(
                 device=device,
                 tokenizer=dataset.llm_tokenizer,
                 collate_fn_=collate_fn_,
-                accelerator=accelerator,
                 suffix="project_testcase",
                 do_save=True,
             )
