@@ -560,7 +560,6 @@ def train_multi_gpu_accelerate(
         console.log(f"Distributed type: {accelerator.distributed_type}")
         console.log(f"Number of processes: {accelerator.num_processes}")
         console.log(f"Mixed precision: {mixed_precision}")
-
     tokenizer = dataset.llm_tokenizer
     tr_dataset = GLMFDataset(
         data=dataset.train_data,
@@ -598,6 +597,12 @@ def train_multi_gpu_accelerate(
     va_loader = DataLoader(
         va_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn
     )
+
+    if accelerator.is_main_process:
+        logging_train_data(
+            console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
+        )
+
     patch_model(process_group=process_group)
     device = accelerator.device
     config = model.config

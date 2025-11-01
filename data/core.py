@@ -91,9 +91,9 @@ PROMPT_CODE_GRAPH = """## Inputs:
 """
 
 RESPONSE_TEMPLATE = """Here is the test case:
-<code>
+```
 {}
-</code>
+```
 """
 
 PROMPT_COT = """Generate a test case for the following module such that:
