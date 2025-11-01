@@ -125,10 +125,6 @@ def main() -> None:
         local_rank = 0
         args.num_gpu = 0
 
-    if args.num_gpu > 1:
-        timeout_long_ncll = timedelta(seconds=90000)  # 100 minutes
-        init_process_group("nccl", timeout=timeout_long_ncll)
-
     # Debugging tokenizer:
     console.log(
         f"[cyan]Tokenizer special tokens:[/cyan]\n{dataset.llm_tokenizer.special_tokens_map}"
@@ -142,6 +138,9 @@ def main() -> None:
             console.log(f"[cyan]{key}[/cyan]: {value}")
 
     if args.mode == "train":
+        if args.num_gpu > 1:
+            timeout_long_ncll = timedelta(seconds=90000)  # 100 minutes
+            init_process_group("nccl", timeout=timeout_long_ncll)
 
         model = get_model(
             args=args,
