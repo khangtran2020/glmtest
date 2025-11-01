@@ -409,9 +409,9 @@ def validate(
 ):
     model.eval()
 
-    console.log(
-        f"[green]Module in eval mode: model.gnn {model.module.gnn.training} - model.llm {model.module.llm_model.training} [/green]"
-    )
+    # console.log(
+    #     f"[green]Module in eval mode: model.gnn {model.module.gnn.training} - model.llm {model.module.llm_model.training} [/green]"
+    # )
 
     with torch.no_grad():
 
