@@ -152,7 +152,6 @@ def test_with_accelerate(args):
         tokenizer=dataset.llm_tokenizer,
         collate_fn_=collate_fn_,
         suffix=f"part{accelerator.process_index}",
-        accelerator=accelerator,  # Pass accelerator if needed
     )
 
     # Wait for all processes to finish
