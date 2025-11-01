@@ -260,42 +260,6 @@ def test_on_multiple_gpus(
     """Test model using multiple GPUs with distributed processing"""
     world_size = args.num_gpu
     console.log(f"[green]Starting multi-GPU testing on {world_size} GPUs...[/green]")
-
-    if torch.cuda.is_available():
-        # Check if distributed training is enabled (this is the case when using Accelerate or torchrun with multi-node)
-        if "WORLD_SIZE" in os.environ and int(os.environ["WORLD_SIZE"]) > 1:
-            rank = int(os.environ.get("RANK", 0))
-            local_rank = int(
-                os.environ.get("LOCAL_RANK", rank % torch.cuda.device_count())
-            )
-            world_size = int(os.environ["WORLD_SIZE"])
-            device = torch.device("cuda", local_rank)
-            console.log(
-                f"Distributed training: rank {rank+1}/{world_size}, using device {device}."
-            )
-            args.num_gpu = world_size
-        else:
-            # Fallback for single-node training, single or multi GPU.
-            n_gpus = torch.cuda.device_count()
-            if n_gpus > 1:
-                console.log(f"Using {n_gpus} GPUs on a single node.")
-                # device = torch.device("cuda:0")
-                rank = int(os.environ.get("RANK", 0))
-                device = torch.device("cuda", rank)
-                args.num_gpu = n_gpus
-            else:
-                console.log("Using 1 GPU.")
-                device = torch.device("cuda:0")
-                rank = 0
-                local_rank = 0
-                args.num_gpu = 1
-    else:
-        console.log("No GPUs available, using CPU instead.")
-        device = torch.device("cpu")
-        rank = -1
-        local_rank = 0
-        args.num_gpu = 0
-
     try:
         # Use a random port for distributed processing
         import random
