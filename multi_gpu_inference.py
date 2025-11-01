@@ -147,7 +147,7 @@ def eval_model_worker(
             setup_distributed(rank, world_size, args.master_port)
 
         console.log(f"[green][GPU {rank}] Initializing evaluation worker[/green]")
-        console.log(f"[GPU {rank}] Model path: {args.model_path}")
+        console.log(f"[GPU {rank}] Model path: {args.model_weight_path}")
 
         # Use the actual GPU rank directly instead of modifying CUDA_VISIBLE_DEVICES
         device = f"cuda:{rank}"
