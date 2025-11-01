@@ -2,6 +2,7 @@ import os
 import json
 import math
 import torch
+import warnings
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from itertools import islice
@@ -21,6 +22,8 @@ from functools import partial
 # typing
 from argparse import Namespace
 from rich.console import Console
+
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
 def split_list(lst, n):
