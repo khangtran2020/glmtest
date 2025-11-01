@@ -196,6 +196,10 @@ def get_model_test(
     tokenizer: PreTrainedTokenizer,
     rank: int,
 ):
+    if rank == -1:
+        device = torch.device("cpu")
+    else:
+        device = torch.device(f"cuda:{rank}")
     # load model
     assert (
         args.model_weight_path is not None
@@ -338,11 +342,15 @@ def get_model_test(
         if args.dtype == "bf16":
             if p.dtype != torch.bfloat16:
                 p.data = p.data.to(torch.bfloat16)
+            if p.device != device:
+                p.data = p.data.to(device)
         elif args.dtype == "fp16":
             if p.dtype != torch.float16:
                 p.data = p.data.to(torch.float16)
+            if p.device != device:
+                p.data = p.data.to(device)
 
-    console.log(f"Model is loaded to device: {model.device} - with type {model.dtype}")
+    # console.log(f"Model is loaded to device: {model.device} - with type {model.dtype}")
     for name, param in model.named_parameters():
         console.log(
             f"[yellow]Parameter {name}, dtype: {param.dtype}, devices: {param.device}[/yellow]"
