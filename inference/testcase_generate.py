@@ -44,7 +44,7 @@ def testcase_generate(
     mixed_precision: str = "bf16",
     do_generate: bool = True,
 ):
-
+    config = model.config
     accelerator = Accelerator(
         mixed_precision=mixed_precision,
         log_with="wandb",
@@ -82,6 +82,7 @@ def testcase_generate(
             dataset=te_dataset,
             model=model,
             args=args,
+            config=config,
             console=console,
             device=device,
             tokenizer=dataset.llm_tokenizer,
