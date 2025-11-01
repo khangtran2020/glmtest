@@ -240,7 +240,7 @@ def generate_and_save_on_one_dataset(
                     graph_token_indices = None
 
                 if args.num_gpu > 1:
-                    inputs_embeds = model.base_model.extract_embedding(
+                    inputs_embeds = model.module.extract_embedding(
                         input_ids=micro_input["input_ids"],
                         graphs=graphs,
                         inputs_embeds=None,
@@ -266,7 +266,7 @@ def generate_and_save_on_one_dataset(
 
                 with torch.autocast(device_type="cuda", dtype=torch.float16):
                     if args.num_gpu > 1:
-                        outputs = model.base_model.generate(
+                        outputs = model.module.generate(
                             inputs_embeds=inputs_embeds,
                             attention_mask=micro_input["attention_mask"],
                             generation_config=generation_config,
@@ -274,7 +274,7 @@ def generate_and_save_on_one_dataset(
                         )
 
                         if isinstance(model, GLMFModelFuzzing):
-                            model.base_model.clear_cache()
+                            model.module.clear_cache()
                     else:
                         outputs = model.generate(
                             inputs_embeds=inputs_embeds,
