@@ -92,6 +92,7 @@ def test_with_accelerate(args):
         device=accelerator.device,
         console=console,
     )
+    config = model.config
 
     # Prepare model with Accelerate - this handles Flash Attention device assignment
     model = accelerator.prepare_model(model)
@@ -147,6 +148,7 @@ def test_with_accelerate(args):
         dataset=te_dataset,
         model=model,
         args=args,
+        config=config,
         console=console,
         device=accelerator.device,
         tokenizer=dataset.llm_tokenizer,

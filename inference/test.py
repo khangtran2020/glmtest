@@ -34,11 +34,6 @@ def test(
     collate_fn_ = partial(
         collate_fn, tokenizer=dataset.llm_tokenizer, max_seq_length=args.max_seq_length
     )
-    accelerator = Accelerator(
-        mixed_precision=mixed_precision,
-        log_with="wandb",
-        project_dir=args.log_dir,
-    )
     tokenizer = dataset.llm_tokenizer
     if config is None:
         config = model.config
@@ -62,6 +57,7 @@ def test(
             args=args,
             console=console,
             device=device,
+            config=config,
             tokenizer=tokenizer,
             collate_fn_=collate_fn_,
             # accelerator=accelerator,
@@ -94,6 +90,7 @@ def test(
             args=args,
             console=console,
             device=device,
+            config=config,
             tokenizer=tokenizer,
             collate_fn_=collate_fn_,
             # accelerator=accelerator,
@@ -105,6 +102,7 @@ def test(
             args=args,
             console=console,
             device=device,
+            config=config,
             tokenizer=tokenizer,
             collate_fn_=collate_fn_,
             # accelerator=accelerator,
@@ -120,6 +118,7 @@ def generate_and_save_on_one_dataset(
     device: torch.device,
     tokenizer: PreTrainedTokenizer,
     collate_fn_: callable,
+    config: GLMFModelConfig = None,
     suffix: str = "train",
     do_save: bool = True,
 ):
@@ -230,8 +229,7 @@ def generate_and_save_on_one_dataset(
                             mask.to(device) for mask in batch["graph_mask"][i]
                         ]
                         graph_token_index = torch.where(
-                            micro_input["input_ids"][i]
-                            == model.config.graph_token_id[1]
+                            micro_input["input_ids"][i] == config.graph_token_id[1]
                         )[0].tolist()
                         graphs.append(graph)
                         graph_masks.append(graph_mask)
