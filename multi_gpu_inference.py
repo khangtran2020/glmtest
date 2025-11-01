@@ -301,7 +301,7 @@ def test_on_multiple_gpus(
         import random
 
         args.master_port = random.randint(10000, 60000)
-        console.logf(f"Using master port {args.master_port}, num_gpu={world_size}")
+        console.log(f"Using master port {args.master_port}, num_gpu={world_size}")
         mp.spawn(
             eval_model_worker,
             args=(world_size, args),
