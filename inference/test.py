@@ -286,7 +286,7 @@ def test(
             device=device,
             tokenizer=tokenizer,
             collate_fn_=collate_fn_,
-            accelerator=accelerator,
+            # accelerator=accelerator,
             suffix="train",
         )
     else:
@@ -318,7 +318,7 @@ def test(
             device=device,
             tokenizer=tokenizer,
             collate_fn_=collate_fn_,
-            accelerator=accelerator,
+            # accelerator=accelerator,
             suffix="module",
         )
         generate_and_save_on_one_dataset(
@@ -329,7 +329,7 @@ def test(
             device=device,
             tokenizer=tokenizer,
             collate_fn_=collate_fn_,
-            accelerator=accelerator,
+            # accelerator=accelerator,
             suffix="project",
         )
 
