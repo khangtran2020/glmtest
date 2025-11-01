@@ -239,13 +239,22 @@ def generate_and_save_on_one_dataset(
                     graph_masks = None
                     graph_token_indices = None
 
-                inputs_embeds = model.extract_embedding(
-                    input_ids=micro_input["input_ids"],
-                    graphs=graphs,
-                    inputs_embeds=None,
-                    graph_masks=graph_masks,
-                    graph_token_indices=graph_token_indices,
-                )
+                if args.num_gpu > 1:
+                    inputs_embeds = model.base_model.extract_embedding(
+                        input_ids=micro_input["input_ids"],
+                        graphs=graphs,
+                        inputs_embeds=None,
+                        graph_masks=graph_masks,
+                        graph_token_indices=graph_token_indices,
+                    )
+                else:
+                    inputs_embeds = model.extract_embedding(
+                        input_ids=micro_input["input_ids"],
+                        graphs=graphs,
+                        inputs_embeds=None,
+                        graph_masks=graph_masks,
+                        graph_token_indices=graph_token_indices,
+                    )
 
                 generation_config = GenerationConfig(
                     temperature=args.temp,
@@ -256,15 +265,25 @@ def generate_and_save_on_one_dataset(
                 )
 
                 with torch.autocast(device_type="cuda", dtype=torch.float16):
-                    outputs = model.generate(
-                        inputs_embeds=inputs_embeds,
-                        attention_mask=micro_input["attention_mask"],
-                        generation_config=generation_config,
-                        pad_token_id=tokenizer.eos_token_id,
-                    )
+                    if args.num_gpu > 1:
+                        outputs = model.base_model.generate(
+                            inputs_embeds=inputs_embeds,
+                            attention_mask=micro_input["attention_mask"],
+                            generation_config=generation_config,
+                            pad_token_id=tokenizer.eos_token_id,
+                        )
 
-                if isinstance(model, GLMFModelFuzzing):
-                    model.clear_cache()
+                        if isinstance(model, GLMFModelFuzzing):
+                            model.base_model.clear_cache()
+                    else:
+                        outputs = model.generate(
+                            inputs_embeds=inputs_embeds,
+                            attention_mask=micro_input["attention_mask"],
+                            generation_config=generation_config,
+                            pad_token_id=tokenizer.eos_token_id,
+                        )
+                        if isinstance(model, GLMFModelFuzzing):
+                            model.clear_cache()
 
                 out_text = tokenizer.batch_decode(
                     outputs,
