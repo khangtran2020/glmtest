@@ -8,7 +8,7 @@ from data.utils import get_dataset
 from graph.utils import get_graph
 from train.train import train
 from model.model import get_model
-from inference.test import test, eval_bleu_score, test_on_multiple_gpus
+from inference.test import test, eval_bleu_score
 from inference.testcase_generate import testcase_generate
 from train.utils import load_checkpoint
 from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -194,33 +194,29 @@ def main() -> None:
         )
 
     elif args.mode == "test":
+        model = get_model(
+            args=args,
+            tokenizer=dataset.llm_tokenizer,
+            rank=rank,
+            device=device,
+            console=console,
+        )
+        # unifying dtype to avoid errors
+        for n, p in model.named_parameters():
+            if args.dtype == "bf16":
+                if p.dtype != torch.bfloat16:
+                    p.data = p.data.to(torch.bfloat16)
+            elif args.dtype == "fp16":
+                if p.dtype != torch.float16:
+                    p.data = p.data.to(torch.float16)
 
-        if args.num_gpu > 1:
-            test_on_multiple_gpus(args=args, dataset=dataset, console=console)
-        else:
-            model = get_model(
-                args=args,
-                tokenizer=dataset.llm_tokenizer,
-                rank=rank,
-                device=device,
-                console=console,
-            )
-            # unifying dtype to avoid errors
-            for n, p in model.named_parameters():
-                if args.dtype == "bf16":
-                    if p.dtype != torch.bfloat16:
-                        p.data = p.data.to(torch.bfloat16)
-                elif args.dtype == "fp16":
-                    if p.dtype != torch.float16:
-                        p.data = p.data.to(torch.float16)
+        console.log(
+            f"Model is loaded to device: {model.device} - with type {model.dtype}"
+        )
+        for name, param in model.named_parameters():
+            console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
 
-            console.log(
-                f"Model is loaded to device: {model.device} - with type {model.dtype}"
-            )
-            for name, param in model.named_parameters():
-                console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
-
-            test(args=args, dataset=dataset, model=model, console=console)
+        test(args=args, dataset=dataset, model=model, console=console)
 
     elif args.mode == "metric":
         assert (
