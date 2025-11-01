@@ -1,10 +1,7 @@
 import os
 import json
-import math
 import torch
 import warnings
-import torch.distributed as dist
-import torch.multiprocessing as mp
 from itertools import islice
 from config import parse_args
 from utils.console import console
@@ -13,165 +10,94 @@ from data.utils import get_dataset
 from graph.utils import get_graph
 from model.model import get_model
 from inference.test import generate_and_save_on_one_dataset
-from inference.testcase_generate import testcase_generate
 from data.loader import GLMFDataset, collate_fn
-from model.model import get_model
-import torch.distributed as dist
 from functools import partial
-
-# typing
-from argparse import Namespace
-from rich.console import Console
+from accelerate import Accelerator, PartialState
+from torch.utils.data import DataLoader, Subset
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-def split_list(lst, n):
-    """Split a list into n (roughly) equal-sized chunks"""
-    chunk_size = math.ceil(len(lst) / n)
-    return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
+def test_with_accelerate(args):
+    """Test model using Accelerate for automatic multi-GPU handling"""
 
+    # Initialize Accelerator - this handles all distributed setup
+    accelerator = Accelerator()
 
-def get_chunk(lst, n, k):
-    """Get the k-th chunk from a list split into n chunks"""
-    chunks = split_list(lst, n)
-    return chunks[k] if k < len(chunks) else []
-
-
-def setup_distributed(rank, world_size, master_port=None):
-    """Initialize distributed processing"""
-    import random
-    import time
-    import socket
-
-    os.environ["MASTER_ADDR"] = "localhost"
-
-    # Use provided port or find a free one
-    if master_port is None:
-        # Find a free port
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind(("", 0))
-            master_port = s.getsockname()[1]
-
-    os.environ["MASTER_PORT"] = str(master_port)
-
-    print(f"[GPU {rank}] Setting up distributed processing on port {master_port}")
-
-    try:
-        # Add timeout to prevent hanging
-        dist.init_process_group(
-            backend="nccl",
-            rank=rank,
-            world_size=world_size,
-            timeout=(
-                torch.distributed.default_pg_timeout
-                if hasattr(torch.distributed, "default_pg_timeout")
-                else None
-            ),
-        )
-        torch.cuda.set_device(rank)
-        print(f"[GPU {rank}] Distributed setup successful")
-    except Exception as e:
-        print(f"[GPU {rank}] Failed to setup distributed processing: {e}")
-        print(f"[GPU {rank}] This usually indicates a distributed processing issue")
-        raise
-
-
-def cleanup_distributed():
-    """Clean up distributed processing"""
-    try:
-        if dist.is_initialized():
-            dist.destroy_process_group()
-    except Exception as e:
-        print(f"Warning: Failed to cleanup distributed process group: {e}")
-
-
-def eval_model_worker(
-    rank: int,
-    world_size: int,
-    args: Namespace,
-):
-    """Worker function for each GPU"""
-    # Initializing the dataset
-    graph = get_graph(
-        args=args,
-        graph_type=args.graph_type,
-        logger=console,
+    console.log(
+        f"[green]Process {accelerator.process_index} of {accelerator.num_processes} started[/green]"
     )
-    dataset = get_dataset(
-        data_name=args.data,
-        data_path=args.data_path,
-        logger=console,
-        feat_model=args.feat_model,
-        llm_model=args.llm_model,
-        max_pynguin_run_time=args.max_pynguin_run_time,
-        docker_image=args.docker_image,
-        num_cpu=args.num_cpu,
-        graph=graph,
-        llm_model_name=args.llm_model_name,
-        model_name=args.model_name,
-        data_max_length=args.max_seq_length,
-        baseline_prompt=args.baseline_prompt,
-        debug=args.debug,
-        mode=args.mode,
-        graph_sampling=args.graph_sampling,
-        n_hops=args.n_layers,
-        max_tokens=args.max_seq_length,
-        raw_overwrite=args.raw_overwrite,
-        repo=args.repo,
-    )
-    if dataset is None:
-        console.log("[red]Dataset not found, exiting...[/red]")
-        return
+    console.log(f"[green]Using device: {accelerator.device}[/green]")
 
-    if args.mode == "data":
-        dataset.process_raw()
-        console.log("Data processing completed. Exiting as mode is 'data'.")
-        return
-
-    if args.mode == "testgen":
-        if args.module_path is None:
-            dataset.prepare_data_for_test_gen()
-    else:
-        dataset.prepare_data()
-
-    if args.repo is not None:
-        dataset.prepare_data_by_repo()
-
-    dataset.train_test_split(
-        val_split=int(100), test_only=True if args.mode == "testgen" else False
-    )
-
-    console.log(f"Broadcasted args and dataset to all processes.")
-
-    try:
-        # Setup distributed processing only for multi-GPU
-        if world_size > 1:
-            setup_distributed(rank, world_size, args.master_port)
-
-        console.log(f"[green][GPU {rank}] Initializing evaluation worker[/green]")
-        console.log(f"[GPU {rank}] Model path: {args.model_weight_path}")
-
-        # Use the actual GPU rank directly instead of modifying CUDA_VISIBLE_DEVICES
-        device = f"cuda:{rank}"
-        torch.cuda.set_device(rank)
-
-        # Get model
-        model = get_model(
+    # Initialize dataset (only on main process to avoid duplication)
+    with accelerator.main_process_first():
+        graph = get_graph(
             args=args,
-            tokenizer=dataset.llm_tokenizer,
-            rank=rank,
-            device=device,
-            console=console,
+            graph_type=args.graph_type,
+            logger=console,
+        )
+        dataset = get_dataset(
+            data_name=args.data,
+            data_path=args.data_path,
+            logger=console,
+            feat_model=args.feat_model,
+            llm_model=args.llm_model,
+            max_pynguin_run_time=args.max_pynguin_run_time,
+            docker_image=args.docker_image,
+            num_cpu=args.num_cpu,
+            graph=graph,
+            llm_model_name=args.llm_model_name,
+            model_name=args.model_name,
+            data_max_length=args.max_seq_length,
+            baseline_prompt=args.baseline_prompt,
+            debug=args.debug,
+            mode=args.mode,
+            graph_sampling=args.graph_sampling,
+            n_hops=args.n_layers,
+            max_tokens=args.max_seq_length,
+            raw_overwrite=args.raw_overwrite,
+            repo=args.repo,
         )
 
-        collate_fn_ = partial(
-            collate_fn,
-            tokenizer=dataset.llm_tokenizer,
-            max_seq_length=args.max_seq_length,
+        if dataset is None:
+            console.log("[red]Dataset not found, exiting...[/red]")
+            return
+
+        if args.mode == "data":
+            dataset.process_raw()
+            console.log("Data processing completed. Exiting as mode is 'data'.")
+            return
+
+        if args.mode == "testgen":
+            if args.module_path is None:
+                dataset.prepare_data_for_test_gen()
+        else:
+            dataset.prepare_data()
+
+        if args.repo is not None:
+            dataset.prepare_data_by_repo()
+
+        dataset.train_test_split(
+            val_split=int(100), test_only=True if args.mode == "testgen" else False
         )
 
-        # unifying dtype to avoid errors
+    # Wait for all processes to reach this point
+    accelerator.wait_for_everyone()
+
+    # Get model - Accelerate handles device placement
+    model = get_model(
+        args=args,
+        tokenizer=dataset.llm_tokenizer,
+        rank=accelerator.process_index,
+        device=accelerator.device,
+        console=console,
+    )
+
+    # Prepare model with Accelerate - this handles Flash Attention device assignment
+    model = accelerator.prepare_model(model)
+
+    # Unify dtype
+    with accelerator.main_process_first():
         for n, p in model.named_parameters():
             if args.dtype == "bf16":
                 if p.dtype != torch.bfloat16:
@@ -179,56 +105,66 @@ def eval_model_worker(
             elif args.dtype == "fp16":
                 if p.dtype != torch.float16:
                     p.data = p.data.to(torch.float16)
-        print(f"[GPU {rank}] Model loaded successfully")
 
-        if args.test_on_train:
-            data = dict(islice(dataset.train_data.items(), 10))
-            keys = list(data.keys())
-        else:
-            data = dataset.test_data["module"]
-            keys = list(data.keys())
+    console.log(f"[Process {accelerator.process_index}] Model loaded successfully")
 
-        chunk = get_chunk(keys, world_size, rank)
-        print(f"[GPU {rank}] Processing {len(keys)} questions")
+    # Prepare dataset
+    if args.test_on_train:
+        data = dict(islice(dataset.train_data.items(), 10))
+    else:
+        data = dataset.test_data["module"]
 
-        if len(chunk) == 0:
-            print(f"[GPU {rank}] No questions assigned, exiting")
-            return
+    te_dataset = GLMFDataset(
+        data=data,
+        tokenizer=dataset.llm_tokenizer,
+        max_seq_length=args.max_seq_length,
+        debug=args.debug,
+        n_hops=dataset.n_hops,
+        testing=True,
+        dtype=args.dtype,
+        num_gpus=args.num_gpu,
+    )
 
-        # Create output file for this rank
-        te_dataset = GLMFDataset(
-            data=dataset.test_data["module"],
-            tokenizer=dataset.llm_tokenizer,
-            max_seq_length=args.max_seq_length,
-            debug=args.debug,
-            n_hops=dataset.n_hops,
-            testing=True,
-            dtype=args.dtype,
-            num_gpus=args.num_gpu,
-        )
-        generate_and_save_on_one_dataset(
-            dataset=te_dataset,
-            model=model,
-            args=args,
-            console=console,
-            device=device,
-            tokenizer=dataset.llm_tokenizer,
-            collate_fn_=collate_fn_,
-            suffix=f"part{rank}",
-        )
+    collate_fn_ = partial(
+        collate_fn,
+        tokenizer=dataset.llm_tokenizer,
+        max_seq_length=args.max_seq_length,
+    )
 
-    except Exception as e:
-        print(f"[GPU {rank}] Critical error: {e}")
-        import traceback
+    # Create DataLoader - Accelerate will automatically shard the data
+    dataloader = DataLoader(
+        te_dataset,
+        batch_size=1,
+        collate_fn=collate_fn_,
+        shuffle=False,
+    )
 
-        traceback.print_exc()
-    finally:
-        # Only cleanup distributed if we set it up
-        if world_size > 1:
-            cleanup_distributed()
+    # Prepare dataloader with Accelerate
+    dataloader = accelerator.prepare_data_loader(dataloader)
+
+    # Run inference
+    generate_and_save_on_one_dataset(
+        dataset=te_dataset,
+        model=model,
+        args=args,
+        console=console,
+        device=accelerator.device,
+        tokenizer=dataset.llm_tokenizer,
+        collate_fn_=collate_fn_,
+        suffix=f"part{accelerator.process_index}",
+        accelerator=accelerator,  # Pass accelerator if needed
+    )
+
+    # Wait for all processes to finish
+    accelerator.wait_for_everyone()
+
+    # Merge results on main process
+    if accelerator.is_main_process:
+        merge_results(args, accelerator.num_processes, console)
+        console.log("[green]All results merged successfully![/green]")
 
 
-def merge_results(args, world_size, console: Console, suffix: str = None):
+def merge_results(args, world_size, console, suffix: str = None):
     """Merge results from all GPUs into a single file"""
     console.log("[green]Merging results from all GPUs...[/green]")
     all_results = []
@@ -257,40 +193,11 @@ def merge_results(args, world_size, console: Console, suffix: str = None):
     console.log(f"[blue]Merged {len(all_results)} results into {final_file}[/blue]")
 
 
-def test_on_multiple_gpus(
-    args: Namespace,
-):
-    """Test model using multiple GPUs with distributed processing"""
-    world_size = args.num_gpu
-    console.log(f"[green]Starting multi-GPU testing on {world_size} GPUs...[/green]")
-    try:
-        # Use a random port for distributed processing
-        import random
-
-        args.master_port = random.randint(10000, 60000)
-        console.log(f"Using master port {args.master_port}, num_gpu={world_size}")
-        mp.spawn(
-            eval_model_worker,
-            args=(world_size, args),
-            nprocs=world_size,
-            join=True,
-        )
-
-        # Merge results from all GPUs
-        merge_results(args, world_size, console, "module")
-    except Exception as e:
-        console.log(f"[red]Multi-GPU testing failed[/red]: {e}")
-        import traceback
-
-        traceback.print_exc()
-
-
 if __name__ == "__main__":
     args = parse_args()
-    console.log("Generating with multiple GPUs")
+    console.log("Generating with Accelerate multi-GPU support")
 
-    # Initialize the argument parser
     print_args(args=args)
     seed_everything(args.seed)
 
-    test_on_multiple_gpus(args=args)
+    test_with_accelerate(args=args)
