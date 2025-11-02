@@ -228,7 +228,7 @@ class PromptEngineer:
         self.client = init_api(model=model, api_key=api_key)
 
     def build_prompt(
-        self, dataset: Data, split: str = "module", prompt_type: str = "zero_shot"
+        self, dataset: Data, split: str = "test_module", prompt_type: str = "zero_shot"
     ) -> List[Dict[str, str]]:
 
         data = dataset.data[split]
