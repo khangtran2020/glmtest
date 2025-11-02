@@ -199,10 +199,23 @@ def main() -> None:
                     map_location=f"cuda:{rank}" if torch.cuda.is_available() else "cpu",
                     weights_only=True,
                 )
-                model.load_state_dict(
-                    state_dict,
-                    strict=False,
-                )
+                # Get current model's state dict
+                model_dict = model.state_dict()
+
+                # Filter out mismatched keys or shapes
+                filtered_dict = {
+                    k: v
+                    for k, v in state_dict.items()
+                    if k in model_dict and v.shape == model_dict[k].shape
+                }
+
+                # Update the model dict
+                model_dict.update(filtered_dict)
+                model.load_state_dict(model_dict)
+                # model.load_state_dict(
+                #     state_dict,
+                #     strict=False,
+                # )
                 console.log(
                     f"[cyan]Model weights loaded from {args.checkpoint_path}[/cyan]"
                 )
