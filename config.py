@@ -425,6 +425,48 @@ def add_testgen_group(group):
     )
 
 
+def add_baseline_group(group):
+    group.add_argument(
+        "--baseline_type",
+        type=str,
+        help="type of baseline to use",
+        default="prompt_engineer",
+    )
+    group.add_argument(
+        "--baseline_llm_model", type=str, help="baseline llm model", default=None
+    )
+    group.add_argument(
+        "--baseline_api_key",
+        type=str,
+        help="api key for the baseline llm model",
+        default=None,
+    )
+    group.add_argument(
+        "--baseline_output_path",
+        type=str,
+        help="path to save baseline outputs",
+        default=None,
+    )
+    group.add_argument(
+        "--baseline_output_name",
+        type=str,
+        help="file path for baseline generation",
+        default=None,
+    )
+    group.add_argument(
+        "--baseline_prompt_type",
+        type=str,
+        help="type of prompt to use",
+        default="zero_shot",
+    )
+    group.add_argument(
+        "--baseline_temp", type=float, help="temperature for baseline", default=0.01
+    )
+    group.add_argument(
+        "--baseline_max_tokens", type=int, help="max tokens for baseline", default=512
+    )
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     general_group = parser.add_argument_group(title="General configuration")
@@ -435,6 +477,7 @@ def parse_args():
     testgen_group = parser.add_argument_group(
         title="Test-case generation configuration"
     )
+    baseline_group = parser.add_argument_group(title="Baseline configuration")
 
     add_joern_group(joern_group)
     add_data_group(data_group)
@@ -442,5 +485,6 @@ def parse_args():
     add_training_group(training_group)
     add_model_group(model_group)
     add_testgen_group(testgen_group)
+    add_baseline_group(baseline_group)
 
     return parser.parse_args()

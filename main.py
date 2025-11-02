@@ -16,6 +16,9 @@ from torch.optim import AdamW
 from datetime import timedelta
 from torch.distributed import init_process_group
 
+# baseline
+from baselines.prompt_engineer.run import PromptEngineer
+
 warnings.filterwarnings("ignore")
 
 
@@ -80,6 +83,24 @@ def main() -> None:
             dataset.prepare_data_for_test_gen()
     else:
         dataset.prepare_data()
+
+    if args.mode == "baseline":
+        if args.baseline_type == "prompt_engineer":
+            pe = PromptEngineer(
+                args=args, model=args.baseline_llm_model, api_key=args.baseline_api_key
+            )
+            pe.run_prompt_engineering(
+                dataset=dataset,
+                prompt_type=args.baseline_prompt_type,
+                temperature=args.baseline_temp,
+                output_path=args.baseline_output_path,
+                output_name=args.baseline_output_name,
+                max_tokens=args.baseline_max_tokens,
+            )
+            console.log(
+                "Baseline Prompt Engineer completed. Exiting as mode is 'baseline'."
+            )
+            return
 
     if args.repo is not None:
         dataset.prepare_data_by_repo()
