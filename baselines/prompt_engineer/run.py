@@ -159,7 +159,7 @@ def query_prompt(
             kwargs = {
                 "model": model,
                 "max_completion_tokens": max_tokens,
-                "temperature": temperature,
+                # "temperature": temperature,
                 "messages": messages,
             }
             response = client.chat.completions.create(**kwargs)
