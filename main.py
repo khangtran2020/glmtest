@@ -198,6 +198,7 @@ def main() -> None:
                     args.checkpoint_path,
                     map_location=f"cuda:{rank}" if torch.cuda.is_available() else "cpu",
                     weights_only=True,
+                    strict=False,
                 )
                 model.load_state_dict(state_dict)
                 console.log(
