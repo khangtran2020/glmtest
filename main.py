@@ -216,6 +216,7 @@ def main() -> None:
                 #     state_dict,
                 #     strict=False,
                 # )
+                start_step = 20000
                 console.log(
                     f"[cyan]Model weights loaded from {args.checkpoint_path}[/cyan]"
                 )
