@@ -90,6 +90,7 @@ def extract_test_case(raw: Union[str, dict]) -> str:
             try:
                 data = ast.literal_eval(payload)
             except Exception as e:
+                print(f"Failed to parse payload: {payload}")
                 raise ValueError(
                     "Could not parse payload as JSON or Python literal"
                 ) from e
