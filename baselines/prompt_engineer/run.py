@@ -210,6 +210,9 @@ def query_prompt(
 
     except Exception as e:
         print(f"An error occurred during query: {e}")
+        import traceback
+
+        traceback.print_exc()
         return {
             "success": False,
             "content": str(e),
