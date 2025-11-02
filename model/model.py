@@ -497,14 +497,22 @@ def get_model_testgen(
                 tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
                 tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
             ]
+
+        # take .pt file from the model_weight_path
         console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
         for file in os.listdir(args.model_weight_path):
             if file.endswith(".pt"):
                 state_dict = torch.load(
                     os.path.join(args.model_weight_path, file),
-                    map_location=f"cuda:{rank}" if args.num_gpu >= 1 else "cpu",
+                    map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
                 )
-                model.load_state_dict(state_dict)
+                console.log(
+                    f"[green]Using LoRA weights for testing: {use_lora}.[/green]"
+                )
+                # for key in list(state_dict.keys()):
+                if "current_checkpoint" in args.model_weight_path:
+                    state_dict = state_dict["model_state_dict"]
+                model.load_state_dict(state_dict, strict=False)
                 if use_lora:
                     model.llm_model = model.llm_model.merge_and_unload()
                 console.log(f"[red]Model weights loaded from {file}[/red]")
