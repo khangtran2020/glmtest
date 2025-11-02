@@ -344,6 +344,9 @@ class PromptEngineer:
             f"[green]Built {len(prompt_list)} prompts for prompt engineering.[/green]"
         )
 
+        # print one prompt for debugging
+        self.console.log(f"[yellow]Sample Prompt:[/yellow]\n{prompt_list[0]['prompt']}")
+
         self.generate_responses(
             prompt_list=prompt_list,
             max_tokens=max_tokens,
