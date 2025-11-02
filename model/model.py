@@ -210,6 +210,7 @@ def get_model_test(
         or "best_model" in args.model_weight_path
     ):
         use_lora = True
+        console.log(f"[green]Using LoRA weights for testing.[/green]")
     else:
         use_lora = False
 
@@ -334,6 +335,7 @@ def get_model_test(
                 os.path.join(args.model_weight_path, file),
                 map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
             )
+            console.log(f"[green]Using LoRA weights for testing: {use_lora}.[/green]")
             model.load_state_dict(state_dict)
             if use_lora:
                 model.llm_model = model.llm_model.merge_and_unload()
