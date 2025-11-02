@@ -336,6 +336,10 @@ def get_model_test(
                 map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
             )
             console.log(f"[green]Using LoRA weights for testing: {use_lora}.[/green]")
+            for key in list(state_dict.keys()):
+                if "base_model." in key:
+                    new_key = key.replace(".base_model.model", "")
+                    state_dict[new_key] = state_dict.pop(key)
             model.load_state_dict(state_dict)
             if use_lora:
                 model.llm_model = model.llm_model.merge_and_unload()
