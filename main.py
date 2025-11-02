@@ -198,8 +198,8 @@ def main() -> None:
             check_point = load_checkpoint(path=args.checkpoint_path, rank=local_rank)
 
             model.load_state_dict(check_point["model_state_dict"])
-            optimizer.load_state_dict(check_point["optimizer_state_dict"])
-            lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
+            # optimizer.load_state_dict(check_point["optimizer_state_dict"])
+            # lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
             start_step = check_point["global_step"]
         else:
             start_step = -1
