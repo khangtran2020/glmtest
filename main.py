@@ -192,15 +192,29 @@ def main() -> None:
         )
 
         if args.continue_training:
-            assert (
-                args.checkpoint_path is not None
-            ), "Checkpoint path must be specified."
-            check_point = load_checkpoint(path=args.checkpoint_path, rank=local_rank)
 
-            model.load_state_dict(check_point["model_state_dict"])
-            # optimizer.load_state_dict(check_point["optimizer_state_dict"])
-            # lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
-            start_step = check_point["global_step"]
+            if "best_model" in args.checkpoint_path:
+                state_dict = torch.load(
+                    args.checkpoint_path,
+                    map_location=f"cuda:{rank}" if torch.cuda.is_available() else "cpu",
+                    weights_only=True,
+                )
+                model.load_state_dict(state_dict)
+                console.log(
+                    f"[cyan]Model weights loaded from {args.checkpoint_path}[/cyan]"
+                )
+            else:
+                assert (
+                    args.checkpoint_path is not None
+                ), "Checkpoint path must be specified."
+                check_point = load_checkpoint(
+                    path=args.checkpoint_path, rank=local_rank
+                )
+
+                model.load_state_dict(check_point["model_state_dict"])
+                optimizer.load_state_dict(check_point["optimizer_state_dict"])
+                lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
+                start_step = check_point["global_step"]
         else:
             start_step = -1
 
