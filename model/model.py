@@ -205,7 +205,10 @@ def get_model_test(
         args.model_weight_path is not None
     ), "Model directory must be specified for testing."
 
-    if "current_checkpoint" in args.model_weight_path:
+    if (
+        "current_checkpoint" in args.model_weight_path
+        or "best_model" in args.model_weight_path
+    ):
         use_lora = True
     else:
         use_lora = False
