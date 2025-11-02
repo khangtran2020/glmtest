@@ -346,7 +346,7 @@ class PromptEngineer:
 
         self.generate_responses(
             prompt_list=prompt_list,
-            model=self.mo,
+            model=self.model,
             max_tokens=max_tokens,
             temperature=temperature,
             output_path=output_path,
