@@ -282,8 +282,52 @@ class PromptEngineer:
         output_path: Optional[str] = None,
         output_name: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        responses = []
+        responses: List[Dict[str, Any]] = []
+
+        # Prepare output files if requested and discover already-processed keys
+        output_file = None
+        test_case_file = None
+        processed_keys = set()
+        if output_path is not None and output_name is not None:
+            os.makedirs(output_path, exist_ok=True)
+            output_file = os.path.join(output_path, f"{output_name}_responses.jsonl")
+            test_case_file = os.path.join(
+                output_path, f"{output_name}_test_cases.jsonl"
+            )
+
+            # If responses file exists, read processed keys to skip
+            if os.path.exists(output_file):
+                try:
+                    with open(output_file, "r") as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                rec = json.loads(line)
+                                iid = rec.get("instance_id")
+                                bkey = rec.get("branch_key")
+                                if iid is not None and bkey is not None:
+                                    processed_keys.add(KEY_TEMPLATE.format(iid, bkey))
+                            except Exception:
+                                # ignore malformed lines
+                                continue
+                except Exception:
+                    # If reading fails, proceed without skipping
+                    processed_keys = set()
+
+        skipped = 0
+        generated = 0
+
         for prompt_item in tqdm(prompt_list):
+            iid = prompt_item["instance_id"]
+            bkey = prompt_item["branch_key"]
+            key = KEY_TEMPLATE.format(iid, bkey)
+
+            if key in processed_keys:
+                skipped += 1
+                continue
+
             prompt_text = prompt_item["prompt"]
             response = query_prompt(
                 prompt=prompt_text,
@@ -292,39 +336,53 @@ class PromptEngineer:
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
+
             response_record = {
-                "instance_id": prompt_item["instance_id"],
+                "instance_id": iid,
                 "module_path": prompt_item["module_path"],
-                "branch_key": prompt_item["branch_key"],
+                "branch_key": bkey,
                 "response": response,
             }
+
+            # Append to responses list (in-memory)
             responses.append(response_record)
 
-        self.console.log(f"[green]Generated {len(responses)} responses.[/green]")
+            # Persist immediately (append mode) so we can resume later
+            if output_file is not None:
+                try:
+                    with open(output_file, "a") as f:
+                        f.write(json.dumps(response_record) + "\n")
+                except Exception as e:
+                    self.console.log(
+                        f"[red]Failed to append to responses file: {e}[/red]"
+                    )
 
-        # Save responses to output file
-        if output_path is not None and output_name is not None:
-            os.makedirs(output_path, exist_ok=True)
-            output_file = os.path.join(output_path, f"{output_name}_responses.jsonl")
-            with open(output_file, "w") as f:
-                for resp in responses:
-                    f.write(json.dumps(resp) + "\n")
+            # Persist extracted test case as a small mapping {uuid: test_case}
+            if test_case_file is not None:
+                try:
+                    uuid = f"{iid}_test_case_{bkey.split('_')[-1]}"
+                    extract_content = ""
+                    try:
+                        extract_content = response.get("extract_content", "")
+                    except Exception:
+                        extract_content = ""
+                    test_case_record = {uuid: extract_content}
+                    with open(test_case_file, "a") as f:
+                        f.write(json.dumps(test_case_record) + "\n")
+                except Exception as e:
+                    self.console.log(
+                        f"[red]Failed to append to test case file: {e}[/red]"
+                    )
 
-            # Save only extracted test cases
-            test_case_file = os.path.join(
-                output_path, f"{output_name}_test_cases.jsonl"
-            )
-            with open(test_case_file, "w") as f:
-                for resp in responses:
-                    uuid = f"{resp['instance_id']}_test_case_{resp['branch_key'].split('_')[-1]}"
-                    test_case_record = {
-                        uuid: resp["response"].get("extract_content", ""),
-                    }
-                    f.write(json.dumps(test_case_record) + "\n")
+            # Mark as processed so we don't re-run in the same session
+            processed_keys.add(key)
+            generated += 1
 
-            self.console.log(
-                f"[green]Saved responses to {output_file} and test cases to {test_case_file}[/green]"
-            )
+        self.console.log(
+            f"[green]Generated {generated} new responses (skipped {skipped})[/green]"
+        )
+
+        return responses
 
     def run_prompt_engineering(
         self,
