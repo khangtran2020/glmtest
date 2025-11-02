@@ -9,55 +9,53 @@ from rich.console import Console
 from data.core import Data
 from typing import List, Dict, Any, Optional, Union
 
-PROMPT_ZERO_SHOT = """Generate a test case for the following module such that:
-- The test case use the pytest framework and executable.
-- The test case will be put in the `tests/` directory which is place in the root of the project.
-- The test case will need to execute the provided branch of execution in the provided module.
+PROMPT_ZERO_SHOT = """
+You are an assistant that generates a single pytest test case for a given Python module and a given execution branch.
 
-Here is the module:
+INSTRUCTIONS (must follow exactly):
+1) Think internally as needed, but do NOT output any chain-of-thought, reasoning, notes, or explanation. Only output the final JSON object described below — nothing else (no text, no code fences, no comments).
+2) The output MUST be exactly one JSON object with a single key "test_case" whose value is a string containing the complete, executable Python test file contents (pytest compatible).
+3) If you cannot produce a valid test case, output exactly: {{"test_case": ""}} and nothing else.
+4) The JSON must parse. Do not output backticks or markdown fences. Do not prepend or append any extra characters.
+5) The test_case string should contain only valid Python code (with imports as needed) that, when saved into tests/, exercises the provided branch.
+
+MODULE:
 ```python
 {}
 ```
 
-The module is from this path:
+MODULE PATH:
 {}
 
-Here is the execution branch. The execution branch is a sequence of executable line number in the module:
+EXECUTION BRANCH (a sequence of executable line numbers or segments):
 {}
 
-Just output your answer WITHOUT REASONING and ensure your response is in the following format:
-
-```json
-{{
-  "test_case": <YOUR ANSWER FOR THE TEST CASE - JUST ONLY THE EXECUTABLE PYTHON CODE>
-}}
-```
+Output ONLY the final JSON object now, for example:
+{{ "test_case": "import ...\n\ndef test_...():\n    ..." }}
 """
 
-PROMPT_COT = """Generate a test case for the following module such that:
-- The test case use the pytest framework and executable.
-- The test case will be put in the `tests/` directory which is place in the root of the project.
-- The test case will need to execute the provided branch of execution in the provided module.
+PROMPT_COT = """
+You are an assistant that will produce a single pytest test case for a given Python module and a given execution branch.
 
-Here is the module:
+IMPORTANT:
+- You may think privately/internal to yourself, but you MUST NOT output any chain-of-thought or intermediate reasoning.
+- Your ONLY visible output must be a single JSON object with exactly one key "test_case". The value must be a string containing the full Python test (pytest) code.
+- If you cannot produce a valid test, return exactly: {{"test_case": ""}}.
+- No extra text, no explanations, and no code fences — only the JSON object.
+
+MODULE:
 ```python
 {}
 ```
 
-The module is from this path:
+MODULE PATH:
 {}
 
-Here is the execution branch. The execution branch is a sequence of executable line number in the module:
+EXECUTION BRANCH:
 {}
 
-Carefully consider the problem internally, but do NOT output any chain-of-thought or intermediate reasoning.
-Provide only the final answer in the following JSON format:
-
-```json
-{{
-  "test_case": <YOUR ANSWER FOR THE TEST CASE - JUST ONLY THE EXECUTABLE PYTHON CODE>
-}}
-```
+Now, after private consideration, output the final JSON object only:
+{{ "test_case": "<PLACE YOUR PYTEST CODE HERE>" }}
 """
 
 KEY_TEMPLATE = "{}_{}"
