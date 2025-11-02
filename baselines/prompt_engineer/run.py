@@ -337,7 +337,7 @@ class PromptEngineer:
     ):
         prompt_list = self.build_prompt(
             dataset=dataset,
-            split="module",
+            split="test_module",
             prompt_type=prompt_type,
         )
         self.console.log(
