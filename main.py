@@ -85,7 +85,7 @@ def main() -> None:
         dataset.prepare_data()
 
     if args.mode == "baseline":
-        if args.baseline_type == "prompt_engineer":
+        if args.baseline_prompt_type == "prompt_engineer":
             pe = PromptEngineer(
                 args=args, model=args.baseline_llm_model, api_key=args.baseline_api_key
             )

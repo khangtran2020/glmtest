@@ -116,7 +116,7 @@ def init_api(model: str, api_key: str):
     Raises:
         ValueError: If an unsupported model is provided.
     """
-    if model.startswith("o3-mini") or ("gpt" in model) or ("deepseek" in model):
+    if ("o3-mini" in model) or ("gpt" in model) or ("deepseek" in model):
         client = openai.OpenAI(api_key=api_key)
     elif "claude" in model:
         client = anthropic.Anthropic(api_key=api_key)
