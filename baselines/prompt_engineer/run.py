@@ -160,9 +160,16 @@ def query_prompt(
             kwargs = {
                 "model": model,
                 "max_completion_tokens": max_tokens,
-                # "temperature": temperature,
                 "messages": messages,
             }
+
+            # For o3-mini models, set reasoning_effort to "low" to minimize thinking
+            if "o3-mini" in model:
+                kwargs["reasoning_effort"] = "low"
+            else:
+                # Only add temperature for non-o3-mini models
+                kwargs["temperature"] = temperature
+
             response = client.chat.completions.create(**kwargs)
 
             # OpenAI's chat.completions.create returns a Completion object
