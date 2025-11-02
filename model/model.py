@@ -338,7 +338,9 @@ def get_model_test(
             console.log(f"[green]Using LoRA weights for testing: {use_lora}.[/green]")
             for key in list(state_dict.keys()):
                 if "base_model." in key:
-                    new_key = key.replace(".base_model.model", "")
+                    new_key = key.replace(".base_model.model", "").replace(
+                        ".base_layer", ""
+                    )
                     state_dict[new_key] = state_dict.pop(key)
             model.load_state_dict(state_dict)
             if use_lora:
