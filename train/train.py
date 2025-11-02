@@ -435,7 +435,9 @@ def train_single_gpu_accelerate(
                         unwrapped_model = accelerator.unwrap_model(model).to("cpu")
                         torch.save(
                             unwrapped_model.state_dict(),
-                            os.path.join(checkpoint_dir, "model_weight.pt"),
+                            os.path.join(
+                                checkpoint_dir, f"model_weight_step{global_step}.pt"
+                            ),
                         )
                         tokenizer.save_pretrained(checkpoint_dir)
                         accelerator.print(f"Saving best checkpoint to {checkpoint_dir}")
@@ -467,7 +469,11 @@ def train_single_gpu_accelerate(
     unwrapped_model = accelerator.unwrap_model(model)
 
     # load best model for final evaluation
-    best_model_path = os.path.join(save_path, "best_model", "model_weight.pt")
+    best_model_path = os.path.join(save_path, "best_model")
+    for file in os.listdir(best_model_path):
+        if file.endswith(".pt"):
+            best_model_path = os.path.join(best_model_path, file)
+            break
     if os.path.exists(best_model_path):
         console.log(f"Loading best model from {best_model_path} for final evaluation")
         state_dict = torch.load(best_model_path, map_location="cpu")
@@ -874,7 +880,9 @@ def train_multi_gpu_accelerate(
                             unwrapped_model = accelerator.unwrap_model(model)
                             torch.save(
                                 unwrapped_model.state_dict(),
-                                os.path.join(checkpoint_dir, "model_weight.pt"),
+                                os.path.join(
+                                    checkpoint_dir, f"model_weight_step{global_step}.pt"
+                                ),
                             )
                             tokenizer.save_pretrained(checkpoint_dir)
                             console.log(
@@ -933,7 +941,11 @@ def train_multi_gpu_accelerate(
             os.makedirs(final_model_path, exist_ok=True)
 
         unwrapped_model = accelerator.unwrap_model(model)
-        best_model_path = os.path.join(save_path, "best_model", "model_weight.pt")
+        best_model_path = os.path.join(save_path, "best_model")
+        for file in os.listdir(best_model_path):
+            if file.endswith(".pt"):
+                best_model_path = os.path.join(best_model_path, file)
+                break
         if os.path.exists(best_model_path):
             console.log(
                 f"Loading best model from {best_model_path} for final evaluation"

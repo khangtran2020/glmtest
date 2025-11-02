@@ -194,8 +194,13 @@ def main() -> None:
         if args.continue_training:
 
             if "best_model" in args.checkpoint_path:
+                model_path = None
+                for file in os.listdir(args.checkpoint_path):
+                    if file.endswith(".pt"):
+                        model_path = os.path.join(args.checkpoint_path, file)
+                        break
                 state_dict = torch.load(
-                    args.checkpoint_path,
+                    model_path,
                     map_location=f"cuda:{rank}" if torch.cuda.is_available() else "cpu",
                     weights_only=True,
                 )
@@ -212,11 +217,7 @@ def main() -> None:
                 # Update the model dict
                 model_dict.update(filtered_dict)
                 model.load_state_dict(model_dict)
-                # model.load_state_dict(
-                #     state_dict,
-                #     strict=False,
-                # )
-                start_step = 20000
+                start_step = int(model_path.split("step")[-1].split(".pt")[0])
                 console.log(
                     f"[cyan]Model weights loaded from {args.checkpoint_path}[/cyan]"
                 )
