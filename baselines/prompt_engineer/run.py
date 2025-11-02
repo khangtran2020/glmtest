@@ -165,6 +165,9 @@ def query_prompt(
             }
             response = client.chat.completions.create(**kwargs)
 
+            # print out response for debugging
+            print(f"Response: {response}")
+
             # OpenAI's chat.completions.create returns a Completion object
             return {
                 "success": True,
