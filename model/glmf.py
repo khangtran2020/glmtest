@@ -312,7 +312,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     inputs_embeds,
                 )
             else:  # branch mode
-                inputs_embeds = self.extract_embedding_graph(
+                inputs_embeds = self.extract_embedding_branch(
                     graph_token_indices,
                     graphs,
                     graph_masks,
@@ -324,7 +324,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         return inputs_embeds
 
-    def extract_embedding_graph(
+    def extract_embedding_branch(
         self,
         graph_token_indices: List[List[int]],
         graphs: List[dict],
