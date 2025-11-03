@@ -67,6 +67,7 @@ def main() -> None:
         n_hops=args.n_layers,
         max_tokens=args.max_seq_length,
         raw_overwrite=args.raw_overwrite,
+        gnn_mode=args.gnn_mode,
         repo=args.repo,
     )
     if dataset is None:
