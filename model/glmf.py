@@ -1,9 +1,8 @@
 import os
 import gc
 import torch
-from torch import nn
+from torch import nn, Tensor
 from rich import print as pprint
-
 from transformers import AutoModelForCausalLM, AutoConfig
 from transformers.configuration_utils import PretrainedConfig
 from transformers import AutoModelForCausalLM, PreTrainedTokenizer
@@ -223,6 +222,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         self.debug = debug
         self.rank = rank
         self.is_training = is_training
+        self.gnn_mode = config.mode
 
         pprint(f"[green]Model is loaded to device of rank: {rank}[/green]")
 
@@ -304,80 +304,110 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         ):
             assert graph_masks is not None
             assert graph_token_indices is not None
-            batch_size = inputs_embeds.size(0)
-
-            for i in range(batch_size):
-
-                graph_token_index = graph_token_indices[i]
-                ranges = []
-                start = graph_token_index[0]
-                prev = graph_token_index[0]
-                for j in graph_token_index[1:]:
-                    if j == prev + 1:
-                        prev = j
-                    else:
-                        ranges.append((start, prev))
-                        start = j
-                        prev = j
-                ranges.append((start, prev))
-                assert len(ranges) == len(
-                    graph_masks[i]
-                ), "Mismatch between graph masks and token index ranges."
-
-                graph = graphs[i]
-                for key in graph.keys():
-                    graph[key] = graph[key].to(self.llm_model.device)
-                    # if self.rank == 0 and self.debug:
-                    #     pprint(
-                    #         f"[blue][debug] sample {i} graph key {key} num nodes: {graph[key].ndata['feat'].size()}[/blue]"
-                    #     )
-
-                graph_mask = graph_masks[i]
-                overall_mask = None  # merge graph_mask
-                for j, mask in enumerate(graph_mask):
-                    if j == 0:
-                        overall_mask = mask.to(torch.bool)
-                    else:
-                        overall_mask = overall_mask | mask.to(torch.bool)
-
-                overall_indices = (overall_mask[0] == 1).nonzero(as_tuple=True)[0]
-                # if self.rank == 0 and self.debug:
-                #     pprint(
-                #         f"[blue][debug] sample {i} overall_indices: {overall_indices}, {overall_indices.size()}[/blue]"
-                #     )
-
-                # get index of node_embedding returned by GNN
-                mask_idx = []
-                for j, mask in enumerate(graph_mask):
-                    mask_indices = (mask[0] == 1).nonzero(as_tuple=True)[0]
-                    # pprint(
-                    #     f"[blue][debug] sample {i} mask_indices {j}: {mask_indices}[/blue]"
-                    # )
-                    idx_in_overall = []
-                    for k, idx in enumerate(mask_indices):
-                        if idx in overall_indices:
-                            idx_in_overall.append(k)
-                    mask_idx.append(idx_in_overall)
-
-                overall_mask = overall_mask.to(self.llm_model.device)
-                graph_embeds = self.gnn(graph, overall_mask)
-                # if self.rank == 0 and self.debug:
-                #     pprint(
-                #         f"[blue][debug] sample {i} graph_embeds: {graph_embeds.size()}[/blue]"
-                #     )
-
-                for j, mask in enumerate(graph_mask):
-                    embeds = graph_embeds[mask_idx[j], :]
-                    assert embeds.size(0) == len(mask_idx[j])
-                    embeds = embeds.to(inputs_embeds.device)
-                    inputs_embeds[i, ranges[j][0] : ranges[j][1] + 1, :] = embeds.to(
-                        inputs_embeds.dtype
-                    )
-
+            if self.gnn_mode == "node":
+                inputs_embeds = self.extract_embedding_node(
+                    graph_token_indices,
+                    graphs,
+                    graph_masks,
+                    inputs_embeds,
+                )
+            else:  # branch mode
+                inputs_embeds = self.extract_embedding_graph(
+                    graph_token_indices,
+                    graphs,
+                    graph_masks,
+                    inputs_embeds,
+                )
         else:
             if self.is_training:
                 inputs_embeds = inputs_embeds.requires_grad_(True)
 
+        return inputs_embeds
+
+    def extract_embedding_graph(
+        self,
+        graph_token_indices: List[List[int]],
+        graphs: List[dict],
+        graph_masks: List[torch.Tensor],
+        inputs_embeds: torch.Tensor,
+    ) -> Tensor:
+
+        batch_size = inputs_embeds.size(0)
+        for i in range(batch_size):
+            graph_token_index = graph_token_indices[i]
+            graph = graphs[i]
+            for key in graph.keys():
+                graph[key] = graph[key].to(self.llm_model.device)
+
+            graph_mask = graph_masks[i]
+            for j, mask in enumerate(graph_mask):
+                mask = mask.to(self.llm_model.device)
+                embeds = self.gnn(graph, mask)
+                embeds = embeds.to(inputs_embeds.device)
+                inputs_embeds[i, graph_token_index[j] : graph_token_index[j] + 1, :] = (
+                    embeds.to(inputs_embeds.dtype)
+                )
+
+        return inputs_embeds
+
+    def extract_embedding_node(
+        self,
+        graph_token_indices: List[List[int]],
+        graphs: List[dict],
+        graph_masks: List[torch.Tensor],
+        inputs_embeds: torch.Tensor,
+    ) -> Tensor:
+
+        batch_size = inputs_embeds.size(0)
+        for i in range(batch_size):
+            graph_token_index = graph_token_indices[i]
+            ranges = []
+            start = graph_token_index[0]
+            prev = graph_token_index[0]
+            for j in graph_token_index[1:]:
+                if j == prev + 1:
+                    prev = j
+                else:
+                    ranges.append((start, prev))
+                    start = j
+                    prev = j
+            ranges.append((start, prev))
+            assert len(ranges) == len(
+                graph_masks[i]
+            ), "Mismatch between graph masks and token index ranges."
+
+            graph = graphs[i]
+            for key in graph.keys():
+                graph[key] = graph[key].to(self.llm_model.device)
+
+            graph_mask = graph_masks[i]
+            overall_mask = None  # merge graph_mask
+            for j, mask in enumerate(graph_mask):
+                if j == 0:
+                    overall_mask = mask.to(torch.bool)
+                else:
+                    overall_mask = overall_mask | mask.to(torch.bool)
+
+            overall_indices = (overall_mask[0] == 1).nonzero(as_tuple=True)[0]
+            mask_idx = []
+            for j, mask in enumerate(graph_mask):
+                mask_indices = (mask[0] == 1).nonzero(as_tuple=True)[0]
+                idx_in_overall = []
+                for k, idx in enumerate(mask_indices):
+                    if idx in overall_indices:
+                        idx_in_overall.append(k)
+                mask_idx.append(idx_in_overall)
+
+            overall_mask = overall_mask.to(self.llm_model.device)
+            graph_embeds = self.gnn(graph, overall_mask)
+
+            for j, mask in enumerate(graph_mask):
+                embeds = graph_embeds[mask_idx[j], :]
+                assert embeds.size(0) == len(mask_idx[j])
+                embeds = embeds.to(inputs_embeds.device)
+                inputs_embeds[i, ranges[j][0] : ranges[j][1] + 1, :] = embeds.to(
+                    inputs_embeds.dtype
+                )
         return inputs_embeds
 
     def forward(
