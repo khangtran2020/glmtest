@@ -604,11 +604,18 @@ class Data(object):
         assert self.data is not None
 
         processed_data = None
-        processed_data_file_path = os.path.join(
-            self.data_path,
-            f"{self.baseline_prompt}_{self.max_tokens}_{self.llm_model_name}",
-            "processed_data.json",
-        )
+        if "graph" not in self.baseline_prompt:
+            processed_data_file_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.max_tokens}_{self.llm_model_name}",
+                "processed_data.json",
+            )
+        else:
+            processed_data_file_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.max_tokens}_{self.llm_model_name}_{self.gnn_mode}",
+                "processed_data.json",
+            )
         if os.path.exists(processed_data_file_path):
             with open(
                 processed_data_file_path,
