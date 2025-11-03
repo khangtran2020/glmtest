@@ -344,6 +344,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 mask = mask.to(self.llm_model.device)
                 embeds = self.gnn(graph, mask)
                 embeds = embeds.to(inputs_embeds.device)
+                pprint(
+                    f"[yellow]Graph embeds shape: {embeds.shape}, input_embedds {inputs_embeds[i, graph_token_index[j] : graph_token_index[j] + 1, :].size()}[/yellow]"
+                )
                 inputs_embeds[i, graph_token_index[j] : graph_token_index[j] + 1, :] = (
                     embeds.to(inputs_embeds.dtype)
                 )
