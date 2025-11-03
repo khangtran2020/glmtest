@@ -1031,7 +1031,7 @@ class Data(object):
         branch: List,
         module_path: str,
         tokenizer: PreTrainedTokenizer,
-        gnn_mode: str = "graph",
+        gnn_mode: str = "branch",
         testing: bool = False,
     ):
 
@@ -1039,7 +1039,7 @@ class Data(object):
         #     f"Preparing prompts with baseline_prompt: {self.baseline_prompt}"
         # )
         if not testing:
-            if gnn_mode == "graph":
+            if gnn_mode == "branch":
                 graph_pad = ""
                 for i, item in enumerate(active_nodes):
                     if i == 0:
@@ -1144,7 +1144,7 @@ class Data(object):
 
             return task_prompt_input, task_prompt_output, task_prompt
         else:
-            if gnn_mode == "graph":
+            if gnn_mode == "branch":
                 graph_pad = ""
                 for i, item in enumerate(active_nodes):
                     if i == 0:
