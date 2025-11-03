@@ -228,7 +228,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         if "graph" in self.baseline_prompt:
             self.gnn = MultiGAT(
-                config.mode,
+                # config.mode,
                 config.in_feats,
                 config.n_hidden,
                 config.hidden_size,
