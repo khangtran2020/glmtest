@@ -335,22 +335,38 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         batch_size = inputs_embeds.size(0)
         for i in range(batch_size):
             graph_token_index = graph_token_indices[i]
+
             graph = graphs[i]
             for key in graph.keys():
                 graph[key] = graph[key].to(self.llm_model.device)
 
             graph_mask = graph_masks[i]
+            overall_mask = None  # merge graph_mask
             for j, mask in enumerate(graph_mask):
-                mask = mask.to(self.llm_model.device)
-                embeds = self.gnn(graph, mask)
-                embeds = embeds.to(inputs_embeds.device)
-                # pprint(
-                #     f"[yellow]Graph embeds shape: {embeds.shape}, input_embedds {inputs_embeds[i, graph_token_index[j] : graph_token_index[j] + 1, :].size()}[/yellow]"
-                # )
-                inputs_embeds[i, graph_token_index[j] : graph_token_index[j] + 1, :] = (
-                    embeds.to(inputs_embeds.dtype)
-                )
+                if j == 0:
+                    overall_mask = mask.to(torch.bool)
+                else:
+                    overall_mask = overall_mask | mask.to(torch.bool)
 
+            overall_indices = (overall_mask[0] == 1).nonzero(as_tuple=True)[0]
+            mask_idx = []
+            for j, mask in enumerate(graph_mask):
+                mask_indices = (mask[0] == 1).nonzero(as_tuple=True)[0]
+                idx_in_overall = []
+                for k, idx in enumerate(mask_indices):
+                    if idx in overall_indices:
+                        idx_in_overall.append(k)
+                mask_idx.append(idx_in_overall)
+
+            overall_mask = overall_mask.to(self.llm_model.device)
+            graph_embeds = self.gnn(graph, overall_mask)
+
+            for j, mask in enumerate(graph_mask):
+                embeds = graph_embeds[mask_idx[j], :]
+                assert embeds.size(0) == len(mask_idx[j])
+                inputs_embeds[i, graph_token_index[j] : graph_token_index[j] + 1, :] = (
+                    embeds.to(inputs_embeds.dtype).mean(dim=0, keepdim=True)
+                )
         return inputs_embeds
 
     def extract_embedding_node(
