@@ -364,7 +364,7 @@ class GAT(nn.Module):
         self.last_layer = torch.nn.Linear(
             in_features=n_hidden * num_head, out_features=hidden_size
         )
-        assert mode in ["graph", "node"]
+        assert mode in ["branch", "node"]
         self.mode = mode
 
         self.n_layers = n_layers
