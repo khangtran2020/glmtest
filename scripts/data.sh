@@ -34,5 +34,4 @@ python main.py --mode data \
     --seed 42 \
     --data_path $data_path \
     --data $data \
-    --batch_size 1 \
-    --name $name
+    --batch_size 1

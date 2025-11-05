@@ -150,7 +150,7 @@ class TestGenEval(Data):
 
             for i, task in enumerate(raw_data):
                 if NEW_KEY_ID not in task.keys():
-                    task[NEW_KEY_ID] = task["instance_id"]
+                    task[NEW_KEY_ID] = task[KEY_ID]
 
             raw_data = {task[NEW_KEY_ID]: task for task in raw_data}
 
