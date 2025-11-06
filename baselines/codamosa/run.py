@@ -209,17 +209,22 @@ def prepare_instance(
     )
 
 
-def cleanup_instance(task_instance: dict, console: Console) -> None:
+def cleanup_instance(
+    task_instance: dict,
+    console: Console,
+    baseline_temp_dir: str,
+) -> None:
     repo = task_instance.get("repo")
     if not repo:
         raise ValueError("The 'repo' must be provided in the task instance.")
 
     repo_name = repo.split("/")[-1]
-    cleanup_cmd = ["rm", "-rf", f"/tmp/{repo_name}"]
+    repo_path = os.path.join(baseline_temp_dir, repo_name)
+    cleanup_cmd = ["rm", "-rf", repo_path]
 
     try:
         subprocess.run(cleanup_cmd, check=True)
-        console.log(f"[yellow]Cleaned up /tmp/{repo_name}.[/yellow]")
+        console.log(f"[yellow]Cleaned up {repo_path}.[/yellow]")
     except subprocess.CalledProcessError as e:
         console.log(f"[red]Error during cleanup: {e}[/red]")
         raise
