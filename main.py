@@ -1,4 +1,5 @@
 import os
+import json
 import torch
 import warnings
 from config import parse_args
@@ -18,6 +19,7 @@ from torch.distributed import init_process_group
 
 # baseline
 from baselines.prompt_engineer.run import PromptEngineer
+from baselines.codamosa.run import run_codamosa
 
 warnings.filterwarnings("ignore")
 
@@ -104,6 +106,15 @@ def main() -> None:
             console.log(
                 "Baseline Prompt Engineer completed. Exiting as mode is 'baseline'."
             )
+            return
+        elif args.baseline_prompt_type == "codamosa":
+            if not os.path.exists(os.path.join(args.data_path, "test_module.jsonl")):
+                raise FileNotFoundError(
+                    "test_module.jsonl not found, please crawl the data"
+                )
+            with open(os.path.join(args.data_path, "test_module.jsonl"), "r") as f:
+                task_instances = [json.loads(line) for line in f.readlines()]
+            run_codamosa(args=args, task_instances=task_instances, console=console)
             return
 
     if args.repo is not None:
