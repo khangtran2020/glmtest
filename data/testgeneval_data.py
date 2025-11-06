@@ -266,7 +266,7 @@ class TestGenEval(Data):
                             tkey
                         ]
 
-                        mask, branch_to_remove = self.get_mask_tensor(
+                        mask = self.get_mask_tensor(
                             graph=graph, branch=raw_data[key]["branches"][tkey]
                         )
 
@@ -274,19 +274,7 @@ class TestGenEval(Data):
                             self.logger.log(
                                 f"[red]Mask is empty for {key} test case {tkey}[/red]"
                             )
-                            # mark branch to be removed
-                            # key_to_remove.append(nkey)
                             continue
-
-                        # self.logger.log(
-                        #     f"Length of mask: {len(mask)}, length of branch: {len(dat['test_cases'][nkey]['branch'])}, removing branches: {branch_to_remove}"
-                        # )
-
-                        dat["test_cases"][nkey]["branch"] = [
-                            b
-                            for k, b in enumerate(raw_data[key]["branches"][tkey])
-                            if k not in branch_to_remove
-                        ]
 
                         assert len(dat["test_cases"][nkey]["branch"]) == len(
                             mask

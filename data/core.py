@@ -445,7 +445,7 @@ class Data(object):
     ) -> List[torch.Tensor]:
 
         all_mask = []
-        branch_to_remove = []
+        # branch_to_remove = []
         for j, branch_item in enumerate(branch):
             mask = np.zeros(len(graph["nodes"]))
             line_list = list(set(branch_item))
@@ -457,16 +457,16 @@ class Data(object):
                         mask[i] = 1
                 except:
                     mask[i] = 0
-            if mask.sum() == 0:
-                branch_to_remove.append(j)
-                continue
-            mask = torch.Tensor([mask])
+            # if mask.sum() == 0:
+            #     branch_to_remove.append(j)
+            #     continue
+            # mask = torch.Tensor([mask])
             all_mask.append(mask)
 
         if len(all_mask) == 1:
             # only import branch
-            return None, None
-        return all_mask, branch_to_remove
+            return None
+        return all_mask
 
     def get_node_features(self, graph: Dict) -> torch.Tensor:
         df = self.preprocess(graph)
@@ -887,9 +887,7 @@ class Data(object):
 
                     for i, branch in enumerate(branches):
 
-                        all_masks, branch_to_remove = self.get_mask_tensor(
-                            graph=graph, branch=branch
-                        )
+                        all_masks = self.get_mask_tensor(graph=graph, branch=branch)
 
                         if all_masks is None:
                             self.logger.log(
@@ -897,10 +895,6 @@ class Data(object):
                             )
                             num_discarded += 1
                             continue
-
-                        branch = [
-                            b for k, b in enumerate(branch) if k not in branch_to_remove
-                        ]
 
                         active_nodes = [
                             get_index_by_value(a=all_masks[j][0], val=1)
