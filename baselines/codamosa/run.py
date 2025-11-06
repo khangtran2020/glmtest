@@ -90,8 +90,8 @@ def prepare_instance(
     checkout_cmd = ["git", "checkout", commit, str(repo_new_path)]
 
     try:
-        clone_cmd = " ".join(clone_cmd)
-        checkout_cmd = " ".join(checkout_cmd)
+        # clone_cmd = " ".join(clone_cmd)
+        # checkout_cmd = " ".join(checkout_cmd)
         subprocess.run(clone_cmd, check=True)
         subprocess.run(checkout_cmd, check=True)
         console.log(
