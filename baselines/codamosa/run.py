@@ -174,7 +174,7 @@ def run_codamosa(args, task_instances: List[dict], console: Console) -> None:
             f"{output_file}:/output",
             "--bind",
             f"/tmp/{repo_name}:/package:ro",
-            args.sif_file,
+            args.baseline_sif_path,
             "--project_path",
             "/input",
             "--module-name",

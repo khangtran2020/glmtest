@@ -448,6 +448,12 @@ def add_baseline_group(group):
         default=None,
     )
     group.add_argument(
+        "--baseline_sif_path",
+        type=str,
+        help="path to jif file for baseline generation",
+        default=None,
+    )
+    group.add_argument(
         "--baseline_output_name",
         type=str,
         help="file path for baseline generation",
