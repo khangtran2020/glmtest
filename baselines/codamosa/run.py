@@ -183,7 +183,9 @@ def prepare_instance(
         repo = git.Repo.clone_from(
             f"https://github.com/{repo}.git", repo_new_path, no_checkout=True
         )
-    repo.git.checkout(checkout_dict[repo][version])
+    commit_id = checkout_dict[repo][version]
+    console.log(f"[yellow]Checking out {repo} to commit {commit_id}.[/yellow]")
+    repo.git.checkout(commit_id)
     packages = package_name_dict.get(repo, [])
     with open(f"/tmp/{repo_name}/package.txt", "w") as f:
         for package in packages[:-1]:
