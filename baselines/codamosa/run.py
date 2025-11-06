@@ -178,14 +178,14 @@ def prepare_instance(
     repo_new_path = os.path.join(baseline_temp_dir, repo_name)
 
     if os.path.exists(repo_new_path):
-        repo = Repo(repo_new_path)
+        repo_obj = Repo(repo_new_path)
     else:
-        repo = git.Repo.clone_from(
+        repo_obj = git.Repo.clone_from(
             f"https://github.com/{repo}.git", repo_new_path, no_checkout=True
         )
     commit_id = checkout_dict[repo][version]
     console.log(f"[yellow]Checking out {repo} to commit {commit_id}.[/yellow]")
-    repo.git.checkout(commit_id)
+    repo_obj.git.checkout(commit_id)
     packages = package_name_dict.get(repo, [])
     with open(f"/tmp/{repo_name}/package.txt", "w") as f:
         for package in packages[:-1]:
