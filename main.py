@@ -112,7 +112,7 @@ def main() -> None:
                 raise FileNotFoundError(
                     "test_module.jsonl not found, please crawl the data"
                 )
-            with open(os.path.join(args.data_path, "test_module.jsonl"), "r") as f:
+            with open(os.path.join(dataset.data_path, "test_module.jsonl"), "r") as f:
                 task_instances = [json.loads(line) for line in f.readlines()]
             run_codamosa(args=args, task_instances=task_instances, console=console)
             return
