@@ -216,3 +216,5 @@ def run_codamosa(args, task_instances: List[dict], console: Console) -> None:
         except subprocess.CalledProcessError as e:
             console.log(f"[red]Error during Codamosa execution: {e}[/red]")
             raise
+
+        cleanup_instance(task_instance, console)
