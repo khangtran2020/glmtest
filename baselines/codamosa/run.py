@@ -1,5 +1,6 @@
 import os
 import git
+import shutil
 import subprocess
 from git import Repo
 from rich.console import Console
@@ -187,7 +188,7 @@ def prepare_instance(
     console.log(f"[yellow]Checking out {repo} to commit {commit_id}.[/yellow]")
     repo_obj.git.reset("--hard", commit_id)
     packages = package_name_dict.get(repo, [])
-    with open(f"/tmp/{repo_name}/package.txt", "w") as f:
+    with open(os.path.join(repo_new_path, "package.txt"), "w") as f:
         for package in packages[:-1]:
             f.write(f"{package}\n")
         target_package = packages[-1] if packages else ""
@@ -209,10 +210,9 @@ def cleanup_instance(
 
     repo_name = repo.split("/")[-1]
     repo_path = os.path.join(baseline_temp_dir, repo_name)
-    cleanup_cmd = ["rm", "-rf", repo_path]
 
     try:
-        subprocess.run(cleanup_cmd, check=True)
+        shutil.rmtree(repo_path)
         console.log(f"[yellow]Cleaned up {repo_path}.[/yellow]")
     except subprocess.CalledProcessError as e:
         console.log(f"[red]Error during cleanup: {e}[/red]")
