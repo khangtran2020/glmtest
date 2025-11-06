@@ -82,6 +82,8 @@ def prepare_instance(task_instance: dict, console: Console) -> None:
     checkout_cmd = ["git", "checkout", commit, f"/tmp/{repo_name}"]
 
     try:
+        clone_cmd = " ".join(clone_cmd)
+        checkout_cmd = " ".join(checkout_cmd)
         subprocess.run(clone_cmd, check=True)
         subprocess.run(checkout_cmd, check=True)
         console.log(
