@@ -251,16 +251,20 @@ def run_codamosa(args, task_instances: List[dict], console: Console) -> None:
 
         repo_new_path = os.path.join(args.baseline_tmp_dir, repo_name)
 
+        # docker run --rm -v $TEST_BASE/test-apps/flutils:/input:ro -v /tmp/flutils-out:/output \
+        # -v $TEST_BASE/test-apps/flutils:/package:ro codamosa-runner
+
         codamosa_cmd = [
-            "apptainer",
+            "docker",
             "run",
-            "--bind",
+            "--rm",
+            "-v",
             f"{repo_new_path}:/input:ro",
-            "--bind",
+            "-v",
             f"{output_file}:/output",
-            "--bind",
+            "-v",
             f"{repo_new_path}:/package:ro",
-            args.baseline_sif_path,
+            "codamosa-runner",
             "--project_path",
             "/input",
             "--module-name",
