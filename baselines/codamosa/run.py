@@ -156,7 +156,10 @@ def run_codamosa(args, task_instances: List[dict], console: Console) -> None:
             --model_base_url "<BASE_URL>" \
             --model_relative_url "<RELATIVE_URL>"
         """
-        output_file = os.path.join(args.baseline_output_path, args.baseline_output_name)
+        output_file = os.path.join(
+            args.baseline_output_path,
+            f"{args.baseline_output_name}_{task_instance.get('id', 'output')}.json",
+        )
         if "claude" in args.baseline_llm_model.lower():
             url = "https://api.anthropic.com/v1/messages"
         elif (
