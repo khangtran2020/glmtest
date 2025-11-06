@@ -185,7 +185,7 @@ def prepare_instance(
         )
     commit_id = checkout_dict[repo][version]
     console.log(f"[yellow]Checking out {repo} to commit {commit_id}.[/yellow]")
-    repo_obj.git.checkout(commit_id)
+    repo_obj.git.reset("--hard", commit_id)
     packages = package_name_dict.get(repo, [])
     with open(f"/tmp/{repo_name}/package.txt", "w") as f:
         for package in packages[:-1]:
