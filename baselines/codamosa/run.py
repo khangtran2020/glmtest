@@ -68,7 +68,9 @@ package_name_dict = {
 }
 
 
-def prepare_instance(task_instance: dict, console: Console) -> None:
+def prepare_instance(
+    task_instance: dict, baseline_temp_dir: str, console: Console
+) -> None:
     repo = task_instance.get("repo")
     commit = task_instance.get("base_commit")
     version = task_instance.get("version")
@@ -78,8 +80,14 @@ def prepare_instance(task_instance: dict, console: Console) -> None:
         )
 
     repo_name = repo.split("/")[-1]
-    clone_cmd = ["git", "clone", repo, f"/tmp/{repo_name}"]
-    checkout_cmd = ["git", "checkout", commit, f"/tmp/{repo_name}"]
+    repo_new_path = os.path.join(baseline_temp_dir, repo_name)
+    clone_cmd = [
+        "git",
+        "clone",
+        f"https://github.com/{repo}.git",
+        repo_new_path,
+    ]
+    checkout_cmd = ["git", "checkout", commit, str(repo_new_path)]
 
     try:
         clone_cmd = " ".join(clone_cmd)
@@ -124,9 +132,14 @@ def cleanup_instance(task_instance: dict, console: Console) -> None:
 
 def run_codamosa(args, task_instances: List[dict], console: Console) -> None:
 
+    os.makedirs(args.baseline_output_path, exist_ok=True)
+    os.makedirs(args.baseline_tmp_dir, exist_ok=True)
+
     for task_instance in task_instances:
 
-        prepare_instance(task_instance, console)
+        prepare_instance(
+            task_instance, baseline_temp_dir=args.baseline_tmp_dir, console=console
+        )
         repo = task_instance.get("repo")
         if not repo:
             raise ValueError("The 'repo' must be provided in the task instance.")
@@ -160,8 +173,9 @@ def run_codamosa(args, task_instances: List[dict], console: Console) -> None:
         """
         output_file = os.path.join(
             args.baseline_output_path,
-            f"{args.baseline_output_name}_{task_instance.get('id', 'output')}.json",
+            f"{args.baseline_output_name}_{task_instance.get('id', 'output')}",
         )
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
         if "claude" in args.baseline_llm_model.lower():
             url = "https://api.anthropic.com/v1/messages"
         elif (

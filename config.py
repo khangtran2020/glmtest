@@ -471,6 +471,12 @@ def add_baseline_group(group):
     group.add_argument(
         "--baseline_max_tokens", type=int, help="max tokens for baseline", default=512
     )
+    group.add_argument(
+        "--baseline_tmp_dir",
+        type=str,
+        help="temp dir for baseline",
+        default="./results/temp",
+    )
 
 
 def parse_args():
