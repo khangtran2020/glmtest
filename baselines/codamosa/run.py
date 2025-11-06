@@ -229,42 +229,18 @@ def run_codamosa(args, task_instances: List[dict], console: Console) -> None:
         prepare_instance(
             task_instance, baseline_temp_dir=args.baseline_tmp_dir, console=console
         )
+
         repo = task_instance.get("repo")
         if not repo:
             raise ValueError("The 'repo' must be provided in the task instance.")
 
         repo_name = repo.split("/")[-1]
-        """
-        Command to run is something like:
-        apptainer run \
-            --bind $TEST_BASE/test-apps/flutils:/input:ro \
-            --bind /tmp/flutils-out:/output \
-            --bind $TEST_BASE/test-apps/flutils:/package:ro \
-            Sif file \
-            --project_path /input \
-            --module-name flutils.packages \
-            --output-path /output \
-            --report-dir /output \
-            --maximum_search_time 120 \
-            --output_variables TargetModule,CoverageTimeline \
-            --coverage_metrics BRANCH,LINE \
-            --assertion-generation NONE \
-            --algorithm CODAMOSA \
-            -v \
-            --include-partially-parsable True \
-            --allow-expandable-cluster True \
-            --uninterpreted_statements ONLY \
-            --temperature 0.8 \
-            --model_name code-davinci-002 \
-            --authorization-key "$AUTH_KEY" \
-            --model_base_url "<BASE_URL>" \
-            --model_relative_url "<RELATIVE_URL>"
-        """
         output_file = os.path.join(
             args.baseline_output_path,
             f"{args.baseline_output_name}_{task_instance.get('id', 'output')}",
         )
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        os.makedirs(output_file, exist_ok=True)
+
         if "claude" in args.baseline_llm_model.lower():
             url = "https://api.anthropic.com/v1/messages"
         elif (
@@ -273,15 +249,17 @@ def run_codamosa(args, task_instances: List[dict], console: Console) -> None:
         ):
             url = "https://api.openai.com/v1/chat/completions"
 
+        repo_new_path = os.path.join(args.baseline_tmp_dir, repo_name)
+
         codamosa_cmd = [
             "apptainer",
             "run",
             "--bind",
-            f"/tmp/{repo_name}:/input:ro",
+            f"{repo_new_path}:/input:ro",
             "--bind",
             f"{output_file}:/output",
             "--bind",
-            f"/tmp/{repo_name}:/package:ro",
+            f"{repo_new_path}:/package:ro",
             args.baseline_sif_path,
             "--project_path",
             "/input",
