@@ -108,7 +108,7 @@ def main() -> None:
             )
             return
         elif args.baseline_prompt_type == "codamosa":
-            if not os.path.exists(os.path.join(args.data_path, "test_module.jsonl")):
+            if not os.path.exists(os.path.join(dataset.data_path, "test_module.jsonl")):
                 raise FileNotFoundError(
                     "test_module.jsonl not found, please crawl the data"
                 )
