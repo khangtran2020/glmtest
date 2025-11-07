@@ -660,7 +660,9 @@ class Data(object):
                         src_code = file.read()
 
                     module_path = dat.get("module_path", "N/A")
-                    all_masks = torch.load(dat["graph"]["mask_path"], weights_only=True)
+                    all_masks = torch.load(
+                        dat["graph"]["mask_path"], weights_only=False
+                    )
                     assert len(all_masks) == len(dat["test_cases"])
 
                     if "graph" in self.baseline_prompt:
