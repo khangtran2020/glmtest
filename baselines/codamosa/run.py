@@ -319,6 +319,5 @@ def run_codamosa(args, task_instances: List[dict], console: Console) -> None:
             console.log(f"[green]Ran Codamosa on /tmp/{repo_name}.[/green]")
         except subprocess.CalledProcessError as e:
             console.log(f"[red]Error during Codamosa execution: {e}[/red]")
-            continue
 
         cleanup_instance(task_instance, console)
