@@ -185,17 +185,31 @@ def prepare_instance(
             f"https://github.com/{repo}.git", repo_new_path, no_checkout=True
         )
     commit_id = checkout_dict[repo][version]
-    console.log(f"[yellow]Checking out {repo} to commit {commit_id}.[/yellow]")
+    console.log(f"[green]Checking out {repo} to commit {commit_id}.[/green]")
     repo_obj.git.reset("--hard", commit_id)
-    packages = package_name_dict.get(repo, [])
-    with open(os.path.join(repo_new_path, "package.txt"), "w") as f:
-        for package in packages[:-1]:
-            f.write(f"{package}\n")
-        target_package = packages[-1] if packages else ""
-        f.write(f"{target_package}\n")
+    # packages = package_name_dict.get(repo, [])
+    # with open(os.path.join(repo_new_path, "package.txt"), "w") as f:
+    #     for package in packages[:-1]:
+    #         f.write(f"{package}\n")
+    #     target_package = packages[-1] if packages else ""
+    #     f.write(f"{target_package}\n")
+    # pipreqs /path/to/your/project --savepath /path/to/custom/requirements.in
+    package_cmd = [
+        "pipreqs",
+        repo_new_path,
+        "--force",
+        "--savepath",
+        os.path.join(repo_new_path, "package.txt"),
+    ]
+    try:
+        subprocess.run(package_cmd, check=True)
+        console.log(f"[green]Generated package.txt for {repo}.[/green]")
+    except subprocess.CalledProcessError as e:
+        console.log(f"[red]Error during package.txt generation: {e}[/red]")
+        raise
 
     console.log(
-        f"[yellow]Created package.txt for {repo} with target version {version}.[/yellow]"
+        f"[green]Created package.txt for {repo} with target version {version}.[/green]"
     )
 
 
@@ -213,7 +227,7 @@ def cleanup_instance(
 
     try:
         shutil.rmtree(repo_path)
-        console.log(f"[yellow]Cleaned up {repo_path}.[/yellow]")
+        console.log(f"[green]Cleaned up {repo_path}.[/green]")
     except subprocess.CalledProcessError as e:
         console.log(f"[red]Error during cleanup: {e}[/red]")
         raise
@@ -302,7 +316,7 @@ def run_codamosa(args, task_instances: List[dict], console: Console) -> None:
 
         try:
             subprocess.run(codamosa_cmd, check=True)
-            console.log(f"[yellow]Ran Codamosa on /tmp/{repo_name}.[/yellow]")
+            console.log(f"[green]Ran Codamosa on /tmp/{repo_name}.[/green]")
         except subprocess.CalledProcessError as e:
             console.log(f"[red]Error during Codamosa execution: {e}[/red]")
             continue
