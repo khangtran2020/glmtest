@@ -21,11 +21,11 @@ from model.gnn import GRAPH_KEYS
 # typing
 from typing import List, Union, Dict, Any
 
-SYSTEM_PROMPT = """You are an AI agent that generates executable Python test cases targeting a specific execution branch of a module.
+PROMPT_TEMPLATE = """# INSTRUCTION: You are an AI agent that generates executable Python test cases targeting a specific execution branch of a module.
 
 Inputs:
+- Module source: source code of the target module (Could be truncated to related line only).
 - Execution branch information: the lines of the target module executed.
-- Truncated module source: only the lines relevant to that branch.
 - Module path: a valid, importable path from the PYTHONPATH directory.
 - Code Property Graph (CPG) embeddings (Optional): semantic and structural information about the code elements related to the branch.
 
@@ -37,91 +37,32 @@ Tasks:
 Requirements:
 - All imports must be valid and correspond to existing modules; do not invent or hallucinate any packages.
 - Use standard testing practices (unittest, pytest, or assert statements).
-- Keep the code clear, minimal, and maintainable."""
+- Keep the code clear, minimal, and maintainable.
 
-PYNGUIN_TEMPLATE = """docker run --rm -v {}:/input:ro -v {}:/output -v {}:/package:ro {} \
-    --module-name {} --coverage_metrics BRANCH --maximum_search_time {} --report-dir /output --project_path /input --output-path /output --output_variables TargetModule,CoverageTimeline --assertion-generation NONE"""
+------------------------------------------------------------
 
-PROMPT_CODE = """Given a code script and an execution code lines, generate the test case for the corresponding code snippet:
+# INPUTS:
+
+## Module Source:
 ```
 {}
 ```
 
-Here is the execution code lines:
-{}
-"""
-
-PROMPT_CODE_TR = """## Inputs:
-
-### Execution Branches Information (Line to Line executed):
+## Execution Branches Information (Line to Line executed):
 {}
 
-### Truncated Module Source:
+
+## Module Path:
+{}
+
+## Code Property Graph (CPG) Node Embeddings:
+{}
+
+------------------------------------------------------------"""
+
+RESPONSE_TEMPLATE = """# OUTPUTS: Here is the generated Python test code targeting the specified execution branch
 ```
 {}
-```
-
-### Module Path:
-{}
-
-### Task: Generate a runnable Python test case that specifically execute the above execution branch in the given module, using only valid imports and assertions that must pass.
-"""
-
-PROMPT_GRAPH = """Generate the test case for the graph embedding of a targeted execution branch below:
-{}
-"""
-
-PROMPT_CODE_GRAPH = """## Inputs:
-
-### Execution Branches Information (Line to Line executed):
-{}
-
-### Truncated Module Source:
-```
-{}
-```
-
-### Module Path:
-{}
-
-### Code Property Graph (CPG) Node Embeddings:
-{}
-
-### Task: Generate a runnable Python test case that specifically execute the above execution branch in the given module, using only valid imports and assertions that must pass.
-"""
-
-RESPONSE_TEMPLATE = """Here is the test case:
-```
-{}
-```
-"""
-
-PROMPT_COT = """Generate a test case for the following module such that:
-- The test case use the pytest framework and executable.
-- The test case will be put in the `tests/` directory which is place in the root of the project.
-- The test case will need to execute the provided branch of execution in the provided module.
-
-Here is the module:
-```python
-{module}
-```
-
-Here is the execution branch. The execution branch is a sequence of executable line number in the module:
-{execution_branch}
-
-THINK STEP-BY-STEP and provide your response in the following format:
-
-```json
-{{
-  "test_case": <YOUR ANSWER FOR THE TEST CASE - JUST ONLY THE EXECUTABLE PYTHON CODE>
-}}
-```
-"""
-
-RESPONSE_BASELINE_TEMPLATE = """```json
-{{
-  "test_case": {}
-}}
 ```
 """
 
@@ -369,18 +310,6 @@ class Data(object):
                 break
         # get the data and analyze the data
         return module_results_info
-
-    def get_pynguin_command_for_module(self, module_info: dict) -> str:
-
-        pynguin_command = PYNGUIN_TEMPLATE.format(
-            os.path.abspath(module_info["code_path"]),
-            os.path.abspath(module_info["output_test_path"]),
-            os.path.abspath(module_info["package_path"]),
-            self.docker_image,
-            module_info["module_name_test_gen"],
-            self.run_time,
-        )
-        return pynguin_command
 
     def count_test_cases(self, test_file: str) -> int:
 
@@ -1039,51 +968,71 @@ class Data(object):
                 graph_pad = ""
                 for i, item in enumerate(active_nodes):
                     if i == 0:
-                        graph_pad += "Import branch: <|graph_pad|>" + "\n"
+                        if len(active_nodes) >= 1:
+                            graph_pad += "Import branch: <|graph_pad|>" + "\n"
+                        else:
+                            graph_pad += "Import branch: Not Available" + "\n"
                     else:
-                        graph_pad += f"Branch #{i}: <|graph_pad|>\n"
+                        if len(active_nodes) >= 1:
+                            graph_pad += f"Branch #{i}: <|graph_pad|>\n"
+                        else:
+                            graph_pad += f"Branch #{i}: Not Available\n"
             else:
                 graph_pad = ""
                 for i, item in enumerate(active_nodes):
                     if i == 0:
-                        graph_pad += (
-                            "Import branch: " + "<|graph_pad|>" * item.size(0) + "\n"
-                        )
+                        if len(active_nodes) >= 1:
+                            graph_pad += (
+                                "Import branch: "
+                                + "<|graph_pad|>" * item.size(0)
+                                + "\n"
+                            )
+                        else:
+                            graph_pad += "Import branch: Not Available" + "\n"
                     else:
-                        graph_pad += (
-                            f"Branch #{i}: " + "<|graph_pad|>" * item.size(0) + "\n"
-                        )
-            if self.baseline_prompt == "code":
-                code_line = self.generate_code_line(branch)
-                text = PROMPT_CODE.format(src_code, code_line)
-                response = RESPONSE_TEMPLATE.format(testcase_out)
-            elif self.baseline_prompt == "graph":
-                text = PROMPT_GRAPH.format(graph_pad)
-                response = RESPONSE_TEMPLATE.format(testcase_out)
-            elif self.baseline_prompt == "code_graph":
-                text = PROMPT_CODE_GRAPH.format(src_code, graph_pad)
-                response = RESPONSE_TEMPLATE.format(testcase_out)
-            elif self.baseline_prompt == "code_tr":
-                # self.logger.log("Truncating code...")
-                branch_line = ""
-                for i, branch_item in enumerate(branch):
-                    if i == 0:
-                        branch_line += (
-                            f"Import branch: "
-                            + "->".join([str(item) for item in branch_item])
-                            + "\n"
-                        )
-                        continue
+                        if len(active_nodes) >= 1:
+                            graph_pad += (
+                                f"Branch #{i}: " + "<|graph_pad|>" * item.size(0) + "\n"
+                            )
+                        else:
+                            graph_pad += f"Branch #{i}: Not Available\n"
+            branch_line = ""
+            for i, branch_item in enumerate(branch):
+                if i == 0:
                     branch_line += (
-                        f"Branch #{i}: "
+                        f"Import branch: "
                         + "->".join([str(item) for item in branch_item])
                         + "\n"
                     )
+                    continue
+                branch_line += (
+                    f"Branch #{i}: "
+                    + "->".join([str(item) for item in branch_item])
+                    + "\n"
+                )
+            if self.baseline_prompt == "code":
+                text = PROMPT_TEMPLATE.format(
+                    src_code, branch_line, module_path, "Not Available"
+                )
+                response = RESPONSE_TEMPLATE.format(testcase_out)
+            elif self.baseline_prompt == "graph":
+                text = PROMPT_TEMPLATE.format(
+                    "Not Available", "Not Available", module_path, graph_pad
+                )
+                response = RESPONSE_TEMPLATE.format(testcase_out)
+            elif self.baseline_prompt == "code_graph":
+                text = PROMPT_TEMPLATE.format(
+                    src_code, branch_line, module_path, graph_pad
+                )
+                response = RESPONSE_TEMPLATE.format(testcase_out)
+            elif self.baseline_prompt == "code_tr":
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
                 if truncated_code is None:
                     self.logger.log("Truncated code is None")
                     return None
-                text = PROMPT_CODE_TR.format(branch_line, truncated_code, module_path)
+                text = PROMPT_TEMPLATE.format(
+                    truncated_code, branch_line, module_path, "Not Available"
+                )
                 response = RESPONSE_TEMPLATE.format(testcase_out)
             elif self.baseline_prompt == "graph_tr":
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
@@ -1101,18 +1050,13 @@ class Data(object):
                         + "->".join([str(item) for item in branch_item])
                         + "\n"
                     )
-                text = PROMPT_CODE_GRAPH.format(
-                    branch_line, truncated_code, module_path, graph_pad
+                text = PROMPT_TEMPLATE.format(
+                    truncated_code, branch_line, module_path, graph_pad
                 )
                 response = RESPONSE_TEMPLATE.format(testcase_out)
-            elif self.baseline_prompt == "code_baseline":
-                code_line = self.generate_code_line(branch)
-                text = PROMPT_COT.format(module=src_code, execution_branch=code_line)
-                response = RESPONSE_BASELINE_TEMPLATE.format(testcase_out)
 
             task_prompt = tokenizer.apply_chat_template(
                 [
-                    {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": text},
                     {"role": "assistant", "content": response},
                 ],
@@ -1121,7 +1065,6 @@ class Data(object):
 
             task_prompt_input = tokenizer.apply_chat_template(
                 [
-                    {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": text},
                 ],
                 tokenize=False,
@@ -1144,53 +1087,90 @@ class Data(object):
                 graph_pad = ""
                 for i, item in enumerate(active_nodes):
                     if i == 0:
-                        graph_pad += "Import branch: <|graph_pad|>" + "\n"
+                        if len(active_nodes) >= 1:
+                            graph_pad += "Import branch: <|graph_pad|>" + "\n"
+                        else:
+                            graph_pad += "Import branch: Not Available" + "\n"
                     else:
-                        graph_pad += f"Branch #{i}: <|graph_pad|>" + "\n"
+                        if len(active_nodes) >= 1:
+                            graph_pad += f"Branch #{i}: <|graph_pad|>\n"
+                        else:
+                            graph_pad += f"Branch #{i}: Not Available\n"
             else:
                 graph_pad = ""
                 for i, item in enumerate(active_nodes):
                     if i == 0:
-                        graph_pad += (
-                            "Import branch: " + "<|graph_pad|>" * item.size(0) + "\n"
-                        )
+                        if len(active_nodes) >= 1:
+                            graph_pad += (
+                                "Import branch: "
+                                + "<|graph_pad|>" * item.size(0)
+                                + "\n"
+                            )
+                        else:
+                            graph_pad += "Import branch: Not Available" + "\n"
                     else:
-                        graph_pad += (
-                            f"Branch #{i}: " + "<|graph_pad|>" * item.size(0) + "\n"
-                        )
+                        if len(active_nodes) >= 1:
+                            graph_pad += (
+                                f"Branch #{i}: " + "<|graph_pad|>" * item.size(0) + "\n"
+                            )
+                        else:
+                            graph_pad += f"Branch #{i}: Not Available\n"
+            branch_line = ""
+            for i, branch_item in enumerate(branch):
+                if i == 0:
+                    branch_line += (
+                        f"Import branch: "
+                        + "->".join([str(item) for item in branch_item])
+                        + "\n"
+                    )
+                    continue
+                branch_line += (
+                    f"Branch #{i}: "
+                    + "->".join([str(item) for item in branch_item])
+                    + "\n"
+                )
             if self.baseline_prompt == "code":
-                code_line = self.generate_code_line(branch)
-                text = PROMPT_CODE.format(src_code, code_line)
+                text = PROMPT_TEMPLATE.format(
+                    src_code, branch_line, module_path, "Not Available"
+                )
             elif self.baseline_prompt == "graph":
-                text = PROMPT_GRAPH.format(graph_pad)
+                text = PROMPT_TEMPLATE.format(
+                    "Not Available", "Not Available", module_path, graph_pad
+                )
             elif self.baseline_prompt == "code_graph":
-                text = PROMPT_CODE_GRAPH.format(src_code, graph_pad)
+                text = PROMPT_TEMPLATE.format(
+                    src_code, branch_line, module_path, graph_pad
+                )
             elif self.baseline_prompt == "code_tr":
-                # self.logger.log("Truncating code...")
-                trucated_code = self.truncate_code(src_code=src_code, branch=branch)
-                if trucated_code is None:
+                truncated_code = self.truncate_code(src_code=src_code, branch=branch)
+                if truncated_code is None:
                     self.logger.log("Truncated code is None")
                     return None
-                text = PROMPT_CODE_TR.format(trucated_code)
+                text = PROMPT_TEMPLATE.format(
+                    truncated_code, branch_line, module_path, "Not Available"
+                )
             elif self.baseline_prompt == "graph_tr":
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
                 branch_line = ""
                 for i, branch_item in enumerate(branch):
+                    if i == 0:
+                        branch_line += (
+                            f"Import branch: "
+                            + "->".join([str(item) for item in branch_item])
+                            + "\n"
+                        )
+                        continue
                     branch_line += (
-                        f"Branch #{i+1}"
+                        f"Branch #{i}: "
                         + "->".join([str(item) for item in branch_item])
                         + "\n"
                     )
-                text = PROMPT_CODE_GRAPH.format(
-                    branch_line, truncated_code, module_path, graph_pad
+                text = PROMPT_TEMPLATE.format(
+                    truncated_code, branch_line, module_path, graph_pad
                 )
-            elif self.baseline_prompt == "code_baseline":
-                code_line = self.generate_code_line(branch)
-                text = PROMPT_COT.format(module=src_code, execution_branch=code_line)
 
             task_prompt_input = tokenizer.apply_chat_template(
                 [
-                    {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": text},
                 ],
                 tokenize=False,
