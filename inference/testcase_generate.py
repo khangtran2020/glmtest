@@ -10,13 +10,7 @@ from utils.utils import get_index_by_value
 from graph.core import Graph
 from graph.utils import get_graph
 from data.core import Data
-from data.core import (
-    PROMPT_CODE,
-    PROMPT_GRAPH,
-    PROMPT_CODE_GRAPH,
-    PROMPT_CODE_TR,
-    PROMPT_COT,
-)
+from data.core import PROMPT_TEMPLATE
 from accelerate import Accelerator
 from inference.test import generate_and_save_on_one_dataset
 from inference.verifier import verify_test_case
@@ -494,36 +488,78 @@ def get_prompt(
     src_code: str,
     mask: torch.Tensor,
     branch: List,
+    module_path: str,
     tokenizer: PreTrainedTokenizer,
     gnn_mode: str = "graph",
     baseline_prompt: str = "graph_tr",
     max_tokens: int = 2048,
 ):
-
-    if gnn_mode == "graph":
-        graph_pad = "<|graph_pad|>"
+    if gnn_mode == "branch":
+        graph_pad = ""
+        for i, item in enumerate(mask):
+            if i == 0:
+                if len(mask) >= 1:
+                    graph_pad += "Import branch: <|graph_pad|>" + "\n"
+                else:
+                    graph_pad += "Import branch: Not Available" + "\n"
+            else:
+                if len(mask) >= 1:
+                    graph_pad += f"Branch #{i}: <|graph_pad|>\n"
+                else:
+                    graph_pad += f"Branch #{i}: Not Available\n"
     else:
-        graph_pad = "<|graph_pad|>" * mask.size(0)
-    if baseline_prompt == "code":
-        code_line = generate_code_line(branch)
-        text = PROMPT_CODE.format(src_code, code_line)
-    elif baseline_prompt == "graph":
-        text = PROMPT_GRAPH.format(graph_pad)
-    elif baseline_prompt == "code_graph":
-        text = PROMPT_CODE_GRAPH.format(src_code, graph_pad)
-    elif baseline_prompt == "code_tr":
-        # logger.log("Truncating code...")
-        trucated_code = truncate_code(src_code=src_code, branch=branch)
-        if trucated_code is None:
-            return None
-        text = PROMPT_CODE_TR.format(trucated_code)
-    elif baseline_prompt == "graph_tr":
-        trucated_code = truncate_code(src_code=src_code, branch=branch)
-        text = PROMPT_CODE_GRAPH.format(trucated_code, graph_pad)
-    elif baseline_prompt == "code_baseline":
-        code_line = generate_code_line(branch)
-        text = PROMPT_COT.format(module=src_code, execution_branch=code_line)
+        graph_pad = ""
+        for i, item in enumerate(mask):
+            if i == 0:
+                if len(mask) >= 1:
+                    graph_pad += (
+                        "Import branch: " + "<|graph_pad|>" * item.size(0) + "\n"
+                    )
+                else:
+                    graph_pad += "Import branch: Not Available" + "\n"
+            else:
+                if len(mask) >= 1:
+                    graph_pad += (
+                        f"Branch #{i}: " + "<|graph_pad|>" * item.size(0) + "\n"
+                    )
+                else:
+                    graph_pad += f"Branch #{i}: Not Available\n"
 
+    branch_line = ""
+    for i, branch_item in enumerate(branch):
+        if i == 0:
+            branch_line += (
+                f"Import branch: "
+                + "->".join([str(item) for item in branch_item])
+                + "\n"
+            )
+            continue
+        branch_line += (
+            f"Branch #{i}: " + "->".join([str(item) for item in branch_item]) + "\n"
+        )
+
+    if baseline_prompt == "code":
+        text = PROMPT_TEMPLATE.format(
+            src_code, branch_line, module_path, "Not Available"
+        )
+    elif baseline_prompt == "graph":
+        text = PROMPT_TEMPLATE.format(
+            "Not Available", "Not Available", module_path, graph_pad
+        )
+    elif baseline_prompt == "code_graph":
+        text = PROMPT_TEMPLATE.format(src_code, branch_line, module_path, graph_pad)
+    elif baseline_prompt == "code_tr":
+        truncated_code = truncate_code(src_code=src_code, branch=branch)
+        if truncated_code is None:
+            return None
+        text = PROMPT_TEMPLATE.format(
+            truncated_code, branch_line, module_path, "Not Available"
+        )
+    elif baseline_prompt == "graph_tr":
+        truncated_code = truncate_code(src_code=src_code, branch=branch)
+        text = PROMPT_TEMPLATE.format(
+            truncated_code, branch_line, module_path, graph_pad
+        )
     task_prompt_input = tokenizer.apply_chat_template(
         [{"role": "user", "content": text}],
         tokenize=False,

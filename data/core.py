@@ -1036,20 +1036,6 @@ class Data(object):
                 response = RESPONSE_TEMPLATE.format(testcase_out)
             elif self.baseline_prompt == "graph_tr":
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
-                branch_line = ""
-                for i, branch_item in enumerate(branch):
-                    if i == 0:
-                        branch_line += (
-                            f"Import branch: "
-                            + "->".join([str(item) for item in branch_item])
-                            + "\n"
-                        )
-                        continue
-                    branch_line += (
-                        f"Branch #{i}: "
-                        + "->".join([str(item) for item in branch_item])
-                        + "\n"
-                    )
                 text = PROMPT_TEMPLATE.format(
                     truncated_code, branch_line, module_path, graph_pad
                 )
@@ -1151,20 +1137,6 @@ class Data(object):
                 )
             elif self.baseline_prompt == "graph_tr":
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
-                branch_line = ""
-                for i, branch_item in enumerate(branch):
-                    if i == 0:
-                        branch_line += (
-                            f"Import branch: "
-                            + "->".join([str(item) for item in branch_item])
-                            + "\n"
-                        )
-                        continue
-                    branch_line += (
-                        f"Branch #{i}: "
-                        + "->".join([str(item) for item in branch_item])
-                        + "\n"
-                    )
                 text = PROMPT_TEMPLATE.format(
                     truncated_code, branch_line, module_path, graph_pad
                 )
