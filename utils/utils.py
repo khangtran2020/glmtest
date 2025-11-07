@@ -270,8 +270,8 @@ def print_args(args):
     return arg_dict
 
 
-def get_index_by_value(a, val):
-    return (a == val).nonzero(as_tuple=True)[0]
+# def get_index_by_value(a, val):
+#     return (a == val).nonzero(as_tuple=True)[0]
 
 
 def check_package_exists_in_pypi(package_name: str) -> bool:
@@ -346,7 +346,9 @@ def extract_list_content(input_string) -> List[str]:
     return matches
 
 
-def get_index_by_value(a: torch.Tensor, val) -> torch.Tensor:
+def get_index_by_value(a, val) -> torch.Tensor:
+    if isinstance(a, np.ndarray):
+        a = torch.from_numpy(a)
     return (a == val).nonzero(as_tuple=True)[0]
 
 
