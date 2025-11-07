@@ -268,7 +268,7 @@ def run_codamosa(args, task_instances: List[dict], console: Console) -> None:
             "--project_path",
             "/input",
             "--module-name",
-            task_instance.get("code_file", ""),
+            task_instance.get("code_file", "").replace("/", ".").rstrip(".py"),
             "--output-path",
             "/output",
             "--report-dir",
