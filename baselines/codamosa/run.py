@@ -192,7 +192,7 @@ def prepare_instance(
         for package in packages[:-1]:
             f.write(f"{package}\n")
         target_package = packages[-1] if packages else ""
-        f.write(f"{target_package}=={version}\n")
+        f.write(f"{target_package}~={version}\n")
 
     console.log(
         f"[yellow]Created package.txt for {repo} with target version {version}.[/yellow]"
