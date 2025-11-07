@@ -82,6 +82,12 @@ def add_model_group(group):
         default="node",
     )
     group.add_argument(
+        "--gnn_type",
+        type=str,
+        help="type of gnn: gat, graphsage",
+        default="gat",
+    )
+    group.add_argument(
         "--model_name",
         type=str,
         help="name of the LLM",

@@ -75,6 +75,7 @@ def get_model_train(
             baseline_prompt=args.baseline_prompt,
             debug=args.debug,
             rank=rank,
+            gnn_type=args.gnn_type,
             multi_gpu=True if args.num_gpu > 1 else False,
             is_training=True,
         )
@@ -174,6 +175,7 @@ def get_model_train(
             multi_gpu=True if args.num_gpu > 1 else False,
             debug=args.debug,
             rank=rank,
+            gnn_type=args.gnn_type,
             is_training=True,
         )
 
@@ -245,6 +247,7 @@ def get_model_test(
             baseline_prompt=args.baseline_prompt,
             debug=args.debug,
             rank=rank,
+            gnn_type=args.gnn_type,
             multi_gpu=True if args.num_gpu > 1 else False,
             is_training=False,
         )
@@ -317,6 +320,7 @@ def get_model_test(
             baseline_prompt=args.baseline_prompt,
             debug=args.debug,
             rank=rank,
+            gnn_type=args.gnn_type,
             multi_gpu=True if args.num_gpu > 1 else False,
             is_training=False,
         )
@@ -416,6 +420,7 @@ def get_model_testgen(
                 baseline_prompt=args.baseline_prompt,
                 debug=args.debug,
                 rank=rank,
+                gnn_type=args.gnn_type,
                 multi_gpu=True if args.num_gpu > 1 else False,
                 is_training=False,
             )
@@ -488,6 +493,7 @@ def get_model_testgen(
                 baseline_prompt=args.baseline_prompt,
                 debug=args.debug,
                 rank=rank,
+                gnn_type=args.gnn_type,
                 multi_gpu=True if args.num_gpu > 1 else False,
                 is_training=False,
             )

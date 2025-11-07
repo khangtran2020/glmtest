@@ -17,7 +17,7 @@ from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING
 from transformers.loss.loss_utils import fixed_cross_entropy
 
 # from utils.prompter import Prompter
-from model.gnn import MultiGAT
+from model.gnn import MultiGAT, MutliGraphSage
 from train.utils import extract_local
 from ring_flash_attn import update_ring_flash_attn_params
 from peft import get_peft_model, LoraConfig, TaskType
@@ -208,6 +208,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         self,
         config: GLMFModelConfig,
         rank: int = 0,
+        gnn_type: str = "gat",
         tokenizer: PreTrainedTokenizer = None,
         baseline_prompt: str = None,
         multi_gpu: bool = False,
@@ -227,15 +228,24 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         pprint(f"[green]Model is loaded to device of rank: {rank}[/green]")
 
         if "graph" in self.baseline_prompt:
-            self.gnn = MultiGAT(
-                # config.mode,
-                config.in_feats,
-                config.n_hidden,
-                config.hidden_size,
-                config.n_layers,
-                config.num_head,
-                config.dropout,
-            )
+            if gnn_type == "gat":
+                self.gnn = MultiGAT(
+                    # config.mode,
+                    config.in_feats,
+                    config.n_hidden,
+                    config.hidden_size,
+                    config.n_layers,
+                    config.num_head,
+                    config.dropout,
+                )
+            else:  # graphsage
+                self.gnn = MutliGraphSage(
+                    in_feats=config.in_feats,
+                    n_hidden=config.n_hidden,
+                    hidden_size=config.hidden_size,
+                    n_layers=config.n_layers,
+                    dropout=config.dropout,
+                )
 
         if config.dtype == "fp16":
             self.llm_model = AutoModelForCausalLM.from_pretrained(
