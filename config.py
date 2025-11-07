@@ -477,6 +477,11 @@ def add_baseline_group(group):
         help="temp dir for baseline",
         default="./results/temp",
     )
+    group.add_argument(
+        "--baseline_skip_prepare_data",
+        action="store_true",
+        help="skip data preparation for baseline",
+    )
 
 
 def parse_args():

@@ -81,11 +81,12 @@ def main() -> None:
         console.log("Data processing completed. Exiting as mode is 'data'.")
         return
 
-    if args.mode == "testgen":
-        if args.module_path is None:
-            dataset.prepare_data_for_test_gen()
-    else:
-        dataset.prepare_data()
+    if not args.baseline_skip_prepare_data:
+        if args.mode == "testgen":
+            if args.module_path is None:
+                dataset.prepare_data_for_test_gen()
+        else:
+            dataset.prepare_data()
 
     if args.mode == "baseline":
         if args.baseline_prompt_type == "prompt_engineer":
