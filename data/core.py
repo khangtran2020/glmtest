@@ -639,6 +639,7 @@ class Data(object):
                         mask_key = int(testcase.split("_")[-1])
                         branch_masks: List[torch.Tensor] = all_masks[mask_key]
                         branch_line = dat["test_cases"][testcase]["branch"]
+                        print(branch_masks)
                         active_nodes = [
                             get_index_by_value(a=branch_masks[i][0], val=1)
                             for i in range(len(branch_masks))
