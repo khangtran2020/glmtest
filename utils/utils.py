@@ -349,7 +349,9 @@ def extract_list_content(input_string) -> List[str]:
 def get_index_by_value(a, val) -> torch.Tensor:
     if isinstance(a, np.ndarray):
         a = torch.from_numpy(a)
-    assert isinstance(a, torch.Tensor)
+    assert isinstance(
+        a, torch.Tensor
+    ), f"Expected torch.Tensor or np.ndarray, got {type(a)}"
     return (a == val).nonzero(as_tuple=True)[0]
 
 
