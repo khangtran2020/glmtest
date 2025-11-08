@@ -420,7 +420,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             overall_indices = (overall_mask[0] == 1).nonzero(as_tuple=True)[0]
             mask_idx = []
             for j, mask in enumerate(graph_mask):
-                mask_indices = (mask[0] == 1).nonzero(as_tuple=True)[0]
+                mask_indices = (mask == 1).nonzero(as_tuple=True)[0]
                 idx_in_overall = []
                 for k, idx in enumerate(mask_indices):
                     if idx in overall_indices:
