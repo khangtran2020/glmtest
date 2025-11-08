@@ -427,7 +427,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                         idx_in_overall.append(k)
                 mask_idx.append(idx_in_overall)
 
-            overall_mask = overall_mask.to(self.llm_model.device)
+            overall_mask = overall_mask.long().to(self.llm_model.device)
             graph_embeds = self.gnn(graph, overall_mask)
 
             for j, mask in enumerate(graph_mask):

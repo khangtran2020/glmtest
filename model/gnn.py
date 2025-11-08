@@ -753,7 +753,7 @@ class GraphSage(nn.Module):
 
         h = self.last_layer(h)
         h = self.activation(h)
-        temp = self.get_index_by_value(mask[0], 1)
+        temp = self.get_index_by_value(mask, 1)
         return h[temp]
 
     def get_index_by_value(self, a, val):
