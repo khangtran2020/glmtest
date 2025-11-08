@@ -599,9 +599,10 @@ class Data(object):
                         graph_path = os.path.join(processed_data_path, graph_name)
 
                         if os.path.exists(graph_path):
-                            self.logger.log(
-                                f"[yellow]Graph already exists for {uuid}, loading...[/yellow]"
-                            )
+                            pass
+                            # self.logger.log(
+                            #     f"[yellow]Graph already exists for {uuid}, loading...[/yellow]"
+                            # )
                         else:
                             graph = self.read_graph(dat)
 
@@ -785,9 +786,9 @@ class Data(object):
                         graph_path = os.path.join(processed_data_path, graph_name)
 
                         if os.path.exists(graph_path):
-                            self.logger.log(
-                                f"[yellow]Graph already exists for {uuid}, loading...[/yellow]"
-                            )
+                            # self.logger.log(
+                            #     f"[yellow]Graph already exists for {uuid}, loading...[/yellow]"
+                            # )
                             # load graph
                             with open(dat["graph"]["src_graph_path"], "r") as file:
                                 graph = json.load(file)
