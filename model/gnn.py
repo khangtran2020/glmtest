@@ -730,7 +730,6 @@ class GraphSage(nn.Module):
                 in_feats,
                 n_hidden,
                 aggregator_type="mean",
-                allow_zero_in_degree=True,
             )
         )
         for i in range(0, n_layers - 1):
@@ -739,7 +738,6 @@ class GraphSage(nn.Module):
                     n_hidden,
                     n_hidden,
                     aggregator_type="mean",
-                    allow_zero_in_degree=True,
                 )
             )
         self.dropout = nn.Dropout(dropout)
