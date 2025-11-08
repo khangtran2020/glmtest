@@ -393,6 +393,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             ranges = []
             start = graph_token_index[0]
             prev = graph_token_index[0]
+            graph_mask = graph_masks[i]
             for j in graph_token_index[1:]:
                 if j == prev + 1:
                     prev = j
@@ -401,15 +402,15 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     start = j
                     prev = j
             ranges.append((start, prev))
+            graph_mask = [mask for mask in graph_mask if mask.sum() > 0]
             assert len(ranges) == len(
-                graph_masks[i]
-            ), f"Mismatch between graph masks {len(graph_masks[i])} and token index ranges {len(ranges)}."
+                graph_mask
+            ), f"Mismatch between graph masks {len(graph_mask)} and token index ranges {len(ranges)}."
 
             graph = graphs[i]
             for key in graph.keys():
                 graph[key] = graph[key].to(self.llm_model.device)
 
-            graph_mask = graph_masks[i]
             overall_mask = None  # merge graph_mask
             for j, mask in enumerate(graph_mask):
                 if j == 0:
@@ -431,9 +432,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             graph_embeds = self.gnn(graph, overall_mask)
 
             for j, mask in enumerate(graph_mask):
-                # pprint(
-                #     f"[blue]Graph {j} - mask idx: {mask_idx[j]} - mask: {mask} - graph_embed: {graph_embeds.size()}[/blue]"
-                # )
                 embeds = graph_embeds[mask_idx[j], :]
                 assert embeds.size(0) == len(mask_idx[j])
                 embeds = embeds.to(inputs_embeds.device)
