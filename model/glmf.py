@@ -416,7 +416,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     overall_mask = mask.to(torch.bool)
                 else:
                     overall_mask = overall_mask | mask.to(torch.bool)
-
+            pprint(f"[yellow]Overall_mask: {overall_mask}[/yellow]")
             overall_indices = (overall_mask == 1).nonzero(as_tuple=True)[0]
             mask_idx = []
             for j, mask in enumerate(graph_mask):
