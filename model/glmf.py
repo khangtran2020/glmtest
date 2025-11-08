@@ -431,9 +431,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             graph_embeds = self.gnn(graph, overall_mask)
 
             for j, mask in enumerate(graph_mask):
-                pprint(
-                    f"[blue]Graph {j} - mask idx: {mask_idx[j]} - mask: {mask}[/blue]"
-                )
+                # pprint(
+                #     f"[blue]Graph {j} - mask idx: {mask_idx[j]} - mask: {mask}[/blue]"
+                # )
                 embeds = graph_embeds[mask_idx[j], :]
                 assert embeds.size(0) == len(mask_idx[j])
                 embeds = embeds.to(inputs_embeds.device)
