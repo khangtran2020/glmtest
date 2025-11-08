@@ -699,9 +699,9 @@ class Data(object):
                         with open(data_path, "w") as file:
                             json.dump(data, file, indent=4)
 
-                        self.logger.log(
-                            f"Data is saved to {data_path} for uuid - {uuid}, testcase - {testcase}"
-                        )
+                        # self.logger.log(
+                        #     f"Data is saved to {data_path} for uuid - {uuid}, testcase - {testcase}"
+                        # )
 
                         self.processed_data[data_n][
                             f"{uuid}_testcase_{testcase}"
@@ -884,9 +884,9 @@ class Data(object):
                         with open(data_path, "w") as file:
                             json.dump(data, file, indent=4)
 
-                        self.logger.log(
-                            f"Data is saved to {data_path} for uuid - {uuid}, testcase - {i}"
-                        )
+                        # self.logger.log(
+                        #     f"Data is saved to {data_path} for uuid - {uuid}, testcase - {i}"
+                        # )
 
                         self.processed_data[data_n][f"{uuid}_testcase_{i}"] = data_path
 
