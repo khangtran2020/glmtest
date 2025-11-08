@@ -6,7 +6,7 @@ import torch
 import numpy as np
 import pandas as pd
 import networkx as nx
-from tqdm import tqdm
+from functools import partial
 from rich.progress import Progress
 from rich.console import Console
 from graph.core import Graph
@@ -17,9 +17,10 @@ from utils.code_analyzer import analyze_code, remove_method_from_class
 from sklearn.preprocessing import LabelEncoder
 from copy import deepcopy
 from model.gnn import GRAPH_KEYS
+from multiprocessing import Pool, cpu_count
 
 # typing
-from typing import List, Union, Dict, Any
+from typing import List, Union, Dict, Any, Tuple, Optional
 
 PROMPT_TEMPLATE = """# INSTRUCTION: You are an AI agent that generates executable Python test cases targeting a specific execution branch of a module.
 
@@ -526,7 +527,7 @@ class Data(object):
             "test_project": new_test_project if new_test_project is not None else {},
         }
 
-    def prepare_data(self) -> None:
+    def prepare_data_single_cpu(self) -> None:
         """
         Prepare the training data for the model
         """
@@ -583,6 +584,8 @@ class Data(object):
             for data_n in self.data.keys():  # train, test_module, test_project
 
                 self.processed_data[data_n] = {}
+
+                self._prepare_data(num_process=4)
 
                 for uuid, dat in self.data[data_n].items():
                     with open(dat["code_path"], "r") as file:
@@ -721,6 +724,271 @@ class Data(object):
         self.logger.log(
             f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_tokens)}"
         )
+
+    def prepare_data(self, num_processes: Optional[int] = None) -> None:
+        """
+        Prepare the training data for the model with multiprocessing support
+
+        Args:
+            num_processes: Number of processes to use. Defaults to cpu_count() - 1
+        """
+        assert self.data is not None
+
+        if num_processes is None:
+            num_processes = max(1, cpu_count() - 1)
+
+        processed_data = None
+        if "graph" not in self.baseline_prompt:
+            processed_data_file_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.max_tokens}_{self.llm_model_name}",
+                "processed_data.json",
+            )
+        else:
+            self.logger.log(
+                f"[cyan]GNN mode: {self.gnn_mode} - prompt: {self.baseline_prompt}[/cyan]"
+            )
+            processed_data_file_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.max_tokens}_{self.llm_model_name}_{self.gnn_mode}",
+                "processed_data.json",
+            )
+
+        if os.path.exists(processed_data_file_path):
+            with open(processed_data_file_path, "r") as file:
+                self.processed_data = json.load(file)
+            processed_data = True
+        else:
+            processed_data_path = os.path.join(self.data_path, f"raw")
+            processed_prompt_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.max_tokens}_{self.llm_model_name}_{self.gnn_mode}",
+            )
+
+            os.makedirs(processed_data_path, exist_ok=True)
+            os.makedirs(processed_prompt_path, exist_ok=True)
+
+        if processed_data:
+            self.logger.log("[green]Data is already processed![/green]")
+            self.logger.log(f"Size of data data: {len(self.processed_data)}")
+            return
+
+        with self.logger.status(
+            f"[green]Preparing data with {num_processes} processes...[/green]"
+        ):
+            self.processed_data = {}
+            all_num_tokens = []
+            total_num_discarded = 0
+
+            for data_n in self.data.keys():  # train, test_module, test_project
+                self.processed_data[data_n] = {}
+
+                # Prepare arguments for multiprocessing
+                uuid_data_items = list(self.data[data_n].items())
+
+                # Create partial function with fixed arguments
+                process_func = partial(
+                    self._prepare_data,
+                    baseline_prompt=self.baseline_prompt,
+                    data_path=self.data_path,
+                    processed_data_path=processed_data_path,
+                    processed_prompt_path=processed_prompt_path,
+                    max_tokens=self.max_tokens,
+                    llm_model_name=self.llm_model_name,
+                    gnn_mode=self.gnn_mode,
+                    data_fuzz=self.data_fuzz,
+                    llm_tokenizer=self.llm_tokenizer,
+                    get_prompt_func=self.get_prompt,
+                    read_graph_func=self.read_graph,
+                    add_fuzz_tags_func=self.add_fuzz_tags,
+                    logger=self.logger,
+                )
+
+                # Process in parallel
+                with Pool(processes=num_processes) as pool:
+                    results = pool.map(process_func, uuid_data_items)
+
+                # Aggregate results
+                for uuid, processed_items, num_discarded, num_tokens in results:
+                    total_num_discarded += num_discarded
+                    all_num_tokens.extend(num_tokens)
+
+                    for item in processed_items:
+                        self.processed_data[data_n][item["key"]] = item["path"]
+                        self.logger.log(
+                            f"Data is saved to {item['path']} for {item['key']}"
+                        )
+
+        # Save processed data metadata
+        with open(processed_data_file_path, "w") as file:
+            json.dump(self.processed_data, file, indent=4)
+
+        self.logger.log("[green]Data is ready![/green]")
+        self.logger.log(
+            f"Size of processed data: {sum(len(v) for v in self.processed_data.values())}, "
+            f"num_discarded: {total_num_discarded}"
+        )
+
+        if all_num_tokens:
+            quartiles = np.quantile(all_num_tokens, [0, 0.25, 0.5, 0.75, 1])
+            max_num_tokens = max(all_num_tokens)
+            min_num_tokens = min(all_num_tokens)
+            self.logger.log(
+                f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, "
+                f"min: {min_num_tokens}, num_data: {len(all_num_tokens)}"
+            )
+
+    def _prepare_data(
+        self,
+        uuid_data: Tuple[str, Dict],
+        baseline_prompt: str,
+        data_path: str,
+        processed_data_path: str,
+        processed_prompt_path: str,
+        max_tokens: int,
+        llm_model_name: str,
+        gnn_mode: str,
+        data_fuzz: bool,
+        llm_tokenizer,
+        get_prompt_func,
+        read_graph_func,
+        add_fuzz_tags_func,
+        logger,
+    ) -> Tuple[str, List[Dict], int, List[int]]:
+        """
+        Process a single UUID and all its test cases.
+        Returns: (uuid, list of processed data dicts, num_discarded, num_tokens list)
+        """
+        uuid, dat = uuid_data
+        processed_items = []
+        num_discarded = 0
+        num_tokens = []
+
+        try:
+            # Read source code
+            with open(dat["code_path"], "r") as file:
+                src_code = file.read()
+
+            module_path = dat.get("module_path", "N/A")
+            all_masks = torch.load(dat["graph"]["mask_path"], weights_only=False)
+
+            if len(all_masks) != len(dat["test_cases"]):
+                logger.log(f"[red]Mask length mismatch for {uuid}[/red]")
+                return uuid, [], len(dat["test_cases"]), []
+
+            # Handle graph processing if needed
+            graph_path = None
+            if "graph" in baseline_prompt:
+                graph_name = f"{uuid}_graph.pt"
+                graph_path = os.path.join(processed_data_path, graph_name)
+
+                if not os.path.exists(graph_path):
+                    graph = read_graph_func(dat)
+
+                    check_graph_exist_dict = {}
+                    graph_dict = {}
+                    for key in GRAPH_KEYS:
+                        check_graph_exist_dict[key] = False
+
+                    for key in graph.keys():
+                        if isinstance(graph[key], dgl.DGLGraph):
+                            graph_dict[key] = graph[key]
+                            check_graph_exist_dict[key] = True
+
+                    exist_atleast_one = any(check_graph_exist_dict.values())
+
+                    if not exist_atleast_one:
+                        logger.log(f"[red]Graph is not generated for {uuid}[/red]")
+                        return uuid, [], len(dat["test_cases"]), []
+
+                    torch.save(graph_dict, graph_path)
+
+            # Process each test case
+            for testcase in dat["test_cases"].keys():
+                test_code = dat["test_cases"][testcase]["test_case"]
+
+                if data_fuzz:
+                    test_code = add_fuzz_tags_func(test_code)
+
+                if test_code == "N/A":
+                    num_discarded += 1
+                    continue
+
+                mask_key = int(testcase.split("_")[-1])
+                branch_masks: List[torch.Tensor] = all_masks[mask_key]
+                branch_line = dat["test_cases"][testcase]["branch"]
+
+                active_nodes = [
+                    get_index_by_value(a=branch_masks[i], val=1)
+                    for i in range(len(branch_masks))
+                ]
+
+                if len(active_nodes) == 0:
+                    logger.log(
+                        f"Active node empty at uuid: {uuid} testcase: {testcase}"
+                    )
+                    num_discarded += 1
+                    continue
+
+                result = get_prompt_func(
+                    src_code=src_code,
+                    testcase_out=test_code,
+                    active_nodes=active_nodes,
+                    tokenizer=llm_tokenizer,
+                    module_path=module_path,
+                    branch=branch_line,
+                    gnn_mode=gnn_mode,
+                )
+
+                if result is None:
+                    num_discarded += 1
+                    continue
+
+                prompt, response, full_text = result
+                num_token = len(llm_tokenizer.tokenize(full_text))
+                num_tokens.append(num_token)
+
+                if "graph" in baseline_prompt:
+                    data = {
+                        "uuid": f"{uuid}_{testcase}",
+                        "prompt": prompt,
+                        "response": response,
+                        "full_text": full_text,
+                        "active_node": [
+                            active_node.tolist() for active_node in active_nodes
+                        ],
+                        "mask": [
+                            all_masks[mask_key][i].tolist()
+                            for i in range(len(all_masks[mask_key]))
+                        ],
+                        "graph_path": graph_path,
+                    }
+                else:
+                    data = {
+                        "uuid": f"{uuid}_{testcase}",
+                        "prompt": prompt,
+                        "response": response,
+                        "full_text": full_text,
+                        "active_node": None,
+                        "mask": None,
+                        "graph_path": None,
+                    }
+
+                data_name = f"{uuid}_testcase_{testcase}.json"
+                data_path_file = os.path.join(processed_prompt_path, data_name)
+
+                with open(data_path_file, "w") as file:
+                    json.dump(data, file, indent=4)
+
+                processed_items.append(
+                    {"key": f"{uuid}_testcase_{testcase}", "path": data_path_file}
+                )
+
+        except Exception as e:
+            logger.log(f"[red]Error processing {uuid}: {str(e)}[/red]")
+            return uuid, [], 0, []
+
+        return uuid, processed_items, num_discarded, num_tokens
 
     def prepare_data_for_test_gen(self):
 
