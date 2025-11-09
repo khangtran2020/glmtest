@@ -549,7 +549,7 @@ class Data(object):
         if old_data_path is not None:
             assert os.path.exists(old_data_path)
             with open(
-                processed_data_file_path,
+                old_data_path,
                 "r",
             ) as file:
                 self.processed_data = json.load(file)
