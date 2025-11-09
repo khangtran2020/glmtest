@@ -526,7 +526,7 @@ class Data(object):
             "test_project": new_test_project if new_test_project is not None else {},
         }
 
-    def prepare_data(self, old_data_path: str = None) -> None:
+    def prepare_data(self) -> None:
         """
         Prepare the training data for the model
         """
@@ -536,34 +536,15 @@ class Data(object):
         if "graph" not in self.baseline_prompt:
             processed_data_file_path = os.path.join(
                 self.data_path,
-                f"{self.baseline_prompt}_{self.max_tokens}_{self.llm_model_name}",
+                f"{self.baseline_prompt}_{self.llm_model_name}",
                 "processed_data.json",
             )
         else:
             processed_data_file_path = os.path.join(
                 self.data_path,
-                f"{self.baseline_prompt}_{self.max_tokens}_{self.llm_model_name}_{self.gnn_mode}",
+                f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
                 "processed_data.json",
             )
-
-        if old_data_path is not None:
-            assert os.path.exists(old_data_path)
-            with open(
-                old_data_path,
-                "r",
-            ) as file:
-                self.processed_data = json.load(file)
-            processed_data = True
-            keys_to_remove = []
-            for key in self.processed_data["train"].keys():
-                with open(self.processed_data["train"][key], "r") as f:
-                    data_json = json.load(f)
-                full_text = data_json["full_text"]
-                num_token = len(self.llm_tokenizer.tokenize(full_text))
-                if num_token > self.max_tokens:
-                    keys_to_remove.append(key)
-            for key in keys_to_remove:
-                self.processed_data["train"].pop(key)
 
         if os.path.exists(processed_data_file_path):
             with open(
@@ -616,12 +597,7 @@ class Data(object):
                         graph_name = f"{uuid}_graph.pt"
                         graph_path = os.path.join(processed_data_path, graph_name)
 
-                        if os.path.exists(graph_path):
-                            pass
-                            # self.logger.log(
-                            #     f"[yellow]Graph already exists for {uuid}, loading...[/yellow]"
-                            # )
-                        else:
+                        if not os.path.exists(graph_path):
                             graph = self.read_graph(dat)
 
                             check_graph_exist_dict = {}
@@ -701,6 +677,7 @@ class Data(object):
                                     for i in range(len(all_masks[mask_key]))
                                 ],
                                 "graph_path": graph_path,
+                                "num_tokens": num_token,
                             }
                         else:
                             data = {
@@ -711,6 +688,7 @@ class Data(object):
                                 "active_node": None,
                                 "mask": None,
                                 "graph_path": None,
+                                "num_tokens": num_token,
                             }
 
                         data_name = f"{uuid}_testcase_{testcase}.json"
@@ -746,11 +724,20 @@ class Data(object):
         assert self.data is not None
 
         processed_data = None
-        processed_data_file_path = os.path.join(
-            self.data_path,
-            f"{self.baseline_prompt}_{self.max_tokens}_{self.model_name}",
-            "processed_data_for_test_gen.json",
-        )
+
+        if "graph" not in self.baseline_prompt:
+            processed_data_file_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.model_name}",
+                "processed_data_for_test_gen.json",
+            )
+        else:
+            processed_data_file_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.model_name}_{self.gnn_mode}",
+                "processed_data_for_test_gen.json",
+            )
+
         if os.path.exists(processed_data_file_path):
             with open(
                 processed_data_file_path,
@@ -796,18 +783,12 @@ class Data(object):
 
                     module_path = dat.get("module_path", "N/A")
                     branches = get_all_branch(code=src_code)
-                    # init_branch = branches[0]
-                    # branches = branches[1:]
 
                     if "graph" in self.baseline_prompt:
                         graph_name = f"{uuid}_graph.pt"
                         graph_path = os.path.join(processed_data_path, graph_name)
 
                         if os.path.exists(graph_path):
-                            # self.logger.log(
-                            #     f"[yellow]Graph already exists for {uuid}, loading...[/yellow]"
-                            # )
-                            # load graph
                             with open(dat["graph"]["src_graph_path"], "r") as file:
                                 graph = json.load(file)
                         else:
@@ -887,6 +868,7 @@ class Data(object):
                                     all_masks[i].tolist() for i in range(len(all_masks))
                                 ],
                                 "graph_path": graph_path,
+                                "num_tokens": num_token,
                             }
 
                         else:
@@ -896,16 +878,13 @@ class Data(object):
                                 "active_node": None,
                                 "mask": None,
                                 "graph_path": None,
+                                "num_tokens": num_token,
                             }
 
                         data_name = f"{uuid}_testcase_{i}.json"
                         data_path = os.path.join(processed_prompt_path, data_name)
                         with open(data_path, "w") as file:
                             json.dump(data, file, indent=4)
-
-                        # self.logger.log(
-                        #     f"Data is saved to {data_path} for uuid - {uuid}, testcase - {i}"
-                        # )
 
                         self.processed_data[data_n][f"{uuid}_testcase_{i}"] = data_path
 
@@ -922,6 +901,22 @@ class Data(object):
         min_num_tokens = min(num_tokens)
         self.logger.log(
             f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_tokens)}"
+        )
+
+    def filter_by_max_tokens(self, max_tokens: int) -> None:
+        assert self.processed_data is not None
+        filtered_data = {}
+        for data_n in self.processed_data.keys():
+            filtered_data[data_n] = {}
+            for key in self.processed_data[data_n].keys():
+                data_path = self.processed_data[data_n][key]
+                with open(data_path, "r") as file:
+                    data = json.load(file)
+                if data["num_tokens"] <= max_tokens:
+                    filtered_data[data_n][key] = data_path
+        self.processed_data = filtered_data
+        self.logger.log(
+            f"[green]Data is filtered by max tokens {max_tokens}! New size: {len(self.processed_data)}[/green]"
         )
 
     def read_graph(self, data: dict) -> dict:
@@ -1081,11 +1076,11 @@ class Data(object):
                 tokenize=False,
             )
 
-            if len(self.llm_tokenizer.tokenize(task_prompt)) > self.max_tokens:
-                self.logger.log(
-                    f"[red]Task is too long: {len(self.llm_tokenizer.tokenize(task_prompt))} > {self.max_tokens}[/red]"
-                )
-                return None
+            # if len(self.llm_tokenizer.tokenize(task_prompt)) > self.max_tokens:
+            #     self.logger.log(
+            #         f"[red]Task is too long: {len(self.llm_tokenizer.tokenize(task_prompt))} > {self.max_tokens}[/red]"
+            #     )
+            #     return None
 
             return task_prompt_input, task_prompt_output, task_prompt
         else:
@@ -1168,11 +1163,11 @@ class Data(object):
                 tokenize=False,
             )
 
-            if len(self.llm_tokenizer.tokenize(task_prompt_input)) > self.max_tokens:
-                self.logger.log(
-                    f"[red]Task is too long: {len(self.llm_tokenizer.tokenize(task_prompt_input))} > {self.max_tokens}[/red]"
-                )
-                return None
+            # if len(self.llm_tokenizer.tokenize(task_prompt_input)) > self.max_tokens:
+            #     self.logger.log(
+            #         f"[red]Task is too long: {len(self.llm_tokenizer.tokenize(task_prompt_input))} > {self.max_tokens}[/red]"
+            #     )
+            #     return None
 
             return task_prompt_input
 

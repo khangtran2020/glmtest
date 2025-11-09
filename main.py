@@ -88,6 +88,8 @@ def main() -> None:
         else:
             dataset.prepare_data(old_data_path=args.old_data_path)
 
+    dataset.filter_by_max_tokens(max_tokens=args.max_seq_length)
+
     if args.mode == "baseline":
         if args.baseline_prompt_type == "prompt_engineer":
             pe = PromptEngineer(
