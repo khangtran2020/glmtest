@@ -86,7 +86,7 @@ def main() -> None:
             if args.module_path is None:
                 dataset.prepare_data_for_test_gen()
         else:
-            dataset.prepare_data()
+            dataset.prepare_data(old_data_path=args.old_data_path)
 
     if args.mode == "baseline":
         if args.baseline_prompt_type == "prompt_engineer":
