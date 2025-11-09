@@ -560,7 +560,7 @@ class Data(object):
             )
             processed_prompt_path = os.path.join(
                 self.data_path,
-                f"{self.baseline_prompt}_{self.max_tokens}_{self.llm_model_name}_{self.gnn_mode}",
+                f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
             )
 
             os.makedirs(processed_data_path, exist_ok=True)
