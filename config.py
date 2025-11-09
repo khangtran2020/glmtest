@@ -59,6 +59,9 @@ def add_data_group(group):
         help="repo to use for training",
         default=None,
     )
+    group.add_argument(
+        "--old_data_path", type=str, help="path to old data for graph sampling"
+    )
 
 
 def add_joern_group(group):

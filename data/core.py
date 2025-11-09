@@ -526,7 +526,7 @@ class Data(object):
             "test_project": new_test_project if new_test_project is not None else {},
         }
 
-    def prepare_data(self) -> None:
+    def prepare_data(self, old_data_path: str = None) -> None:
         """
         Prepare the training data for the model
         """
@@ -540,14 +540,30 @@ class Data(object):
                 "processed_data.json",
             )
         else:
-            self.logger.log(
-                f"[cyan]GNN mode: {self.gnn_mode} - prompt: {self.baseline_prompt}[/cyan]"
-            )
             processed_data_file_path = os.path.join(
                 self.data_path,
                 f"{self.baseline_prompt}_{self.max_tokens}_{self.llm_model_name}_{self.gnn_mode}",
                 "processed_data.json",
             )
+
+        if old_data_path is not None:
+            assert os.path.exists(old_data_path)
+            with open(
+                processed_data_file_path,
+                "r",
+            ) as file:
+                self.processed_data = json.load(file)
+            processed_data = True
+            keys_to_remove = []
+            for key in self.processed_data["train"].keys():
+                with open(self.processed_data["train"][key], "r") as f:
+                    data_json = json.load(f)
+                full_text = data_json["full_text"]
+                num_token = len(self.llm_tokenizer.tokenize(full_text))
+                if num_token > self.max_tokens:
+                    keys_to_remove.append(key)
+            for key in keys_to_remove:
+                self.processed_data["train"].pop(key)
 
         if os.path.exists(processed_data_file_path):
             with open(
