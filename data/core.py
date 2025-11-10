@@ -742,13 +742,13 @@ class Data(object):
         if "graph" not in self.baseline_prompt:
             processed_data_file_path = os.path.join(
                 self.data_path,
-                f"{self.baseline_prompt}_{self.model_name}",
+                f"{self.baseline_prompt}_{self.llm_model_name}",
                 "processed_data_for_test_gen.json",
             )
         else:
             processed_data_file_path = os.path.join(
                 self.data_path,
-                f"{self.baseline_prompt}_{self.model_name}_{self.gnn_mode}",
+                f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
                 "processed_data_for_test_gen.json",
             )
 
