@@ -843,7 +843,7 @@ class Data(object):
                             continue
 
                         active_nodes = [
-                            get_index_by_value(a=all_masks[j][0], val=1)
+                            get_index_by_value(a=all_masks[j], val=1)
                             for j in range(len(all_masks))
                         ]
 
