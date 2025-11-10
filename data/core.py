@@ -700,9 +700,10 @@ class Data(object):
                         #     f"Data is saved to {data_path} for uuid - {uuid}, testcase - {testcase}"
                         # )
 
-                        self.processed_data[data_n][
-                            f"{uuid}_testcase_{testcase}"
-                        ] = data_path
+                        self.processed_data[data_n][f"{uuid}_testcase_{testcase}"] = {
+                            "num_tokens": num_token,
+                            "path": data_path,
+                        }
 
         with open(processed_data_file_path, "w") as file:
             json.dump(self.processed_data, file, indent=4)
@@ -886,7 +887,10 @@ class Data(object):
                         with open(data_path, "w") as file:
                             json.dump(data, file, indent=4)
 
-                        self.processed_data[data_n][f"{uuid}_testcase_{i}"] = data_path
+                        self.processed_data[data_n][f"{uuid}_testcase_{i}"] = {
+                            "num_tokens": num_token,
+                            "path": data_path,
+                        }
 
         with open(processed_data_file_path, "w") as file:
             json.dump(self.processed_data, file, indent=4)
@@ -910,11 +914,8 @@ class Data(object):
         for data_n in self.processed_data.keys():
             filtered_data[data_n] = {}
             for key in tqdm(self.processed_data[data_n].keys()):
-                data_path = self.processed_data[data_n][key]
-                with open(data_path, "r") as file:
-                    data = json.load(file)
-                if data["num_tokens"] <= max_tokens:
-                    filtered_data[data_n][key] = data_path
+                if self.processed_data[data_n][key]["num_tokens"] <= max_tokens:
+                    filtered_data[data_n][key] = self.processed_data[data_n][key]
         self.processed_data = filtered_data
         self.logger.log(
             f"[green]Data is filtered by max tokens {max_tokens}! New size: {len(self.processed_data)}[/green]"
