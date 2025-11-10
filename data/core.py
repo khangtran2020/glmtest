@@ -924,11 +924,35 @@ class Data(object):
         self.logger.log(f"[green]Filtering data by max tokens {max_tokens}...[/green]")
         assert self.processed_data is not None
         filtered_data = {}
+        need_to_save = False
         for data_n in self.processed_data.keys():
             filtered_data[data_n] = {}
             for key in tqdm(self.processed_data[data_n].keys()):
-                if self.processed_data[data_n][key]["num_tokens"] <= max_tokens:
-                    filtered_data[data_n][key] = self.processed_data[data_n][key]
+                if isinstance(self.processed_data[data_n][key], dict):
+                    if self.processed_data[data_n][key]["num_tokens"] <= max_tokens:
+                        filtered_data[data_n][key] = self.processed_data[data_n][key]
+                else:
+                    path = self.processed_data[data_n][key]
+                    with open(path, "r") as file:
+                        data = json.load(file)
+                        num_token = data["num_tokens"]
+                    if num_token <= max_tokens:
+                        filtered_data[data_n][key] = self.processed_data[data_n][key]
+                    self.processed_data[data_n][key] = {
+                        "num_tokens": num_token,
+                        "path": path,
+                    }
+                    need_to_save = True
+
+        if need_to_save:
+            processed_data_file_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                "processed_data.json",
+            )
+            with open(processed_data_file_path, "w") as file:
+                json.dump(self.processed_data, file, indent=4)
+
         self.processed_data = filtered_data
         self.logger.log(
             f"[green]Data is filtered by max tokens {max_tokens}! New size: {len(self.processed_data)}[/green]"
