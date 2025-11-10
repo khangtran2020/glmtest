@@ -904,11 +904,12 @@ class Data(object):
         )
 
     def filter_by_max_tokens(self, max_tokens: int) -> None:
+        self.logger.log(f"[green]Filtering data by max tokens {max_tokens}...[/green]")
         assert self.processed_data is not None
         filtered_data = {}
         for data_n in self.processed_data.keys():
             filtered_data[data_n] = {}
-            for key in self.processed_data[data_n].keys():
+            for key in tqdm(self.processed_data[data_n].keys()):
                 data_path = self.processed_data[data_n][key]
                 with open(data_path, "r") as file:
                     data = json.load(file)
