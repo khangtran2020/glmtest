@@ -47,7 +47,7 @@ class GLMFDataset(Dataset):
 
     def __getitem__(self, idx):
 
-        data_path = self.data[self.index_to_key_dict[idx]]
+        data_path = self.data[self.index_to_key_dict[idx]]["path"]
         with open(data_path, "r") as f:
             sample = json.load(f)
         graph_path = sample["graph_path"]
