@@ -62,6 +62,16 @@ def add_data_group(group):
     group.add_argument(
         "--old_data_path", type=str, help="path to old data for graph sampling"
     )
+    group.add_argument("--get_reason", action="store_true", help="get reason from llm")
+    group.add_argument(
+        "--reason_model", type=str, help="model to get reason", default=None
+    )
+    group.add_argument(
+        "--reason_api_key", type=str, help="api key for reason model", default=None
+    )
+    # group.add_argument(
+    #     "--reasoning_save_path", type=str, help="api key for reason model", default=None
+    # )
 
 
 def add_joern_group(group):

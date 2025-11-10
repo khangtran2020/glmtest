@@ -6,6 +6,7 @@ from config import parse_args
 from utils.console import console
 from utils.utils import print_args, seed_everything
 from data.utils import get_dataset
+from data.core import get_reasoning
 from graph.utils import get_graph
 from train.train import train
 from model.model import get_model
@@ -88,7 +89,32 @@ def main() -> None:
         else:
             dataset.prepare_data()
 
-    dataset.filter_by_max_tokens(max_tokens=args.max_seq_length)
+    if args.get_reason:
+        dataset.filter_by_max_tokens(max_tokens=8192)
+        reasoning_save_path = os.path.join(
+            dataset.data_path,
+            f"{dataset.baseline_prompt}_{dataset.llm_model_name}_{dataset.gnn_mode}",
+            "reasoning.json",
+        )
+        if os.path.exists(reasoning_save_path):
+            console.log(
+                f"[yellow]Reasoning file already exists at {reasoning_save_path}[/yellow]"
+            )
+            return  # exit if reasoning file already exists
+        else:
+            console.log(
+                f"[green]Generating reasoning for dataset and saving to {reasoning_save_path}[/green]"
+            )
+            reason_dict = get_reasoning(
+                samples=dataset.processed_data["train"],
+                api_key=args.reason_api_key,
+                model=args.reason_model,
+            )
+            with open(reasoning_save_path, "w") as f:
+                json.dump(reason_dict, f, indent=4)
+            return  # exit after getting reasoning
+    else:
+        dataset.filter_by_max_tokens(max_tokens=args.max_seq_length)
 
     if args.mode == "baseline":
         if args.baseline_prompt_type == "prompt_engineer":

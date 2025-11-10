@@ -1,8 +1,10 @@
 import os
+import re
 import ast
 import dgl
 import json
 import torch
+import anthropic
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -65,6 +67,17 @@ RESPONSE_TEMPLATE = """# OUTPUTS: Here is the generated Python test code targeti
 {}
 ```
 """
+
+REASONING_TEMPLATE_PROMPT = """Given a data sample (including input and output), I aim to generate a reasoning explanation for why the output is associated with the input, within 100 words. The reasoning explanation will be put before the #OUTPUTS tag to train the LLMs for reasoning. It also needs to incorporate some sort of information from the graph embedding, please. It is worth noting that each graph_pad will be replaced by a graph embedding of a node associated with that branch. Help generate such reasoning.
+
+# DATA SAMPLE:
+{}
+
+# OUTPUT INSTRUCTION: Just return the reasoning in this form:
+
+```json
+{{"reason": <YOUR ANSWER>}}
+```"""
 
 
 class FuzzTagTransformer(ast.NodeTransformer):
@@ -1396,3 +1409,42 @@ class Data(object):
                 end = getattr(node, "end_lineno", start)
                 import_lines.extend(source_lines[start - 1 : end])
         return "\n".join(import_lines)
+
+
+def get_reasoning(
+    samples: Dict[str, dict],
+    api_key: str,
+    model: str,
+    max_tokens: int = 512,
+    temperature: float = 0.7,
+) -> str:
+    client = anthropic.Anthropic(api_key=api_key)
+    reason_dict = {}
+    for key in samples.keys():
+        full_text = samples[key]["full_text"]
+        prompt = REASONING_TEMPLATE_PROMPT.format(full_text)
+        # Anthropic's messages.create API
+        messages = [{"role": "user", "content": prompt}]
+        kwargs = {
+            "model": model,
+            "max_tokens": max_tokens,  # Anthropic uses max_tokens, not max_output_tokens
+            "temperature": temperature,
+            "messages": messages,
+        }
+        response = client.messages.create(**kwargs)
+
+        fence = re.compile(r"```(?:json)?\s*([\s\S]*?\{[\s\S]*?\})\s*```", re.MULTILINE)
+        m = fence.search(response.choices[0].message.content)
+        payload = m.group(1) if m else response.choices[0].message.content
+
+        # 3) Try JSON first:
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError:
+            print(f"Failed to extract json payload: {payload}")
+
+        if "reason" not in data:
+            print(f"Failed to extract reason in payload: {payload}")
+        else:
+            reason_dict[key] = data["reason"]
+    return reason_dict
