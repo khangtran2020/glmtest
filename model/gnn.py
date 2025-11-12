@@ -385,7 +385,7 @@ class GAT(nn.Module):
         h = self.activation(h)
         h = h.flatten(1)
         h = h * (mask.view(-1, 1))
-        temp = self.get_index_by_value(mask[0], 1)
+        temp = self.get_index_by_value(mask, 1)
         return h[temp]
 
     def get_index_by_value(self, a, val):
