@@ -70,16 +70,24 @@ RESPONSE_TEMPLATE = """# OUTPUTS: Here is the generated Python test code targeti
 ```
 """
 
-REASONING_TEMPLATE_PROMPT = """Given a data sample (including input and output), I aim to generate a reasoning explanation for why the output is associated with the input, within 100 words. The reasoning explanation will be put before the #OUTPUTS tag to train the LLMs for reasoning. It also needs to incorporate some sort of information from the graph embedding, please. It is worth noting that each graph_pad will be replaced by a graph embedding of a node associated with that branch, and some branch might not have graph embedding (indicated by Not available). However, if provided (i.e. has graph_pad) the reasoning should align (in a way) the graph embedding with the executed branches. Help generate such reasoning.
+REASONING_TEMPLATE_PROMPT = """Given a data sample (including input and output), generate a reasoning explanation (within 100 words) that describes the analytical process for deriving the output from the input. This reasoning will be placed before the #OUTPUTS tag to train LLMs for reasoning.
+
+Your reasoning should:
+1. Explain how you analyze the input components (module source, execution branches, module path, CPG embeddings)
+2. Describe how you synthesize this information to generate the output
+3. Incorporate graph embedding information: each <|graph_pad|> represents a CPG node embedding for that branch. When embeddings are provided, explain how they encode semantic/structural relationships (e.g., control flow, data dependencies, variable interactions) that guide the output generation
+4. Connect the execution branch patterns to the generated test code logic
+
+Focus on the reasoning process, not describing what the test does.
 
 # DATA SAMPLE:
 {}
 
-# OUTPUT INSTRUCTION: Just return the reasoning in this form:
-
-```json
+# OUTPUT INSTRUCTION: Return only the reasoning in this form:
+````json
 {{"reason": <YOUR ANSWER>}}
-```"""
+```
+"""
 
 
 class FuzzTagTransformer(ast.NodeTransformer):
