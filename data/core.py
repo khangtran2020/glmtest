@@ -4,6 +4,7 @@ import ast
 import dgl
 import json
 import torch
+import random
 import anthropic
 import numpy as np
 import pandas as pd
@@ -11,6 +12,7 @@ import networkx as nx
 from tqdm import tqdm
 from rich.progress import Progress
 from rich.console import Console
+from rich.pretty import pretty_repr
 from graph.core import Graph
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from branch.utils import run_coverage, get_all_branch
@@ -68,7 +70,7 @@ RESPONSE_TEMPLATE = """# OUTPUTS: Here is the generated Python test code targeti
 ```
 """
 
-REASONING_TEMPLATE_PROMPT = """Given a data sample (including input and output), I aim to generate a reasoning explanation for why the output is associated with the input, within 100 words. The reasoning explanation will be put before the #OUTPUTS tag to train the LLMs for reasoning. It also needs to incorporate some sort of information from the graph embedding, please. It is worth noting that each graph_pad will be replaced by a graph embedding of a node associated with that branch. Help generate such reasoning.
+REASONING_TEMPLATE_PROMPT = """Given a data sample (including input and output), I aim to generate a reasoning explanation for why the output is associated with the input, within 100 words. The reasoning explanation will be put before the #OUTPUTS tag to train the LLMs for reasoning. It also needs to incorporate some sort of information from the graph embedding, please. It is worth noting that each graph_pad will be replaced by a graph embedding of a node associated with that branch, and some branch might not have graph embedding. Help generate such reasoning.
 
 # DATA SAMPLE:
 {}
@@ -970,6 +972,47 @@ class Data(object):
             f"[green]Data is filtered by max tokens {max_tokens}! New size: {len(self.processed_data)}[/green]"
         )
 
+    def filter_for_reasoning(self, max_samples: int) -> None:
+        self.logger.log(f"[green]Filtering data for reasoning...[/green]")
+        assert self.processed_data is not None
+        filtered_data = {}
+        data_n = "train"
+        filtered_data = {}
+
+        # get num data point by repo:
+        total_data = len(self.processed_data[data_n].keys())
+        repo_stats = {}
+        data_point_by_repo = {}
+        for key in self.processed_data[data_n].keys():
+            repo = key.split("-")[0]
+            if repo not in repo_stats.keys():
+                repo_stats[repo] = 0
+            if repo not in data_point_by_repo.keys():
+                data_point_by_repo[repo] = []
+            repo_stats[repo] += 1
+            data_point_by_repo[repo].append(key)
+
+        self.logger.log(f"Total data points: {total_data}")
+        self.logger.log(f"Data points by repo: {pretty_repr(repo_stats)}")
+
+        for repo in data_point_by_repo.keys():
+            repo_data_points = data_point_by_repo[repo]
+            num_data_points = len(repo_data_points)
+            num_samples = int((num_data_points / total_data) * max_samples)
+            self.logger.log(
+                f"Randomly selecting {num_samples} samples from repo {repo} with {num_data_points} data points"
+            )
+            selected_data_points = random.sample(
+                repo_data_points, min(num_samples, num_data_points)
+            )
+            for data_point in selected_data_points:
+                filtered_data[data_point] = self.processed_data[data_n][data_point]
+
+        self.processed_data[data_n] = filtered_data
+        self.logger.log(
+            f"[green]Data is filtered for reasoning! New size: {len(filtered_data)}[/green]"
+        )
+
     def read_graph(self, data: dict) -> dict:
 
         graph_path = data["graph"]["src_graph_path"]
@@ -1456,7 +1499,7 @@ def get_reasoning(
 ) -> str:
     client = anthropic.Anthropic(api_key=api_key)
     reason_dict = {}
-    for key in samples.keys():
+    for key in tqdm(samples.keys()):
         full_text = samples[key]["full_text"]
         prompt = REASONING_TEMPLATE_PROMPT.format(full_text)
         # Anthropic's messages.create API
@@ -1477,10 +1520,12 @@ def get_reasoning(
         try:
             data = json.loads(payload)
         except json.JSONDecodeError:
+            data = payload
             print(f"Failed to extract json payload: {payload}")
 
-        if "reason" not in data:
+        if ("reason" not in data) or (not isinstance(data, dict)):
             print(f"Failed to extract reason in payload: {payload}")
+            reason_dict[key] = data
         else:
             reason_dict[key] = data["reason"]
     return reason_dict

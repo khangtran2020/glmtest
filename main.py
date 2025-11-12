@@ -91,6 +91,7 @@ def main() -> None:
 
     if args.get_reason:
         dataset.filter_by_max_tokens(max_tokens=8192)
+        dataset.filter_for_reasoning(max_samples=10000)
         reasoning_save_path = os.path.join(
             dataset.data_path,
             f"{dataset.baseline_prompt}_{dataset.llm_model_name}_{dataset.gnn_mode}",
