@@ -1,6 +1,7 @@
 import os
 import json
 import torch
+import random
 import warnings
 from config import parse_args
 from utils.console import console
@@ -100,22 +101,54 @@ def main() -> None:
             console.log(
                 f"[yellow]Reasoning file already exists at {reasoning_save_path}[/yellow]"
             )
-            return  # exit if reasoning file already exists
+            with open(reasoning_save_path, "r") as f:
+                generated_reasoning = [json.loads(line) for line in f.readlines()]
+
+            generated_keys = list(
+                set([list(obj.keys())[0] for obj in generated_reasoning])
+            )
+            samples = dataset.processed_data["train"]
+            repo_dict = {}
+            for key in samples.keys():
+                repo = key.split("-")[0]
+                if repo not in repo_dict:
+                    repo_dict[repo] = []
+                repo_dict[repo].append(key)
+
+            removed_keys = []
+            for key in generated_keys:
+                repo = key.split("-")[0]
+                if key in repo_dict[repo]:
+                    repo_dict[repo].remove(key)
+                    removed_keys.append(key)
+
+            remain_keys = [key for key in generated_keys if key not in removed_keys]
+            for key in remain_keys:
+                repo = key.split("-")[0]
+                chosen_key = random.choice(repo_dict[repo])
+                repo_dict[repo].remove(chosen_key)
+
+            samples_to_generate = {}
+            for repo in repo_dict:
+                for key in repo_dict[repo]:
+                    samples_to_generate[key] = samples[key]
         else:
-            console.log(
-                f"[green]Generating reasoning for dataset and saving to {reasoning_save_path}[/green]"
-            )
-            reason_dict = get_reasoning(
-                samples=dataset.processed_data["train"],
-                api_key=args.reason_api_key,
-                console=console,
-                max_tokens=512,
-                model=args.reason_model,
-                save_path=reasoning_save_path,
-            )
-            # with open(reasoning_save_path, "w") as f:
-            #     json.dump(reason_dict, f, indent=4)
-            return  # exit after getting reasoning
+            samples_to_generate = dataset.processed_data["train"]
+
+        console.log(
+            f"[green]Generating reasoning for dataset and saving to {reasoning_save_path}[/green]"
+        )
+        reason_dict = get_reasoning(
+            samples=samples_to_generate,
+            api_key=args.reason_api_key,
+            console=console,
+            max_tokens=512,
+            model=args.reason_model,
+            save_path=reasoning_save_path,
+        )
+        # with open(reasoning_save_path, "w") as f:
+        #     json.dump(reason_dict, f, indent=4)
+        return  # exit after getting reasoning
     else:
         dataset.filter_by_max_tokens(max_tokens=args.max_seq_length)
 
