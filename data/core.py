@@ -1521,8 +1521,8 @@ def get_reasoning(
             fence = re.compile(
                 r"```(?:json)?\s*([\s\S]*?\{[\s\S]*?\})\s*```", re.MULTILINE
             )
-            m = fence.search(response.choices[0].message.content)
-            payload = m.group(1) if m else response.choices[0].message.content
+            m = fence.search(response.content[0].text)
+            payload = m.group(1) if m else response.content[0].text
 
             # 3) Try JSON first:
             try:
