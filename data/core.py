@@ -1503,8 +1503,10 @@ def get_reasoning(
     reason_dict = {}
     with open(save_path, "a") as file:
         for key in tqdm(samples.keys()):
-            print(samples[key].keys())
-            full_text = samples[key]["full_text"]
+            data_path = samples[key]["path"]
+            with open(data_path, "r") as f:
+                sample = json.load(f)
+            full_text = sample["full_text"]
             prompt = REASONING_TEMPLATE_PROMPT.format(full_text)
             # Anthropic's messages.create API
             messages = [{"role": "user", "content": prompt}]
