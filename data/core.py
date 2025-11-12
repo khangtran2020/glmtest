@@ -1322,9 +1322,23 @@ class Data(object):
 
             # split train and val
             keys_list = list(self.processed_data["train"].keys())
-            np.random.shuffle(keys_list)
-            val_keys = keys_list[:num_val]
-            train_keys = keys_list[num_val:]
+            repo_dict = {}
+            for key in keys_list:
+                repo = key.split("-")[0]
+                if repo not in repo_dict:
+                    repo_dict[repo] = []
+                repo_dict[repo].append(key)
+
+            num_repo = len(repo_dict.keys())
+            num_val_per_repo = max(1, num_val // num_repo)
+
+            val_keys = []
+            for repo in repo_dict.keys():
+                repo_keys = repo_dict[repo]
+                np.random.shuffle(repo_keys)
+                val_keys.extend(repo_keys[:num_val_per_repo])
+
+            train_keys = [key for key in keys_list if key not in val_keys]
 
             train_data = {}
             val_data = {}
