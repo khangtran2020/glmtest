@@ -1495,6 +1495,7 @@ def get_reasoning(
     api_key: str,
     model: str,
     max_tokens: int = 512,
+    console: Console = None,
     temperature: float = 0.7,
 ) -> str:
     client = anthropic.Anthropic(api_key=api_key)
@@ -1528,4 +1529,7 @@ def get_reasoning(
             reason_dict[key] = data
         else:
             reason_dict[key] = data["reason"]
+        console.log(
+            f"[green]Reasoning generated for sample {key}: {reason_dict[key]}[/green]"
+        )
     return reason_dict
