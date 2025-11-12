@@ -89,12 +89,11 @@ def main() -> None:
         else:
             dataset.prepare_data()
 
-    if args.get_reason:
+    if args.mode == "reasoning":
         dataset.filter_by_max_tokens(max_tokens=8192)
         dataset.filter_for_reasoning(max_samples=10000)
         reasoning_save_path = os.path.join(
             dataset.data_path,
-            f"{dataset.baseline_prompt}_{dataset.llm_model_name}_{dataset.gnn_mode}",
             "reasoning.json",
         )
         if os.path.exists(reasoning_save_path):
@@ -109,6 +108,8 @@ def main() -> None:
             reason_dict = get_reasoning(
                 samples=dataset.processed_data["train"],
                 api_key=args.reason_api_key,
+                console=console,
+                max_tokens=512,
                 model=args.reason_model,
             )
             with open(reasoning_save_path, "w") as f:
