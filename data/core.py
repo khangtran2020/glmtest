@@ -571,10 +571,16 @@ class Data(object):
                 self.data_path,
                 f"raw",
             )
-            processed_prompt_path = os.path.join(
-                self.data_path,
-                f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
-            )
+            if "graph" not in self.baseline_prompt:
+                processed_prompt_path = os.path.join(
+                    self.data_path,
+                    f"{self.baseline_prompt}_{self.llm_model_name}",
+                )
+            else:
+                processed_prompt_path = os.path.join(
+                    self.data_path,
+                    f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                )
 
             os.makedirs(processed_data_path, exist_ok=True)
             os.makedirs(processed_prompt_path, exist_ok=True)
@@ -764,10 +770,16 @@ class Data(object):
                 self.data_path,
                 f"raw",
             )
-            processed_prompt_path = os.path.join(
-                self.data_path,
-                f"{self.baseline_prompt}_{self.max_tokens}_{self.model_name}",
-            )
+            if "graph" not in self.baseline_prompt:
+                processed_prompt_path = os.path.join(
+                    self.data_path,
+                    f"{self.baseline_prompt}_{self.llm_model_name}",
+                )
+            else:
+                processed_prompt_path = os.path.join(
+                    self.data_path,
+                    f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                )
 
             os.makedirs(processed_data_path, exist_ok=True)
             os.makedirs(processed_prompt_path, exist_ok=True)
