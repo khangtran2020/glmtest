@@ -1547,7 +1547,7 @@ def get_reasoning(
             console.log(
                 f"[green]Reasoning generated for sample {key}[/green]: {reason_dict[key]}"
             )
-            file.write(json.dumps({key: reason_dict[key]}, indent=4))
+            file.write(json.dumps({key: reason_dict[key]}))
             file.write("\n")
             console.log(f"[yellow]Reasoning saved to {save_path}[/yellow]")
     return reason_dict

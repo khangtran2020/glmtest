@@ -94,7 +94,7 @@ def main() -> None:
         dataset.filter_for_reasoning(max_samples=10000)
         reasoning_save_path = os.path.join(
             dataset.data_path,
-            "reasoning.json",
+            "reasoning.jsonl",
         )
         if os.path.exists(reasoning_save_path):
             console.log(
