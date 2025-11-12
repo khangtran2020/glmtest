@@ -111,9 +111,10 @@ def main() -> None:
                 console=console,
                 max_tokens=512,
                 model=args.reason_model,
+                save_path=reasoning_save_path,
             )
-            with open(reasoning_save_path, "w") as f:
-                json.dump(reason_dict, f, indent=4)
+            # with open(reasoning_save_path, "w") as f:
+            #     json.dump(reason_dict, f, indent=4)
             return  # exit after getting reasoning
     else:
         dataset.filter_by_max_tokens(max_tokens=args.max_seq_length)

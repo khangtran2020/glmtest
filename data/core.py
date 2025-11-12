@@ -1497,39 +1497,45 @@ def get_reasoning(
     max_tokens: int = 512,
     console: Console = None,
     temperature: float = 0.7,
+    save_path: str = None,
 ) -> str:
     client = anthropic.Anthropic(api_key=api_key)
     reason_dict = {}
-    for key in tqdm(samples.keys()):
-        full_text = samples[key]["full_text"]
-        prompt = REASONING_TEMPLATE_PROMPT.format(full_text)
-        # Anthropic's messages.create API
-        messages = [{"role": "user", "content": prompt}]
-        kwargs = {
-            "model": model,
-            "max_tokens": max_tokens,  # Anthropic uses max_tokens, not max_output_tokens
-            "temperature": temperature,
-            "messages": messages,
-        }
-        response = client.messages.create(**kwargs)
+    with open(save_path, "a") as file:
+        for key in tqdm(samples.keys()):
+            full_text = samples[key]["full_text"]
+            prompt = REASONING_TEMPLATE_PROMPT.format(full_text)
+            # Anthropic's messages.create API
+            messages = [{"role": "user", "content": prompt}]
+            kwargs = {
+                "model": model,
+                "max_tokens": max_tokens,  # Anthropic uses max_tokens, not max_output_tokens
+                "temperature": temperature,
+                "messages": messages,
+            }
+            response = client.messages.create(**kwargs)
 
-        fence = re.compile(r"```(?:json)?\s*([\s\S]*?\{[\s\S]*?\})\s*```", re.MULTILINE)
-        m = fence.search(response.choices[0].message.content)
-        payload = m.group(1) if m else response.choices[0].message.content
+            fence = re.compile(
+                r"```(?:json)?\s*([\s\S]*?\{[\s\S]*?\})\s*```", re.MULTILINE
+            )
+            m = fence.search(response.choices[0].message.content)
+            payload = m.group(1) if m else response.choices[0].message.content
 
-        # 3) Try JSON first:
-        try:
-            data = json.loads(payload)
-        except json.JSONDecodeError:
-            data = payload
-            print(f"Failed to extract json payload: {payload}")
+            # 3) Try JSON first:
+            try:
+                data = json.loads(payload)
+            except json.JSONDecodeError:
+                data = payload
+                print(f"Failed to extract json payload: {payload}")
 
-        if ("reason" not in data) or (not isinstance(data, dict)):
-            print(f"Failed to extract reason in payload: {payload}")
-            reason_dict[key] = data
-        else:
-            reason_dict[key] = data["reason"]
-        console.log(
-            f"[green]Reasoning generated for sample {key}: {reason_dict[key]}[/green]"
-        )
+            if ("reason" not in data) or (not isinstance(data, dict)):
+                print(f"Failed to extract reason in payload: {payload}")
+                reason_dict[key] = data
+            else:
+                reason_dict[key] = data["reason"]
+            console.log(
+                f"[green]Reasoning generated for sample {key}: {reason_dict[key]}[/green]"
+            )
+            file.write(json.dumps({key: reason_dict[key]}, indent=4))
+            file.write("\n")
     return reason_dict
