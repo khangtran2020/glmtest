@@ -70,7 +70,7 @@ RESPONSE_TEMPLATE = """# OUTPUTS: Here is the generated Python test code targeti
 ```
 """
 
-REASONING_TEMPLATE_PROMPT = """Given a data sample (including input and output), I aim to generate a reasoning explanation for why the output is associated with the input, within 100 words. The reasoning explanation will be put before the #OUTPUTS tag to train the LLMs for reasoning. It also needs to incorporate some sort of information from the graph embedding, please. It is worth noting that each graph_pad will be replaced by a graph embedding of a node associated with that branch, and some branch might not have graph embedding. Help generate such reasoning.
+REASONING_TEMPLATE_PROMPT = """Given a data sample (including input and output), I aim to generate a reasoning explanation for why the output is associated with the input, within 100 words. The reasoning explanation will be put before the #OUTPUTS tag to train the LLMs for reasoning. It also needs to incorporate some sort of information from the graph embedding, please. It is worth noting that each graph_pad will be replaced by a graph embedding of a node associated with that branch, and some branch might not have graph embedding (indicated by Not available). However, if provided (i.e. has graph_pad) the reasoning should align (in a way) the graph embedding with the executed branches. Help generate such reasoning.
 
 # DATA SAMPLE:
 {}
@@ -1537,8 +1537,9 @@ def get_reasoning(
             else:
                 reason_dict[key] = data["reason"]
             console.log(
-                f"[green]Reasoning generated for sample {key}: {reason_dict[key]}[/green]"
+                f"[green]Reasoning generated for sample {key}[/green]: {reason_dict[key]}"
             )
             file.write(json.dumps({key: reason_dict[key]}, indent=4))
             file.write("\n")
+            console.log(f"[yellow]Reasoning saved to {save_path}[/yellow]")
     return reason_dict
