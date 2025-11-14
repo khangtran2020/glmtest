@@ -713,6 +713,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         logits = self.llm_model.base_model.model.lm_head(
             hidden_states[:, slice_indices, :]
         )
+        pprint(
+            f"[blue]Step {step} - rank {rank}[/blue]: [blue]Logits -[/blue] {logits}"
+        )
 
         loss = None
         if labels is not None:

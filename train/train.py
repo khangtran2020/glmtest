@@ -733,7 +733,7 @@ def train_multi_gpu_accelerate(
 
                 with torch.no_grad():
                     all_losses = accelerator.gather(loss)
-                    # print(f"All losses at step {global_step}: {all_losses}")
+                    print(f"All losses at step {global_step}: {all_losses}")
                     all_losses = torch.where(
                         torch.isnan(all_losses),
                         torch.zeros_like(all_losses),
