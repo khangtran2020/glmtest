@@ -379,10 +379,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     embeds.to(inputs_embeds.dtype).mean(dim=0, keepdim=True)
                 )
 
-            # Check NaN values in inputs_embeds
-            if torch.isnan(inputs_embeds).any():
-                pprint("[red]Warning: NaN values found in graph_embeds![/red]")
-                pprint(inputs_embeds)
+            # # Check NaN values in inputs_embeds
+            # if torch.isnan(inputs_embeds).any():
+            #     pprint("[red]Warning: NaN values found in graph_embeds![/red]")
+            #     pprint(inputs_embeds)
 
         return inputs_embeds
 
@@ -720,9 +720,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         logits = self.llm_model.base_model.model.lm_head(
             hidden_states[:, slice_indices, :]
         )
-        pprint(
-            f"[blue]Step {step} - rank {rank}[/blue]: [blue]Logits -[/blue] {logits}"
-        )
+        # pprint(
+        #     f"[blue]Step {step} - rank {rank}[/blue]: [blue]Logits -[/blue] {logits}"
+        # )
 
         loss = None
         if labels is not None:
