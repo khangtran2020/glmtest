@@ -371,17 +371,18 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             overall_mask = overall_mask.to(self.llm_model.device)
             graph_embeds = self.gnn(graph, overall_mask)
 
-            # Check NaN values in inputs_embeds
-            if torch.isnan(graph_embeds).any():
-                pprint("[red]Warning: NaN values found in graph_embeds![/red]")
-                pprint(graph_embeds)
-
             for j, mask in enumerate(graph_mask):
                 embeds = graph_embeds[mask_idx[j], :]
                 assert embeds.size(0) == len(mask_idx[j])
                 inputs_embeds[i, graph_token_index[j] : graph_token_index[j] + 1, :] = (
                     embeds.to(inputs_embeds.dtype).mean(dim=0, keepdim=True)
                 )
+
+            # Check NaN values in inputs_embeds
+            if torch.isnan(inputs_embeds).any():
+                pprint("[red]Warning: NaN values found in graph_embeds![/red]")
+                pprint(inputs_embeds)
+
         return inputs_embeds
 
     def extract_embedding_node(
