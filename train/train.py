@@ -717,6 +717,9 @@ def train_multi_gpu_accelerate(
                     accelerator.wait_for_everyone()
                     loss = outputs.loss
                     accelerator.backward(loss)
+                    console.log(
+                        f"Loss at rank {accelerator.process_index}: {loss.item()}"
+                    )
                     accelerator.wait_for_everyone()
 
                 if accelerator.sync_gradients:
@@ -730,7 +733,6 @@ def train_multi_gpu_accelerate(
 
                 with torch.no_grad():
                     all_losses = accelerator.gather(loss)
-                    console.log(f"all_losses before nan handling: {all_losses}")
                     all_losses = torch.where(
                         torch.isnan(all_losses),
                         torch.zeros_like(all_losses),
