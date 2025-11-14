@@ -332,11 +332,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             if self.is_training:
                 inputs_embeds = inputs_embeds.requires_grad_(True)
 
-        # Check NaN values in inputs_embeds
-        if torch.isnan(inputs_embeds).any():
-            pprint("[red]Warning: NaN values found in inputs_embeds![/red]")
-            pprint(inputs_embeds)
-
         return inputs_embeds
 
     def extract_embedding_branch(
@@ -375,6 +370,11 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
             overall_mask = overall_mask.to(self.llm_model.device)
             graph_embeds = self.gnn(graph, overall_mask)
+
+            # Check NaN values in inputs_embeds
+            if torch.isnan(graph_embeds).any():
+                pprint("[red]Warning: NaN values found in graph_embeds![/red]")
+                pprint(graph_embeds)
 
             for j, mask in enumerate(graph_mask):
                 embeds = graph_embeds[mask_idx[j], :]
