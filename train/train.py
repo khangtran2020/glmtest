@@ -771,7 +771,7 @@ def train_multi_gpu_accelerate(
                     progress.update(
                         train_epoch_task,
                         advance=1,
-                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB",
+                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.10f} - RAM usage: {ram_usage:.1f} MB",
                     )
                 epoch_loss += avg_batch_loss * batch_size
                 num_items += batch_size
