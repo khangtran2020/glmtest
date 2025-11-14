@@ -111,6 +111,26 @@ def logging_train_data(
         + f"{data_point_example['text']}\n"
         + "[yellow]================ End of example data point ================[/yellow]"
     )
+    len_of_tokenized = len(data_point_example["input"]["input_ids"].squeeze(0))
+    len_of_labels = len(data_point_example["input"]["labels"].squeeze(0))
+    len_of_attention_mask = len(
+        data_point_example["input"]["attention_mask"].squeeze(0)
+    )
+    console.log(
+        f"[yellow]================ Example tokenized - {len_of_tokenized} ================[/yellow]\n"
+        + f"{data_point_example['input']['input_ids'].squeeze(0).tolist()}\n"
+        + "[yellow]================ End of example tokenized ================[/yellow]"
+    )
+    console.log(
+        f"[yellow]================ Example attention_mask - {len_of_attention_mask} ================[/yellow]\n"
+        + f"{data_point_example['input']['attention_mask'].squeeze(0).tolist()}\n"
+        + "[yellow]================ End of example tokenized ================[/yellow]"
+    )
+    console.log(
+        f"[yellow]================ Example label - {len_of_labels} ================[/yellow]\n"
+        + f"{data_point_example['input']['labels'].squeeze(0).tolist()}\n"
+        + "[yellow]================ End of example label ================[/yellow]"
+    )
 
 
 def logging_gpu_usage(step: int, console: Console):
