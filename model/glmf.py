@@ -619,6 +619,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         rank = self.rank
 
         num_processes = dist.get_world_size()
+        pprint(f"[blue]Number of processes: {num_processes}[/blue]")
         inputs_embeds, cu_seqlens_emb = extract_local(
             inputs_embeds, rank, num_processes, inputs_embeds.device
         )
