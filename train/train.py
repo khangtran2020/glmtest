@@ -717,8 +717,8 @@ def train_multi_gpu_accelerate(
                     accelerator.wait_for_everyone()
                     loss = outputs.loss
                     accelerator.backward(loss)
-                    console.log(
-                        f"Loss at rank {accelerator.process_index}: {loss.item()}"
+                    print(
+                        f"Loss at rank {accelerator.process_index} - step {global_step}: {loss.item()}"
                     )
                     accelerator.wait_for_everyone()
 
