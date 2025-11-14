@@ -351,6 +351,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 graph[key] = graph[key].to(self.llm_model.device)
 
             graph_mask = graph_masks[i]
+            graph_mask = [mask for mask in graph_mask if mask.sum() > 0]
             overall_mask = None  # merge graph_mask
             for j, mask in enumerate(graph_mask):
                 if j == 0:
