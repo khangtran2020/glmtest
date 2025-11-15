@@ -415,6 +415,11 @@ def add_training_group(group):
         action="store_true",
         help="Train only the NVIB layers",
     )
+    group.add_argument(
+        "--only_gnn",
+        action="store_true",
+        help="Train only the GNN layers",
+    )
 
 
 def add_testgen_group(group):
