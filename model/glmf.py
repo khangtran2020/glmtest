@@ -224,6 +224,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         self.rank = rank
         self.is_training = is_training
         self.gnn_mode = config.mode
+        self.use_lora = config.use_lora
 
         pprint(f"[green]Model is loaded to device of rank: {rank}[/green]")
 
@@ -662,34 +663,33 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if accelerator is not None:
             accelerator.wait_for_everyone()
 
-        # return self.llm_model(
-        #     input_ids=None,
-        #     attention_mask=attention_mask,
-        #     position_ids=position_ids,
-        #     past_key_values=past_key_values,
-        #     inputs_embeds=inputs_embeds,
-        #     labels=labels,
-        #     use_cache=use_cache,
-        #     cache_position=cache_position,
-        # )
-
         if self.is_training:
-            # print("Running in training mode.")
-            # print(
-            #     f"Type of self.llm_model.base_model.model.model: {type(self.llm_model.base_model.model.model)}"
-            # )
-            outputs = self.llm_model.base_model.model.model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
-                past_key_values=past_key_values,
-                inputs_embeds=inputs_embeds,
-                use_cache=use_cache,
-                output_attentions=output_attentions,
-                output_hidden_states=output_hidden_states,
-                return_dict=return_dict,
-                cache_position=cache_position,
-            )
+            if self.use_lora:
+                outputs = self.llm_model.base_model.model.model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    position_ids=position_ids,
+                    past_key_values=past_key_values,
+                    inputs_embeds=inputs_embeds,
+                    use_cache=use_cache,
+                    output_attentions=output_attentions,
+                    output_hidden_states=output_hidden_states,
+                    return_dict=return_dict,
+                    cache_position=cache_position,
+                )
+            else:
+                outputs = self.llm_model.base_model.model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    position_ids=position_ids,
+                    past_key_values=past_key_values,
+                    inputs_embeds=inputs_embeds,
+                    use_cache=use_cache,
+                    output_attentions=output_attentions,
+                    output_hidden_states=output_hidden_states,
+                    return_dict=return_dict,
+                    cache_position=cache_position,
+                )
         else:
             outputs = self.llm_model.model(
                 input_ids=input_ids,
@@ -705,12 +705,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             )
 
         hidden_states = outputs.last_hidden_state
-        # print("Hidden states requires_grad:", hidden_states.requires_grad)
-        # print("Hidden states grad_fn:", hidden_states.grad_fn)
-
-        # # pprint(
-        # #     f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]Last hidden_states value: {hidden_states} [/cyan]\n\n\n"
-        # # )
 
         slice_indices = (
             slice(-logits_to_keep, None)
@@ -720,9 +714,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         logits = self.llm_model.base_model.model.lm_head(
             hidden_states[:, slice_indices, :]
         )
-        # pprint(
-        #     f"[blue]Step {step} - rank {rank}[/blue]: [blue]Logits -[/blue] {logits}"
-        # )
 
         loss = None
         if labels is not None:
@@ -737,9 +728,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 ignore_index=ignore_index,
                 **kwargs,
             )
-        #     # pprint(
-        #     #     f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]loss: {loss}[/cyan], [green]logits shape: {logits}[/green], [blue]labels shape: {labels}[/blue]"
-        #     # )
 
         return CausalLMOutputWithPast(
             loss=loss,
