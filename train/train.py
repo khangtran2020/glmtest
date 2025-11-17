@@ -66,7 +66,7 @@ def train(
             console.log(
                 f"Training GNN on multi GPU - {args.num_gpu} GPUs - with mode: train_multi_gpu_accelerate"
             )
-            train_multi_gpu_accelerate(
+            train_multi_gpu_gnnonly(
                 args=args,
                 dataset=dataset,
                 console=console,
