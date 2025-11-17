@@ -406,6 +406,7 @@ def validate(
     console: Console,
     accelerator: Accelerator,
     multi_gpu: bool = False,
+    only_gnn: bool = False,
 ):
     model.eval()
 
@@ -457,6 +458,7 @@ def validate(
                     graphs=graphs,
                     graph_masks=graph_masks,
                     graph_token_indices=graph_token_indices,
+                    only_gnn=only_gnn,
                 )
                 loss = outputs.loss
                 if multi_gpu:
