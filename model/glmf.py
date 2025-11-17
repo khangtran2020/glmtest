@@ -678,7 +678,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     cache_position=cache_position,
                 )
             else:
-                outputs = self.llm_model.base_model.model(
+                outputs = self.llm_model.model(
                     input_ids=input_ids,
                     attention_mask=attention_mask,
                     position_ids=position_ids,
