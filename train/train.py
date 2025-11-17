@@ -1219,7 +1219,7 @@ def train_multi_gpu_gnnonly(
                         torch.zeros_like(all_losses),
                         all_losses,
                     )
-                    total_loss = torch.sum(all_losses)
+                    total_loss = torch.mean(all_losses)
                     batch_loss += total_loss.detach().float().item()
 
                 for key in micro_input.keys():
