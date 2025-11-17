@@ -325,7 +325,7 @@ def train_single_gpu_accelerate(
                     optimizer.step()
                     lr_scheduler.step()
                     optimizer.zero_grad()
-                logging_gpu_usage(step=global_step, console=console)
+                # logging_gpu_usage(step=global_step, console=console)
 
                 batch_loss += loss.item()
                 avg_batch_loss = batch_loss / batch_size
