@@ -1142,12 +1142,12 @@ def train_multi_gpu_gnnonly(
 
                     continue
 
-                accelerator.wait_for_everyone()
+                # accelerator.wait_for_everyone()
                 global_step += args.batch_size
                 batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
 
-                accelerator.wait_for_everyone()
+                # accelerator.wait_for_everyone()
 
                 if "token_type_ids" in batch["input"]:
                     batch["input"].pop("token_type_ids")
@@ -1158,7 +1158,7 @@ def train_multi_gpu_gnnonly(
                     "labels": batch["input"]["labels"],
                 }
 
-                accelerator.wait_for_everyone()
+                # accelerator.wait_for_everyone()
 
                 if "graph" in args.baseline_prompt:
                     graphs = batch["graph"]
@@ -1182,7 +1182,7 @@ def train_multi_gpu_gnnonly(
                     .expand(micro_input["input_ids"].shape[0], -1)
                 )
 
-                accelerator.wait_for_everyone()
+                # accelerator.wait_for_everyone()
 
                 with accelerator.accumulate(model):
 
@@ -1197,10 +1197,10 @@ def train_multi_gpu_gnnonly(
                         only_gnn=True,
                     )
 
-                    accelerator.wait_for_everyone()
+                    # accelerator.wait_for_everyone()
                     loss = outputs.loss
                     accelerator.backward(loss)
-                    accelerator.wait_for_everyone()
+                    # accelerator.wait_for_everyone()
 
                 if accelerator.sync_gradients:
 
@@ -1275,7 +1275,6 @@ def train_multi_gpu_gnnonly(
 
                 if accelerator.sync_gradients and (global_step % args.save_steps == 0):
                     accelerator.wait_for_everyone()
-
                     if (previous_checkpoint_step != -1) and (
                         accelerator.is_main_process
                     ):
