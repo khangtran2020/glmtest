@@ -711,9 +711,12 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             if isinstance(logits_to_keep, int)
             else logits_to_keep
         )
-        logits = self.llm_model.base_model.model.lm_head(
-            hidden_states[:, slice_indices, :]
-        )
+        if self.is_training and self.use_lora:
+            logits = self.llm_model.base_model.model.lm_head(
+                hidden_states[:, slice_indices, :]
+            )
+        else:
+            logits = self.llm_model.lm_head(hidden_states[:, slice_indices, :])
 
         loss = None
         if labels is not None:
