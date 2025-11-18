@@ -301,6 +301,7 @@ def train_single_gpu_accelerate(
                     "attention_mask": batch["input"]["attention_mask"].to(device),
                     "labels": batch["input"]["labels"].to(device),
                 }
+                user_prompt_lens = batch.get("user_prompt_lens", None)
 
                 if "graph" in args.baseline_prompt:
                     graphs = []
@@ -316,8 +317,13 @@ def train_single_gpu_accelerate(
                         graph_mask = [
                             mask.to(device) for mask in batch["graph_mask"][i]
                         ]
+
+                        print(
+                            f"Size of micro_input['input_ids'][i]: {micro_input['input_ids'][i].size()}"
+                        )
+
                         graph_token_index = torch.where(
-                            micro_input["input_ids"][i]
+                            micro_input["input_ids"][i][: user_prompt_lens[i]]
                             == model.config.graph_token_id[1]
                         )[0].tolist()
                         graphs.append(graph)
