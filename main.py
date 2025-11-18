@@ -92,7 +92,7 @@ def main() -> None:
 
     if args.mode == "reasoning":
         dataset.filter_by_max_tokens(max_tokens=8192)
-        dataset.filter_for_reasoning(max_samples=10000)
+        dataset.sample_for_reasoning(max_samples=10000)
         reasoning_save_path = os.path.join(
             dataset.data_path,
             "reasoning.jsonl",
@@ -181,6 +181,30 @@ def main() -> None:
                 task_instances = [json.loads(line) for line in f.readlines()]
             run_codamosa(args=args, task_instances=task_instances, console=console)
             return
+
+    if args.mode == "train" and args.train_reasoning:
+        reasoning_path = os.path.join(
+            dataset.data_path,
+            "reasoning.jsonl",
+        )
+        assert os.path.exists(
+            reasoning_path
+        ), "Reasoning file not found, please generate it first."
+        with open(reasoning_path, "r") as f:
+            reasoning_data = [json.loads(line) for line in f.readlines()]
+
+        generated_keys = list(set([list(obj.keys())[0] for obj in reasoning_data]))
+        samples = dataset.processed_data["train"]
+        key_to_reasoning = {}
+        for key in samples.keys():
+            key_to_reasoning[key] = samples[key]
+        dataset.processed_data["train"] = key_to_reasoning
+
+        reasoning_dict = {}
+        for obj in reasoning_data:
+            key = list(obj.keys())[0]
+            reasoning_dict[key] = obj[key]
+        dataset.add_reasoning(reasoning_dict=reasoning_dict)
 
     if args.repo is not None:
         dataset.prepare_data_by_repo()

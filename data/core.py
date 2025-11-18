@@ -980,7 +980,7 @@ class Data(object):
             f"[green]Data is filtered by max tokens {max_tokens}! New size: {len(self.processed_data)}[/green]"
         )
 
-    def filter_for_reasoning(self, max_samples: int) -> None:
+    def sample_for_reasoning(self, max_samples: int) -> None:
         self.logger.log(f"[green]Filtering data for reasoning...[/green]")
         assert self.processed_data is not None
         filtered_data = {}
@@ -1020,6 +1020,39 @@ class Data(object):
         self.logger.log(
             f"[green]Data is filtered for reasoning! New size: {len(filtered_data)}[/green]"
         )
+
+    def add_reasoning(self, reasoning_dict: dict) -> None:
+        # add reasoning to the training data
+        self.logger.log(f"[green]Adding reasoning to the data...[/green]")
+        assert self.processed_data is not None
+
+        samples = self.processed_data["train"]
+        for key in tqdm(samples.keys()):
+            if key in reasoning_dict.keys():
+                data_path = samples[key]["path"]
+                with open(data_path, "r") as file:
+                    data = json.load(file)
+                reasoning = reasoning_dict[key]
+
+                # processing full text
+                full_text = data["full_text"]
+                insert_text = f"\n\n# Thinking:\n<think>\n{reasoning}\n</think>\n"
+                text_before = full_text.split(
+                    "Here is the generated Python test code targeting the specified execution branch"
+                )[0]
+                text_after = full_text.split(
+                    "Here is the generated Python test code targeting the specified execution branch"
+                )[1]
+                new_full_text = (
+                    text_before
+                    + insert_text
+                    + "From the above reason, here is the generated Python test code targeting the specified execution branch"
+                    + text_after
+                )
+                data["full_text"] = new_full_text
+                # save data
+                with open(data_path, "w") as file:
+                    json.dump(data, file, indent=4)
 
     def read_graph(self, data: dict) -> dict:
 

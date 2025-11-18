@@ -420,6 +420,11 @@ def add_training_group(group):
         action="store_true",
         help="Train only the GNN layers",
     )
+    group.add_argument(
+        "--train_reasoning",
+        action="store_true",
+        help="Train with reasoning",
+    )
 
 
 def add_testgen_group(group):
