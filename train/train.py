@@ -223,6 +223,7 @@ def train_single_gpu_accelerate(
         dtype=args.dtype,
         num_gpus=args.num_gpu,
         logger=console,
+        reasoning_dict=getattr(dataset, "reasoning_dict", None),
     )
     va_dataset = GLMFDataset(
         data=dataset.val_data,
@@ -233,6 +234,7 @@ def train_single_gpu_accelerate(
         dtype=args.dtype,
         num_gpus=args.num_gpu,
         logger=console,
+        reasoning_dict=getattr(dataset, "reasoning_dict", None),
     )
     tr_loader = DataLoader(
         tr_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn
@@ -594,6 +596,7 @@ def train_multi_gpu_accelerate(
         logger=console,
         dtype=args.dtype,
         num_gpus=args.num_gpu,
+        reasoning_dict=getattr(dataset, "reasoning_dict", None),
     )
     va_dataset = GLMFDataset(
         data=dataset.val_data,
@@ -604,6 +607,7 @@ def train_multi_gpu_accelerate(
         logger=console,
         dtype=args.dtype,
         num_gpus=args.num_gpu,
+        reasoning_dict=getattr(dataset, "reasoning_dict", None),
     )
     dataloader_params = {
         "batch_size": args.batch_size,
@@ -1057,6 +1061,7 @@ def train_multi_gpu_gnnonly(
         logger=console,
         dtype=args.dtype,
         num_gpus=args.num_gpu,
+        reasoning_dict=getattr(dataset, "reasoning_dict", None),
     )
     va_dataset = GLMFDataset(
         data=dataset.val_data,
@@ -1067,6 +1072,7 @@ def train_multi_gpu_gnnonly(
         logger=console,
         dtype=args.dtype,
         num_gpus=args.num_gpu,
+        reasoning_dict=getattr(dataset, "reasoning_dict", None),
     )
     dataloader_params = {
         "batch_size": args.batch_size,
