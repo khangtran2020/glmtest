@@ -632,6 +632,7 @@ def train_multi_gpu_accelerate(
         )
 
     patch_model(process_group=process_group)
+    console.log("Model patched for Ring Attention")
     device = accelerator.device
     config = model.config
     model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
