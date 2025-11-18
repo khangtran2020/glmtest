@@ -64,7 +64,7 @@ def train(
     else:
         if args.only_gnn:
             console.log(
-                f"Training GNN on multi GPU - {args.num_gpu} GPUs - with mode: train_multi_gpu_accelerate"
+                f"Training GNN on multi GPU - {args.num_gpu} GPUs - with mode: train_multi_gpu_gnnonly"
             )
             train_multi_gpu_gnnonly(
                 args=args,
@@ -740,9 +740,9 @@ def train_multi_gpu_accelerate(
                     accelerator.wait_for_everyone()
                     loss = outputs.loss
                     accelerator.backward(loss)
-                    # print(
-                    #     f"Loss at rank {accelerator.process_index} - step {global_step}: {loss.item()}"
-                    # )
+                    print(
+                        f"Loss at rank {accelerator.process_index} - step {global_step}: {loss.item()}"
+                    )
                     accelerator.wait_for_everyone()
 
                 if accelerator.sync_gradients:
@@ -812,9 +812,9 @@ def train_multi_gpu_accelerate(
                             },
                             step=global_step,
                         )
-                        console.print(
-                            f"[yellow]Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}[/yellow]"
-                        )
+                        # console.print(
+                        #     f"[yellow]Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}[/yellow]"
+                        # )
 
                 if accelerator.sync_gradients and (global_step % args.save_steps == 0):
                     accelerator.wait_for_everyone()
