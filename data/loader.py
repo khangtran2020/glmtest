@@ -92,7 +92,7 @@ class GLMFDataset(Dataset):
         # processing full text
         if self.reasoning_dict is not None:
             full_text = sample["full_text"]
-            insert_text = f"\n\n# Thinking:\n<think>\n{self.reasoning_dict}\n</think>\n"
+            insert_text = f"\n\n# Thinking:\n<think>\n{self.reasoning_dict[self.index_to_key_dict[idx]]}\n</think>\n"
             text_before = full_text.split(
                 "Here is the generated Python test code targeting the specified execution branch"
             )[0]
