@@ -204,7 +204,8 @@ def main() -> None:
         for obj in reasoning_data:
             key = list(obj.keys())[0]
             reasoning_dict[key] = obj[key]
-        dataset.add_reasoning(reasoning_dict=reasoning_dict)
+        # dataset.add_reasoning(reasoning_dict=reasoning_dict)
+        setattr(dataset, "reasoning_dict", reasoning_dict)
 
     if args.repo is not None:
         dataset.prepare_data_by_repo()

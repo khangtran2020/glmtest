@@ -22,6 +22,7 @@ class GLMFDataset(Dataset):
         num_gpus: int = 1,
         dtype: str = "bf16",
         logger=None,
+        reasoning_dict: Dict[str, Any] = None,
     ):
         self.data = data
         self.tokenizer = tokenizer
@@ -35,6 +36,7 @@ class GLMFDataset(Dataset):
         self.logger = logger
         self.dtype = dtype
         self.index_to_key_dict = dict(zip(range(len(self.data)), self.data.keys()))
+        self.reasoning_dict = reasoning_dict
 
         if self.logger is not None:
             self.logger.log(
@@ -86,6 +88,24 @@ class GLMFDataset(Dataset):
                     .ndata["feat"]
                     .to(dtype=torch.bfloat16 if self.dtype == "bf16" else torch.float16)
                 )
+
+        # processing full text
+        if self.reasoning_dict is not None:
+            full_text = sample["full_text"]
+            insert_text = f"\n\n# Thinking:\n<think>\n{self.reasoning_dict}\n</think>\n"
+            text_before = full_text.split(
+                "Here is the generated Python test code targeting the specified execution branch"
+            )[0]
+            text_after = full_text.split(
+                "Here is the generated Python test code targeting the specified execution branch"
+            )[1]
+            new_full_text = (
+                text_before
+                + insert_text
+                + "From the above reason, here is the generated Python test code targeting the specified execution branch"
+                + text_after
+            )
+            sample["full_text"] = new_full_text
 
         if self.testing == False:
             full_text = sample["full_text"]
