@@ -196,8 +196,9 @@ def main() -> None:
         generated_keys = list(set([list(obj.keys())[0] for obj in reasoning_data]))
         samples = dataset.processed_data["train"]
         key_to_reasoning = {}
-        for key in samples.keys():
+        for key in generated_keys:
             key_to_reasoning[key] = samples[key]
+
         dataset.processed_data["train"] = key_to_reasoning
 
         reasoning_dict = {}
