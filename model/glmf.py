@@ -413,7 +413,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             graph_mask = [mask for mask in graph_mask if mask.sum() > 0]
             assert len(ranges) == len(
                 graph_mask
-            ), f"Mismatch between graph masks {len(graph_mask)} and token index ranges {len(ranges)}."
+            ), f"Mismatch between graph masks {len(graph_mask)} and token index ranges {len(ranges)}. Graph token index are: {graph_token_index} - ranges: {ranges}."
 
             graph = graphs[i]
             for key in graph.keys():
