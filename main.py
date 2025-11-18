@@ -209,9 +209,14 @@ def main() -> None:
         # check keys in train is the same as keys in reasoning_dict
         train_keys = set(dataset.processed_data["train"].keys())
         reasoning_keys = set(reasoning_dict.keys())
-        assert (
-            train_keys == reasoning_keys
-        ), "Train keys and reasoning keys do not match."
+        # take intersection and none intersection
+        common_keys = train_keys.intersection(reasoning_keys)
+        missing_in_reasoning = train_keys - reasoning_keys
+        if len(missing_in_reasoning) > 0:
+            console.log(
+                f"[yellow]Warning: {len(missing_in_reasoning)} samples are missing reasoning. They will be ignored during training.[/yellow]"
+            )
+            raise ValueError("Some training samples are missing reasoning.")
 
         setattr(dataset, "reasoning_dict", reasoning_dict)
 
