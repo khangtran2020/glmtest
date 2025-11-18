@@ -205,6 +205,14 @@ def main() -> None:
             key = list(obj.keys())[0]
             reasoning_dict[key] = obj[key]
         # dataset.add_reasoning(reasoning_dict=reasoning_dict)
+
+        # check keys in train is the same as keys in reasoning_dict
+        train_keys = set(dataset.processed_data["train"].keys())
+        reasoning_keys = set(reasoning_dict.keys())
+        assert (
+            train_keys == reasoning_keys
+        ), "Train keys and reasoning keys do not match."
+
         setattr(dataset, "reasoning_dict", reasoning_dict)
 
     if args.repo is not None:
