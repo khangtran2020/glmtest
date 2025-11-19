@@ -230,7 +230,7 @@ def main() -> None:
 
     # save keys of training data for each rank to check:
     with open(
-        os.path.join(args.output_dir, args.name, f"rank_{args.rank}_data_keys.txt"), "w"
+        os.path.join(args.output_dir, args.name, f"rank_{int(os.environ.get("RANK", 0))}_data_keys.txt"), "w"
     ) as f:
         for idx in range(len(dataset)):
             f.write(f"{dataset.index_to_key_dict[idx]}\n")
