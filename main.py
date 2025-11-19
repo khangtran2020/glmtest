@@ -237,7 +237,9 @@ def main() -> None:
         ),
         "w",
     ) as f:
-        for key in dataset.processed_data["train"].keys():
+        keys = list(dataset.train_data.keys())
+        keys = sorted(keys)
+        for key in keys:
             f.write(f"{key}\n")
 
     console.log(f"Broadcasted args and dataset to all processes.")
