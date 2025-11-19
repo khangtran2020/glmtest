@@ -193,25 +193,23 @@ def get_model_train(
             f"Attention implementation of the model is: {model.llm_model.config._attn_implementation}"
         )
 
-        if args.only_gnn:
+    if args.only_gnn:
 
-            # freeze all params first
-            for param in model.parameters():
-                param.requires_grad = False
+        # freeze all params first
+        for param in model.parameters():
+            param.requires_grad = False
 
-            # unfreeze GNN params
-            for name, param in model.named_parameters():
-                if "gnn" in name:
-                    param.requires_grad = True
-                    console.log(f"Parameter {name} is set to be trainable.")
+        # unfreeze GNN params
+        for name, param in model.named_parameters():
+            if "gnn" in name:
+                param.requires_grad = True
+                console.log(f"Parameter {name} is set to be trainable.")
 
-            # Count trainable parameters
-            trainable_params = sum(
-                p.numel() for p in model.parameters() if p.requires_grad
-            )
-            console.log(
-                f"[blue] Only GNN training mode activated. Total trainable parameters: {trainable_params} [/blue]"
-            )
+        # Count trainable parameters
+        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        console.log(
+            f"[blue] Only GNN training mode activated. Total trainable parameters: {trainable_params} [/blue]"
+        )
 
     if args.train_reasoning:
         console.log(f"[blue] Training with reasoning mode activated. [/blue]")

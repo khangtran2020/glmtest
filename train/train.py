@@ -1023,9 +1023,9 @@ def train_multi_gpu_gnnonly(
     mixed_precision: str = "bf16",
 ):
 
-    num_device = torch.cuda.device_count()
+    # num_device = torch.cuda.device_count()
     accelerator = Accelerator(
-        gradient_accumulation_steps=args.gradient_accumulation_steps // num_device,
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
         mixed_precision=mixed_precision,
         log_with="wandb",
         project_dir=args.log_dir,
@@ -1155,7 +1155,7 @@ def train_multi_gpu_gnnonly(
 
                     continue
 
-                # accelerator.wait_for_everyone()
+                accelerator.wait_for_everyone()
                 global_step += args.batch_size
                 batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
@@ -1196,7 +1196,6 @@ def train_multi_gpu_gnnonly(
                 )
 
                 # accelerator.wait_for_everyone()
-
                 with accelerator.accumulate(model):
 
                     outputs = model(
@@ -1216,7 +1215,6 @@ def train_multi_gpu_gnnonly(
                     # accelerator.wait_for_everyone()
 
                 if accelerator.sync_gradients:
-
                     accelerator.wait_for_everyone()
                     accelerator.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                     optimizer.step()
@@ -1226,7 +1224,7 @@ def train_multi_gpu_gnnonly(
 
                 with torch.no_grad():
                     all_losses = accelerator.gather(loss)
-                    # print(f"All losses at step {global_step}: {all_losses}")
+                    accelerator.print(f"All losses at step {global_step}: {all_losses}")
                     all_losses = torch.where(
                         torch.isnan(all_losses),
                         torch.zeros_like(all_losses),
@@ -1258,9 +1256,9 @@ def train_multi_gpu_gnnonly(
                 avg_batch_loss = batch_loss / batch_size
                 if accelerator.is_main_process:
                     ram_usage = log_ram_usage()
-                    # console.log(
-                    #     f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
-                    # )
+                    accelerator.print(
+                        f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
+                    )
                     progress.update(
                         train_epoch_task,
                         advance=1,
@@ -1354,13 +1352,13 @@ def train_multi_gpu_gnnonly(
 
                     if accelerator.is_main_process:
                         wandb.log({"val_loss": val_loss})
-                        console.log(
+                        accelerator.print(
                             f"Validation loss: {val_loss:.4f} at step {global_step}"
                         )
 
                         if val_loss < best_val_loss:
                             best_val_loss = val_loss
-                            console.log(
+                            accelerator.print(
                                 f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
                             )
                             checkpoint_dir = os.path.join(
