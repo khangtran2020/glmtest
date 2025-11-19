@@ -568,6 +568,8 @@ def train_multi_gpu_accelerate(
     )
 
     process_group = dist.group.WORLD
+
+    save_path = os.path.join(args.output_dir, args.name)
     if accelerator.is_main_process:
         accelerator.init_trackers(
             project_name="GLMFuzz",
@@ -586,7 +588,6 @@ def train_multi_gpu_accelerate(
             },
             init_kwargs={"wandb": {"name": args.name}},
         )
-        save_path = os.path.join(args.output_dir, args.name)
         if os.path.exists(save_path):
             if continue_training == False:
                 shutil.rmtree(save_path)
