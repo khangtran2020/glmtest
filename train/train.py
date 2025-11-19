@@ -7,6 +7,7 @@ import wandb
 import shutil
 import torch.distributed as dist
 from rich import print as pprint
+from rich.pretty import pretty_repr
 from functools import partial
 from model.gnn import GRAPH_KEYS
 from torch.utils.data import DataLoader
@@ -604,6 +605,14 @@ def train_multi_gpu_accelerate(
         dtype=args.dtype,
         num_gpus=args.num_gpu,
         reasoning_dict=getattr(dataset, "reasoning_dict", None),
+    )
+
+    print_dict = {}
+    for idx in range(3):
+        print_dict[idx] = tr_dataset.index_to_key_dict[idx]
+
+    console.log(
+        f"[blue][RANK {accelerator.process_index}][/blue] Train dataset int_to_key dict: {pretty_repr(print_dict)}"
     )
 
     va_dataset = GLMFDataset(
