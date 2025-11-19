@@ -604,6 +604,11 @@ def train_multi_gpu_accelerate(
         num_gpus=args.num_gpu,
         reasoning_dict=getattr(dataset, "reasoning_dict", None),
     )
+
+    console.log(
+        f"[blue][RANK {accelerator.process_index}][/blue] Train dataset int_to_key dict: {tr_dataset.index_to_key_dict}"
+    )
+
     va_dataset = GLMFDataset(
         data=dataset.val_data,
         tokenizer=dataset.llm_tokenizer,
