@@ -219,6 +219,13 @@ def main() -> None:
             )
             raise ValueError("Some training samples are missing reasoning.")
 
+        missing_in_reasoning = reasoning_keys - train_keys
+        if len(missing_in_reasoning) > 0:
+            console.log(
+                f"[yellow]Warning: {len(missing_in_reasoning)} samples are missing reasoning. They will be ignored during training.[/yellow]"
+            )
+            raise ValueError("Some training samples are missing reasoning.")
+
         setattr(dataset, "reasoning_dict", reasoning_dict)
 
     if args.repo is not None:
