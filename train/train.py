@@ -702,7 +702,7 @@ def train_multi_gpu_accelerate(
 
                 if args.train_reasoning:
                     console.log(
-                        f"[RANK {accelerator.process_index}] Training with data: {batch['input']['input_ids'].size()}"
+                        f"[green][RANK {accelerator.process_index}][/green] Training with data: {batch['input']['input_ids'].size()}\n"
                     )
                     accelerator.wait_for_everyone()
 
