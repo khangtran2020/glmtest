@@ -228,6 +228,13 @@ def main() -> None:
         val_split=int(1000), test_only=True if args.mode == "testgen" else False
     )
 
+    # save keys of training data for each rank to check:
+    with open(
+        os.path.join(args.output_dir, args.name, f"rank_{args.rank}_data_keys.txt"), "w"
+    ) as f:
+        for idx in range(len(dataset)):
+            f.write(f"{dataset.index_to_key_dict[idx]}\n")
+
     console.log(f"Broadcasted args and dataset to all processes.")
 
     if torch.cuda.is_available():
