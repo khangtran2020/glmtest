@@ -695,7 +695,9 @@ def train_multi_gpu_accelerate(
                 batch_size = batch["input"]["input_ids"].size(0)
 
                 if args.train_reasoning:
-                    accelerator.print(f"[RANK {accelerator.process_index}] Training with data: {batch["input"]["input_ids"].size()}")
+                    accelerator.print(
+                        f"[RANK {accelerator.process_index}] Training with data: {batch['input']['input_ids'].size()}"
+                    )
 
                 accelerator.wait_for_everyone()
 
