@@ -632,6 +632,11 @@ def train_multi_gpu_accelerate(
         va_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn
     )
 
+    if args.train_reasoning:
+        accelerator.print(
+            f"[RANK {accelerator.process_index}] Training with tr_loader: {len(tr_loader)} batches"
+        )
+
     if accelerator.is_main_process:
         logging_train_data(
             console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
