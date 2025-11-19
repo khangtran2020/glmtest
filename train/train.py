@@ -632,10 +632,11 @@ def train_multi_gpu_accelerate(
         va_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn
     )
 
-    # if args.train_reasoning:
-    console.log(
-        f"[blue][RANK {accelerator.process_index}][/blue] Training with tr_loader: {len(tr_loader)} batches\n\n va_loader: {len(va_loader)} batches\n\n"
-    )
+    if args.train_reasoning:
+        console.log(
+            f"[blue][RANK {accelerator.process_index}][/blue] Training with tr_loader: {len(tr_loader)} batches\n\n va_loader: {len(va_loader)} batches\n\n"
+        )
+        accelerator.wait_for_everyone()
 
     # if accelerator.is_main_process:
     #     logging_train_data(
@@ -700,9 +701,10 @@ def train_multi_gpu_accelerate(
                 batch_size = batch["input"]["input_ids"].size(0)
 
                 if args.train_reasoning:
-                    accelerator.print(
+                    console.log(
                         f"[RANK {accelerator.process_index}] Training with data: {batch['input']['input_ids'].size()}"
                     )
+                    accelerator.wait_for_everyone()
 
                 accelerator.wait_for_everyone()
 
