@@ -3,10 +3,10 @@ import io
 import gc
 import sys
 import time
-import json
 import torch
 import wandb
 import shutil
+import pickle
 import torch.distributed as dist
 from rich import print as pprint
 from rich.pretty import pretty_repr
@@ -612,15 +612,15 @@ def train_multi_gpu_accelerate(
     if accelerator.is_main_process:
         index_to_key_dict = tr_dataset.index_to_key_dict
         # save index_to_key_dict to disk for reference
-        with open(os.path.join(save_path, "train_index_to_key_dict.json"), "w") as f:
-            json.dump(index_to_key_dict, f, indent=4)
+        with open(os.path.join(save_path, "train_index_to_key_dict.pkl"), "w") as f:
+            pickle.dump(index_to_key_dict, f)
     else:
         # wait for the main process to save the index_to_key_dict
         dist.barrier(group=process_group)
 
     # Load index_to_key_dict from the save file
-    with open(os.path.join(save_path, "train_index_to_key_dict.json"), "r") as f:
-        index_to_key_dict = json.load(f)
+    with open(os.path.join(save_path, "train_index_to_key_dict.pkl"), "r") as f:
+        index_to_key_dict = pickle.load(f)
     tr_dataset.index_to_key_dict = index_to_key_dict
 
     va_dataset = GLMFDataset(
@@ -639,15 +639,15 @@ def train_multi_gpu_accelerate(
     if accelerator.is_main_process:
         index_to_key_dict = va_dataset.index_to_key_dict
         # save index_to_key_dict to disk for reference
-        with open(os.path.join(save_path, "valid_index_to_key_dict.json"), "w") as f:
-            json.dump(index_to_key_dict, f, indent=4)
+        with open(os.path.join(save_path, "valid_index_to_key_dict.pkl"), "w") as f:
+            pickle.dump(index_to_key_dict, f)
     else:
         # wait for the main process to save the index_to_key_dict
         dist.barrier(group=process_group)
 
     # Load index_to_key_dict from the save file
-    with open(os.path.join(save_path, "valid_index_to_key_dict.json"), "r") as f:
-        index_to_key_dict = json.load(f)
+    with open(os.path.join(save_path, "valid_index_to_key_dict.pkl"), "r") as f:
+        index_to_key_dict = pickle.load(f)
     va_dataset.index_to_key_dict = index_to_key_dict
     accelerator.wait_for_everyone()
 
