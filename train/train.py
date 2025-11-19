@@ -616,7 +616,7 @@ def train_multi_gpu_accelerate(
             pickle.dump(index_to_key_dict, f)
     else:
         # wait for the main process to save the index_to_key_dict
-        dist.barrier(group=process_group)
+        time.sleep(60)
 
     # Load index_to_key_dict from the save file
     with open(os.path.join(save_path, "train_index_to_key_dict.pkl"), "rb") as f:
