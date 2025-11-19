@@ -633,8 +633,8 @@ def train_multi_gpu_accelerate(
     )
 
     # if args.train_reasoning:
-    accelerator.print(
-        f"[RANK {accelerator.process_index}] Training with tr_loader: {len(tr_loader)} batches\n\n va_loader: {len(va_loader)} batches\n\n"
+    console.log(
+        f"[blue][RANK {accelerator.process_index}][/blue] Training with tr_loader: {len(tr_loader)} batches\n\n va_loader: {len(va_loader)} batches\n\n"
     )
 
     # if accelerator.is_main_process:
