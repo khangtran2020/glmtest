@@ -637,10 +637,10 @@ def train_multi_gpu_accelerate(
             f"[RANK {accelerator.process_index}] Training with tr_loader: {len(tr_loader)} batches"
         )
 
-    if accelerator.is_main_process:
-        logging_train_data(
-            console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
-        )
+    # if accelerator.is_main_process:
+    #     logging_train_data(
+    #         console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
+    #     )
 
     patch_model(process_group=process_group)
     console.log("Model patched for Ring Attention")
