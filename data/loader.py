@@ -19,6 +19,7 @@ class GLMFDataset(Dataset):
         debug: bool = False,
         n_hops: int = 2,
         testing: bool = False,
+        rank: int = 0,
         num_gpus: int = 1,
         dtype: str = "bf16",
         logger=None,
@@ -35,6 +36,7 @@ class GLMFDataset(Dataset):
         self.num_gpus = num_gpus
         self.logger = logger
         self.dtype = dtype
+        self.rank = rank
         self.index_to_key_dict = dict(zip(range(len(self.data)), self.data.keys()))
         self.reasoning_dict = reasoning_dict
 
@@ -55,7 +57,9 @@ class GLMFDataset(Dataset):
         #     else None
         # )
 
-        print("Loading sample index: ", idx)
+        pprint(
+            f"[RANK - {self.rank}] Loading sample: index - {idx}, key - {self.index_to_key_dict[idx]}"
+        )
 
         data_path = self.data[self.index_to_key_dict[idx]]["path"]
         with open(data_path, "r") as f:
