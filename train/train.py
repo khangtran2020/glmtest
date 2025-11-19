@@ -651,6 +651,22 @@ def train_multi_gpu_accelerate(
     va_dataset.index_to_key_dict = index_to_key_dict
     accelerator.wait_for_everyone()
 
+    print_dict = {}
+    for idx in range(3):
+        print_dict[idx] = tr_dataset.index_to_key_dict[idx]
+
+    console.log(
+        f"[blue][RANK {accelerator.process_index}][/blue] Train dataset int_to_key dict: {pretty_repr(print_dict)}"
+    )
+
+    print_dict = {}
+    for idx in range(3):
+        print_dict[idx] = va_dataset.index_to_key_dict[idx]
+
+    console.log(
+        f"[blue][RANK {accelerator.process_index}][/blue] Valid dataset int_to_key dict: {pretty_repr(print_dict)}"
+    )
+
     dataloader_params = {
         "batch_size": args.batch_size,
         "collate_fn": collate_fn,
