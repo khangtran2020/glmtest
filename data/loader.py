@@ -55,6 +55,8 @@ class GLMFDataset(Dataset):
         #     else None
         # )
 
+        print("Loading sample index: ", idx)
+
         data_path = self.data[self.index_to_key_dict[idx]]["path"]
         with open(data_path, "r") as f:
             sample = json.load(f)
