@@ -237,8 +237,8 @@ def main() -> None:
         ),
         "w",
     ) as f:
-        for idx in range(len(dataset)):
-            f.write(f"{dataset.index_to_key_dict[idx]}\n")
+        for key in dataset.processed_data["train"].keys():
+            f.write(f"{key}\n")
 
     console.log(f"Broadcasted args and dataset to all processes.")
 
