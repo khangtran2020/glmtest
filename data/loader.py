@@ -57,9 +57,9 @@ class GLMFDataset(Dataset):
         #     else None
         # )
 
-        pprint(
-            f"[RANK - {self.rank}] Loading sample: index - {idx}, key - {self.index_to_key_dict[idx]}"
-        )
+        # pprint(
+        #     f"[RANK - {self.rank}] Loading sample: index - {idx}, key - {self.index_to_key_dict[idx]}"
+        # )
 
         data_path = self.data[self.index_to_key_dict[idx]]["path"]
         with open(data_path, "r") as f:
