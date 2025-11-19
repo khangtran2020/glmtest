@@ -1270,6 +1270,7 @@ def train_multi_gpu_gnnonly(
                 if (
                     global_step % args.logging_steps == 0
                 ) and accelerator.is_main_process:
+                    accelerator.print(f"Logging at step {global_step}")
                     current_lr = lr_scheduler.get_last_lr()[0]
                     if accelerator.is_main_process:
                         accelerator.log(
@@ -1286,6 +1287,7 @@ def train_multi_gpu_gnnonly(
 
                 if accelerator.sync_gradients and (global_step % args.save_steps == 0):
                     accelerator.wait_for_everyone()
+                    accelerator.print(f"Saving checkpoint at step {global_step}...")
                     if (previous_checkpoint_step != -1) and (
                         accelerator.is_main_process
                     ):

@@ -385,7 +385,7 @@ def add_training_group(group):
         "--logging_steps",
         type=int,
         help="number of steps to logs",
-        default=200,
+        default=128,
     )
     group.add_argument(
         "--save_steps",
