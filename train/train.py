@@ -700,11 +700,11 @@ def train_multi_gpu_accelerate(
                 batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
 
-                if args.train_reasoning:
-                    console.log(
-                        f"[green][RANK {accelerator.process_index}][/green] Training with data: {batch['input']['input_ids'].size()}\n"
-                    )
-                    accelerator.wait_for_everyone()
+                # if args.train_reasoning:
+                console.log(
+                    f"[green][RANK {accelerator.process_index} - Step {global_step}][/green] Training with data: {batch['input']['input_ids'].size()}\n"
+                )
+                accelerator.wait_for_everyone()
 
                 accelerator.wait_for_everyone()
 
