@@ -3,6 +3,7 @@ import io
 import gc
 import sys
 import time
+import json
 import torch
 import wandb
 import shutil
@@ -29,35 +30,6 @@ from utils.utils import log_ram_usage
 from argparse import Namespace
 from rich.console import Console
 from transformers import PreTrainedTokenizer
-
-
-def synchronize_dict(data_dict, rank, world_size, group=None):
-    if rank == 0:
-        # Serialize the dictionary on the root process
-        buffer = io.BytesIO()
-        torch.save(data_dict, buffer)
-        serialized_data = torch.ByteTensor(list(buffer.getvalue()))
-
-        # Determine the size of the serialized data
-        size_tensor = torch.LongTensor([serialized_data.numel()])
-        dist.broadcast(size_tensor, src=0, group=group)
-
-        # Broadcast the serialized data
-        dist.broadcast(serialized_data, src=0, group=group)
-    else:
-        # Receive the size of the serialized data
-        size_tensor = torch.LongTensor([0])
-        dist.broadcast(size_tensor, src=0, group=group)
-
-        # Initialize a buffer of the correct size and receive the data
-        serialized_data = torch.empty(size_tensor.item(), dtype=torch.uint8)
-        dist.broadcast(serialized_data, src=0, group=group)
-
-        # Deserialize the data
-        buffer = io.BytesIO(serialized_data.tolist())
-        data_dict = torch.load(buffer)
-
-    return data_dict
 
 
 def train(
@@ -636,13 +608,18 @@ def train_multi_gpu_accelerate(
         reasoning_dict=getattr(dataset, "reasoning_dict", None),
     )
 
-    index_to_key_dict = tr_dataset.index_to_key_dict
-    index_to_key_dict = synchronize_dict(
-        data_dict=index_to_key_dict,
-        rank=accelerator.process_index,
-        world_size=accelerator.num_processes,
-        group=process_group,
-    )
+    if accelerator.is_main_process:
+        index_to_key_dict = tr_dataset.index_to_key_dict
+        # save index_to_key_dict to disk for reference
+        with open(os.path.join(save_path, "train_index_to_key_dict.json"), "w") as f:
+            json.dump(index_to_key_dict, f, indent=4)
+    else:
+        # wait for the main process to save the index_to_key_dict
+        dist.barrier(group=process_group)
+
+    # Load index_to_key_dict from the save file
+    with open(os.path.join(save_path, "train_index_to_key_dict.json"), "r") as f:
+        index_to_key_dict = json.load(f)
     tr_dataset.index_to_key_dict = index_to_key_dict
 
     va_dataset = GLMFDataset(
@@ -657,14 +634,21 @@ def train_multi_gpu_accelerate(
         num_gpus=args.num_gpu,
         reasoning_dict=getattr(dataset, "reasoning_dict", None),
     )
-    index_to_key_dict = va_dataset.index_to_key_dict
-    index_to_key_dict = synchronize_dict(
-        data_dict=index_to_key_dict,
-        rank=accelerator.process_index,
-        world_size=accelerator.num_processes,
-        group=process_group,
-    )
+
+    if accelerator.is_main_process:
+        index_to_key_dict = va_dataset.index_to_key_dict
+        # save index_to_key_dict to disk for reference
+        with open(os.path.join(save_path, "valid_index_to_key_dict.json"), "w") as f:
+            json.dump(index_to_key_dict, f, indent=4)
+    else:
+        # wait for the main process to save the index_to_key_dict
+        dist.barrier(group=process_group)
+
+    # Load index_to_key_dict from the save file
+    with open(os.path.join(save_path, "valid_index_to_key_dict.json"), "r") as f:
+        index_to_key_dict = json.load(f)
     va_dataset.index_to_key_dict = index_to_key_dict
+    accelerator.wait_for_everyone()
 
     dataloader_params = {
         "batch_size": args.batch_size,
