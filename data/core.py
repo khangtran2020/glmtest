@@ -927,7 +927,7 @@ class Data(object):
                             reasoning = reasoning_dict[f"{uuid}_testcase_{testcase}"]
                             if "<|graph_pad|>" in reasoning:
                                 reasoning = reasoning.replace(
-                                    "<|graph_pad|>", "CPG embedding"
+                                    "<|graph_pad|>", "CPG embedding(s)"
                                 ).strip()
 
                             insert_text = f"\n\n<think>\n{reasoning}\n</think>\n"
