@@ -193,7 +193,9 @@ def main() -> None:
         with open(reasoning_path, "r") as f:
             reasoning_data = [json.loads(line) for line in f.readlines()]
 
-        generated_keys = list(set([list(obj.keys())[0] for obj in reasoning_data]))
+        generated_keys = sorted(
+            list(set([list(obj.keys())[0] for obj in reasoning_data]))
+        )
         samples = dataset.processed_data["train"]
         key_to_reasoning = {}
         for key in generated_keys:

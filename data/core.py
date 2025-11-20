@@ -749,6 +749,102 @@ class Data(object):
             f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_tokens)}"
         )
 
+    def prepare_reasoning_data(self) -> None:
+
+        assert self.data is not None
+
+        processed_data = None
+
+        if "graph" not in self.baseline_prompt:
+            processed_data_file_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.llm_model_name}",
+                "processed_data_for_reasoning.json",
+            )
+        else:
+            processed_data_file_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                "processed_data_for_reasoning.json",
+            )
+
+        if os.path.exists(processed_data_file_path):
+            with open(
+                processed_data_file_path,
+                "r",
+            ) as file:
+                self.processed_data = json.load(file)
+            processed_data = True
+        else:
+            processed_data_path = os.path.join(
+                self.data_path,
+                f"raw",
+            )
+            if "graph" not in self.baseline_prompt:
+                processed_prompt_path = os.path.join(
+                    self.data_path,
+                    f"{self.baseline_prompt}_{self.llm_model_name}",
+                )
+            else:
+                processed_prompt_path = os.path.join(
+                    self.data_path,
+                    f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                )
+
+            os.makedirs(processed_data_path, exist_ok=True)
+            os.makedirs(processed_prompt_path, exist_ok=True)
+
+        if processed_data:
+            self.logger.log("[green]Data is already processed![/green]")
+            self.logger.log(f"Size of data data: {len(self.processed_data)}")
+            return
+        reasoning_path = os.path.join(
+            self.data_path,
+            "reasoning.jsonl",
+        )
+        assert os.path.exists(
+            reasoning_path
+        ), "Reasoning file not found, please generate it first."
+        with open(reasoning_path, "r") as f:
+            reasoning_data = [json.loads(line) for line in f.readlines()]
+
+        generated_keys = sorted(
+            list(set([list(obj.keys())[0] for obj in reasoning_data]))
+        )
+        samples = self.processed_data["train"]
+        key_to_reasoning = {}
+        for key in generated_keys:
+            key_to_reasoning[key] = samples[key]
+
+        self.processed_data["train"] = key_to_reasoning
+
+        reasoning_dict = {}
+        for obj in reasoning_data:
+            key = list(obj.keys())[0]
+            reasoning_dict[key] = obj[key]
+        # dataset.add_reasoning(reasoning_dict=reasoning_dict)
+
+        # check keys in train is the same as keys in reasoning_dict
+        # train_keys = set(dataset.processed_data["train"].keys())
+        # reasoning_keys = set(reasoning_dict.keys())
+        # take intersection and none intersection
+        # common_keys = train_keys.intersection(reasoning_keys)
+        # missing_in_reasoning = train_keys - reasoning_keys
+        # if len(missing_in_reasoning) > 0:
+        #     console.log(
+        #         f"[yellow]Warning: {len(missing_in_reasoning)} samples are missing reasoning. They will be ignored during training.[/yellow]"
+        #     )
+        #     raise ValueError("Some training samples are missing reasoning.")
+
+        # missing_in_reasoning = reasoning_keys - train_keys
+        # if len(missing_in_reasoning) > 0:
+        #     console.log(
+        #         f"[yellow]Warning: {len(missing_in_reasoning)} samples are missing reasoning. They will be ignored during training.[/yellow]"
+        #     )
+        #     raise ValueError("Some training samples are missing reasoning.")
+
+        # setattr(dataset, "reasoning_dict", reasoning_dict)
+
     def prepare_data_for_test_gen(self):
 
         assert self.data is not None
