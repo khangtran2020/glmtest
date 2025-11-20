@@ -560,12 +560,14 @@ class Data(object):
             processed_data_file_path = os.path.join(
                 self.data_path,
                 f"{self.baseline_prompt}_{self.llm_model_name}",
+                "original",
                 "processed_data.json",
             )
         else:
             processed_data_file_path = os.path.join(
                 self.data_path,
                 f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                "original",
                 "processed_data.json",
             )
 
@@ -585,11 +587,13 @@ class Data(object):
                 processed_prompt_path = os.path.join(
                     self.data_path,
                     f"{self.baseline_prompt}_{self.llm_model_name}",
+                    "original",
                 )
             else:
                 processed_prompt_path = os.path.join(
                     self.data_path,
                     f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                    "original",
                 )
 
             os.makedirs(processed_data_path, exist_ok=True)
@@ -724,10 +728,6 @@ class Data(object):
                         data_path = os.path.join(processed_prompt_path, data_name)
                         with open(data_path, "w") as file:
                             json.dump(data, file, indent=4)
-
-                        # self.logger.log(
-                        #     f"Data is saved to {data_path} for uuid - {uuid}, testcase - {testcase}"
-                        # )
 
                         self.processed_data[data_n][f"{uuid}_testcase_{testcase}"] = {
                             "num_tokens": num_token,
