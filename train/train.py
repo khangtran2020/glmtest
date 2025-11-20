@@ -109,7 +109,7 @@ def logging_train_data(
     console.log(f"Train data: {len(tr_dataset)} data points")
     console.log(f"Valid data: {len(va_dataset)} data points")
 
-    data_point_example = tr_dataset[0]
+    uuid, data_point_example = tr_dataset[0]
     console.log("Data prepared:")
     console.log(f"Train data: {len(tr_dataset)} data points")
     console.log(f"Valid data: {len(va_dataset)} data points")
