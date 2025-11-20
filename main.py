@@ -87,10 +87,14 @@ def main() -> None:
         if args.mode == "testgen":
             if args.module_path is None:
                 dataset.prepare_data_for_test_gen()
+        if (args.mode == "prepare_reasoning") or (
+            (args.mode == "train") and args.train_reasoning
+        ):
+            dataset.prepare_reasoning_data()
         else:
             dataset.prepare_data()
 
-    if args.mode == "reasoning":
+    if args.mode == "generate_reasoning":
         dataset.filter_by_max_tokens(max_tokens=8192)
         dataset.sample_for_reasoning(max_samples=10000)
         reasoning_save_path = os.path.join(
@@ -182,53 +186,7 @@ def main() -> None:
             run_codamosa(args=args, task_instances=task_instances, console=console)
             return
 
-    if args.mode == "train" and args.train_reasoning:
-        reasoning_path = os.path.join(
-            dataset.data_path,
-            "reasoning.jsonl",
-        )
-        assert os.path.exists(
-            reasoning_path
-        ), "Reasoning file not found, please generate it first."
-        with open(reasoning_path, "r") as f:
-            reasoning_data = [json.loads(line) for line in f.readlines()]
-
-        generated_keys = sorted(
-            list(set([list(obj.keys())[0] for obj in reasoning_data]))
-        )
-        samples = dataset.processed_data["train"]
-        key_to_reasoning = {}
-        for key in generated_keys:
-            key_to_reasoning[key] = samples[key]
-
-        dataset.processed_data["train"] = key_to_reasoning
-
-        reasoning_dict = {}
-        for obj in reasoning_data:
-            key = list(obj.keys())[0]
-            reasoning_dict[key] = obj[key]
-        # dataset.add_reasoning(reasoning_dict=reasoning_dict)
-
-        # check keys in train is the same as keys in reasoning_dict
-        train_keys = set(dataset.processed_data["train"].keys())
-        reasoning_keys = set(reasoning_dict.keys())
-        # take intersection and none intersection
-        common_keys = train_keys.intersection(reasoning_keys)
-        missing_in_reasoning = train_keys - reasoning_keys
-        if len(missing_in_reasoning) > 0:
-            console.log(
-                f"[yellow]Warning: {len(missing_in_reasoning)} samples are missing reasoning. They will be ignored during training.[/yellow]"
-            )
-            raise ValueError("Some training samples are missing reasoning.")
-
-        missing_in_reasoning = reasoning_keys - train_keys
-        if len(missing_in_reasoning) > 0:
-            console.log(
-                f"[yellow]Warning: {len(missing_in_reasoning)} samples are missing reasoning. They will be ignored during training.[/yellow]"
-            )
-            raise ValueError("Some training samples are missing reasoning.")
-
-        setattr(dataset, "reasoning_dict", reasoning_dict)
+    # if args.mode == "prepare_reasoning":
 
     if args.repo is not None:
         dataset.prepare_data_by_repo()

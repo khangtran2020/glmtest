@@ -753,19 +753,21 @@ class Data(object):
 
         assert self.data is not None
 
-        processed_data = None
+        processed_data = False
 
         if "graph" not in self.baseline_prompt:
             processed_data_file_path = os.path.join(
                 self.data_path,
                 f"{self.baseline_prompt}_{self.llm_model_name}",
-                "processed_data_for_reasoning.json",
+                "reasoning",
+                "processed_data.json",
             )
         else:
             processed_data_file_path = os.path.join(
                 self.data_path,
                 f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
-                "processed_data_for_reasoning.json",
+                "reasoning",
+                "processed_data.json",
             )
 
         if os.path.exists(processed_data_file_path):
@@ -784,11 +786,13 @@ class Data(object):
                 processed_prompt_path = os.path.join(
                     self.data_path,
                     f"{self.baseline_prompt}_{self.llm_model_name}",
+                    "reasoning",
                 )
             else:
                 processed_prompt_path = os.path.join(
                     self.data_path,
                     f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                    "reasoning",
                 )
 
             os.makedirs(processed_data_path, exist_ok=True)
@@ -798,6 +802,7 @@ class Data(object):
             self.logger.log("[green]Data is already processed![/green]")
             self.logger.log(f"Size of data data: {len(self.processed_data)}")
             return
+
         reasoning_path = os.path.join(
             self.data_path,
             "reasoning.jsonl",
@@ -808,42 +813,203 @@ class Data(object):
         with open(reasoning_path, "r") as f:
             reasoning_data = [json.loads(line) for line in f.readlines()]
 
-        generated_keys = sorted(
-            list(set([list(obj.keys())[0] for obj in reasoning_data]))
-        )
-        samples = self.processed_data["train"]
-        key_to_reasoning = {}
-        for key in generated_keys:
-            key_to_reasoning[key] = samples[key]
-
-        self.processed_data["train"] = key_to_reasoning
-
         reasoning_dict = {}
         for obj in reasoning_data:
             key = list(obj.keys())[0]
             reasoning_dict[key] = obj[key]
-        # dataset.add_reasoning(reasoning_dict=reasoning_dict)
 
-        # check keys in train is the same as keys in reasoning_dict
-        # train_keys = set(dataset.processed_data["train"].keys())
-        # reasoning_keys = set(reasoning_dict.keys())
-        # take intersection and none intersection
-        # common_keys = train_keys.intersection(reasoning_keys)
-        # missing_in_reasoning = train_keys - reasoning_keys
-        # if len(missing_in_reasoning) > 0:
-        #     console.log(
-        #         f"[yellow]Warning: {len(missing_in_reasoning)} samples are missing reasoning. They will be ignored during training.[/yellow]"
-        #     )
-        #     raise ValueError("Some training samples are missing reasoning.")
+        generated_keys = sorted(
+            list(set([list(obj.keys())[0] for obj in reasoning_data]))
+        )
 
-        # missing_in_reasoning = reasoning_keys - train_keys
-        # if len(missing_in_reasoning) > 0:
-        #     console.log(
-        #         f"[yellow]Warning: {len(missing_in_reasoning)} samples are missing reasoning. They will be ignored during training.[/yellow]"
-        #     )
-        #     raise ValueError("Some training samples are missing reasoning.")
+        with self.logger.status("[green]Preparing reasoning data...[/green]"):
 
-        # setattr(dataset, "reasoning_dict", reasoning_dict)
+            self.processed_data = {}
+            num_tokens = []
+            num_discarded = 0
+
+            for data_n in self.data.keys():  # train, test_module, test_project
+
+                self.processed_data[data_n] = {}
+
+                for uuid, dat in tqdm(
+                    self.data[data_n].items(), position=0, leave=True
+                ):
+                    with open(dat["code_path"], "r") as file:
+                        src_code = file.read()
+
+                    module_path = dat.get("module_path", "N/A")
+                    all_masks = torch.load(
+                        dat["graph"]["mask_path"], weights_only=False
+                    )
+                    assert len(all_masks) == len(dat["test_cases"])
+
+                    if "graph" in self.baseline_prompt:
+                        graph_name = f"{uuid}_graph.pt"
+                        graph_path = os.path.join(processed_data_path, graph_name)
+
+                        if not os.path.exists(graph_path):
+                            graph = self.read_graph(dat)
+
+                            check_graph_exist_dict = {}
+                            graph_dict = {}
+                            for key in GRAPH_KEYS:
+                                check_graph_exist_dict[key] = False
+
+                            for key in graph.keys():
+                                if isinstance(graph[key], dgl.DGLGraph):
+                                    graph_dict[key] = graph[key]
+                                    check_graph_exist_dict[key] = True
+
+                            exist_atleast_one = False
+                            for key in check_graph_exist_dict.keys():
+                                if check_graph_exist_dict[key] == True:
+                                    exist_atleast_one = True
+                                    break
+
+                            if not exist_atleast_one:
+                                self.logger.log(
+                                    f"[red]Graph is not generated for {uuid}[/red]"
+                                )
+                                num_discarded += len(dat["test_cases"])
+                                continue
+                            torch.save(graph_dict, graph_path)
+
+                    for testcase in dat["test_cases"].keys():
+
+                        if data_n == "train":
+
+                            if f"{uuid}_testcase_{testcase}" not in generated_keys:
+                                self.logger.log(
+                                    f"Reasoning not found for uuid: {uuid} testcase: {testcase}"
+                                )
+                                num_discarded += 1
+                                continue
+
+                        test_code = dat["test_cases"][testcase]["test_case"]
+                        if self.data_fuzz:
+                            test_code = self.add_fuzz_tags(test_code)
+                        if test_code == "N/A":
+                            num_discarded += 1
+                            continue
+                        mask_key = int(testcase.split("_")[-1])
+                        branch_masks: List[torch.Tensor] = all_masks[mask_key]
+                        branch_line = dat["test_cases"][testcase]["branch"]
+                        # print(branch_masks)
+                        active_nodes = [
+                            get_index_by_value(a=branch_masks[i], val=1)
+                            for i in range(len(branch_masks))
+                        ]
+                        if len(active_nodes) == 0:
+                            self.logger.log(
+                                f"Active node empty at uuid: {uuid} testcase: {testcase}"
+                            )
+                            num_discarded += 1
+                            continue
+
+                        result = self.get_prompt(
+                            src_code=src_code,
+                            testcase_out=test_code,
+                            active_nodes=active_nodes,
+                            tokenizer=self.llm_tokenizer,
+                            module_path=module_path,
+                            branch=branch_line,
+                            gnn_mode=self.gnn_mode,
+                        )
+
+                        if result is None:
+                            num_discarded += 1
+                            continue
+
+                        prompt, response, full_text = result
+
+                        if data_n == "train":
+                            reasoning = reasoning_dict[f"{uuid}_testcase_{testcase}"]
+
+                            insert_text = f"\n\n<think>\n{reasoning}\n</think>\n"
+                            text_before = full_text.split(
+                                "Here is the generated Python test code targeting the specified execution branch"
+                            )[0]
+                            text_after = full_text.split(
+                                "Here is the generated Python test code targeting the specified execution branch"
+                            )[1]
+                            new_full_text = (
+                                text_before
+                                + insert_text
+                                + "From the above reason, here is the generated Python test code targeting the specified execution branch"
+                                + text_after
+                            )
+                            full_text = new_full_text
+
+                            text_before = response.split(
+                                "Here is the generated Python test code targeting the specified execution branch"
+                            )[0]
+                            text_after = response.split(
+                                "Here is the generated Python test code targeting the specified execution branch"
+                            )[1]
+                            new_response = (
+                                text_before
+                                + insert_text
+                                + "From the above reason, here is the generated Python test code targeting the specified execution branch"
+                                + text_after
+                            )
+                            response = new_response
+
+                        num_token = len(self.llm_tokenizer.tokenize(full_text))
+                        num_tokens.append(num_token)
+
+                        if "graph" in self.baseline_prompt:
+                            data = {
+                                "uuid": f"{uuid}_{testcase}",
+                                "prompt": prompt,
+                                "response": response,
+                                "full_text": full_text,
+                                "active_node": [
+                                    active_node.tolist() for active_node in active_nodes
+                                ],
+                                "mask": [
+                                    all_masks[mask_key][i].tolist()
+                                    for i in range(len(all_masks[mask_key]))
+                                ],
+                                "graph_path": graph_path,
+                                "num_tokens": num_token,
+                            }
+                        else:
+                            data = {
+                                "uuid": f"{uuid}_{testcase}",
+                                "prompt": prompt,
+                                "response": response,
+                                "full_text": full_text,
+                                "active_node": None,
+                                "mask": None,
+                                "graph_path": None,
+                                "num_tokens": num_token,
+                            }
+
+                        data_name = f"{uuid}_testcase_{testcase}.json"
+                        data_path = os.path.join(processed_prompt_path, data_name)
+                        with open(data_path, "w") as file:
+                            json.dump(data, file, indent=4)
+
+                        self.processed_data[data_n][f"{uuid}_testcase_{testcase}"] = {
+                            "num_tokens": num_token,
+                            "path": data_path,
+                        }
+
+        with open(processed_data_file_path, "w") as file:
+            json.dump(self.processed_data, file, indent=4)
+
+        self.logger.log("[green]Data is ready![/green]")
+        self.logger.log(
+            f"Size of processed data: {len(self.processed_data)}, num_discarded: {num_discarded}"
+        )
+
+        quartiles = np.quantile(num_tokens, [0, 0.25, 0.5, 0.75, 1])
+        max_num_tokens = max(num_tokens)
+        min_num_tokens = min(num_tokens)
+        self.logger.log(
+            f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_tokens)}"
+        )
 
     def prepare_data_for_test_gen(self):
 
@@ -855,12 +1021,14 @@ class Data(object):
             processed_data_file_path = os.path.join(
                 self.data_path,
                 f"{self.baseline_prompt}_{self.llm_model_name}",
+                "testgen",
                 "processed_data_for_test_gen.json",
             )
         else:
             processed_data_file_path = os.path.join(
                 self.data_path,
                 f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                "testgen",
                 "processed_data_for_test_gen.json",
             )
 
