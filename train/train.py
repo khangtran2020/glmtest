@@ -728,6 +728,11 @@ def train_multi_gpu_accelerate(
 
             for step, batch in enumerate(tr_loader):
 
+                uuid, batch = batch
+
+                if accelerator.is_main_process:
+                    accelerator.print(f"At step {global_step} - processing uuid {uuid}")
+
                 if (continue_training == True) and (global_step <= start_step):
 
                     global_step += args.batch_size
@@ -750,9 +755,9 @@ def train_multi_gpu_accelerate(
                 user_prompt_lens = batch.get("user_prompt_lens", None)
 
                 # if args.train_reasoning:
-                console.log(
-                    f"[green][RANK {accelerator.process_index} - Step {global_step}][/green] Training with data: {batch['input']['input_ids'].size()}\n"
-                )
+                # console.log(
+                #     f"[green][RANK {accelerator.process_index} - Step {global_step}][/green] Training with data: {batch['input']['input_ids'].size()}\n"
+                # )
                 accelerator.wait_for_everyone()
 
                 accelerator.wait_for_everyone()
@@ -807,9 +812,9 @@ def train_multi_gpu_accelerate(
                     accelerator.wait_for_everyone()
                     loss = outputs.loss
                     accelerator.backward(loss)
-                    print(
-                        f"Loss at rank {accelerator.process_index} - step {global_step}: {loss.item()}"
-                    )
+                    # print(
+                    #     f"Loss at rank {accelerator.process_index} - step {global_step}: {loss.item()}"
+                    # )
                     accelerator.wait_for_everyone()
 
                 if accelerator.sync_gradients:

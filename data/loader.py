@@ -121,7 +121,7 @@ class GLMFDataset(Dataset):
             ):
                 raise ValueError("Input must contain graph token")
 
-            return {
+            batch = {
                 "text": full_text,
                 "input": tokenized,
                 "graph": graph,  # Should be a dictionary of graph structures
@@ -129,6 +129,7 @@ class GLMFDataset(Dataset):
                 "active_nodes": (active_nodes if active_nodes is not None else None),
                 "user_prompt_len": user_prompt_len,
             }
+            return (uuid, batch)
         else:
             prompt = sample["prompt"]
             uuid = sample["uuid"]
