@@ -606,19 +606,19 @@ def train_multi_gpu_accelerate(
         num_gpus=args.num_gpu,
     )
 
-    if accelerator.is_main_process:
-        index_to_key_dict = tr_dataset.index_to_key_dict
-        # save index_to_key_dict to disk for reference
-        with open(os.path.join(save_path, "train_index_to_key_dict.pkl"), "wb") as f:
-            pickle.dump(index_to_key_dict, f)
-    else:
-        # wait for the main process to save the index_to_key_dict
-        time.sleep(120)
+    # if accelerator.is_main_process:
+    #     index_to_key_dict = tr_dataset.index_to_key_dict
+    #     # save index_to_key_dict to disk for reference
+    #     with open(os.path.join(save_path, "train_index_to_key_dict.pkl"), "wb") as f:
+    #         pickle.dump(index_to_key_dict, f)
+    # else:
+    #     # wait for the main process to save the index_to_key_dict
+    #     time.sleep(120)
 
-    # Load index_to_key_dict from the save file
-    with open(os.path.join(save_path, "train_index_to_key_dict.pkl"), "rb") as f:
-        index_to_key_dict = pickle.load(f)
-    tr_dataset.index_to_key_dict = index_to_key_dict
+    # # Load index_to_key_dict from the save file
+    # with open(os.path.join(save_path, "train_index_to_key_dict.pkl"), "rb") as f:
+    #     index_to_key_dict = pickle.load(f)
+    # tr_dataset.index_to_key_dict = index_to_key_dict
 
     va_dataset = GLMFDataset(
         data=dataset.val_data,
@@ -632,36 +632,36 @@ def train_multi_gpu_accelerate(
         num_gpus=args.num_gpu,
     )
 
-    if accelerator.is_main_process:
-        index_to_key_dict = va_dataset.index_to_key_dict
-        # save index_to_key_dict to disk for reference
-        with open(os.path.join(save_path, "valid_index_to_key_dict.pkl"), "wb") as f:
-            pickle.dump(index_to_key_dict, f)
-    else:
-        # wait for the main process to save the index_to_key_dict
-        time.sleep(120)
+    # if accelerator.is_main_process:
+    #     index_to_key_dict = va_dataset.index_to_key_dict
+    #     # save index_to_key_dict to disk for reference
+    #     with open(os.path.join(save_path, "valid_index_to_key_dict.pkl"), "wb") as f:
+    #         pickle.dump(index_to_key_dict, f)
+    # else:
+    #     # wait for the main process to save the index_to_key_dict
+    #     time.sleep(120)
 
-    # Load index_to_key_dict from the save file
-    with open(os.path.join(save_path, "valid_index_to_key_dict.pkl"), "rb") as f:
-        index_to_key_dict = pickle.load(f)
-    va_dataset.index_to_key_dict = index_to_key_dict
-    accelerator.wait_for_everyone()
+    # # Load index_to_key_dict from the save file
+    # with open(os.path.join(save_path, "valid_index_to_key_dict.pkl"), "rb") as f:
+    #     index_to_key_dict = pickle.load(f)
+    # va_dataset.index_to_key_dict = index_to_key_dict
+    # accelerator.wait_for_everyone()
 
-    print_dict = {}
-    for idx in range(3):
-        print_dict[idx] = tr_dataset.index_to_key_dict[idx]
+    # print_dict = {}
+    # for idx in range(3):
+    #     print_dict[idx] = tr_dataset.index_to_key_dict[idx]
 
-    console.log(
-        f"[blue][RANK {accelerator.process_index}][/blue] Train dataset int_to_key dict: {pretty_repr(print_dict)}"
-    )
+    # console.log(
+    #     f"[blue][RANK {accelerator.process_index}][/blue] Train dataset int_to_key dict: {pretty_repr(print_dict)}"
+    # )
 
-    print_dict = {}
-    for idx in range(3):
-        print_dict[idx] = va_dataset.index_to_key_dict[idx]
+    # print_dict = {}
+    # for idx in range(3):
+    #     print_dict[idx] = va_dataset.index_to_key_dict[idx]
 
-    console.log(
-        f"[blue][RANK {accelerator.process_index}][/blue] Valid dataset int_to_key dict: {pretty_repr(print_dict)}"
-    )
+    # console.log(
+    #     f"[blue][RANK {accelerator.process_index}][/blue] Valid dataset int_to_key dict: {pretty_repr(print_dict)}"
+    # )
 
     dataloader_params = {
         "batch_size": args.batch_size,
