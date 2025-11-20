@@ -423,6 +423,11 @@ def validate(
             val_task = progress.add_task("Validating...", total=len(loader))
 
         for step, batch in enumerate(loader):
+            uuid, batch = batch
+
+            if accelerator.is_main_process:
+                accelerator.print(f"Validating uuids: {uuid} at step {step}")
+
             batch_loss = 0.0
             batch_size = batch["input"]["input_ids"].size(0)
             num_item += batch_size
