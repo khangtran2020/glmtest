@@ -49,16 +49,6 @@ class GLMFDataset(Dataset):
 
     def __getitem__(self, idx):
 
-        # (
-        #     self.logger.log(f"Loading sample index: {idx}")
-        #     if self.logger is not None
-        #     else None
-        # )
-
-        # pprint(
-        #     f"[RANK - {self.rank}] Loading sample: index - {idx}, key - {self.index_to_key_dict[idx]}"
-        # )
-
         data_path = self.data[self.index_to_key_dict[idx]]["path"]
         with open(data_path, "r") as f:
             sample = json.load(f)
@@ -100,6 +90,7 @@ class GLMFDataset(Dataset):
                 )
 
         if self.testing == False:
+            uuid = sample["uuid"]
             full_text = sample["full_text"]
             tokenized, pad_size = self.tokenize(full_text, num_gpu=self.num_gpus)
 
