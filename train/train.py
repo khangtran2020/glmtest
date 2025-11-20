@@ -1204,6 +1204,7 @@ def train_multi_gpu_gnnonly(
 
             for step, batch in enumerate(tr_loader):
 
+                uuid, batch = batch
                 if (continue_training == True) and (global_step <= start_step):
 
                     global_step += args.batch_size
