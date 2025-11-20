@@ -323,7 +323,7 @@ def train_single_gpu_accelerate(
                         )
 
                         graph_token_index = torch.where(
-                            micro_input["input_ids"][i][: user_prompt_lens[i]]
+                            micro_input["input_ids"][i]
                             == model.config.graph_token_id[1]
                         )[0].tolist()
                         graphs.append(graph)
@@ -775,8 +775,7 @@ def train_multi_gpu_accelerate(
 
                     for i in range(batch_size):
                         graph_token_index = torch.where(
-                            micro_input["input_ids"][i][: user_prompt_lens[i]]
-                            == config.graph_token_id[1]
+                            micro_input["input_ids"][i] == config.graph_token_id[1]
                         )[0].tolist()
                         graph_token_indices.append(graph_token_index)
 
@@ -1241,8 +1240,7 @@ def train_multi_gpu_gnnonly(
 
                     for i in range(batch_size):
                         graph_token_index = torch.where(
-                            micro_input["input_ids"][i][: user_prompt_lens[i]]
-                            == config.graph_token_id[1]
+                            micro_input["input_ids"][i] == config.graph_token_id[1]
                         )[0].tolist()
                         graph_token_indices.append(graph_token_index)
 
