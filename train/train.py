@@ -606,20 +606,6 @@ def train_multi_gpu_accelerate(
         num_gpus=args.num_gpu,
     )
 
-    # if accelerator.is_main_process:
-    #     index_to_key_dict = tr_dataset.index_to_key_dict
-    #     # save index_to_key_dict to disk for reference
-    #     with open(os.path.join(save_path, "train_index_to_key_dict.pkl"), "wb") as f:
-    #         pickle.dump(index_to_key_dict, f)
-    # else:
-    #     # wait for the main process to save the index_to_key_dict
-    #     time.sleep(120)
-
-    # # Load index_to_key_dict from the save file
-    # with open(os.path.join(save_path, "train_index_to_key_dict.pkl"), "rb") as f:
-    #     index_to_key_dict = pickle.load(f)
-    # tr_dataset.index_to_key_dict = index_to_key_dict
-
     va_dataset = GLMFDataset(
         data=dataset.val_data,
         tokenizer=dataset.llm_tokenizer,
@@ -631,37 +617,6 @@ def train_multi_gpu_accelerate(
         dtype=args.dtype,
         num_gpus=args.num_gpu,
     )
-
-    # if accelerator.is_main_process:
-    #     index_to_key_dict = va_dataset.index_to_key_dict
-    #     # save index_to_key_dict to disk for reference
-    #     with open(os.path.join(save_path, "valid_index_to_key_dict.pkl"), "wb") as f:
-    #         pickle.dump(index_to_key_dict, f)
-    # else:
-    #     # wait for the main process to save the index_to_key_dict
-    #     time.sleep(120)
-
-    # # Load index_to_key_dict from the save file
-    # with open(os.path.join(save_path, "valid_index_to_key_dict.pkl"), "rb") as f:
-    #     index_to_key_dict = pickle.load(f)
-    # va_dataset.index_to_key_dict = index_to_key_dict
-    # accelerator.wait_for_everyone()
-
-    # print_dict = {}
-    # for idx in range(3):
-    #     print_dict[idx] = tr_dataset.index_to_key_dict[idx]
-
-    # console.log(
-    #     f"[blue][RANK {accelerator.process_index}][/blue] Train dataset int_to_key dict: {pretty_repr(print_dict)}"
-    # )
-
-    # print_dict = {}
-    # for idx in range(3):
-    #     print_dict[idx] = va_dataset.index_to_key_dict[idx]
-
-    # console.log(
-    #     f"[blue][RANK {accelerator.process_index}][/blue] Valid dataset int_to_key dict: {pretty_repr(print_dict)}"
-    # )
 
     dataloader_params = {
         "batch_size": args.batch_size,
@@ -679,17 +634,6 @@ def train_multi_gpu_accelerate(
     va_loader = DataLoader(
         va_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn
     )
-
-    if args.train_reasoning:
-        console.log(
-            f"[blue][RANK {accelerator.process_index}][/blue] Training with tr_loader: {len(tr_loader)} batches\n\n va_loader: {len(va_loader)} batches\n\n"
-        )
-        accelerator.wait_for_everyone()
-
-    # if accelerator.is_main_process:
-    #     logging_train_data(
-    #         console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
-    #     )
 
     patch_model(process_group=process_group)
     console.log("Model patched for Ring Attention")
@@ -730,8 +674,11 @@ def train_multi_gpu_accelerate(
 
                 uuid, batch = batch
 
-                if accelerator.is_main_process:
-                    accelerator.print(f"At step {global_step} - processing uuid {uuid}")
+                # if accelerator.is_main_process:
+                #     accelerator.print(f"At step {global_step} - processing uuid {uuid}")
+                print(
+                    f"At step {global_step}, rank {accelerator.process_index} is processing uuid {uuid}"
+                )
 
                 if (continue_training == True) and (global_step <= start_step):
 
@@ -1205,6 +1152,9 @@ def train_multi_gpu_gnnonly(
             for step, batch in enumerate(tr_loader):
 
                 uuid, batch = batch
+                print(
+                    f"At step {global_step}, rank {accelerator.process_index} is processing uuid {uuid}"
+                )
                 if (continue_training == True) and (global_step <= start_step):
 
                     global_step += args.batch_size
@@ -1224,7 +1174,6 @@ def train_multi_gpu_gnnonly(
                 global_step += args.batch_size
                 batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
-                user_prompt_lens = batch.get("user_prompt_lens", None)
 
                 # accelerator.wait_for_everyone()
 
@@ -1290,7 +1239,6 @@ def train_multi_gpu_gnnonly(
 
                 with torch.no_grad():
                     all_losses = accelerator.gather(loss)
-                    accelerator.print(f"All losses at step {global_step}: {all_losses}")
                     all_losses = torch.where(
                         torch.isnan(all_losses),
                         torch.zeros_like(all_losses),
@@ -1322,9 +1270,6 @@ def train_multi_gpu_gnnonly(
                 avg_batch_loss = batch_loss / batch_size
                 if accelerator.is_main_process:
                     ram_usage = log_ram_usage()
-                    accelerator.print(
-                        f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
-                    )
                     progress.update(
                         train_epoch_task,
                         advance=1,

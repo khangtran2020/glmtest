@@ -425,8 +425,9 @@ def validate(
         for step, batch in enumerate(loader):
             uuid, batch = batch
 
-            if accelerator.is_main_process:
-                accelerator.print(f"Validating uuids: {uuid} at step {step}")
+            print(
+                f"At step {step}, rank {accelerator.process_index} is processing uuids: {uuid}"
+            )
 
             batch_loss = 0.0
             batch_size = batch["input"]["input_ids"].size(0)
