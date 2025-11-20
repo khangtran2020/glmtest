@@ -225,7 +225,6 @@ def train_single_gpu_accelerate(
         dtype=args.dtype,
         num_gpus=args.num_gpu,
         logger=console,
-        reasoning_dict=getattr(dataset, "reasoning_dict", None),
     )
     va_dataset = GLMFDataset(
         data=dataset.val_data,
@@ -236,7 +235,6 @@ def train_single_gpu_accelerate(
         dtype=args.dtype,
         num_gpus=args.num_gpu,
         logger=console,
-        reasoning_dict=getattr(dataset, "reasoning_dict", None),
     )
     tr_loader = DataLoader(
         tr_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn
@@ -606,7 +604,6 @@ def train_multi_gpu_accelerate(
         rank=accelerator.process_index,
         dtype=args.dtype,
         num_gpus=args.num_gpu,
-        reasoning_dict=getattr(dataset, "reasoning_dict", None),
     )
 
     if accelerator.is_main_process:
@@ -633,7 +630,6 @@ def train_multi_gpu_accelerate(
         rank=accelerator.process_index,
         dtype=args.dtype,
         num_gpus=args.num_gpu,
-        reasoning_dict=getattr(dataset, "reasoning_dict", None),
     )
 
     if accelerator.is_main_process:
@@ -1134,7 +1130,6 @@ def train_multi_gpu_gnnonly(
         logger=console,
         dtype=args.dtype,
         num_gpus=args.num_gpu,
-        reasoning_dict=getattr(dataset, "reasoning_dict", None),
     )
     va_dataset = GLMFDataset(
         data=dataset.val_data,
@@ -1145,7 +1140,6 @@ def train_multi_gpu_gnnonly(
         logger=console,
         dtype=args.dtype,
         num_gpus=args.num_gpu,
-        reasoning_dict=getattr(dataset, "reasoning_dict", None),
     )
     dataloader_params = {
         "batch_size": args.batch_size,
@@ -1225,6 +1219,7 @@ def train_multi_gpu_gnnonly(
                 global_step += args.batch_size
                 batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
+                user_prompt_lens = batch.get("user_prompt_lens", None)
 
                 # accelerator.wait_for_everyone()
 
@@ -1246,7 +1241,8 @@ def train_multi_gpu_gnnonly(
 
                     for i in range(batch_size):
                         graph_token_index = torch.where(
-                            micro_input["input_ids"][i] == config.graph_token_id[1]
+                            micro_input["input_ids"][i][: user_prompt_lens[i]]
+                            == config.graph_token_id[1]
                         )[0].tolist()
                         graph_token_indices.append(graph_token_index)
 
