@@ -751,6 +751,7 @@ def train_multi_gpu_accelerate(
                 global_step += args.batch_size
                 batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
+                user_prompt_lens = batch.get("user_prompt_lens", None)
 
                 # if args.train_reasoning:
                 console.log(
@@ -778,7 +779,8 @@ def train_multi_gpu_accelerate(
 
                     for i in range(batch_size):
                         graph_token_index = torch.where(
-                            micro_input["input_ids"][i] == config.graph_token_id[1]
+                            micro_input["input_ids"][i][: user_prompt_lens[i]]
+                            == config.graph_token_id[1]
                         )[0].tolist()
                         graph_token_indices.append(graph_token_index)
 
