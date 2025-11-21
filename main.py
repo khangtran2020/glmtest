@@ -151,8 +151,6 @@ def main() -> None:
             save_path=reasoning_save_path,
         )
         return  # exit after getting reasoning
-    else:
-        dataset.filter_by_max_tokens(max_tokens=args.max_seq_length)
 
     if args.mode == "baseline":
         if args.baseline_prompt_type == "prompt_engineer":
@@ -183,6 +181,8 @@ def main() -> None:
                 task_instances = [json.loads(line) for line in f.readlines()]
             run_codamosa(args=args, task_instances=task_instances, console=console)
             return
+
+    dataset.filter_by_max_tokens(max_tokens=args.max_seq_length)
     if args.repo is not None:
         dataset.prepare_data_by_repo()
 
