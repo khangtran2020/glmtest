@@ -288,6 +288,8 @@ def get_all_branch(
         if arc[1] not in init_branch:
             init_branch.append(arc[1])
 
+    init_branch = sorted(init_branch)
+
     branches = []
     num_branch = 0
     # process func

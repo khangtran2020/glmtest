@@ -409,14 +409,9 @@ class Data(object):
                         mask[i] = 1
                 except:
                     mask[i] = 0
-            # if mask.sum() == 0:
-            #     branch_to_remove.append(j)
-            #     continue
-            # mask = torch.Tensor([mask])
             all_mask.append(mask)
 
         if len(all_mask) == 1:
-            # only import branch
             return None
         return all_mask
 
@@ -1131,18 +1126,11 @@ class Data(object):
                             self.logger.log(
                                 f"Only import branch at uuid: {uuid}, testcase: {i}"
                             )
-                            num_discarded += 1
-                            continue
 
                         active_nodes = [
                             get_index_by_value(a=all_masks[j], val=1)
                             for j in range(len(all_masks))
                         ]
-
-                        if len(active_nodes) == 0:
-                            self.logger.log(f"Active node empty at uuid: {uuid}")
-                            num_discarded += 1
-                            continue
 
                         result = self.get_prompt(
                             src_code=src_code,
@@ -1158,6 +1146,7 @@ class Data(object):
                         if result is None:
                             num_discarded += 1
                             continue
+
                         prompt = result
                         num_token = len(self.llm_tokenizer.tokenize(prompt))
                         num_tokens.append(num_token)
