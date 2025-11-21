@@ -164,6 +164,99 @@ package_name_dict = {
 }
 
 
+install_script_dict = {
+    "astropy/astropy": {
+        "5.1": "baselines/codamosa/install/astropy/5.1/install.sh",
+        "5.0": "baselines/codamosa/install/astropy/5.0/install.sh",
+        "4.2": "baselines/codamosa/install/astropy/4.2/install.sh",
+        "4.3": "baselines/codamosa/install/astropy/4.3/install.sh",
+        "3.0": "baselines/codamosa/install/astropy/3.0/install.sh",
+        "1.3": "baselines/codamosa/install/astropy/1.3/install.sh",
+        "5.2": "baselines/codamosa/install/astropy/5.2/install.sh",
+        "3.1": "baselines/codamosa/install/astropy/3.1/install.sh",
+    },
+    "django/django": {
+        "1.9": "baselines/codamosa/install/django/1.9/install.sh",
+        "5.0": "baselines/codamosa/install/django/5.0/install.sh",
+        "3.2": "baselines/codamosa/install/django/3.2/install.sh",
+        "2.0": "baselines/codamosa/install/django/2.0/install.sh",
+        "4.2": "baselines/codamosa/install/django/4.2/install.sh",
+        "2.1": "baselines/codamosa/install/django/2.1/install.sh",
+        "3.0": "baselines/codamosa/install/django/3.0/install.sh",
+        "3.1": "baselines/codamosa/install/django/3.1/install.sh",
+        "1.11": "baselines/codamosa/install/django/1.11/install.sh",
+        "1.10": "baselines/codamosa/install/django/1.10/install.sh",
+        "4.1": "baselines/codamosa/install/django/4.1/install.sh",
+        "4.0": "baselines/codamosa/install/django/4.0/install.sh",
+        "2.2": "baselines/codamosa/install/django/2.2/install.sh",
+    },
+    "matplotlib/matplotlib": {
+        "3.3": "baselines/codamosa/install/matplotlib/3.3/install.sh",
+        "3.4": "baselines/codamosa/install/matplotlib/3.4/install.sh",
+        "3.5": "baselines/codamosa/install/matplotlib/3.5/install.sh",
+        "3.2": "baselines/codamosa/install/matplotlib/3.2/install.sh",
+        "3.7": "baselines/codamosa/install/matplotlib/3.7/install.sh",
+        "3.0": "baselines/codamosa/install/matplotlib/3.0/install.sh",
+        "3.1": "baselines/codamosa/install/matplotlib/3.1/install.sh",
+        "3.6": "baselines/codamosa/install/matplotlib/3.6/install.sh",
+    },
+    "mwaskom/seaborn": {
+        "0.13": "baselines/codamosa/install/seaborn/0.13/install.sh",
+        "0.12": "baselines/codamosa/install/seaborn/0.12/install.sh",
+        "0.11": "baselines/codamosa/install/seaborn/0.11/install.sh",
+    },
+    "pydata/xarray": {
+        "2022.03": "baselines/codamosa/install/xarray/2022.03/install.sh",
+        "0.12": "baselines/codamosa/install/xarray/0.12/install.sh",
+        "2022.09": "baselines/codamosa/install/xarray/2022.09/install.sh",
+        "2022.06": "baselines/codamosa/install/xarray/2022.06/install.sh",
+        "0.19": "baselines/codamosa/install/xarray/0.19/install.sh",
+        "0.18": "baselines/codamosa/install/xarray/0.18/install.sh",
+        "0.20": "baselines/codamosa/install/xarray/0.20/install.sh",
+    },
+    "pytest-dev/pytest": {
+        "7.2": "baselines/codamosa/install/pytest/7.2/install.sh",
+        "5.1": "baselines/codamosa/install/pytest/5.1/install.sh",
+        "5.0": "baselines/codamosa/install/pytest/5.0/install.sh",
+        "7.4": "baselines/codamosa/install/pytest/7.4/install.sh",
+        "8.0": "baselines/codamosa/install/pytest/8.0/install.sh",
+        "4.5": "baselines/codamosa/install/pytest/4.5/install.sh",
+        "6.0": "baselines/codamosa/install/pytest/6.0/install.sh",
+        "4.4": "baselines/codamosa/install/pytest/4.4/install.sh",
+        "7.1": "baselines/codamosa/install/pytest/7.1/install.sh",
+        "5.2": "baselines/codamosa/install/pytest/5.2/install.sh",
+        "5.4": "baselines/codamosa/install/pytest/5.4/install.sh",
+        "5.3": "baselines/codamosa/install/pytest/5.3/install.sh",
+        "7.0": "baselines/codamosa/install/pytest/7.0/install.sh",
+        "4.6": "baselines/codamosa/install/pytest/4.6/install.sh",
+        "6.2": "baselines/codamosa/install/pytest/6.2/install.sh",
+        "6.3": "baselines/codamosa/install/pytest/6.3/install.sh",
+    },
+    "scikit-learn/scikit-learn": {
+        "0.22": "baselines/codamosa/install/scikit-learn/0.22/install.sh",
+        "1.4": "baselines/codamosa/install/scikit-learn/1.4/install.sh",
+        "1.3": "baselines/codamosa/install/scikit-learn/1.3/install.sh",
+        "0.21": "baselines/codamosa/install/scikit-learn/0.21/install.sh",
+        "0.20": "baselines/codamosa/install/scikit-learn/0.20/install.sh",
+    },
+    "sympy/sympy": {
+        "1.9": "baselines/codamosa/install/sympy/1.9/install.sh",
+        "1.0": "baselines/codamosa/install/sympy/1.0/install.sh",
+        "1.7": "baselines/codamosa/install/sympy/1.7/install.sh",
+        "1.6": "baselines/codamosa/install/sympy/1.6/install.sh",
+        "1.1": "baselines/codamosa/install/sympy/1.1/install.sh",
+        "1.8": "baselines/codamosa/install/sympy/1.8/install.sh",
+        "1.12": "baselines/codamosa/install/sympy/1.12/install.sh",
+        "1.13": "baselines/codamosa/install/sympy/1.13/install.sh",
+        "1.4": "baselines/codamosa/install/sympy/1.4/install.sh",
+        "1.2": "baselines/codamosa/install/sympy/1.2/install.sh",
+        "1.5": "baselines/codamosa/install/sympy/1.5/install.sh",
+        "1.11": "baselines/codamosa/install/sympy/1.11/install.sh",
+        "1.10": "baselines/codamosa/install/sympy/1.10/install.sh",
+    },
+}
+
+
 def prepare_instance(
     task_instance: dict, baseline_temp_dir: str, console: Console
 ) -> None:
@@ -187,26 +280,14 @@ def prepare_instance(
     commit_id = checkout_dict[repo][version]
     console.log(f"[green]Checking out {repo} to commit {commit_id}.[/green]")
     repo_obj.git.reset("--hard", commit_id)
-    # packages = package_name_dict.get(repo, [])
-    # with open(os.path.join(repo_new_path, "package.txt"), "w") as f:
-    #     for package in packages[:-1]:
-    #         f.write(f"{package}\n")
-    #     target_package = packages[-1] if packages else ""
-    #     f.write(f"{target_package}\n")
-    # pipreqs /path/to/your/project --savepath /path/to/custom/requirements.in
-    package_cmd = [
-        "pipreqs",
-        repo_new_path,
-        "--force",
-        "--savepath",
-        os.path.join(repo_new_path, "package.txt"),
-    ]
-    try:
-        subprocess.run(package_cmd, check=True)
-        console.log(f"[green]Generated package.txt for {repo}.[/green]")
-    except subprocess.CalledProcessError as e:
-        console.log(f"[red]Error during package.txt generation: {e}[/red]")
-        raise
+
+    # Read install script path
+    install_script_path = install_script_dict[repo][version]
+    with open(install_script_path, "r") as f:
+        install_commands = f.read()
+
+    with open(os.path.join(repo_new_path, "install.sh"), "w") as f:
+        f.write(install_commands)
 
     console.log(
         f"[green]Created package.txt for {repo} with target version {version}.[/green]"
