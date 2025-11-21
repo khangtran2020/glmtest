@@ -409,11 +409,6 @@ def validate(
     only_gnn: bool = False,
 ):
     model.eval()
-
-    # console.log(
-    #     f"[green]Module in eval mode: model.gnn {model.module.gnn.training} - model.llm {model.module.llm_model.training} [/green]"
-    # )
-
     with torch.no_grad():
 
         val_loss = 0.0
@@ -424,83 +419,67 @@ def validate(
 
         for step, batch in enumerate(loader):
             uuid, batch = batch
-
-            print(
-                f"At step {step}, rank {accelerator.process_index} is processing uuids: {uuid}"
-            )
-
             batch_loss = 0.0
             batch_size = batch["input"]["input_ids"].size(0)
             num_item += batch_size
+            if "token_type_ids" in batch["input"]:
+                batch["input"].pop("token_type_ids")
+            micro_input = {
+                "input_ids": batch["input"]["input_ids"],
+                "attention_mask": batch["input"]["attention_mask"],
+                "labels": batch["input"]["labels"],
+            }
 
-            # Process each sample in the batch as a micro-batch.
-            try:
+            if "graph" in args.baseline_prompt:
+                graphs = batch["graph"]
+                graph_masks = batch["graph_mask"]
+                graph_token_indices = []
+                for i in range(batch_size):
+                    graph_token_index = torch.where(
+                        micro_input["input_ids"][i] == config.graph_token_id[1]
+                    )[0].tolist()
+                    graph_token_indices.append(graph_token_index)
 
-                if "token_type_ids" in batch["input"]:
-                    batch["input"].pop("token_type_ids")
-                micro_input = {
-                    "input_ids": batch["input"]["input_ids"],
-                    "attention_mask": batch["input"]["attention_mask"],
-                    "labels": batch["input"]["labels"],
-                }
+            else:
+                graphs = None
+                graph_masks = None
+                graph_token_indices = None
 
-                if "graph" in args.baseline_prompt:
-                    graphs = batch["graph"]
-                    graph_masks = batch["graph_mask"]
-                    graph_token_indices = []
-                    for i in range(batch_size):
-                        graph_token_index = torch.where(
-                            micro_input["input_ids"][i] == config.graph_token_id[1]
-                        )[0].tolist()
-                        graph_token_indices.append(graph_token_index)
+            outputs = model(
+                **micro_input,
+                graphs=graphs,
+                graph_masks=graph_masks,
+                graph_token_indices=graph_token_indices,
+                only_gnn=only_gnn,
+            )
+            loss = outputs.loss
+            if multi_gpu:
+                all_losses = accelerator.gather(loss)
+                all_losses = torch.where(torch.isnan(all_losses), 0.0, all_losses)
+                total_loss = torch.mean(all_losses)
+                batch_loss += total_loss.item()
+                del all_losses, total_loss
+            else:
+                batch_loss += loss.item()
 
-                else:
-                    graphs = None
-                    graph_masks = None
-                    graph_token_indices = None
+            # logging_gpu_usage(step=step, console=console)
 
-                outputs = model(
-                    **micro_input,
-                    graphs=graphs,
-                    graph_masks=graph_masks,
-                    graph_token_indices=graph_token_indices,
-                    only_gnn=only_gnn,
-                )
-                loss = outputs.loss
-                if multi_gpu:
-                    all_losses = accelerator.gather(loss)
-                    all_losses = torch.where(torch.isnan(all_losses), 0.0, all_losses)
-                    total_loss = torch.mean(all_losses)
-                    batch_loss += total_loss.item()
-                    del all_losses, total_loss
-                else:
-                    batch_loss += loss.item()
-
-                # logging_gpu_usage(step=step, console=console)
-
-                for key in micro_input.keys():
-                    micro_input[key] = micro_input[key].to("cpu")
-                if "graph" in args.baseline_prompt:
-                    for graph in graphs:
-                        for key in GRAPH_KEYS:
-                            if key in graph.keys():
-                                graph[key] = graph[key].to("cpu")
-                                graph.pop(key, None)
-                    for graph_mask in graph_masks:
-                        for mask in graph_mask:
-                            mask = mask.to("cpu")
-                    del graph_masks, graphs, graph_token_indices
-                loss = loss.to("cpu")
-                del outputs, loss, micro_input, batch
-                gc.collect()
-                torch.cuda.empty_cache()
-
-            except torch.cuda.OutOfMemoryError as e:
-                tqdm.write(
-                    f"OOM in batch {step}: input_dis {micro_input['input_ids'].size()} - graph_mask {graph_mask.size()}"
-                )
-                torch.cuda.empty_cache()
-                continue
+            for key in micro_input.keys():
+                micro_input[key] = micro_input[key].to("cpu")
+            if "graph" in args.baseline_prompt:
+                for graph in graphs:
+                    for key in GRAPH_KEYS:
+                        if key in graph.keys():
+                            graph[key] = graph[key].to("cpu")
+                            graph.pop(key, None)
+                for graph_mask in graph_masks:
+                    for mask in graph_mask:
+                        mask = mask.to("cpu")
+                del graph_masks, graphs, graph_token_indices
+            loss = loss.to("cpu")
+            del outputs, loss, micro_input, batch
+            gc.collect()
+            torch.cuda.empty_cache()
 
             if accelerator.is_main_process:
                 progress.update(
@@ -511,12 +490,9 @@ def validate(
 
             val_loss += batch_loss
 
-            # Periodic cache clearing (every 10 batches)
-            if step % 10 == 0:
-                torch.cuda.empty_cache()
-
         if accelerator.is_main_process:
             progress.update(val_task, visible=False)
         val_loss /= num_item
-        return val_loss
-        # model.train()
+
+    model.train()
+    return val_loss

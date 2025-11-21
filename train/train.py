@@ -1152,9 +1152,6 @@ def train_multi_gpu_gnnonly(
             for step, batch in enumerate(tr_loader):
 
                 uuid, batch = batch
-                print(
-                    f"At step {global_step}, rank {accelerator.process_index} is processing uuid {uuid}"
-                )
                 if (continue_training == True) and (global_step <= start_step):
 
                     global_step += args.batch_size
@@ -1174,9 +1171,6 @@ def train_multi_gpu_gnnonly(
                 global_step += args.batch_size
                 batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
-
-                # accelerator.wait_for_everyone()
-
                 if "token_type_ids" in batch["input"]:
                     batch["input"].pop("token_type_ids")
 
@@ -1185,8 +1179,6 @@ def train_multi_gpu_gnnonly(
                     "attention_mask": batch["input"]["attention_mask"],
                     "labels": batch["input"]["labels"],
                 }
-
-                # accelerator.wait_for_everyone()
 
                 if "graph" in args.baseline_prompt:
                     graphs = batch["graph"]
@@ -1209,8 +1201,6 @@ def train_multi_gpu_gnnonly(
                     .unsqueeze(0)
                     .expand(micro_input["input_ids"].shape[0], -1)
                 )
-
-                # accelerator.wait_for_everyone()
                 with accelerator.accumulate(model):
 
                     outputs = model(
@@ -1223,19 +1213,17 @@ def train_multi_gpu_gnnonly(
                         accelerator=accelerator,
                         only_gnn=True,
                     )
-
-                    # accelerator.wait_for_everyone()
                     loss = outputs.loss
                     accelerator.backward(loss)
-                    # accelerator.wait_for_everyone()
 
-                if accelerator.sync_gradients:
-                    accelerator.wait_for_everyone()
-                    accelerator.clip_grad_norm_(model.parameters(), args.max_grad_norm)
-                    optimizer.step()
-                    lr_scheduler.step()
-                    optimizer.zero_grad()
-                    model.zero_grad()
+                    if accelerator.sync_gradients:
+                        accelerator.wait_for_everyone()
+                        accelerator.clip_grad_norm_(
+                            model.parameters(), args.max_grad_norm
+                        )
+                        optimizer.step()
+                        lr_scheduler.step()
+                        optimizer.zero_grad()
 
                 with torch.no_grad():
                     all_losses = accelerator.gather(loss)
@@ -1281,7 +1269,6 @@ def train_multi_gpu_gnnonly(
                 if (
                     global_step % args.logging_steps == 0
                 ) and accelerator.is_main_process:
-                    accelerator.print(f"Logging at step {global_step}")
                     current_lr = lr_scheduler.get_last_lr()[0]
                     if accelerator.is_main_process:
                         accelerator.log(
@@ -1292,11 +1279,8 @@ def train_multi_gpu_gnnonly(
                             },
                             step=global_step,
                         )
-                        console.print(
-                            f"[yellow]Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}[/yellow]"
-                        )
 
-                if accelerator.sync_gradients and (global_step % args.save_steps == 0):
+                if global_step % args.save_steps == 0:
                     accelerator.wait_for_everyone()
                     accelerator.print(f"Saving checkpoint at step {global_step}...")
                     if (previous_checkpoint_step != -1) and (
@@ -1329,7 +1313,6 @@ def train_multi_gpu_gnnonly(
                                 ],
                                 key=os.path.getctime,
                             )
-                            # print(f"Removing oldest checkpoint: {oldest_checkpoint}")
                             shutil.rmtree(oldest_checkpoint)
 
                         unwrapped_model = accelerator.unwrap_model(model)
@@ -1345,10 +1328,7 @@ def train_multi_gpu_gnnonly(
                         accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
                         del unwrapped_model
 
-                if (
-                    global_step % args.validating_steps == 0
-                    and accelerator.sync_gradients
-                ):
+                if global_step % args.validating_steps == 0:
                     accelerator.wait_for_everyone()
                     val_loss = validate(
                         args=args,
@@ -1400,28 +1380,6 @@ def train_multi_gpu_gnnonly(
                             del checkpoint_dir
                             gc.collect()
 
-                    # move model to cpu to save GPU memory, delete cache, then move back to device
-                    # idling to reduce ram usage
-                    rank = accelerator.process_index
-                    wait_time = rank * 30
-                    console.log(
-                        f"[blue]Process {rank} waiting for {wait_time} seconds before moving model to CPU to reduce GPU memory usage[/blue]"
-                    )
-                    time.sleep(wait_time)
-                    for n, p in model.named_parameters():
-                        p.data = p.data.to("cpu")
-
-                    gc.collect()
-                    torch.cuda.empty_cache()
-                    # model.train()
-                    for n, p in model.named_parameters():
-                        p.data = p.data.to(device)
-                    accelerator.wait_for_everyone()
-
-                if args.debug:
-                    # only run 1 step in debug mode
-                    break
-
             if accelerator.is_main_process:
                 if ((continue_training == True) and (global_step > start_step)) or (
                     continue_training == False
@@ -1434,12 +1392,7 @@ def train_multi_gpu_gnnonly(
                         description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
                     )
 
-            if args.debug:
-                # only run 1 step in debug mode
-                sys.exit(0)
-
     accelerator.wait_for_everyone()
-
     if accelerator.is_main_process:
 
         final_model_path = os.path.join(save_path, "final_model")
