@@ -377,7 +377,7 @@ def get_model_test(
             # for key in list(state_dict.keys()):
             if "current_checkpoint" in args.model_weight_path:
                 state_dict = state_dict["model_state_dict"]
-            model.load_state_dict(state_dict, strict=False)
+            model.load_state_dict(state_dict, strict=True)
             if use_lora:
                 model.llm_model = model.llm_model.merge_and_unload()
             console.log(f"[red]Model weights loaded from {file}[/red]")
@@ -552,7 +552,7 @@ def get_model_testgen(
                 # for key in list(state_dict.keys()):
                 if "current_checkpoint" in args.model_weight_path:
                     state_dict = state_dict["model_state_dict"]
-                model.load_state_dict(state_dict, strict=False)
+                model.load_state_dict(state_dict, strict=True)
                 if use_lora:
                     model.llm_model = model.llm_model.merge_and_unload()
                 console.log(f"[red]Model weights loaded from {file}[/red]")
