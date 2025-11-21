@@ -86,7 +86,7 @@ def main() -> None:
     if not args.baseline_skip_prepare_data:
         if args.mode == "testgen":
             if args.module_path is None:
-                dataset.prepare_data_for_test_gen()
+                dataset.prepare_data_for_test_gen(branch_limit=args.branch_limit)
         if (args.mode == "prepare_reasoning") or (
             (args.mode == "train") and args.train_reasoning
         ):
