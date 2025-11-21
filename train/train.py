@@ -334,7 +334,12 @@ def train_single_gpu_accelerate(
                     graph_masks = None
                     graph_token_indices = None
 
-                with accelerator.accumulate(model):
+                with accelerator.accumulate(model), torch.autocast(
+                    device_type="cuda",
+                    dtype=(
+                        torch.float16 if mixed_precision == "fp16" else torch.bfloat16
+                    ),
+                ):
                     outputs = model(
                         **micro_input,
                         step=global_step,
@@ -749,8 +754,12 @@ def train_multi_gpu_accelerate(
 
                 accelerator.wait_for_everyone()
 
-                with accelerator.accumulate(model):
-
+                with accelerator.accumulate(model), torch.autocast(
+                    device_type="cuda",
+                    dtype=(
+                        torch.float16 if mixed_precision == "fp16" else torch.bfloat16
+                    ),
+                ):
                     outputs = model(
                         **micro_input,
                         position_ids=position_ids.to(device),
@@ -1204,8 +1213,12 @@ def train_multi_gpu_gnnonly(
                     .unsqueeze(0)
                     .expand(micro_input["input_ids"].shape[0], -1)
                 )
-                with accelerator.accumulate(model):
-
+                with accelerator.accumulate(model), torch.autocast(
+                    device_type="cuda",
+                    dtype=(
+                        torch.float16 if mixed_precision == "fp16" else torch.bfloat16
+                    ),
+                ):
                     outputs = model(
                         **micro_input,
                         position_ids=position_ids.to(device),
