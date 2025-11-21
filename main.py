@@ -150,8 +150,6 @@ def main() -> None:
             model=args.reason_model,
             save_path=reasoning_save_path,
         )
-        # with open(reasoning_save_path, "w") as f:
-        #     json.dump(reason_dict, f, indent=4)
         return  # exit after getting reasoning
     else:
         dataset.filter_by_max_tokens(max_tokens=args.max_seq_length)
@@ -185,31 +183,12 @@ def main() -> None:
                 task_instances = [json.loads(line) for line in f.readlines()]
             run_codamosa(args=args, task_instances=task_instances, console=console)
             return
-
-    # if args.mode == "prepare_reasoning":
-
     if args.repo is not None:
         dataset.prepare_data_by_repo()
 
     dataset.train_test_split(
         val_split=int(1000), test_only=True if args.mode == "testgen" else False
     )
-
-    # save keys of training data for each rank to check:
-    with open(
-        os.path.join(
-            args.output_dir,
-            args.name,
-            f"rank_{int(os.environ.get('RANK', 0))}_data_keys.txt",
-        ),
-        "w",
-    ) as f:
-        keys = list(dataset.train_data.keys())
-        keys = sorted(keys)
-        for key in keys:
-            f.write(f"{key}\n")
-
-    console.log(f"Broadcasted args and dataset to all processes.")
 
     if torch.cuda.is_available():
         # Check if distributed training is enabled (this is the case when using Accelerate or torchrun with multi-node)
