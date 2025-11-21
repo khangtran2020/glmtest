@@ -618,6 +618,11 @@ def train_multi_gpu_accelerate(
         num_gpus=args.num_gpu,
     )
 
+    if accelerator.is_main_process:
+        logging_train_data(
+            console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
+        )
+
     dataloader_params = {
         "batch_size": args.batch_size,
         "collate_fn": collate_fn,
