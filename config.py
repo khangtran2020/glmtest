@@ -452,6 +452,7 @@ def add_testgen_group(group):
         help="api key for the verifier model",
         default=None,
     )
+    group.add_argument("--branch_limit", type=int, help="branch limit", default=10000)
 
 
 def add_baseline_group(group):

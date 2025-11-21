@@ -1015,7 +1015,7 @@ class Data(object):
             f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_tokens)}"
         )
 
-    def prepare_data_for_test_gen(self):
+    def prepare_data_for_test_gen(self, branch_limit: int = 100) -> None:
 
         assert self.data is not None
 
@@ -1052,11 +1052,13 @@ class Data(object):
                 processed_prompt_path = os.path.join(
                     self.data_path,
                     f"{self.baseline_prompt}_{self.llm_model_name}",
+                    "testgen",
                 )
             else:
                 processed_prompt_path = os.path.join(
                     self.data_path,
                     f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                    "testgen",
                 )
 
             os.makedirs(processed_data_path, exist_ok=True)
@@ -1086,7 +1088,7 @@ class Data(object):
                         src_code = file.read()
 
                     module_path = dat.get("module_path", "N/A")
-                    branches = get_all_branch(code=src_code)
+                    branches = get_all_branch(code=src_code, branch_limit=branch_limit)
 
                     if "graph" in self.baseline_prompt:
                         graph_name = f"{uuid}_graph.pt"
