@@ -952,20 +952,20 @@ def train_multi_gpu_accelerate(
 
                     # move model to cpu to save GPU memory, delete cache, then move back to device
                     # idling to reduce ram usage
-                    rank = accelerator.process_index
-                    wait_time = rank * 30
-                    console.log(
-                        f"[blue]Process {rank} waiting for {wait_time} seconds before moving model to CPU to reduce GPU memory usage[/blue]"
-                    )
-                    time.sleep(wait_time)
-                    for n, p in model.named_parameters():
-                        p.data = p.data.to("cpu")
+                    # rank = accelerator.process_index
+                    # wait_time = rank * 30
+                    # console.log(
+                    #     f"[blue]Process {rank} waiting for {wait_time} seconds before moving model to CPU to reduce GPU memory usage[/blue]"
+                    # )
+                    # time.sleep(wait_time)
+                    # for n, p in model.named_parameters():
+                    #     p.data = p.data.to("cpu")
 
-                    gc.collect()
-                    torch.cuda.empty_cache()
-                    # model.train()
-                    for n, p in model.named_parameters():
-                        p.data = p.data.to(device)
+                    # gc.collect()
+                    # torch.cuda.empty_cache()
+                    # # model.train()
+                    # for n, p in model.named_parameters():
+                    #     p.data = p.data.to(device)
                     accelerator.wait_for_everyone()
 
                 if args.debug:
@@ -1378,9 +1378,6 @@ def train_multi_gpu_gnnonly(
                             if not os.path.exists(checkpoint_dir):
                                 os.makedirs(checkpoint_dir, exist_ok=True)
 
-                            for n, p in model.named_parameters():
-                                p.data = p.data.to("cpu")
-
                             unwrapped_model = accelerator.unwrap_model(model)
                             torch.save(
                                 unwrapped_model.state_dict(),
@@ -1388,6 +1385,10 @@ def train_multi_gpu_gnnonly(
                                     checkpoint_dir, f"model_weight_step{global_step}.pt"
                                 ),
                             )
+
+                            for n, p in unwrapped_model.named_parameters():
+                                p.data = p.data.to("cpu")
+
                             tokenizer.save_pretrained(checkpoint_dir)
                             console.log(
                                 f"[green]Saved best checkpoint to {checkpoint_dir}[/green]"
