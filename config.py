@@ -170,7 +170,7 @@ def add_model_group(group):
         "--max_num_checkpoint",
         type=int,
         help="maximum number of checkpoints",
-        default=2,
+        default=5,
     )
     group.add_argument(
         "--model_weight_path", type=str, help="path to the model weight", default=None
