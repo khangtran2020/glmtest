@@ -1400,9 +1400,9 @@ def train_multi_gpu_gnnonly(
                     # map model parameters to correct type
                     for n, p in model.named_parameters():
                         if mixed_precision == "fp16":
-                            p.data = p.data.to(torch.float16)
+                            p.data = p.data.to(torch.float16, device=device)
                         else:
-                            p.data = p.data.to(torch.bfloat16)
+                            p.data = p.data.to(torch.bfloat16, device=device)
 
             if accelerator.is_main_process:
                 if ((continue_training == True) and (global_step > start_step)) or (
