@@ -1397,6 +1397,13 @@ def train_multi_gpu_gnnonly(
                             del checkpoint_dir
                             gc.collect()
 
+                    # map model parameters to correct type
+                    for n, p in model.named_parameters():
+                        if mixed_precision == "fp16":
+                            p.data = p.data.to(torch.float16)
+                        else:
+                            p.data = p.data.to(torch.bfloat16)
+
             if accelerator.is_main_process:
                 if ((continue_training == True) and (global_step > start_step)) or (
                     continue_training == False
