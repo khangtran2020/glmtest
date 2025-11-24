@@ -824,7 +824,7 @@ def train_multi_gpu_accelerate(
                             f"[yellow]Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}[/yellow]"
                         )
 
-                if accelerator.sync_gradients and (global_step % args.save_steps == 0):
+                if global_step % args.save_steps == 0:
                     accelerator.wait_for_everyone()
 
                     if (previous_checkpoint_step != -1) and (
@@ -873,10 +873,7 @@ def train_multi_gpu_accelerate(
                         accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
                         del unwrapped_model
 
-                if (
-                    global_step % args.validating_steps == 0
-                    and accelerator.sync_gradients
-                ):
+                if global_step % args.validating_steps == 0:
                     accelerator.wait_for_everyone()
                     val_loss = validate(
                         args=args,
@@ -909,9 +906,6 @@ def train_multi_gpu_accelerate(
                             if not os.path.exists(checkpoint_dir):
                                 os.makedirs(checkpoint_dir, exist_ok=True)
 
-                            for n, p in model.named_parameters():
-                                p.data = p.data.to("cpu")
-
                             unwrapped_model = accelerator.unwrap_model(model)
                             torch.save(
                                 unwrapped_model.state_dict(),
@@ -927,27 +921,14 @@ def train_multi_gpu_accelerate(
                             del checkpoint_dir
                             gc.collect()
 
-                    # move model to cpu to save GPU memory, delete cache, then move back to device
-                    # idling to reduce ram usage
-                    # rank = accelerator.process_index
-                    # wait_time = rank * 30
-                    # console.log(
-                    #     f"[blue]Process {rank} waiting for {wait_time} seconds before moving model to CPU to reduce GPU memory usage[/blue]"
-                    # )
-                    # time.sleep(wait_time)
-                    # for n, p in model.named_parameters():
-                    #     p.data = p.data.to("cpu")
-
-                    # gc.collect()
-                    # torch.cuda.empty_cache()
-                    # # model.train()
-                    # for n, p in model.named_parameters():
-                    #     p.data = p.data.to(device)
-                    # accelerator.wait_for_everyone()
-
-                if args.debug:
-                    # only run 1 step in debug mode
-                    break
+                    for name, param in model.named_parameters():
+                        param = (
+                            param.to(torch.bfloat16)
+                            if mixed_precision == "bf16"
+                            else param.to(torch.float16)
+                        )
+                        param = param.to(device)
+                    accelerator.wait_for_everyone()
 
             if accelerator.is_main_process:
                 if ((continue_training == True) and (global_step > start_step)) or (
@@ -960,10 +941,6 @@ def train_multi_gpu_accelerate(
                         advance=1,
                         description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
                     )
-
-            if args.debug:
-                # only run 1 step in debug mode
-                sys.exit(0)
 
     accelerator.wait_for_everyone()
 

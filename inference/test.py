@@ -505,5 +505,5 @@ def validate(
         if accelerator.is_main_process:
             progress.update(val_task, visible=False)
         val_loss /= num_item
-    return val_loss
     model.train()
+    return val_loss
