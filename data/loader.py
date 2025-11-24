@@ -19,7 +19,6 @@ class GLMFDataset(Dataset):
         debug: bool = False,
         n_hops: int = 2,
         testing: bool = False,
-        rank: int = 0,
         num_gpus: int = 1,
         dtype: str = "bf16",
         logger=None,
@@ -35,7 +34,6 @@ class GLMFDataset(Dataset):
         self.num_gpus = num_gpus
         self.logger = logger
         self.dtype = dtype
-        self.rank = rank
         self.index_to_key_dict = dict(zip(range(len(self.data)), self.data.keys()))
 
         if self.logger is not None:
@@ -90,7 +88,6 @@ class GLMFDataset(Dataset):
                 )
 
         if self.testing == False:
-            uuid = sample["uuid"]
             full_text = sample["full_text"]
             tokenized, pad_size = self.tokenize(full_text, num_gpu=self.num_gpus)
 
@@ -112,15 +109,13 @@ class GLMFDataset(Dataset):
             ):
                 raise ValueError("Input must contain graph token")
 
-            batch = {
+            return {
                 "text": full_text,
                 "input": tokenized,
                 "graph": graph,  # Should be a dictionary of graph structures
                 "graph_mask": (graph_masks if graph_masks is not None else None),
                 "active_nodes": (active_nodes if active_nodes is not None else None),
-                "user_prompt_len": user_prompt_len,
             }
-            return (uuid, batch)
         else:
             prompt = sample["prompt"]
             uuid = sample["uuid"]
@@ -139,7 +134,6 @@ class GLMFDataset(Dataset):
                 "graph": graph,
                 "graph_mask": (graph_masks if graph_masks is not None else None),
                 "active_nodes": (active_nodes if active_nodes is not None else None),
-                "user_prompt_len": input_ids.shape[1],
             }
             return (uuid, batch)
 
@@ -225,7 +219,6 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
         input_ids = [sample["input"]["input_ids"] for sample in batch]
         attention_mask = [sample["input"]["attention_mask"] for sample in batch]
         labels = [sample["input"]["labels"] for sample in batch]
-        user_prompt_lens = [sample["user_prompt_len"] for sample in batch]
 
         collated_input["input_ids"] = pad(input_ids, pad_value=tokenizer.pad_token_id)
         collated_input["attention_mask"] = pad(attention_mask, pad_value=0)
@@ -242,7 +235,6 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
             "graph": (
                 [x["graph"] for x in batch] if batch[0]["graph"] is not None else None
             ),
-            "user_prompt_lens": user_prompt_lens,
         }
         return collated
     else:
@@ -254,7 +246,6 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
         input_ids = [sample["input"]["input_ids"] for sample in batch]
         attention_mask = [sample["input"]["attention_mask"] for sample in batch]
         labels = [sample["input"]["labels"] for sample in batch]
-        user_prompt_lens = [sample["user_prompt_len"] for sample in batch]
 
         collated_input["input_ids"] = pad(input_ids, pad_value=tokenizer.pad_token_id)
         collated_input["attention_mask"] = pad(attention_mask, pad_value=0)
@@ -271,6 +262,5 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
             "graph": (
                 [x["graph"] for x in batch] if batch[0]["graph"] is not None else None
             ),
-            "user_prompt_lens": user_prompt_lens,
         }
         return uuid, collated
