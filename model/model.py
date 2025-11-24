@@ -213,15 +213,15 @@ def get_model_train(
 
     if args.train_reasoning:
         console.log(f"[blue] Training with reasoning mode activated. [/blue]")
-        if args.model_weight_path is not None:
-            for file in os.listdir(args.model_weight_path):
-                if file.endswith(".pt"):
-                    state_dict = torch.load(
-                        os.path.join(args.model_weight_path, file),
-                        map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-                    )
-                    model.load_state_dict(state_dict, strict=False)
-                    console.log(f"[red]Model weights loaded from {file}[/red]")
+    if args.model_weight_path is not None:
+        for file in os.listdir(args.model_weight_path):
+            if file.endswith(".pt"):
+                state_dict = torch.load(
+                    os.path.join(args.model_weight_path, file),
+                    map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+                )
+                model.load_state_dict(state_dict, strict=False)
+                console.log(f"[red]Model weights loaded from {file}[/red]")
 
     return model
 
