@@ -571,8 +571,6 @@ def train_multi_gpu_accelerate(
     )
 
     process_group = dist.group.WORLD
-
-    save_path = os.path.join(args.output_dir, args.name)
     if accelerator.is_main_process:
         accelerator.init_trackers(
             project_name="GLMFuzz",
@@ -591,6 +589,7 @@ def train_multi_gpu_accelerate(
             },
             init_kwargs={"wandb": {"name": args.name}},
         )
+        save_path = os.path.join(args.output_dir, args.name)
         if os.path.exists(save_path):
             if continue_training == False:
                 shutil.rmtree(save_path)
@@ -606,11 +605,9 @@ def train_multi_gpu_accelerate(
         debug=args.debug,
         n_hops=dataset.n_hops,
         logger=console,
-        rank=accelerator.process_index,
         dtype=args.dtype,
         num_gpus=args.num_gpu,
     )
-
     va_dataset = GLMFDataset(
         data=dataset.val_data,
         tokenizer=dataset.llm_tokenizer,
@@ -618,16 +615,9 @@ def train_multi_gpu_accelerate(
         debug=args.debug,
         n_hops=dataset.n_hops,
         logger=console,
-        rank=accelerator.process_index,
         dtype=args.dtype,
         num_gpus=args.num_gpu,
     )
-
-    if accelerator.is_main_process:
-        logging_train_data(
-            console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
-        )
-
     dataloader_params = {
         "batch_size": args.batch_size,
         "collate_fn": collate_fn,
@@ -645,8 +635,12 @@ def train_multi_gpu_accelerate(
         va_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn
     )
 
+    if accelerator.is_main_process:
+        logging_train_data(
+            console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
+        )
+
     patch_model(process_group=process_group)
-    console.log("Model patched for Ring Attention")
     device = accelerator.device
     config = model.config
     model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
@@ -682,14 +676,6 @@ def train_multi_gpu_accelerate(
 
             for step, batch in enumerate(tr_loader):
 
-                uuid, batch = batch
-
-                # if accelerator.is_main_process:
-                #     accelerator.print(f"At step {global_step} - processing uuid {uuid}")
-                # print(
-                #     f"At step {global_step}, rank {accelerator.process_index} is processing uuid {uuid}"
-                # )
-
                 if (continue_training == True) and (global_step <= start_step):
 
                     global_step += args.batch_size
@@ -709,13 +695,6 @@ def train_multi_gpu_accelerate(
                 global_step += args.batch_size
                 batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
-                user_prompt_lens = batch.get("user_prompt_lens", None)
-
-                # if args.train_reasoning:
-                # console.log(
-                #     f"[green][RANK {accelerator.process_index} - Step {global_step}][/green] Training with data: {batch['input']['input_ids'].size()}\n"
-                # )
-                accelerator.wait_for_everyone()
 
                 accelerator.wait_for_everyone()
 
@@ -754,12 +733,8 @@ def train_multi_gpu_accelerate(
 
                 accelerator.wait_for_everyone()
 
-                with accelerator.accumulate(model), torch.autocast(
-                    device_type="cuda",
-                    dtype=(
-                        torch.float16 if mixed_precision == "fp16" else torch.bfloat16
-                    ),
-                ):
+                with accelerator.accumulate(model):
+
                     outputs = model(
                         **micro_input,
                         position_ids=position_ids.to(device),
@@ -773,21 +748,23 @@ def train_multi_gpu_accelerate(
                     accelerator.wait_for_everyone()
                     loss = outputs.loss
                     accelerator.backward(loss)
+                    # print(
+                    #     f"Loss at rank {accelerator.process_index} - step {global_step}: {loss.item()}"
+                    # )
                     accelerator.wait_for_everyone()
 
-                    if accelerator.sync_gradients:
+                if accelerator.sync_gradients:
 
-                        accelerator.wait_for_everyone()
-                        accelerator.clip_grad_norm_(
-                            model.parameters(), args.max_grad_norm
-                        )
-                        optimizer.step()
-                        lr_scheduler.step()
-                        optimizer.zero_grad()
-                        model.zero_grad()
+                    accelerator.wait_for_everyone()
+                    accelerator.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+                    optimizer.step()
+                    lr_scheduler.step()
+                    optimizer.zero_grad()
+                    model.zero_grad()
 
                 with torch.no_grad():
                     all_losses = accelerator.gather(loss)
+                    # print(f"All losses at step {global_step}: {all_losses}")
                     all_losses = torch.where(
                         torch.isnan(all_losses),
                         torch.zeros_like(all_losses),
@@ -843,9 +820,9 @@ def train_multi_gpu_accelerate(
                             },
                             step=global_step,
                         )
-                        # console.print(
-                        #     f"[yellow]Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}[/yellow]"
-                        # )
+                        console.print(
+                            f"[yellow]Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}[/yellow]"
+                        )
 
                 if accelerator.sync_gradients and (global_step % args.save_steps == 0):
                     accelerator.wait_for_everyone()
@@ -966,7 +943,7 @@ def train_multi_gpu_accelerate(
                     # # model.train()
                     # for n, p in model.named_parameters():
                     #     p.data = p.data.to(device)
-                    accelerator.wait_for_everyone()
+                    # accelerator.wait_for_everyone()
 
                 if args.debug:
                     # only run 1 step in debug mode
