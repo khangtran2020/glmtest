@@ -109,7 +109,7 @@ def logging_train_data(
     console.log(f"Train data: {len(tr_dataset)} data points")
     console.log(f"Valid data: {len(va_dataset)} data points")
 
-    uuid, data_point_example = tr_dataset[0]
+    data_point_example = tr_dataset[0]
     console.log("Data prepared:")
     console.log(f"Train data: {len(tr_dataset)} data points")
     console.log(f"Valid data: {len(va_dataset)} data points")
@@ -1140,7 +1140,7 @@ def train_multi_gpu_gnnonly(
 
             for step, batch in enumerate(tr_loader):
 
-                uuid, batch = batch
+                batch = batch
                 if (continue_training == True) and (global_step <= start_step):
 
                     global_step += args.batch_size
