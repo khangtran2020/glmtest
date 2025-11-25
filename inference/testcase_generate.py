@@ -134,6 +134,7 @@ def testcase_generate(
             dtype=args.dtype,
             num_gpus=args.num_gpu,
         )
+
         te_proj_dataset = GLMFDataset(
             data=dataset.test_data["project"],
             tokenizer=dataset.llm_tokenizer,
@@ -143,6 +144,13 @@ def testcase_generate(
             testing=True,
             dtype=args.dtype,
             num_gpus=args.num_gpu,
+        )
+
+        console.log(
+            f"[yellow]Length of module test case dataset:[/yellow] {len(te_mod_dataset)}"
+        )
+        console.log(
+            f"[yellow]Length of project test case dataset:[/yellow] {len(te_proj_dataset)}"
         )
 
         if do_generate:
