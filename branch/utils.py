@@ -293,7 +293,6 @@ def get_all_branch(
     pprint(f"[green]Set of end lines:[/green] {pretty_repr(set_of_endline)}")
     pprint(f"[green]Parsed graph nodes:[/green] {pretty_repr(G.nodes())}")
     pprint(f"[green]Parsed graph edges:[/green] {pretty_repr(G.edges())}")
-    sys.exit(0)
 
     init_lines = get_init_lines(source_code=code)
 
@@ -358,6 +357,7 @@ def get_all_branch(
     # Debugging
     pprint(f"[green]Total branches found so far:[/green] {num_branch}")
     pprint(f"[green]Branches so far:[/green] {pretty_repr(branches)}")
+    sys.exit(0)
 
     # process async func
     if console is not None:
