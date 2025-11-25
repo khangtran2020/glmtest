@@ -401,9 +401,9 @@ def get_all_branch(
             batch_branches = [init_branch] + batch_branches
             branches.append(batch_branches)
 
-    # pprint(
-    #     f"[green]Total branches found: {num_branch}, in {len(branches)} batches[/green]"
-    # )
+    pprint(
+        f"[green]For file {filepath}: total branches found {num_branch} seperated to {len(branches)} batches[/green]"
+    )
 
     return branches
 

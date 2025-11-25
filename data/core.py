@@ -1071,6 +1071,7 @@ class Data(object):
             num_tokens = []
             num_discarded = 0
             num_branch_total = 0
+            num_testcase_total = 0
 
             for data_n in self.data.keys():
 
@@ -1086,8 +1087,7 @@ class Data(object):
 
                     module_path = dat.get("module_path", "N/A")
                     branches = get_all_branch(code=src_code, branch_limit=branch_limit)
-                    for branch in branches:
-                        num_branch_total += len(branch)
+                    num_branch_total += len(branches)
 
                     if "graph" in self.baseline_prompt:
                         graph_name = f"{uuid}_graph.pt"
@@ -1189,8 +1189,10 @@ class Data(object):
                             "num_tokens": num_token,
                             "path": data_path,
                         }
+                        num_testcase_total += 1
 
         self.logger.log(f"[blue]Total branches considered:[/blue] {num_branch_total}")
+        self.logger.log(f"[blue]Total testcases generated:[/blue] {num_testcase_total}")
         sys.exit(0)
 
         with open(processed_data_file_path, "w") as file:
