@@ -277,8 +277,8 @@ def get_all_branch(
     line_dict = analyze_code(code=code)
 
     # Debugging
-    console.log(f"[green]Analyzed line dict:[/green] {pretty_repr(line_dict)}")
-    console.log(f"[green]Source code:[/green]\n{code}")
+    pprint(f"[green]Analyzed line dict:[/green] {pretty_repr(line_dict)}")
+    pprint(f"[green]Source code:[/green]\n{code}")
     sys.exit(0)
 
     G, set_of_endline, arcs = parse_code(code=code)
