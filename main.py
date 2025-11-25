@@ -186,7 +186,9 @@ def main() -> None:
             run_codamosa(args=args, task_instances=task_instances, console=console)
             return
 
-    dataset.filter_by_max_tokens(max_tokens=args.max_seq_length)
+    if args.mode != "testgen":
+        dataset.filter_by_max_tokens(max_tokens=args.max_seq_length)
+
     if args.repo is not None:
         dataset.prepare_data_by_repo()
 
