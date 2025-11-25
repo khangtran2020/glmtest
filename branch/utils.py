@@ -356,8 +356,8 @@ def get_all_branch(
             branches.append(batch_branches)
 
     # Debugging
-    pprint(f"[green]Total branches found so far: {num_branch}[/green]")
-    pprint(f"[green]Branches so far: {pretty_repr(branches)}[/green]")
+    pprint(f"[green]Total branches found so far:[/green] {num_branch}")
+    pprint(f"[green]Branches so far:[/green] {pretty_repr(branches)}")
 
     # process async func
     if console is not None:
