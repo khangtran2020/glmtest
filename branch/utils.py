@@ -1,8 +1,10 @@
 import re
 import os
 import ast
+import sys
 import networkx as nx
 from rich import print as pprint
+from rich.pretty import pretty_repr
 from copy import deepcopy
 from networkx import DiGraph
 from rich.console import Console
@@ -273,6 +275,12 @@ def get_all_branch(
         code = read_module(filepath=filepath)
 
     line_dict = analyze_code(code=code)
+
+    # Debugging
+    console.log(f"[green]Analyzed line dict:[/green] {pretty_repr(line_dict)}")
+    console.log(f"[green]Source code:[/green]\n{code}")
+    sys.exit(0)
+
     G, set_of_endline, arcs = parse_code(code=code)
     init_lines = get_init_lines(source_code=code)
 
