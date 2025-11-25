@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import ast
 import dgl
 import json
@@ -1069,6 +1070,7 @@ class Data(object):
             self.processed_data = {}
             num_tokens = []
             num_discarded = 0
+            num_branch_total = 0
 
             for data_n in self.data.keys():
 
@@ -1084,6 +1086,8 @@ class Data(object):
 
                     module_path = dat.get("module_path", "N/A")
                     branches = get_all_branch(code=src_code, branch_limit=branch_limit)
+                    for branch in branches:
+                        num_branch_total += len(branch)
 
                     if "graph" in self.baseline_prompt:
                         graph_name = f"{uuid}_graph.pt"
@@ -1185,6 +1189,9 @@ class Data(object):
                             "num_tokens": num_token,
                             "path": data_path,
                         }
+
+        self.logger.log(f"[blue]Total branches considered:[/blue] {num_branch_total}")
+        sys.exit(0)
 
         with open(processed_data_file_path, "w") as file:
             json.dump(self.processed_data, file, indent=4)
