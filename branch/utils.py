@@ -278,10 +278,23 @@ def get_all_branch(
 
     # Debugging
     pprint(f"[green]Analyzed line dict:[/green] {pretty_repr(line_dict)}")
-    pprint(f"[green]Source code:[/green]\n{code}")
-    sys.exit(0)
+
+    new_code = []
+    for i, line in enumerate(code.split("\n")):
+        new_code.append(f"{i+1}: {line}")
+    new_code = "\n".join(new_code)
+
+    pprint(f"[green]Source code:[/green]\n{new_code}")
 
     G, set_of_endline, arcs = parse_code(code=code)
+
+    # Debugging
+    pprint(f"[green]Parsed arcs:[/green] {pretty_repr(arcs)}")
+    pprint(f"[green]Set of end lines:[/green] {pretty_repr(set_of_endline)}")
+    pprint(f"[green]Parsed graph nodes:[/green] {pretty_repr(G.nodes())}")
+    pprint(f"[green]Parsed graph edges:[/green] {pretty_repr(G.edges())}")
+    sys.exit(0)
+
     init_lines = get_init_lines(source_code=code)
 
     init_branch = []
