@@ -1191,10 +1191,6 @@ class Data(object):
                         }
                         num_testcase_total += 1
 
-        self.logger.log(f"[blue]Total branches considered:[/blue] {num_branch_total}")
-        self.logger.log(f"[blue]Total testcases generated:[/blue] {num_testcase_total}")
-        sys.exit(0)
-
         with open(processed_data_file_path, "w") as file:
             json.dump(self.processed_data, file, indent=4)
 

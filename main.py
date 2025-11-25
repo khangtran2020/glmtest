@@ -87,6 +87,10 @@ def main() -> None:
         if args.mode == "testgen":
             if args.module_path is None:
                 dataset.prepare_data_for_test_gen(branch_limit=args.branch_limit)
+                for data_n in dataset.processed_data.keys():
+                    console.log(
+                        f"[blue]Number of test cases for {data_n}: {len(dataset.processed_data[data_n])}[/blue]"
+                    )
         if (args.mode == "prepare_reasoning") or (
             (args.mode == "train") and args.train_reasoning
         ):
