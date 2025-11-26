@@ -94,18 +94,14 @@ def test_with_accelerate(args):
     )
     config = model.config
 
-    # Prepare model with Accelerate - this handles Flash Attention device assignment
-    model = accelerator.prepare_model(model)
-
     # Unify dtype
-    with accelerator.main_process_first():
-        for n, p in model.named_parameters():
-            if args.dtype == "bf16":
-                if p.dtype != torch.bfloat16:
-                    p.data = p.data.to(torch.bfloat16)
-            elif args.dtype == "fp16":
-                if p.dtype != torch.float16:
-                    p.data = p.data.to(torch.float16)
+    for n, p in model.named_parameters():
+        if args.dtype == "bf16":
+            if p.dtype != torch.bfloat16:
+                p.data = p.data.to(torch.bfloat16)
+        elif args.dtype == "fp16":
+            if p.dtype != torch.float16:
+                p.data = p.data.to(torch.float16)
 
     console.log(f"[Process {accelerator.process_index}] Model loaded successfully")
 
@@ -141,7 +137,7 @@ def test_with_accelerate(args):
     )
 
     # Prepare dataloader with Accelerate
-    dataloader = accelerator.prepare_data_loader(dataloader)
+    model, dataloader = accelerator.prepare(model, dataloader)
 
     # Run inference
     generate_and_save_on_one_dataset(

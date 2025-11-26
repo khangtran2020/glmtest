@@ -118,16 +118,21 @@ def generate_and_save_on_one_dataset(
     device: torch.device,
     tokenizer: PreTrainedTokenizer,
     collate_fn_: callable,
+    dataloader: DataLoader = None,
     config: GLMFModelConfig = None,
     suffix: str = "train",
     do_save: bool = True,
 ):
-    loader = DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        shuffle=False,
-        collate_fn=collate_fn_,
-    )
+    if dataloader is None:
+        loader = DataLoader(
+            dataset,
+            batch_size=args.batch_size,
+            shuffle=False,
+            collate_fn=collate_fn_,
+        )
+    else:
+        loader = dataloader
+
     generated_text = {}
     processed_instance_id = []
     if do_save:
