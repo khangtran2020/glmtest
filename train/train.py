@@ -12,7 +12,7 @@ from rich import print as pprint
 from rich.pretty import pretty_repr
 from functools import partial
 from model.gnn import GRAPH_KEYS
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from data.core import Data
 from data.loader import GLMFDataset, collate_fn
 from model.model import GLMFModelForCausalLM
@@ -64,11 +64,8 @@ def train(
             collate_fn=collate_fn_,
         )
     else:
-        if args.only_gnn:
-            console.log(
-                f"Training GNN on multi GPU - {args.num_gpu} GPUs - with mode: train_multi_gpu_gnnonly"
-            )
-            train_multi_gpu_gnnonly(
+        if args.ring_attn:
+            train_multi_gpu_accelerate_ring_attn(
                 args=args,
                 dataset=dataset,
                 console=console,
@@ -82,9 +79,6 @@ def train(
                 collate_fn=collate_fn_,
             )
         else:
-            console.log(
-                f"Training on multi GPU - {args.num_gpu} GPUs - with mode: train_multi_gpu_accelerate"
-            )
             train_multi_gpu_accelerate(
                 args=args,
                 dataset=dataset,
@@ -564,7 +558,7 @@ def train_single_gpu_accelerate(
     accelerator.end_training()
 
 
-def train_multi_gpu_accelerate(
+def train_multi_gpu_accelerate_ring_attn(
     args: Namespace,
     dataset: Data,
     console: Console,
@@ -1007,7 +1001,7 @@ def train_multi_gpu_accelerate(
     accelerator.end_training()
 
 
-def train_multi_gpu_gnnonly(
+def train_multi_gpu_accelerate(
     args: Namespace,
     dataset: Data,
     console: Console,
@@ -1022,8 +1016,10 @@ def train_multi_gpu_gnnonly(
 ):
 
     # num_device = torch.cuda.device_count()
+    # Use batch_size as gradient_accumulation_steps for micro-batching
+    # This allows WeightedRandomSampler to work with larger batches while processing samples one-by-one
     accelerator = Accelerator(
-        gradient_accumulation_steps=args.gradient_accumulation_steps,
+        gradient_accumulation_steps=args.batch_size,
         mixed_precision=mixed_precision,
         log_with="wandb",
         project_dir=args.log_dir,
@@ -1037,10 +1033,9 @@ def train_multi_gpu_gnnonly(
                 "dataset": args.data,
                 "learning_rate": args.learning_rate,
                 "batch_size": args.batch_size,
-                "gradient_accumulation_steps": args.gradient_accumulation_steps,
-                "effective_batch_size": args.batch_size
-                * args.gradient_accumulation_steps
-                * accelerator.num_processes,
+                "gradient_accumulation_steps": args.batch_size,  # Micro-batching: process batch_size samples one-by-one
+                "effective_batch_size": args.batch_size  # Each sample processed individually, accumulated over batch_size steps
+                * accelerator.num_processes,  # Multiply by number of GPUs
                 "max_steps": args.num_train_epochs,
                 "mixed_precision": mixed_precision,
                 "seed": args.seed,
@@ -1055,6 +1050,13 @@ def train_multi_gpu_gnnonly(
         console.log(f"Distributed type: {accelerator.distributed_type}")
         console.log(f"Number of processes: {accelerator.num_processes}")
         console.log(f"Mixed precision: {mixed_precision}")
+        console.log(
+            f"[yellow]Micro-batching enabled: Processing {args.batch_size} samples individually, "
+            f"accumulating gradients before optimizer step[/yellow]"
+        )
+        console.log(
+            f"[yellow]Effective batch size: {args.batch_size * accelerator.num_processes}[/yellow]"
+        )
 
     tokenizer = dataset.llm_tokenizer
     tr_dataset = GLMFDataset(
@@ -1077,9 +1079,50 @@ def train_multi_gpu_gnnonly(
         dtype=args.dtype,
         num_gpus=args.num_gpu,
     )
+
+    # Compute repo and create sample weights for imbalanced dataset
+    # Optimize: extract UUIDs directly from data dict without triggering __getitem__
+    repos = []
+    for idx in range(len(tr_dataset)):
+        uuid = list(tr_dataset.data.keys())[idx]
+        repo = uuid.split("-")[0]
+        repos.append(repo)
+
+    # Count occurrences of each repo
+    repo_to_idx = {repo: idx for idx, repo in enumerate(set(repos))}
+    repo_index_tensor = torch.tensor([repo_to_idx[repo] for repo in repos])
+    repo_counts = torch.bincount(repo_index_tensor)
+    weights = 1.0 / repo_counts.float()
+
+    # create dict with key is repo and value is weight
+    repo_weights = {repo: weights[idx].item() for repo, idx in repo_to_idx.items()}
+    sample_weights = [repo_weights[repo] for repo in repos]
+
+    # Log repo distribution
+    if accelerator.is_main_process:
+        unique_repos = len(set(repos))
+        console.log(f"[cyan]Found {unique_repos} unique repos in training set[/cyan]")
+        repo_dist = {
+            list(repo_to_idx.keys())[i]: repo_counts[i].item()
+            for i in range(len(repo_counts))
+        }
+        sorted_dist = dict(
+            sorted(repo_dist.items(), key=lambda x: x[1], reverse=True)[:10]
+        )
+        console.log(f"[cyan]Top 10 repos by sample count: {sorted_dist}[/cyan]")
+        console.log(
+            f"[cyan]Using WeightedRandomSampler for balanced repo sampling[/cyan]"
+        )
+
+    # Create WeightedRandomSampler
+    sampler = WeightedRandomSampler(
+        sample_weights, num_samples=len(repos), replacement=True
+    )
+
     dataloader_params = {
         "batch_size": args.batch_size,
         "collate_fn": collate_fn,
+        "sampler": sampler,
         "num_workers": 4,
         "pin_memory": True,
         "persistent_workers": True,
@@ -1088,10 +1131,11 @@ def train_multi_gpu_gnnonly(
     if not isinstance(tr_dataset, torch.utils.data.IterableDataset):
         dataloader_params["drop_last"] = True
         dataloader_params["worker_init_fn"] = seed_worker
+        # Note: shuffle is not compatible with sampler, sampler handles sampling strategy
 
     tr_loader = DataLoader(tr_dataset, **dataloader_params)
     va_loader = DataLoader(
-        va_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn
+        va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
     )
 
     if accelerator.is_main_process:
@@ -1145,109 +1189,134 @@ def train_multi_gpu_gnnonly(
             num_items = 0.0
 
             for step, batch in enumerate(tr_loader):
-
-                batch = batch
                 if (continue_training == True) and (global_step <= start_step):
-
                     global_step += args.batch_size
                     ram_usage = log_ram_usage()
 
                     if accelerator.is_main_process:
-
                         progress.update(
                             train_epoch_task,
                             advance=1,
                             description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
                         )
-
                     continue
 
                 accelerator.wait_for_everyone()
-                global_step += args.batch_size
-                batch_loss = 0.0
                 batch_size = batch["input"]["input_ids"].size(0)
-                if "token_type_ids" in batch["input"]:
-                    batch["input"].pop("token_type_ids")
+                batch_loss = 0.0
 
-                micro_input = {
-                    "input_ids": batch["input"]["input_ids"],
-                    "attention_mask": batch["input"]["attention_mask"],
-                    "labels": batch["input"]["labels"],
-                }
+                # Micro-batching: Process each sample in batch individually to avoid OOM
+                for micro_idx in range(batch_size):
+                    # Extract single sample from batch
+                    micro_input = {
+                        "input_ids": batch["input"]["input_ids"][
+                            micro_idx : micro_idx + 1
+                        ],
+                        "attention_mask": batch["input"]["attention_mask"][
+                            micro_idx : micro_idx + 1
+                        ],
+                        "labels": batch["input"]["labels"][micro_idx : micro_idx + 1],
+                    }
 
-                if "graph" in args.baseline_prompt:
-                    graphs = batch["graph"]
-                    graph_masks = batch["graph_mask"]
-                    graph_token_indices = []
+                    if "token_type_ids" in batch["input"]:
+                        micro_input["token_type_ids"] = batch["input"][
+                            "token_type_ids"
+                        ][micro_idx : micro_idx + 1]
 
-                    for i in range(batch_size):
-                        graph_token_index = torch.where(
-                            micro_input["input_ids"][i] == config.graph_token_id[1]
-                        )[0].tolist()
-                        graph_token_indices.append(graph_token_index)
-
-                else:
-                    graphs = None
-                    graph_masks = None
-                    graph_token_indices = None
-
-                position_ids = (
-                    torch.arange(micro_input["input_ids"].shape[1])
-                    .unsqueeze(0)
-                    .expand(micro_input["input_ids"].shape[0], -1)
-                )
-                with accelerator.accumulate(model):
-                    outputs = model(
-                        **micro_input,
-                        position_ids=position_ids.to(device),
-                        graphs=graphs,
-                        graph_masks=graph_masks,
-                        graph_token_indices=graph_token_indices,
-                        step=global_step,
-                        accelerator=accelerator,
-                        only_gnn=True,
-                    )
-                    loss = outputs.loss
-                    accelerator.backward(loss)
-
-                    if accelerator.sync_gradients:
-                        accelerator.wait_for_everyone()
-                        accelerator.clip_grad_norm_(
-                            model.parameters(), args.max_grad_norm
+                    # Extract graph data for this sample
+                    if "graph" in args.baseline_prompt:
+                        micro_graphs = (
+                            [batch["graph"][micro_idx]]
+                            if batch["graph"] is not None
+                            else None
                         )
-                        optimizer.step()
-                        lr_scheduler.step()
-                        optimizer.zero_grad(set_to_none=True)
+                        micro_graph_masks = (
+                            [batch["graph_mask"][micro_idx]]
+                            if batch["graph_mask"] is not None
+                            else None
+                        )
 
-                with torch.no_grad():
-                    all_losses = accelerator.gather(loss)
-                    all_losses = torch.where(
-                        torch.isnan(all_losses),
-                        torch.zeros_like(all_losses),
-                        all_losses,
+                        if micro_graphs is not None:
+                            graph_token_index = torch.where(
+                                micro_input["input_ids"][0] == config.graph_token_id[1]
+                            )[0].tolist()
+                            micro_graph_token_indices = [graph_token_index]
+                        else:
+                            micro_graph_token_indices = None
+                    else:
+                        micro_graphs = None
+                        micro_graph_masks = None
+                        micro_graph_token_indices = None
+
+                    position_ids = (
+                        torch.arange(micro_input["input_ids"].shape[1])
+                        .unsqueeze(0)
+                        .expand(micro_input["input_ids"].shape[0], -1)
                     )
-                    total_loss = torch.mean(all_losses)
-                    batch_loss += total_loss.detach().float().item()
 
-                for key in micro_input.keys():
-                    micro_input[key] = micro_input[key].to("cpu")
+                    # Forward pass with gradient accumulation
+                    with accelerator.accumulate(model):
+                        outputs = model(
+                            **micro_input,
+                            position_ids=position_ids.to(device),
+                            graphs=micro_graphs,
+                            graph_masks=micro_graph_masks,
+                            graph_token_indices=micro_graph_token_indices,
+                            step=global_step,
+                            accelerator=accelerator,
+                            only_gnn=True,
+                        )
+                        loss = outputs.loss
+                        accelerator.backward(loss)
 
-                if "graph" in args.baseline_prompt:
-                    for graph in graphs:
-                        for key in GRAPH_KEYS:
-                            if key in graph.keys():
-                                graph[key] = graph[key].to("cpu")
-                                graph.pop(key, None)
-                    for graph_mask in graph_masks:
-                        for mask in graph_mask:
-                            mask = mask.to("cpu")
-                    del graph_masks, graphs, graph_token_indices
+                        if accelerator.sync_gradients:
+                            accelerator.wait_for_everyone()
+                            accelerator.clip_grad_norm_(
+                                model.parameters(), args.max_grad_norm
+                            )
+                            optimizer.step()
+                            lr_scheduler.step()
+                            optimizer.zero_grad(set_to_none=True)
 
-                outputs.logits = outputs.logits.to("cpu")
-                loss = loss.to("cpu")
-                del outputs, loss, micro_input, batch
+                    # Accumulate loss
+                    with torch.no_grad():
+                        all_losses = accelerator.gather(loss)
+                        all_losses = torch.where(
+                            torch.isnan(all_losses),
+                            torch.zeros_like(all_losses),
+                            all_losses,
+                        )
+                        total_loss = torch.mean(all_losses)
+                        batch_loss += total_loss.detach().float().item()
+
+                    # Clean up memory for this micro-batch
+                    for key in micro_input.keys():
+                        micro_input[key] = micro_input[key].to("cpu")
+
+                    if "graph" in args.baseline_prompt and micro_graphs is not None:
+                        for graph in micro_graphs:
+                            for key in GRAPH_KEYS:
+                                if key in graph.keys():
+                                    graph[key] = graph[key].to("cpu")
+                                    graph.pop(key, None)
+                        if micro_graph_masks is not None:
+                            for mask in micro_graph_masks:
+                                for m in mask:
+                                    m = m.to("cpu")
+                        del micro_graphs, micro_graph_masks, micro_graph_token_indices
+
+                    outputs.logits = outputs.logits.to("cpu")
+                    loss = loss.to("cpu")
+                    del outputs, loss, micro_input
+                    gc.collect()
+                    torch.cuda.empty_cache()
+
+                # Update global step and logging
+                global_step += batch_size
+
+                # Clean up batch
+                del batch
                 gc.collect()
-                torch.cuda.empty_cache()
 
                 avg_batch_loss = batch_loss / batch_size
                 if accelerator.is_main_process:
