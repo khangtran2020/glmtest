@@ -21,6 +21,7 @@ from model.gnn import MultiGAT, MutliGraphSage
 from train.utils import extract_local
 from ring_flash_attn import update_ring_flash_attn_params
 from peft import get_peft_model, LoraConfig, TaskType
+from transformers import BitsAndBytesConfig
 
 
 # typing
@@ -49,6 +50,12 @@ class GLMFModelConfig(PretrainedConfig):
         lora_alpha: int = 32,
         lora_dropout: float = 0.1,
         lora_target_modules: List[str] = None,
+        # Quantization parameters (QLoRA)
+        load_in_4bit: bool = False,
+        load_in_8bit: bool = False,
+        bnb_4bit_compute_dtype: str = "bfloat16",
+        bnb_4bit_quant_type: str = "nf4",
+        bnb_4bit_use_double_quant: bool = True,
         debug: bool = False,
         **kwargs,
     ):
@@ -111,6 +118,29 @@ class GLMFModelConfig(PretrainedConfig):
         self.lora_dropout = lora_dropout
         self.lora_target_modules = lora_target_modules
 
+        # Quantization config
+        self.load_in_4bit = load_in_4bit
+        self.load_in_8bit = load_in_8bit
+        self.bnb_4bit_compute_dtype = bnb_4bit_compute_dtype
+        self.bnb_4bit_quant_type = bnb_4bit_quant_type
+        self.bnb_4bit_use_double_quant = bnb_4bit_use_double_quant
+        
+        # Validate quantization settings
+        if self.load_in_4bit and self.load_in_8bit:
+            raise ValueError(
+                "Cannot enable both `load_in_4bit` and `load_in_8bit`. "
+                "Please choose one quantization method."
+            )
+        
+        # Warn if quantization without LoRA
+        if (self.load_in_4bit or self.load_in_8bit) and not self.use_lora:
+            import warnings
+            warnings.warn(
+                "Using quantization without LoRA is not recommended for training. "
+                "Consider enabling LoRA for QLoRA training.",
+                UserWarning
+            )
+
         # self.dtype = dtype
         # self.graph_token_id = [92302, 92303, 92304]
         # super().__init__(**config, **kwargs)
@@ -146,6 +176,11 @@ class GLMFModelConfig(PretrainedConfig):
                 lora_alpha=self.lora_alpha,
                 lora_dropout=self.lora_dropout,
                 lora_target_modules=self.lora_target_modules,
+                load_in_4bit=self.load_in_4bit,
+                load_in_8bit=self.load_in_8bit,
+                bnb_4bit_compute_dtype=self.bnb_4bit_compute_dtype,
+                bnb_4bit_quant_type=self.bnb_4bit_quant_type,
+                bnb_4bit_use_double_quant=self.bnb_4bit_use_double_quant,
                 debug=self.debug,
             )
         except ValueError:
@@ -248,26 +283,66 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     dropout=config.dropout,
                 )
 
-        if config.dtype == "fp16":
-            self.llm_model = AutoModelForCausalLM.from_pretrained(
-                config.model_name,
-                torch_dtype=torch.float16,
-                device_map=f"cuda:{rank}",
-                attn_implementation="flash_attention_2",
+        # Prepare quantization config if needed (QLoRA)
+        quantization_config = None
+        if config.load_in_4bit or config.load_in_8bit:
+
+            if config.load_in_4bit and config.load_in_8bit:
+                raise ValueError(
+                    "Cannot enable both `load_in_4bit` and `load_in_8bit`. "
+                    "Please choose one quantization method."
+                )
+
+            pprint(
+                f"[yellow]Loading model with quantization: 4bit={config.load_in_4bit}, 8bit={config.load_in_8bit}[/yellow]"
             )
+
+            # Map string dtype to torch dtype
+            compute_dtype_map = {
+                "bfloat16": torch.bfloat16,
+                "float16": torch.float16,
+                "float32": torch.float32,
+            }
+
+            compute_dtype = compute_dtype_map.get(
+                config.bnb_4bit_compute_dtype, torch.bfloat16
+            )
+
+            if config.load_in_8bit:
+                quantization_config = BitsAndBytesConfig(
+                    load_in_4bit=False,
+                    load_in_8bit=config.load_in_8bit,
+                    bnb_4bit_compute_dtype=compute_dtype,
+                    bnb_4bit_quant_type=config.bnb_4bit_quant_type,
+                    bnb_4bit_use_double_quant=config.bnb_4bit_use_double_quant,
+                )
+            else:  # 4-bit quantization
+                quantization_config = BitsAndBytesConfig(
+                    load_in_4bit=config.load_in_4bit,
+                    load_in_8bit=False,
+                    bnb_4bit_compute_dtype=compute_dtype,
+                    bnb_4bit_quant_type=config.bnb_4bit_quant_type,
+                    bnb_4bit_use_double_quant=config.bnb_4bit_use_double_quant,
+                )
+
+        # Determine torch dtype (quantization overrides this)
+        if quantization_config is not None:
+            torch_dtype = None  # Let quantization config handle dtype
+        elif config.dtype == "fp16":
+            torch_dtype = torch.float16
         elif config.dtype == "bf16":
-            self.llm_model = AutoModelForCausalLM.from_pretrained(
-                config.model_name,
-                torch_dtype=torch.bfloat16,
-                device_map=f"cuda:{rank}",
-                attn_implementation="flash_attention_2",
-            )
+            torch_dtype = torch.bfloat16
         else:
-            self.llm_model = AutoModelForCausalLM.from_pretrained(
-                config.model_name,
-                device_map=f"cuda:{rank}",
-                attn_implementation="flash_attention_2",
-            )
+            torch_dtype = None
+
+        # Load model with optional quantization
+        self.llm_model = AutoModelForCausalLM.from_pretrained(
+            config.model_name,
+            torch_dtype=torch_dtype,
+            quantization_config=quantization_config,
+            device_map=f"cuda:{rank}",
+            attn_implementation="flash_attention_2",
+        )
 
         if self.is_training:
             self.llm_model.resize_token_embeddings(len(tokenizer))
@@ -285,8 +360,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 task_type=TaskType.CAUSAL_LM,
             )
             self.llm_model = get_peft_model(self.llm_model, lora_config)
-
-        # LoRA init
 
         gc.collect()
         torch.cuda.empty_cache()

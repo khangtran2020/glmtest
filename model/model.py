@@ -109,6 +109,11 @@ def get_model_train(
             lora_alpha=args.lora_alpha,
             lora_dropout=args.lora_dropout,
             lora_target_modules=args.lora_target_modules,
+            load_in_4bit=args.load_in_4bit,
+            load_in_8bit=args.load_in_8bit,
+            bnb_4bit_compute_dtype=args.bnb_4bit_compute_dtype,
+            bnb_4bit_quant_type=args.bnb_4bit_quant_type,
+            bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
             device_map="cuda" if torch.cuda.is_available() else "cpu",
         )
 
@@ -168,6 +173,11 @@ def get_model_train(
             lora_alpha=args.lora_alpha,
             lora_dropout=args.lora_dropout,
             lora_target_modules=args.lora_target_modules,
+            load_in_4bit=args.load_in_4bit,
+            load_in_8bit=args.load_in_8bit,
+            bnb_4bit_compute_dtype=args.bnb_4bit_compute_dtype,
+            bnb_4bit_quant_type=args.bnb_4bit_quant_type,
+            bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
             device_map="cuda" if torch.cuda.is_available() else "cpu",
         )
 
@@ -306,6 +316,11 @@ def get_model_test(
             lora_alpha=args.lora_alpha,
             lora_dropout=args.lora_dropout,
             lora_target_modules=args.lora_target_modules,
+            load_in_4bit=args.load_in_4bit,
+            load_in_8bit=args.load_in_8bit,
+            bnb_4bit_compute_dtype=args.bnb_4bit_compute_dtype,
+            bnb_4bit_quant_type=args.bnb_4bit_quant_type,
+            bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
             device_map="cuda" if torch.cuda.is_available() else "cpu",
         )
 
@@ -345,6 +360,11 @@ def get_model_test(
             lora_alpha=args.lora_alpha,
             lora_dropout=args.lora_dropout,
             lora_target_modules=args.lora_target_modules,
+            load_in_4bit=args.load_in_4bit,
+            load_in_8bit=args.load_in_8bit,
+            bnb_4bit_compute_dtype=args.bnb_4bit_compute_dtype,
+            bnb_4bit_quant_type=args.bnb_4bit_quant_type,
+            bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
             device_map="cuda",
         )
 
@@ -442,6 +462,11 @@ def get_model_testgen(
                 lora_alpha=args.lora_alpha,
                 lora_dropout=args.lora_dropout,
                 lora_target_modules=args.lora_target_modules,
+                load_in_4bit=args.load_in_4bit,
+                load_in_8bit=args.load_in_8bit,
+                bnb_4bit_compute_dtype=args.bnb_4bit_compute_dtype,
+                bnb_4bit_quant_type=args.bnb_4bit_quant_type,
+                bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
                 device_map="cuda" if torch.cuda.is_available() else "cpu",
             )
 
@@ -479,6 +504,11 @@ def get_model_testgen(
                 lora_alpha=args.lora_alpha,
                 lora_dropout=args.lora_dropout,
                 lora_target_modules=args.lora_target_modules,
+                load_in_4bit=args.load_in_4bit,
+                load_in_8bit=args.load_in_8bit,
+                bnb_4bit_compute_dtype=args.bnb_4bit_compute_dtype,
+                bnb_4bit_quant_type=args.bnb_4bit_quant_type,
+                bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
                 device_map="cuda" if torch.cuda.is_available() else "cpu",
             )
 
@@ -518,6 +548,11 @@ def get_model_testgen(
                 lora_alpha=args.lora_alpha,
                 lora_dropout=args.lora_dropout,
                 lora_target_modules=args.lora_target_modules,
+                load_in_4bit=args.load_in_4bit,
+                load_in_8bit=args.load_in_8bit,
+                bnb_4bit_compute_dtype=args.bnb_4bit_compute_dtype,
+                bnb_4bit_quant_type=args.bnb_4bit_quant_type,
+                bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
                 device_map="cuda",
             )
 

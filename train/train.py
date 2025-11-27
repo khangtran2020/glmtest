@@ -247,13 +247,22 @@ def train_single_gpu_accelerate(
     )
     device = accelerator.device
     config = model.config
+
+    # Prepare LLM for k-bit training if using quantization (CRITICAL for QLoRA)
+    # Only affects model.llm_model, GNN remains unaffected
+    if hasattr(config, "load_in_4bit") and (config.load_in_4bit or config.load_in_8bit):
+        from peft import prepare_model_for_kbit_training
+
+        model.llm_model = prepare_model_for_kbit_training(model.llm_model)
+        console.log("[green]LLM prepared for k-bit training (QLoRA)[/green]")
+
     model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
     global_step = 0
     previous_checkpoint_step = -1
     best_val_loss = 10000.0
 
     if continue_training == False:
-        optimizer.zero_grad()
+        optimizer.zero_grad(set_to_none=True)
 
     with Progress(
         SpinnerColumn(),  # Shows a spinner
@@ -334,12 +343,7 @@ def train_single_gpu_accelerate(
                     graph_masks = None
                     graph_token_indices = None
 
-                with accelerator.accumulate(model), torch.autocast(
-                    device_type="cuda",
-                    dtype=(
-                        torch.float16 if mixed_precision == "fp16" else torch.bfloat16
-                    ),
-                ):
+                with accelerator.accumulate(model):
                     outputs = model(
                         **micro_input,
                         step=global_step,
@@ -355,7 +359,7 @@ def train_single_gpu_accelerate(
                     accelerator.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                     optimizer.step()
                     lr_scheduler.step()
-                    optimizer.zero_grad()
+                    optimizer.zero_grad(set_to_none=True)
                 # logging_gpu_usage(step=global_step, console=console)
 
                 batch_loss += loss.item()
@@ -643,6 +647,16 @@ def train_multi_gpu_accelerate(
     patch_model(process_group=process_group)
     device = accelerator.device
     config = model.config
+
+    # Prepare LLM for k-bit training if using quantization (CRITICAL for QLoRA)
+    # Only affects model.llm_model, GNN remains unaffected
+    if hasattr(config, "load_in_4bit") and (config.load_in_4bit or config.load_in_8bit):
+        from peft import prepare_model_for_kbit_training
+
+        model.llm_model = prepare_model_for_kbit_training(model.llm_model)
+        if accelerator.is_main_process:
+            console.log("[green]LLM prepared for k-bit training (QLoRA)[/green]")
+
     model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
 
     # console.log(f"Model prepared with accelerator: {model}")
@@ -759,8 +773,8 @@ def train_multi_gpu_accelerate(
                     accelerator.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                     optimizer.step()
                     lr_scheduler.step()
-                    optimizer.zero_grad()
-                    model.zero_grad()
+                    optimizer.zero_grad(set_to_none=True)
+                    model.zero_grad(set_to_none=True)
 
                 with torch.no_grad():
                     all_losses = accelerator.gather(loss)
@@ -921,13 +935,8 @@ def train_multi_gpu_accelerate(
                             del checkpoint_dir
                             gc.collect()
 
-                    for name, param in model.named_parameters():
-                        param = (
-                            param.to(torch.bfloat16)
-                            if mixed_precision == "bf16"
-                            else param.to(torch.float16)
-                        )
-                        param = param.to(device)
+                    # No need to restore dtypes - Accelerate handles mixed precision automatically
+                    # Converting quantized 4-bit/8-bit weights to bfloat16 would break quantization
                     accelerator.wait_for_everyone()
 
             if accelerator.is_main_process:
@@ -1082,6 +1091,16 @@ def train_multi_gpu_gnnonly(
 
     device = accelerator.device
     config = model.config
+
+    # Prepare LLM for k-bit training if using quantization (CRITICAL for QLoRA)
+    # Only affects model.llm_model, GNN remains unaffected
+    if hasattr(config, "load_in_4bit") and (config.load_in_4bit or config.load_in_8bit):
+        from peft import prepare_model_for_kbit_training
+
+        model.llm_model = prepare_model_for_kbit_training(model.llm_model)
+        if accelerator.is_main_process:
+            console.log("[green]LLM prepared for k-bit training (QLoRA)[/green]")
+
     model, optimizer, lr_scheduler, tr_loader, va_loader = accelerator.prepare(
         model, optimizer, lr_scheduler, tr_loader, va_loader
     )
@@ -1167,12 +1186,7 @@ def train_multi_gpu_gnnonly(
                     .unsqueeze(0)
                     .expand(micro_input["input_ids"].shape[0], -1)
                 )
-                with accelerator.accumulate(model), torch.autocast(
-                    device_type="cuda",
-                    dtype=(
-                        torch.float16 if mixed_precision == "fp16" else torch.bfloat16
-                    ),
-                ):
+                with accelerator.accumulate(model):
                     outputs = model(
                         **micro_input,
                         position_ids=position_ids.to(device),
@@ -1193,7 +1207,7 @@ def train_multi_gpu_gnnonly(
                         )
                         optimizer.step()
                         lr_scheduler.step()
-                        optimizer.zero_grad()
+                        optimizer.zero_grad(set_to_none=True)
 
                 with torch.no_grad():
                     all_losses = accelerator.gather(loss)
@@ -1351,13 +1365,8 @@ def train_multi_gpu_gnnonly(
                             del checkpoint_dir
                             gc.collect()
 
-                    # map model parameters to correct type
-                    for n, p in model.named_parameters():
-                        if mixed_precision == "fp16":
-                            p.data = p.data.to(torch.float16)
-                        else:
-                            p.data = p.data.to(torch.bfloat16)
-                        p.data = p.data.to(device=device)
+                    # No need to restore dtypes - Accelerate handles mixed precision automatically
+                    # Converting quantized 4-bit/8-bit weights to bfloat16 would break quantization
 
             if accelerator.is_main_process:
                 if ((continue_training == True) and (global_step > start_step)) or (
