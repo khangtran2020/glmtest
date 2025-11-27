@@ -1126,7 +1126,7 @@ def train_multi_gpu_accelerate(
         "sampler": sampler,
         # "num_workers": 0,  # Use os.cpu_count() workers
         "pin_memory": True,
-        "persistent_workers": True,
+        # "persistent_workers": True,
     }
 
     if not isinstance(tr_dataset, torch.utils.data.IterableDataset):
