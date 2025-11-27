@@ -1206,7 +1206,7 @@ class Data(object):
             f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_tokens)}"
         )
 
-    def filter_by_max_tokens(self, max_tokens: int) -> None:
+    def filter_by_max_min_tokens(self, max_tokens: int, min_tokens: int) -> None:
         self.logger.log(f"[green]Filtering data by max tokens {max_tokens}...[/green]")
         assert self.processed_data is not None
         filtered_data = {}
@@ -1215,14 +1215,18 @@ class Data(object):
             filtered_data[data_n] = {}
             for key in tqdm(self.processed_data[data_n].keys()):
                 if isinstance(self.processed_data[data_n][key], dict):
-                    if self.processed_data[data_n][key]["num_tokens"] <= max_tokens:
+                    if (
+                        self.processed_data[data_n][key]["num_tokens"] <= max_tokens
+                    ) and (
+                        self.processed_data[data_n][key]["num_tokens"] >= min_tokens
+                    ):
                         filtered_data[data_n][key] = self.processed_data[data_n][key]
                 else:
                     path = self.processed_data[data_n][key]
                     with open(path, "r") as file:
                         data = json.load(file)
                         num_token = data["num_tokens"]
-                    if num_token <= max_tokens:
+                    if (num_token <= max_tokens) and (num_token >= min_tokens):
                         filtered_data[data_n][key] = self.processed_data[data_n][key]
                     self.processed_data[data_n][key] = {
                         "num_tokens": num_token,

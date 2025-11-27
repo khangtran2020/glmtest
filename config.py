@@ -265,7 +265,12 @@ def add_training_group(group):
         help="max sequence length",
         default=12000,
     )
-
+    group.add_argument(
+        "--min_seq_length",
+        type=int,
+        help="max sequence length",
+        default=12000,
+    )
     group.add_argument(
         "--temp",
         type=float,

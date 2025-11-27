@@ -99,7 +99,7 @@ def main() -> None:
             dataset.prepare_data()
 
     if args.mode == "generate_reasoning":
-        dataset.filter_by_max_tokens(max_tokens=8192)
+        dataset.filter_by_max_min_tokens(max_tokens=8192, min_tokens=100)
         dataset.sample_for_reasoning(max_samples=10000)
         reasoning_save_path = os.path.join(
             dataset.data_path,
@@ -187,7 +187,9 @@ def main() -> None:
             return
 
     if args.mode != "testgen":
-        dataset.filter_by_max_tokens(max_tokens=args.max_seq_length)
+        dataset.filter_by_max_min_tokens(
+            max_tokens=args.max_seq_length, min_tokens=args.min_seq_length
+        )
 
     if args.repo is not None:
         dataset.prepare_data_by_repo()
