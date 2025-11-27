@@ -417,6 +417,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         inputs_embeds: torch.Tensor,
     ) -> Tensor:
 
+        # Clone to avoid in-place operation errors with quantized models
+        if inputs_embeds.requires_grad and inputs_embeds.is_leaf:
+            inputs_embeds = inputs_embeds.clone()
+
         batch_size = inputs_embeds.size(0)
         for i in range(batch_size):
             graph_token_index = graph_token_indices[i]
@@ -468,6 +472,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         graph_masks: List[torch.Tensor],
         inputs_embeds: torch.Tensor,
     ) -> Tensor:
+
+        # Clone to avoid in-place operation errors with quantized models
+        if inputs_embeds.requires_grad and inputs_embeds.is_leaf:
+            inputs_embeds = inputs_embeds.clone()
 
         batch_size = inputs_embeds.size(0)
         for i in range(batch_size):
