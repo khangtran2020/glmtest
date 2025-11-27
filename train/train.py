@@ -237,10 +237,21 @@ def train_single_gpu_accelerate(
         logger=console,
     )
     tr_loader = DataLoader(
-        tr_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn
+        tr_dataset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        collate_fn=collate_fn,
+        num_workers=4,
+        pin_memory=True,
+        persistent_workers=True,
     )
     va_loader = DataLoader(
-        va_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn
+        va_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        collate_fn=collate_fn,
+        num_workers=2,
+        pin_memory=True,
     )
     logging_train_data(
         console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
@@ -306,9 +317,13 @@ def train_single_gpu_accelerate(
                     batch["input"].pop("token_type_ids")
 
                 micro_input = {
-                    "input_ids": batch["input"]["input_ids"].to(device),
-                    "attention_mask": batch["input"]["attention_mask"].to(device),
-                    "labels": batch["input"]["labels"].to(device),
+                    "input_ids": batch["input"]["input_ids"].to(
+                        device, non_blocking=True
+                    ),
+                    "attention_mask": batch["input"]["attention_mask"].to(
+                        device, non_blocking=True
+                    ),
+                    "labels": batch["input"]["labels"].to(device, non_blocking=True),
                 }
                 user_prompt_lens = batch.get("user_prompt_lens", None)
 
@@ -321,15 +336,12 @@ def train_single_gpu_accelerate(
                         graph = batch["graph"][i]
                         for key in GRAPH_KEYS:
                             if key in graph.keys():
-                                graph[key] = graph[key].to(device)
+                                graph[key] = graph[key].to(device, non_blocking=True)
 
                         graph_mask = [
-                            mask.to(device) for mask in batch["graph_mask"][i]
+                            mask.to(device, non_blocking=True)
+                            for mask in batch["graph_mask"][i]
                         ]
-
-                        print(
-                            f"Size of micro_input['input_ids'][i]: {micro_input['input_ids'][i].size()}"
-                        )
 
                         graph_token_index = torch.where(
                             micro_input["input_ids"][i]
@@ -391,7 +403,6 @@ def train_single_gpu_accelerate(
                 del outputs, loss, micro_input
                 gc.collect()
                 torch.cuda.empty_cache()
-                torch.cuda.synchronize()
 
                 if global_step % args.logging_steps == 0:
                     current_lr = lr_scheduler.get_last_lr()[0]
@@ -484,7 +495,6 @@ def train_single_gpu_accelerate(
 
                     gc.collect()
                     torch.cuda.empty_cache()
-                    torch.cuda.synchronize()
                     console.log(
                         f"[blue]After validation: {torch.cuda.memory_allocated()}[/blue]"
                     )
