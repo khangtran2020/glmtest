@@ -55,7 +55,7 @@ class GLMFModelConfig(PretrainedConfig):
         load_in_8bit: bool = False,
         bnb_4bit_compute_dtype: str = "bfloat16",
         bnb_4bit_quant_type: str = "nf4",
-        bnb_4bit_use_double_quant: bool = True,
+        bnb_4bit_use_double_quant: bool = False,
         debug: bool = False,
         **kwargs,
     ):
@@ -124,21 +124,22 @@ class GLMFModelConfig(PretrainedConfig):
         self.bnb_4bit_compute_dtype = bnb_4bit_compute_dtype
         self.bnb_4bit_quant_type = bnb_4bit_quant_type
         self.bnb_4bit_use_double_quant = bnb_4bit_use_double_quant
-        
+
         # Validate quantization settings
         if self.load_in_4bit and self.load_in_8bit:
             raise ValueError(
                 "Cannot enable both `load_in_4bit` and `load_in_8bit`. "
                 "Please choose one quantization method."
             )
-        
+
         # Warn if quantization without LoRA
         if (self.load_in_4bit or self.load_in_8bit) and not self.use_lora:
             import warnings
+
             warnings.warn(
                 "Using quantization without LoRA is not recommended for training. "
                 "Consider enabling LoRA for QLoRA training.",
-                UserWarning
+                UserWarning,
             )
 
         # self.dtype = dtype

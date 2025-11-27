@@ -113,7 +113,7 @@ def get_model_train(
             load_in_8bit=args.load_in_8bit,
             bnb_4bit_compute_dtype=args.bnb_4bit_compute_dtype,
             bnb_4bit_quant_type=args.bnb_4bit_quant_type,
-            bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
+            # bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
             device_map="cuda" if torch.cuda.is_available() else "cpu",
         )
 
@@ -177,7 +177,7 @@ def get_model_train(
             load_in_8bit=args.load_in_8bit,
             bnb_4bit_compute_dtype=args.bnb_4bit_compute_dtype,
             bnb_4bit_quant_type=args.bnb_4bit_quant_type,
-            bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
+            # bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
             device_map="cuda" if torch.cuda.is_available() else "cpu",
         )
 
@@ -320,7 +320,7 @@ def get_model_test(
             load_in_8bit=args.load_in_8bit,
             bnb_4bit_compute_dtype=args.bnb_4bit_compute_dtype,
             bnb_4bit_quant_type=args.bnb_4bit_quant_type,
-            bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
+            # bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
             device_map="cuda" if torch.cuda.is_available() else "cpu",
         )
 
@@ -364,7 +364,7 @@ def get_model_test(
             load_in_8bit=args.load_in_8bit,
             bnb_4bit_compute_dtype=args.bnb_4bit_compute_dtype,
             bnb_4bit_quant_type=args.bnb_4bit_quant_type,
-            bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
+            # bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
             device_map="cuda",
         )
 
@@ -466,7 +466,7 @@ def get_model_testgen(
                 load_in_8bit=args.load_in_8bit,
                 bnb_4bit_compute_dtype=args.bnb_4bit_compute_dtype,
                 bnb_4bit_quant_type=args.bnb_4bit_quant_type,
-                bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
+                # bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
                 device_map="cuda" if torch.cuda.is_available() else "cpu",
             )
 
@@ -508,7 +508,7 @@ def get_model_testgen(
                 load_in_8bit=args.load_in_8bit,
                 bnb_4bit_compute_dtype=args.bnb_4bit_compute_dtype,
                 bnb_4bit_quant_type=args.bnb_4bit_quant_type,
-                bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
+                # bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
                 device_map="cuda" if torch.cuda.is_available() else "cpu",
             )
 
@@ -552,7 +552,7 @@ def get_model_testgen(
                 load_in_8bit=args.load_in_8bit,
                 bnb_4bit_compute_dtype=args.bnb_4bit_compute_dtype,
                 bnb_4bit_quant_type=args.bnb_4bit_quant_type,
-                bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
+                # bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant,
                 device_map="cuda",
             )
 
