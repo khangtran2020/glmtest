@@ -327,9 +327,9 @@ def train_single_gpu_accelerate(
                             mask.to(device) for mask in batch["graph_mask"][i]
                         ]
 
-                        # print(
-                        #     f"Size of micro_input['input_ids'][i]: {micro_input['input_ids'][i].size()}"
-                        # )
+                        print(
+                            f"Size of micro_input['input_ids'][i]: {micro_input['input_ids'][i].size()}"
+                        )
 
                         graph_token_index = torch.where(
                             micro_input["input_ids"][i]
