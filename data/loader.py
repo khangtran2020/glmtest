@@ -81,10 +81,11 @@ class GLMFDataset(Dataset):
                     mask=act_node,
                     n_hops=self.n_hops,
                 )
-                graph[key].ndata["feat"] = (
-                    graph[key]
-                    .ndata["feat"]
-                    .to(dtype=torch.bfloat16 if self.dtype == "bf16" else torch.float16)
+                # Force features to CPU and materialize to avoid DGL lazy loading issues with DataLoader workers
+                feat = graph[key].ndata["feat"]
+                graph[key].ndata["feat"] = feat.to(
+                    device="cpu",
+                    dtype=torch.bfloat16 if self.dtype == "bf16" else torch.float16,
                 )
 
         if self.testing == False:
