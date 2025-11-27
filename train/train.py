@@ -761,6 +761,7 @@ def train_multi_gpu_accelerate_ring_attn(
                         graph_token_indices=graph_token_indices,
                         step=global_step,
                         accelerator=accelerator,
+                        ring_attn=True,
                     )
 
                     accelerator.wait_for_everyone()
@@ -1264,7 +1265,7 @@ def train_multi_gpu_accelerate(
                             graph_token_indices=micro_graph_token_indices,
                             step=global_step,
                             accelerator=accelerator,
-                            only_gnn=True,
+                            ring_attn=False,
                         )
                         loss = outputs.loss
                         accelerator.backward(loss)

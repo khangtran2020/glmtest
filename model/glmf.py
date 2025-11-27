@@ -548,7 +548,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
         step: int = 0,
-        only_gnn: bool = False,
+        ring_attn: bool = False,
         accelerator: Optional[Accelerator] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
@@ -587,7 +587,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if accelerator is not None:
             accelerator.wait_for_everyone()
         if self.multi_gpu:
-            if only_gnn:
+            if not ring_attn:
                 return self.llm_model(
                     input_ids=None,
                     inputs_embeds=inputs_embeds,
