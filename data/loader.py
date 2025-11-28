@@ -184,28 +184,32 @@ def pad(
     pad_value: int,
     padding_side: str = "left",
 ) -> torch.Tensor:
-    num_dims = len(input_tensors[0].shape)
-    if num_dims == 1:
-        max_length = max(tensor.size(0) for tensor in input_tensors)
-    else:
+    # Normalize tensors to 1D by squeezing once
+    if input_tensors[0].dim() > 1:
         input_tensors = [tensor.squeeze(0) for tensor in input_tensors]
-        max_length = max(tensor.size(0) for tensor in input_tensors)
 
+    # Get lengths using a single tensor operation
+    lengths = torch.tensor([t.size(0) for t in input_tensors], dtype=torch.long)
+    max_length = lengths.max().item()
+
+    # Pre-allocate output tensor
     padded_tensors = torch.full(
-        (len(input_tensors), max_length), pad_value, dtype=input_tensors[0].dtype
+        (len(input_tensors), max_length),
+        pad_value,
+        dtype=input_tensors[0].dtype,
+        device=input_tensors[0].device,
     )
-    for i, tensor in enumerate(input_tensors):
-        if padding_side == "left":
-            seq_start = max_length - tensor.shape[0]
-        elif padding_side == "right":
-            seq_start = 0
-        else:
-            raise ValueError("padding_side must be 'left' or 'right'")
 
-        # Define the slices
-        seq_slice = slice(seq_start, seq_start + tensor.shape[0])
-        slices = (seq_slice,) + tuple(slice(0, s) for s in tensor.shape[1:])
-        padded_tensors[i][slices] = tensor
+    if padding_side == "left":
+        # Vectorized left padding using advanced indexing
+        for i, (tensor, length) in enumerate(zip(input_tensors, lengths)):
+            padded_tensors[i, max_length - length :] = tensor
+    elif padding_side == "right":
+        # Vectorized right padding using advanced indexing
+        for i, (tensor, length) in enumerate(zip(input_tensors, lengths)):
+            padded_tensors[i, :length] = tensor
+    else:
+        raise ValueError("padding_side must be 'left' or 'right'")
 
     return padded_tensors
 
