@@ -439,13 +439,13 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     overall_mask = overall_mask | mask.to(torch.bool)
 
             overall_indices = (overall_mask == 1).nonzero(as_tuple=True)[0]
+            # Optimization #2: Vectorized mask index computation using torch.isin
             mask_idx = []
             for j, mask in enumerate(graph_mask):
                 mask_indices = (mask == 1).nonzero(as_tuple=True)[0]
-                idx_in_overall = []
-                for k, idx in enumerate(mask_indices):
-                    if idx in overall_indices:
-                        idx_in_overall.append(k)
+                # Use torch.isin for vectorized membership test
+                is_in_overall = torch.isin(mask_indices, overall_indices)
+                idx_in_overall = torch.where(is_in_overall)[0].tolist()
                 mask_idx.append(idx_in_overall)
 
             overall_mask = overall_mask.to(self.llm_model.device)
@@ -480,18 +480,28 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         batch_size = inputs_embeds.size(0)
         for i in range(batch_size):
             graph_token_index = graph_token_indices[i]
-            ranges = []
-            start = graph_token_index[0]
-            prev = graph_token_index[0]
+            # Optimization #5: Vectorized range calculation using torch.diff
+            if len(graph_token_index) == 0:
+                ranges = []
+            elif len(graph_token_index) == 1:
+                ranges = [(graph_token_index[0], graph_token_index[0])]
+            else:
+                # Convert to tensor for vectorized operations
+                gti_tensor = torch.tensor(graph_token_index, dtype=torch.long)
+                # Find discontinuities: where diff > 1
+                diffs = torch.diff(gti_tensor)
+                # Indices where new ranges start (diff > 1)
+                split_indices = torch.where(diffs > 1)[0] + 1
+                # Split into continuous ranges
+                split_points = [0] + split_indices.tolist() + [len(graph_token_index)]
+                ranges = [
+                    (
+                        graph_token_index[split_points[k]],
+                        graph_token_index[split_points[k + 1] - 1],
+                    )
+                    for k in range(len(split_points) - 1)
+                ]
             graph_mask = graph_masks[i]
-            for j in graph_token_index[1:]:
-                if j == prev + 1:
-                    prev = j
-                else:
-                    ranges.append((start, prev))
-                    start = j
-                    prev = j
-            ranges.append((start, prev))
             graph_mask = [mask for mask in graph_mask if mask.sum() > 0]
             assert len(ranges) == len(
                 graph_mask
@@ -509,13 +519,13 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     overall_mask = overall_mask | mask.to(torch.bool)
             # pprint(f"[yellow]Overall_mask: {overall_mask}[/yellow]")
             overall_indices = (overall_mask == 1).nonzero(as_tuple=True)[0]
+            # Optimization #2: Vectorized mask index computation using torch.isin
             mask_idx = []
             for j, mask in enumerate(graph_mask):
                 mask_indices = (mask == 1).nonzero(as_tuple=True)[0]
-                idx_in_overall = []
-                for k, idx in enumerate(mask_indices):
-                    if idx in overall_indices:
-                        idx_in_overall.append(k)
+                # Use torch.isin for vectorized membership test
+                is_in_overall = torch.isin(mask_indices, overall_indices)
+                idx_in_overall = torch.where(is_in_overall)[0].tolist()
                 mask_idx.append(idx_in_overall)
 
             overall_mask = overall_mask.long().to(self.llm_model.device)

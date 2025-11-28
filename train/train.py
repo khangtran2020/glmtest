@@ -368,10 +368,7 @@ def train_single_gpu_accelerate(
                             if key in graph.keys():
                                 graph[key] = graph[key].to(device, non_blocking=True)
 
-                        graph_mask = [
-                            mask.to(device, non_blocking=True)
-                            for mask in batch["graph_mask"][i]
-                        ]
+                        graph_mask = [mask for mask in batch["graph_mask"][i]]
 
                         graph_token_index = torch.where(
                             micro_input["input_ids"][i]
