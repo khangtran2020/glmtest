@@ -18,18 +18,54 @@ from data.loader import GLMFDataset, collate_fn
 from model.model import GLMFModelForCausalLM
 from accelerate import Accelerator
 from transformers.trainer_utils import seed_worker
-from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
+from rich.progress import (
+    Progress,
+    SpinnerColumn,
+    BarColumn,
+    TextColumn,
+    TimeRemainingColumn,
+    TimeElapsedColumn,
+    MofNCompleteColumn,
+    TaskProgressColumn,
+)
 from train.utils import (
     patch_model,
     save_checkpoint,
 )
 from inference.test import validate
 from utils.utils import log_ram_usage
+from collections import deque
 
 # typing
 from argparse import Namespace
 from rich.console import Console
 from transformers import PreTrainedTokenizer
+
+
+class StepTimer:
+    """Simple timer for tracking average step time using a sliding window."""
+
+    def __init__(self, window_size=100):
+        self.step_times = deque(maxlen=window_size)
+        self.start_time = None
+
+    def start(self):
+        """Start timing a step."""
+        self.start_time = time.time()
+
+    def end(self):
+        """End timing a step and record the duration."""
+        if self.start_time:
+            self.step_times.append(time.time() - self.start_time)
+            self.start_time = None
+
+    def avg_time(self):
+        """Get the average step time from the sliding window."""
+        return sum(self.step_times) / len(self.step_times) if self.step_times else 0.0
+
+    def recent_time(self):
+        """Get the most recent step time."""
+        return self.step_times[-1] if self.step_times else 0.0
 
 
 def train(
@@ -1165,18 +1201,25 @@ def train_multi_gpu_accelerate(
     previous_checkpoint_step = -1
     best_val_loss = 10000.0
 
+    # Initialize step timer for performance tracking
+    step_timer = StepTimer(window_size=100)
+
     with Progress(
-        SpinnerColumn(),  # Shows a spinner
-        TextColumn(
-            "[progress.description]{task.description}"
-        ),  # Displays additional info
-        BarColumn(),  # Displays a progress bar
-        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),  # Shows percentage
-        transient=True,
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        MofNCompleteColumn(),
+        TimeElapsedColumn(),
+        TimeRemainingColumn(),
+        TextColumn("| ⏱️  [cyan]{task.fields[step_time]:.2f}s/step"),
+        transient=False,
     ) as progress:
 
         if accelerator.is_main_process:
-            train_task = progress.add_task("Training...", total=args.num_train_epochs)
+            train_task = progress.add_task(
+                "Training...", total=args.num_train_epochs, step_time=0.0
+            )
 
         for epoch in range(args.num_train_epochs):
 
@@ -1185,11 +1228,15 @@ def train_multi_gpu_accelerate(
                 train_epoch_task = progress.add_task(
                     f"Epoch {epoch + 1}/{args.num_train_epochs}",
                     total=len(tr_loader),
+                    step_time=0.0,
                 )
             epoch_loss = 0.0
             num_items = 0.0
 
             for step, batch in enumerate(tr_loader):
+                # Start step timing
+                step_timer.start()
+
                 if (continue_training == True) and (global_step <= start_step):
                     global_step += args.batch_size
                     ram_usage = log_ram_usage()
@@ -1198,8 +1245,10 @@ def train_multi_gpu_accelerate(
                         progress.update(
                             train_epoch_task,
                             advance=1,
+                            step_time=0.0,
                             description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
                         )
+                    step_timer.end()
                     continue
 
                 accelerator.wait_for_everyone()
@@ -1319,13 +1368,18 @@ def train_multi_gpu_accelerate(
                 del batch
                 gc.collect()
 
+                # End step timing
+                step_timer.end()
+
                 avg_batch_loss = batch_loss / batch_size
                 if accelerator.is_main_process:
                     ram_usage = log_ram_usage()
+                    avg_time = step_timer.avg_time()
                     progress.update(
                         train_epoch_task,
                         advance=1,
-                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.10f} - RAM usage: {ram_usage:.1f} MB",
+                        step_time=avg_time,
+                        description=f"Epoch {epoch + 1} | Loss: {avg_batch_loss:.4f} | RAM: {ram_usage:.0f}MB",
                     )
                 epoch_loss += avg_batch_loss * batch_size
                 num_items += batch_size
