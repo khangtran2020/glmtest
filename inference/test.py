@@ -417,14 +417,16 @@ def validate(
         num_item = 0
 
         if accelerator.is_main_process:
-            val_task = progress.add_task("Validating...", total=len(loader))
+            val_task = progress.add_task(
+                "Validating...", total=len(loader), step_time=0.0
+            )
 
         for step, batch in enumerate(loader):
-            batch_start_time = time.time()
             batch_loss = 0.0
             batch_size = batch["input"]["input_ids"].size(0)
             num_item += batch_size
 
+            start_time = time.time()
             # Process each sample in the batch as a micro-batch.
             try:
 
@@ -493,12 +495,12 @@ def validate(
                 torch.cuda.empty_cache()
                 continue
 
-            batch_time = time.time() - batch_start_time
             if accelerator.is_main_process:
                 progress.update(
                     val_task,
                     advance=1,
-                    description=f"Batch {step + 1}/{len(loader)}: loss = {batch_loss/batch_size:.4f} | Time: {batch_time:.3f}s",
+                    step_time=time.time() - start_time,
+                    description=f"Batch {step + 1}/{len(loader)}: loss = {batch_loss/num_item:.4f}",
                 )
 
             val_loss += batch_loss
