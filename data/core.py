@@ -1487,13 +1487,6 @@ class Data(object):
                     module_path, import_lines, testcase_out
                 )
             elif self.baseline_prompt == "code_graph":
-                src_code_line = src_code.split("\n")
-                new_src_code_line = []
-                for i, line in enumerate(src_code_line):
-                    line = f"Line {i+1}: " + line
-                    new_src_code_line.append(line)
-                src_code = "\n".join(new_src_code_line)
-
                 text = PROMPT_TEMPLATE.format(
                     src_code, branch_line, module_path, graph_pad, import_lines
                 )
@@ -1636,12 +1629,6 @@ class Data(object):
                     import_lines,
                 )
             elif self.baseline_prompt == "code_graph":
-                src_code_line = src_code.split("\n")
-                new_src_code_line = []
-                for i, line in enumerate(src_code_line):
-                    line = f"Line {i+1}: " + line
-                    new_src_code_line.append(line)
-                src_code = "\n".join(new_src_code_line)
                 text = PROMPT_TEMPLATE.format(
                     src_code, branch_line, module_path, graph_pad, import_lines
                 )
