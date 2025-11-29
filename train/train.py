@@ -481,9 +481,7 @@ def train_single_gpu_accelerate(
                         args=args,
                         loader=va_loader,
                         model=model,
-                        device=device,
                         accelerator=accelerator,
-                        console=console,
                         config=config,
                         progress=progress,
                     )
@@ -931,9 +929,7 @@ def train_multi_gpu_accelerate_ring_attn(
                         args=args,
                         loader=va_loader,
                         model=model,
-                        device=device,
                         config=config,
-                        console=console,
                         accelerator=accelerator,
                         progress=progress,
                     )
@@ -1449,12 +1445,9 @@ def train_multi_gpu_accelerate(
                         args=args,
                         loader=va_loader,
                         model=model,
-                        device=device,
                         config=config,
-                        console=console,
                         accelerator=accelerator,
                         progress=progress,
-                        only_gnn=True,
                     )
                     accelerator.wait_for_everyone()
 

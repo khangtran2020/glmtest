@@ -406,9 +406,7 @@ def validate(
     loader: DataLoader,
     model: GLMFModelForCausalLM,
     config: GLMFModelConfig,
-    device: torch.device,
     progress: Progress,
-    console: Console,
     accelerator: Accelerator,
     multi_gpu: bool = False,
 ):
