@@ -1472,7 +1472,9 @@ class Data(object):
                 text = PROMPT_TEMPLATE.format(
                     src_code, branch_line, module_path, "Not Available", import_lines
                 )
-                response = RESPONSE_TEMPLATE.format(import_lines, testcase_out)
+                response = RESPONSE_TEMPLATE.format(
+                    module_path, import_lines, testcase_out
+                )
             elif self.baseline_prompt == "graph":
                 text = PROMPT_TEMPLATE.format(
                     "Not Available",
@@ -1481,12 +1483,16 @@ class Data(object):
                     graph_pad,
                     import_lines,
                 )
-                response = RESPONSE_TEMPLATE.format(import_lines, testcase_out)
+                response = RESPONSE_TEMPLATE.format(
+                    module_path, import_lines, testcase_out
+                )
             elif self.baseline_prompt == "code_graph":
                 text = PROMPT_TEMPLATE.format(
                     src_code, branch_line, module_path, graph_pad, import_lines
                 )
-                response = RESPONSE_TEMPLATE.format(import_lines, testcase_out)
+                response = RESPONSE_TEMPLATE.format(
+                    module_path, import_lines, testcase_out
+                )
             elif self.baseline_prompt == "code_tr":
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
                 if truncated_code is None:
@@ -1499,13 +1505,17 @@ class Data(object):
                     "Not Available",
                     import_lines,
                 )
-                response = RESPONSE_TEMPLATE.format(import_lines, testcase_out)
+                response = RESPONSE_TEMPLATE.format(
+                    module_path, import_lines, testcase_out
+                )
             elif self.baseline_prompt == "graph_tr":
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
                 text = PROMPT_TEMPLATE.format(
                     truncated_code, branch_line, module_path, graph_pad, import_lines
                 )
-                response = RESPONSE_TEMPLATE.format(import_lines, testcase_out)
+                response = RESPONSE_TEMPLATE.format(
+                    module_path, import_lines, testcase_out
+                )
 
             task_prompt = tokenizer.apply_chat_template(
                 [
