@@ -70,7 +70,16 @@ Requirements:
 
 ------------------------------------------------------------"""
 
-RESPONSE_TEMPLATE = """# OUTPUTS: Here is the generated Python test code targeting the specified execution branch
+RESPONSE_TEMPLATE = """# OUTPUTS: 
+
+Since the target module is imported from `{}`, the test code should be structured to correctly reference this module. Furthermore, the targeted module can be imported using the following code snippet:
+```
+{}
+```
+
+The test case should not hallucinate any imports and use valid functions/classes from the module.
+
+Here is the generated Python test code targeting the specified execution branch
 ```
 {}
 ```
@@ -1402,7 +1411,7 @@ class Data(object):
                         import_lines.append(ast.unparse(node))
 
                 import_lines = "\n".join(import_lines)
-            except (SyntaxError, ValueError):
+            except Exception as e:
                 # Fallback: regex-based extraction if AST parsing fails
                 import re
 
@@ -1463,7 +1472,7 @@ class Data(object):
                 text = PROMPT_TEMPLATE.format(
                     src_code, branch_line, module_path, "Not Available", import_lines
                 )
-                response = RESPONSE_TEMPLATE.format(testcase_out)
+                response = RESPONSE_TEMPLATE.format(import_lines, testcase_out)
             elif self.baseline_prompt == "graph":
                 text = PROMPT_TEMPLATE.format(
                     "Not Available",
@@ -1472,12 +1481,12 @@ class Data(object):
                     graph_pad,
                     import_lines,
                 )
-                response = RESPONSE_TEMPLATE.format(testcase_out)
+                response = RESPONSE_TEMPLATE.format(import_lines, testcase_out)
             elif self.baseline_prompt == "code_graph":
                 text = PROMPT_TEMPLATE.format(
                     src_code, branch_line, module_path, graph_pad, import_lines
                 )
-                response = RESPONSE_TEMPLATE.format(testcase_out)
+                response = RESPONSE_TEMPLATE.format(import_lines, testcase_out)
             elif self.baseline_prompt == "code_tr":
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
                 if truncated_code is None:
@@ -1490,13 +1499,13 @@ class Data(object):
                     "Not Available",
                     import_lines,
                 )
-                response = RESPONSE_TEMPLATE.format(testcase_out)
+                response = RESPONSE_TEMPLATE.format(import_lines, testcase_out)
             elif self.baseline_prompt == "graph_tr":
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
                 text = PROMPT_TEMPLATE.format(
                     truncated_code, branch_line, module_path, graph_pad, import_lines
                 )
-                response = RESPONSE_TEMPLATE.format(testcase_out)
+                response = RESPONSE_TEMPLATE.format(import_lines, testcase_out)
 
             task_prompt = tokenizer.apply_chat_template(
                 [
