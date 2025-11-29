@@ -437,6 +437,11 @@ def train_single_gpu_accelerate(
                     advance=1,
                     description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} | Data: {data_load_time:.3f}s | Emb: {embedding_time:.3f}s | Fwd: {forward_time:.3f}s | Bwd: {backward_time:.3f}s | RAM: {ram_usage:.1f}MB",
                 )
+                accelerator.print(
+                    f"Step {global_step} - Loss: {avg_batch_loss:.4f} | "
+                    f"Data: {data_load_time:.3f}s | Emb: {embedding_time:.3f}s | "
+                    f"Fwd: {forward_time:.3f}s | Bwd: {backward_time:.3f}s"
+                )
                 epoch_loss += avg_batch_loss * batch_size
                 num_items += batch_size
 
@@ -486,7 +491,7 @@ def train_single_gpu_accelerate(
                         },
                         step=global_step,
                     )
-                    console.log(
+                    accelerator.print(
                         f"[cyan]Timing Stats (avg over {num_batches} batches): "
                         f"Data={avg_data_time:.3f}s | Emb={avg_embedding_time:.3f}s | "
                         f"Fwd={avg_forward_time:.3f}s | Bwd={avg_backward_time:.3f}s[/cyan]"
