@@ -1153,7 +1153,7 @@ def train_multi_gpu_accelerate(
         "batch_size": args.batch_size,
         "collate_fn": collate_fn,
         "sampler": sampler,
-        "num_workers": 4,  # Use os.cpu_count() workers
+        "num_workers": 2,  # Use os.cpu_count() workers
         "pin_memory": True,
         "prefetch_factor": 2,
         "persistent_workers": True,
