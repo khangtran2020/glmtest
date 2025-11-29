@@ -63,6 +63,11 @@ Requirements:
 ## Code Property Graph (CPG) Node Embeddings:
 {}
 
+## Here's how to import the target module:
+```
+{}
+```
+
 ------------------------------------------------------------"""
 
 RESPONSE_TEMPLATE = """# OUTPUTS: Here is the generated Python test code targeting the specified execution branch
@@ -1382,6 +1387,32 @@ class Data(object):
         #     f"Preparing prompts with baseline_prompt: {self.baseline_prompt}"
         # )
         if not testing:
+
+            # Extract imports from testcase_out
+            try:
+                tree = ast.parse(testcase_out)
+                import_lines = []
+
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Import):
+                        # Handle: import module, import module as alias
+                        import_lines.append(ast.unparse(node))
+                    elif isinstance(node, ast.ImportFrom):
+                        # Handle: from module import name, from module import name as alias
+                        import_lines.append(ast.unparse(node))
+
+                import_lines = "\n".join(import_lines)
+            except (SyntaxError, ValueError):
+                # Fallback: regex-based extraction if AST parsing fails
+                import re
+
+                import_pattern = r"^(?:from\s+[\w.]+\s+)?import\s+.+$"
+                lines = testcase_out.split("\n")
+                import_lines = [
+                    line for line in lines if re.match(import_pattern, line.strip())
+                ]
+                import_lines = "\n".join(import_lines)
+
             if gnn_mode == "branch":
                 graph_pad = ""
                 for i, item in enumerate(active_nodes):
@@ -1430,17 +1461,21 @@ class Data(object):
                 )
             if self.baseline_prompt == "code":
                 text = PROMPT_TEMPLATE.format(
-                    src_code, branch_line, module_path, "Not Available"
+                    src_code, branch_line, module_path, "Not Available", import_lines
                 )
                 response = RESPONSE_TEMPLATE.format(testcase_out)
             elif self.baseline_prompt == "graph":
                 text = PROMPT_TEMPLATE.format(
-                    "Not Available", "Not Available", module_path, graph_pad
+                    "Not Available",
+                    "Not Available",
+                    module_path,
+                    graph_pad,
+                    import_lines,
                 )
                 response = RESPONSE_TEMPLATE.format(testcase_out)
             elif self.baseline_prompt == "code_graph":
                 text = PROMPT_TEMPLATE.format(
-                    src_code, branch_line, module_path, graph_pad
+                    src_code, branch_line, module_path, graph_pad, import_lines
                 )
                 response = RESPONSE_TEMPLATE.format(testcase_out)
             elif self.baseline_prompt == "code_tr":
@@ -1449,13 +1484,17 @@ class Data(object):
                     self.logger.log("Truncated code is None")
                     return None
                 text = PROMPT_TEMPLATE.format(
-                    truncated_code, branch_line, module_path, "Not Available"
+                    truncated_code,
+                    branch_line,
+                    module_path,
+                    "Not Available",
+                    import_lines,
                 )
                 response = RESPONSE_TEMPLATE.format(testcase_out)
             elif self.baseline_prompt == "graph_tr":
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
                 text = PROMPT_TEMPLATE.format(
-                    truncated_code, branch_line, module_path, graph_pad
+                    truncated_code, branch_line, module_path, graph_pad, import_lines
                 )
                 response = RESPONSE_TEMPLATE.format(testcase_out)
 
@@ -1487,6 +1526,31 @@ class Data(object):
 
             return task_prompt_input, task_prompt_output, task_prompt
         else:
+            # Extract imports from testcase_out
+            try:
+                tree = ast.parse(testcase_out)
+                import_lines = []
+
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Import):
+                        # Handle: import module, import module as alias
+                        import_lines.append(ast.unparse(node))
+                    elif isinstance(node, ast.ImportFrom):
+                        # Handle: from module import name, from module import name as alias
+                        import_lines.append(ast.unparse(node))
+
+                import_lines = "\n".join(import_lines)
+            except (SyntaxError, ValueError):
+                # Fallback: regex-based extraction if AST parsing fails
+                import re
+
+                import_pattern = r"^(?:from\s+[\w.]+\s+)?import\s+.+$"
+                lines = testcase_out.split("\n")
+                import_lines = [
+                    line for line in lines if re.match(import_pattern, line.strip())
+                ]
+                import_lines = "\n".join(import_lines)
+
             if gnn_mode == "branch":
                 graph_pad = ""
                 for i, item in enumerate(active_nodes):
@@ -1535,15 +1599,19 @@ class Data(object):
                 )
             if self.baseline_prompt == "code":
                 text = PROMPT_TEMPLATE.format(
-                    src_code, branch_line, module_path, "Not Available"
+                    src_code, branch_line, module_path, "Not Available", import_lines
                 )
             elif self.baseline_prompt == "graph":
                 text = PROMPT_TEMPLATE.format(
-                    "Not Available", "Not Available", module_path, graph_pad
+                    "Not Available",
+                    "Not Available",
+                    module_path,
+                    graph_pad,
+                    import_lines,
                 )
             elif self.baseline_prompt == "code_graph":
                 text = PROMPT_TEMPLATE.format(
-                    src_code, branch_line, module_path, graph_pad
+                    src_code, branch_line, module_path, graph_pad, import_lines
                 )
             elif self.baseline_prompt == "code_tr":
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
@@ -1551,12 +1619,16 @@ class Data(object):
                     self.logger.log("Truncated code is None")
                     return None
                 text = PROMPT_TEMPLATE.format(
-                    truncated_code, branch_line, module_path, "Not Available"
+                    truncated_code,
+                    branch_line,
+                    module_path,
+                    "Not Available",
+                    import_lines,
                 )
             elif self.baseline_prompt == "graph_tr":
                 truncated_code = self.truncate_code(src_code=src_code, branch=branch)
                 text = PROMPT_TEMPLATE.format(
-                    truncated_code, branch_line, module_path, graph_pad
+                    truncated_code, branch_line, module_path, graph_pad, import_lines
                 )
 
             task_prompt_input = tokenizer.apply_chat_template(
