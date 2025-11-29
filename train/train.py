@@ -1379,18 +1379,11 @@ def train_multi_gpu_accelerate(
                         micro_graph_masks = None
                         micro_graph_token_indices = None
 
-                    position_ids = (
-                        torch.arange(micro_input["input_ids"].shape[1])
-                        .unsqueeze(0)
-                        .expand(micro_input["input_ids"].shape[0], -1)
-                    )
-
                     # Forward pass with gradient accumulation
                     with accelerator.accumulate(model):
                         forward_start = time.time()
                         outputs = model(
                             **micro_input,
-                            position_ids=position_ids.to(device),
                             graphs=micro_graphs,
                             graph_masks=micro_graph_masks,
                             graph_token_indices=micro_graph_token_indices,
