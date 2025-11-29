@@ -1456,7 +1456,12 @@ def train_multi_gpu_accelerate(
                         train_epoch_task,
                         advance=1,
                         step_time=avg_time,
-                        description=f"Epoch {epoch + 1} | Loss: {avg_batch_loss:.4f} | RAM: {ram_usage:.0f}MB",
+                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} | Data: {data_load_time:.3f}s | Emb: {embedding_time:.3f}s | Fwd: {forward_time:.3f}s | Bwd: {backward_time:.3f}s | RAM: {ram_usage:.1f}MB",
+                    )
+                    accelerator.print(
+                        f"Step {global_step} - Loss: {avg_batch_loss:.4f} | "
+                        f"Data: {data_load_time:.3f}s | Emb: {embedding_time:.3f}s | "
+                        f"Fwd: {forward_time:.3f}s | Bwd: {backward_time:.3f}s"
                     )
                 epoch_loss += avg_batch_loss * batch_size
                 num_items += batch_size
@@ -1465,14 +1470,35 @@ def train_multi_gpu_accelerate(
                     global_step % args.logging_steps == 0
                 ) and accelerator.is_main_process:
                     current_lr = lr_scheduler.get_last_lr()[0]
+                    avg_data_time = (
+                        total_data_time / num_batches if num_batches > 0 else 0
+                    )
+                    avg_embedding_time = (
+                        total_embedding_time / num_batches if num_batches > 0 else 0
+                    )
+                    avg_forward_time = (
+                        total_forward_time / num_batches if num_batches > 0 else 0
+                    )
+                    avg_backward_time = (
+                        total_backward_time / num_batches if num_batches > 0 else 0
+                    )
                     if accelerator.is_main_process:
                         accelerator.log(
                             {
                                 "train/loss": avg_batch_loss,
                                 "train/learning_rate": current_lr,
                                 "train/step": global_step,
+                                "train/avg_data_time": avg_data_time,
+                                "train/avg_embedding_time": avg_embedding_time,
+                                "train/avg_forward_time": avg_forward_time,
+                                "train/avg_backward_time": avg_backward_time,
                             },
                             step=global_step,
+                        )
+                        accelerator.print(
+                            f"[cyan]Timing Stats (avg over {num_batches} batches): "
+                            f"Data={avg_data_time:.3f}s | Emb={avg_embedding_time:.3f}s | "
+                            f"Fwd={avg_forward_time:.3f}s | Bwd={avg_backward_time:.3f}s[/cyan]"
                         )
 
                 if global_step % args.save_steps == 0:
