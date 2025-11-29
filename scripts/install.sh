@@ -12,6 +12,7 @@ pip install transformers==4.51.3 accelerate peft
 
 # install DeepSpeed (optional - for 20-40% training speedup)
 # Compatible version for transformers 4.51.3 + PyTorch 2.4.0
+# Requires: CUDA toolkit and C++ compiler
 pip install deepspeed==0.15.4
 
 # install ring_flash_attn + flash_attn
