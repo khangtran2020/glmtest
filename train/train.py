@@ -1282,9 +1282,17 @@ def train_multi_gpu_accelerate(
             epoch_loss = 0.0
             num_items = 0.0
 
+            # Time tracking variables
+            total_data_time = 0.0
+            total_embedding_time = 0.0
+            total_forward_time = 0.0
+            total_backward_time = 0.0
+            num_batches = 0
+
             for step, batch in enumerate(tr_loader):
                 # Start step timing
                 step_timer.start()
+                batch_start_time = time.time()
 
                 if (continue_training == True) and (global_step <= start_step):
                     global_step += args.batch_size
@@ -1299,6 +1307,9 @@ def train_multi_gpu_accelerate(
                         )
                     step_timer.end()
                     continue
+
+                data_load_time = time.time() - batch_start_time
+                total_data_time += data_load_time
 
                 accelerator.wait_for_everyone()
                 batch_size = batch["input"]["input_ids"].size(0)
@@ -1355,6 +1366,7 @@ def train_multi_gpu_accelerate(
 
                     # Forward pass with gradient accumulation
                     with accelerator.accumulate(model):
+                        forward_start = time.time()
                         outputs = model(
                             **micro_input,
                             position_ids=position_ids.to(device),
@@ -1365,8 +1377,14 @@ def train_multi_gpu_accelerate(
                             accelerator=accelerator,
                             ring_attn=False,
                         )
+                        forward_time = time.time() - forward_start
+                        total_forward_time += forward_time
+
                         loss = outputs.loss
+                        backward_start = time.time()
                         accelerator.backward(loss)
+                        backward_time = time.time() - backward_start
+                        total_backward_time += backward_time
 
                         if accelerator.sync_gradients:
                             accelerator.wait_for_everyone()
@@ -1421,6 +1439,16 @@ def train_multi_gpu_accelerate(
                 step_timer.end()
 
                 avg_batch_loss = batch_loss / batch_size
+                num_batches += 1
+
+                # Get embedding time from model if available
+                embedding_time = getattr(
+                    model.module if hasattr(model, "module") else model,
+                    "_last_embedding_time",
+                    0.0,
+                )
+                total_embedding_time += embedding_time
+
                 if accelerator.is_main_process:
                     ram_usage = log_ram_usage()
                     avg_time = step_timer.avg_time()
