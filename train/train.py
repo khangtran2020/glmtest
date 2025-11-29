@@ -1595,21 +1595,23 @@ def train_multi_gpu_accelerate(
                                 os.makedirs(checkpoint_dir, exist_ok=True)
 
                             unwrapped_model = accelerator.unwrap_model(model)
+                            # Save state dict to CPU to avoid keeping GPU memory
+                            state_dict_cpu = {
+                                k: v.cpu()
+                                for k, v in unwrapped_model.state_dict().items()
+                            }
                             torch.save(
-                                unwrapped_model.state_dict(),
+                                state_dict_cpu,
                                 os.path.join(
                                     checkpoint_dir, f"model_weight_step{global_step}.pt"
                                 ),
                             )
 
-                            for n, p in unwrapped_model.named_parameters():
-                                p.data = p.data.to("cpu")
-
                             tokenizer.save_pretrained(checkpoint_dir)
                             console.log(
                                 f"[green]Saved best checkpoint to {checkpoint_dir}[/green]"
                             )
-                            del unwrapped_model
+                            del state_dict_cpu, unwrapped_model
                             del checkpoint_dir
                             gc.collect()
 
