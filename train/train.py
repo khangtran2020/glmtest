@@ -1292,7 +1292,6 @@ def train_multi_gpu_accelerate(
             for step, batch in enumerate(tr_loader):
                 # Start step timing
                 step_timer.start()
-                batch_start_time = time.time()
 
                 if (continue_training == True) and (global_step <= start_step):
                     global_step += args.batch_size
@@ -1308,7 +1307,8 @@ def train_multi_gpu_accelerate(
                     step_timer.end()
                     continue
 
-                data_load_time = time.time() - batch_start_time
+                # Get data loading time from batch (measured in __getitem__)
+                data_load_time = sum(batch.get("data_load_time", [0.0]))
                 total_data_time += data_load_time
 
                 accelerator.wait_for_everyone()

@@ -46,6 +46,9 @@ class GLMFDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
+        import time
+
+        start_time = time.time()
 
         data_path = self.data[self.index_to_key_dict[idx]]["path"]
         with open(data_path, "r") as f:
@@ -116,6 +119,7 @@ class GLMFDataset(Dataset):
                 "graph": graph,  # Should be a dictionary of graph structures
                 "graph_mask": (graph_masks if graph_masks is not None else None),
                 "active_nodes": (active_nodes if active_nodes is not None else None),
+                "data_load_time": time.time() - start_time,
             }
         else:
             prompt = sample["prompt"]
@@ -135,6 +139,7 @@ class GLMFDataset(Dataset):
                 "graph": graph,
                 "graph_mask": (graph_masks if graph_masks is not None else None),
                 "active_nodes": (active_nodes if active_nodes is not None else None),
+                "data_load_time": time.time() - start_time,
             }
             return (uuid, batch)
 
@@ -240,6 +245,7 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
             "graph": (
                 [x["graph"] for x in batch] if batch[0]["graph"] is not None else None
             ),
+            "data_load_time": [x.get("data_load_time", 0.0) for x in batch],
         }
         return collated
     else:
@@ -267,5 +273,6 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
             "graph": (
                 [x["graph"] for x in batch] if batch[0]["graph"] is not None else None
             ),
+            "data_load_time": [x.get("data_load_time", 0.0) for x in batch],
         }
         return uuid, collated
