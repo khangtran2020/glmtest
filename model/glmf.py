@@ -375,6 +375,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         inputs_embeds: torch.Tensor = None,
     ) -> torch.Tensor:
 
+        import time
+
+        embedding_start = time.time()
+
         # embeds = []
         if inputs_embeds is None:
             # pprint(f"[blue]Input ids shape: {input_ids.shape}[/blue]")
@@ -406,6 +410,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         else:
             if self.is_training:
                 inputs_embeds = inputs_embeds.requires_grad_(True)
+
+        # Store timing for access by training loop
+        self._last_embedding_time = time.time() - embedding_start
 
         return inputs_embeds
 

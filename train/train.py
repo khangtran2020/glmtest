@@ -326,7 +326,15 @@ def train_single_gpu_accelerate(
             epoch_loss = 0.0
             num_items = 0.0
 
+            # Time tracking variables
+            total_data_time = 0.0
+            total_embedding_time = 0.0
+            total_forward_time = 0.0
+            total_backward_time = 0.0
+            num_batches = 0
+
             for step, batch in enumerate(tr_loader):
+                batch_start_time = time.time()
 
                 if (continue_training == True) and (global_step <= start_step):
                     global_step += args.batch_size
@@ -337,6 +345,9 @@ def train_single_gpu_accelerate(
                         description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
                     )
                     continue
+
+                data_load_time = time.time() - batch_start_time
+                total_data_time += data_load_time
 
                 global_step += 1
                 batch_loss = 0.0
@@ -383,6 +394,7 @@ def train_single_gpu_accelerate(
                     graph_token_indices = None
 
                 with accelerator.accumulate(model):
+                    forward_start = time.time()
                     outputs = model(
                         **micro_input,
                         step=global_step,
@@ -390,9 +402,14 @@ def train_single_gpu_accelerate(
                         graph_masks=graph_masks,
                         graph_token_indices=graph_token_indices,
                     )
+                    forward_time = time.time() - forward_start
+                    total_forward_time += forward_time
 
                     loss = outputs.loss
+                    backward_start = time.time()
                     accelerator.backward(loss)
+                    backward_time = time.time() - backward_start
+                    total_backward_time += backward_time
 
                 if accelerator.sync_gradients:
                     accelerator.clip_grad_norm_(model.parameters(), args.max_grad_norm)
@@ -404,10 +421,21 @@ def train_single_gpu_accelerate(
                 batch_loss += loss.item()
                 avg_batch_loss = batch_loss / batch_size
                 ram_usage = log_ram_usage()
+                num_batches += 1
+
+                # Get embedding time from model if available
+                embedding_time = getattr(
+                    model.module if hasattr(model, "module") else model,
+                    "_last_embedding_time",
+                    0.0,
+                )
+                total_embedding_time += embedding_time
+
+                batch_total_time = time.time() - batch_start_time
                 progress.update(
                     train_epoch_task,
                     advance=1,
-                    description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB",
+                    description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} | Data: {data_load_time:.3f}s | Emb: {embedding_time:.3f}s | Fwd: {forward_time:.3f}s | Bwd: {backward_time:.3f}s | RAM: {ram_usage:.1f}MB",
                 )
                 epoch_loss += avg_batch_loss * batch_size
                 num_items += batch_size
@@ -433,13 +461,35 @@ def train_single_gpu_accelerate(
 
                 if global_step % args.logging_steps == 0:
                     current_lr = lr_scheduler.get_last_lr()[0]
+                    avg_data_time = (
+                        total_data_time / num_batches if num_batches > 0 else 0
+                    )
+                    avg_embedding_time = (
+                        total_embedding_time / num_batches if num_batches > 0 else 0
+                    )
+                    avg_forward_time = (
+                        total_forward_time / num_batches if num_batches > 0 else 0
+                    )
+                    avg_backward_time = (
+                        total_backward_time / num_batches if num_batches > 0 else 0
+                    )
+
                     accelerator.log(
                         {
                             "train/loss": avg_batch_loss,
                             "train/learning_rate": current_lr,
                             "train/step": global_step,
+                            "train/avg_data_time": avg_data_time,
+                            "train/avg_embedding_time": avg_embedding_time,
+                            "train/avg_forward_time": avg_forward_time,
+                            "train/avg_backward_time": avg_backward_time,
                         },
                         step=global_step,
+                    )
+                    console.log(
+                        f"[cyan]Timing Stats (avg over {num_batches} batches): "
+                        f"Data={avg_data_time:.3f}s | Emb={avg_embedding_time:.3f}s | "
+                        f"Fwd={avg_forward_time:.3f}s | Bwd={avg_backward_time:.3f}s[/cyan]"
                     )
 
                 if accelerator.sync_gradients and global_step % args.save_steps == 0:
@@ -1153,7 +1203,7 @@ def train_multi_gpu_accelerate(
         "batch_size": args.batch_size,
         "collate_fn": collate_fn,
         "sampler": sampler,
-        "num_workers": 2,  # Use os.cpu_count() workers
+        "num_workers": 1,  # Use os.cpu_count() workers
         "pin_memory": True,
         "prefetch_factor": 2,
         "persistent_workers": True,
