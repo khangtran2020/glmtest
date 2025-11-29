@@ -498,8 +498,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             ), f"Mismatch between graph masks {len(graph_mask)} and token index ranges {len(ranges)}. Graph token index are ranges: {ranges}."
 
             graph = graphs[i]
-            # for key in graph.keys():
-            #     graph[key] = graph[key].to(self.llm_model.device)
+            for key in graph.keys():
+                graph[key] = graph[key].to(self.llm_model.device)
 
             overall_mask = None  # merge graph_mask
             for j, mask in enumerate(graph_mask):
