@@ -70,10 +70,15 @@ def add_data_group(group):
         "--reason_api_key", type=str, help="api key for reason model", default=None
     )
     group.add_argument(
-        "--prefetch_data", action="store_true", help="prefetch all data into memory for faster loading"
+        "--prefetch_data",
+        action="store_true",
+        help="prefetch all data into memory for faster loading",
     )
     group.add_argument(
-        "--data_cache_size", type=int, default=128, help="LRU cache size for data loading"
+        "--data_cache_size",
+        type=int,
+        default=128,
+        help="LRU cache size for data loading",
     )
     # group.add_argument(
     #     "--reasoning_save_path", type=str, help="api key for reason model", default=None
@@ -311,6 +316,17 @@ def add_training_group(group):
         type=int,
         help="gradient accumulation steps",
         default=16,
+    )
+    group.add_argument(
+        "--use_deepspeed",
+        action="store_true",
+        help="use DeepSpeed for training optimization (ZeRO-2 for 20-40%% speedup)",
+    )
+    group.add_argument(
+        "--deepspeed_config",
+        type=str,
+        help="path to DeepSpeed config file",
+        default="configs/deepspeed_zero2.json",
     )
     group.add_argument(
         "--num_gpu",
