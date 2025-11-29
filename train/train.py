@@ -1155,6 +1155,7 @@ def train_multi_gpu_accelerate(
         "sampler": sampler,
         "num_workers": 4,  # Use os.cpu_count() workers
         "pin_memory": True,
+        "prefetch_factor": 2,
         "persistent_workers": True,
     }
 
