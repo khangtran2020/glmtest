@@ -11,7 +11,8 @@ pip install  dgl -f https://data.dgl.ai/wheels/torch-2.4/cu124/repo.html
 pip install transformers==4.51.3 accelerate peft
 
 # install DeepSpeed (optional - for 20-40% training speedup)
-pip install deepspeed
+# Compatible version for transformers 4.51.3 + PyTorch 2.4.0
+pip install deepspeed==0.15.4
 
 # install ring_flash_attn + flash_attn
 pip install ring-flash-attn
