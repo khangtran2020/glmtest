@@ -313,10 +313,25 @@ def main() -> None:
                     path=args.checkpoint_path, rank=local_rank
                 )
 
-                model.load_state_dict(check_point["model_state_dict"])
+                # Load with strict=False to ignore quantization keys while keeping LoRA weights
+                missing_keys, unexpected_keys = model.load_state_dict(
+                    check_point["model_state_dict"], strict=False
+                )
+                
+                if missing_keys:
+                    console.log(f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]")
+                if unexpected_keys:
+                    console.log(f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]")
+                    # Log sample of unexpected keys for debugging
+                    sample_unexpected = list(unexpected_keys)[:3]
+                    console.log(f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]")
+                
                 optimizer.load_state_dict(check_point["optimizer_state_dict"])
                 lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
                 start_step = check_point["global_step"]
+                console.log(
+                    f"[cyan]Checkpoint loaded from {args.checkpoint_path} at step {start_step}[/cyan]"
+                )
         else:
             start_step = -1
 

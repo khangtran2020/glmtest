@@ -243,10 +243,21 @@ def save_checkpoint(
 
     save_name = os.path.join(path, f"checkpoint-{global_step}.pt")
 
+    # Get full state dict
+    full_state_dict = model.state_dict()
+
+    # Filter out quantization metadata to save space (only keep trainable params + essential weights)
+    # Quantization metadata will be regenerated when loading the base model
+    filtered_state_dict = {
+        k: v
+        for k, v in full_state_dict.items()
+        if not any(x in k for x in [".absmax", ".quant_map", ".quant_state"])
+    }
+
     checkpoint = {
         "seed": seed,
         "global_step": global_step,
-        "model_state_dict": model.state_dict(),
+        "model_state_dict": filtered_state_dict,
         "optimizer_state_dict": optimizer.state_dict(),
         "scheduler_state_dict": scheduler.state_dict(),
     }
