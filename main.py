@@ -317,17 +317,44 @@ def main() -> None:
                 missing_keys, unexpected_keys = model.load_state_dict(
                     check_point["model_state_dict"], strict=False
                 )
-                
+
                 if missing_keys:
-                    console.log(f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]")
+                    console.log(
+                        f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
+                    )
                 if unexpected_keys:
-                    console.log(f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]")
+                    console.log(
+                        f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
+                    )
                     # Log sample of unexpected keys for debugging
                     sample_unexpected = list(unexpected_keys)[:3]
-                    console.log(f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]")
-                
-                optimizer.load_state_dict(check_point["optimizer_state_dict"])
-                lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
+                    console.log(
+                        f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
+                    )
+
+                # Load optimizer state if valid
+                try:
+                    if "param_groups" in check_point["optimizer_state_dict"]:
+                        optimizer.load_state_dict(check_point["optimizer_state_dict"])
+                        console.log("[cyan]Optimizer state loaded successfully[/cyan]")
+                    else:
+                        console.log(
+                            "[yellow]Invalid optimizer state in checkpoint, starting with fresh optimizer[/yellow]"
+                        )
+                except Exception as e:
+                    console.log(
+                        f"[yellow]Failed to load optimizer state: {e}. Starting with fresh optimizer[/yellow]"
+                    )
+
+                # Load scheduler state if valid
+                try:
+                    lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
+                    console.log("[cyan]Scheduler state loaded successfully[/cyan]")
+                except Exception as e:
+                    console.log(
+                        f"[yellow]Failed to load scheduler state: {e}. Starting with fresh scheduler[/yellow]"
+                    )
+
                 start_step = check_point["global_step"]
                 console.log(
                     f"[cyan]Checkpoint loaded from {args.checkpoint_path} at step {start_step}[/cyan]"
