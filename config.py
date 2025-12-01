@@ -285,7 +285,7 @@ def add_training_group(group):
         "--min_seq_length",
         type=int,
         help="max sequence length",
-        default=12000,
+        default=0,
     )
     group.add_argument(
         "--temp",
