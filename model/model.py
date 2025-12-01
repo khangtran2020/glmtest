@@ -397,7 +397,24 @@ def get_model_test(
             # for key in list(state_dict.keys()):
             if "current_checkpoint" in args.model_weight_path:
                 state_dict = state_dict["model_state_dict"]
-            model.load_state_dict(state_dict, strict=True)
+                missing_keys, unexpected_keys = model.load_state_dict(
+                    state_dict, strict=False
+                )
+
+                if missing_keys:
+                    console.log(
+                        f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
+                    )
+                if unexpected_keys:
+                    console.log(
+                        f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
+                    )
+                    # Log sample of unexpected keys for debugging
+                    sample_unexpected = list(unexpected_keys)[:3]
+                    console.log(
+                        f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
+                    )
+
             if use_lora:
                 model.llm_model = model.llm_model.merge_and_unload()
             console.log(f"[red]Model weights loaded from {file}[/red]")
