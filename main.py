@@ -195,7 +195,7 @@ def main() -> None:
         dataset.prepare_data_by_repo()
 
     dataset.train_test_split(
-        val_split=int(1000), test_only=True if args.mode == "testgen" else False
+        val_split=int(1000), test_only=True if "test" in args.mode else False
     )
 
     if torch.cuda.is_available():
