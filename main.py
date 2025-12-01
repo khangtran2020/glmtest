@@ -258,6 +258,11 @@ def main() -> None:
             console=console,
         )
 
+        for name, param in model.named_parameters():
+            console.log(
+                f"[blue]RANK {rank}: Parameter {name}, dtype {param.dtype}[/blue]"
+            )
+
         optimizer = AdamW(
             filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
         )
