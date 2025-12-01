@@ -1259,7 +1259,7 @@ class Data(object):
 
         self.processed_data = filtered_data
         self.logger.log(
-            f"[green]Data is filtered by max tokens {max_tokens}! New size: {len(self.processed_data)}[/green]"
+            f"[green]Data is filtered by max tokens {max_tokens}! New size: train - {len(self.processed_data['train'])} - test {len(self.processed_data['test_module'])}[/green]"
         )
 
     def sample_for_reasoning(self, max_samples: int) -> None:
