@@ -261,8 +261,8 @@ def main() -> None:
             if p.dtype != torch.float16:
                 p.data = p.data.to(torch.float16)
 
-    for name, param in model.named_parameters():
-        console.log(f"[blue]RANK {rank}: Parameter {name}, dtype {param.dtype}[/blue]")
+    # for name, param in model.named_parameters():
+    #     console.log(f"[blue]RANK {rank}: Parameter {name}, dtype {param.dtype}[/blue]")
 
     if args.mode == "train":
         if args.num_gpu > 1:
@@ -307,7 +307,7 @@ def main() -> None:
             continue_training=args.continue_training,
             start_step=start_step,
             max_num_checkpoint=args.max_num_checkpoint,
-            mixed_precision="bf16",
+            mixed_precision="bf16" if args.dtype == "bf16" else "fp16",
         )
 
     elif args.mode == "test":

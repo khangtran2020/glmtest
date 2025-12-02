@@ -469,8 +469,6 @@ def validate(
                 else:
                     batch_loss += loss.item()
 
-                # logging_gpu_usage(step=step, console=console)
-
                 for key in micro_input.keys():
                     micro_input[key] = micro_input[key].to("cpu")
                 if "graph" in args.baseline_prompt:
