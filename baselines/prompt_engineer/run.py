@@ -256,6 +256,8 @@ class PromptEngineer:
                 with open(path, "r") as f:
                     dat = json.load(f)
 
+                print(dat.keys())
+
                 uuid = dat["uuid"]
                 tc_key = uuid.split("_testcase_")[-1]
                 tc_key = f"test_case_{tc_key}"
