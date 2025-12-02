@@ -1169,6 +1169,7 @@ class Data(object):
                             branch=branch,
                             gnn_mode=self.gnn_mode,
                             testing=True,
+                            local_imports=local_imports,
                         )
 
                         if result is None:
