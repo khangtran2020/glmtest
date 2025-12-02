@@ -1214,6 +1214,7 @@ class Data(object):
                         data_path = os.path.join(processed_prompt_path, data_name)
                         with open(data_path, "w") as file:
                             json.dump(data, file, indent=4)
+                            print(f"Saved data to {data_path}")
 
                         self.processed_data[data_n][f"{uuid}_testcase_{i}"] = {
                             "num_tokens": num_token,
