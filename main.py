@@ -92,7 +92,7 @@ def main() -> None:
                     console.log(
                         f"[blue]Number of test cases for {data_n}: {len(dataset.processed_data[data_n])}[/blue]"
                     )
-        if (args.mode == "prepare_reasoning") or (
+        elif (args.mode == "prepare_reasoning") or (
             (args.mode == "train") and args.train_reasoning
         ):
             dataset.prepare_reasoning_data()
