@@ -1630,6 +1630,55 @@ def train_multi_gpu_accelerate(
                         description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
                     )
 
+    # One more validation at the end of training
+    val_loss = validate(
+        args=args,
+        loader=va_loader,
+        model=model,
+        config=config,
+        accelerator=accelerator,
+        progress=progress,
+    )
+    accelerator.wait_for_everyone()
+
+    if accelerator.is_main_process:
+        wandb.log({"val_loss": val_loss})
+        accelerator.print(
+            f"Final validation loss: {val_loss:.4f} at step {global_step}"
+        )
+
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            accelerator.print(
+                f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
+            )
+            checkpoint_dir = os.path.join(
+                save_path,
+                f"best_model",
+            )
+
+            if not os.path.exists(checkpoint_dir):
+                os.makedirs(checkpoint_dir, exist_ok=True)
+
+            unwrapped_model = accelerator.unwrap_model(model)
+            # Save state dict to CPU to avoid keeping GPU memory
+            state_dict_cpu = {
+                k: v.cpu() for k, v in unwrapped_model.state_dict().items()
+            }
+            torch.save(
+                state_dict_cpu,
+                os.path.join(checkpoint_dir, f"model_weight_step{global_step}.pt"),
+            )
+
+            tokenizer.save_pretrained(checkpoint_dir)
+            console.log(f"[green]Saved best checkpoint to {checkpoint_dir}[/green]")
+            del state_dict_cpu, unwrapped_model
+            del checkpoint_dir
+            gc.collect()
+
+    # No need to restore dtypes - Accelerate handles mixed precision automatically
+    # Converting quantized 4-bit/8-bit weights to bfloat16 would break quantization
+
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
 
