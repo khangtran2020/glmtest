@@ -251,6 +251,7 @@ class PromptEngineer:
             data = dataset.processed_data[split]
             # Add tqdm progress bar
             for key in tqdm(data.keys()):
+                print(data[key].keys())
                 uuid = data[key]["uuid"]
                 tc_key = uuid.split("_testcase_")[-1]
                 tc_key = f"test_case_{tc_key}"
