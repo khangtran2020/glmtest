@@ -517,6 +517,11 @@ def add_baseline_group(group):
         default="prompt_engineer",
     )
     group.add_argument(
+        "--baseline_on_testgen",
+        action="store_true",
+        help="use baseline on test case generation",
+    )
+    group.add_argument(
         "--baseline_llm_model", type=str, help="baseline llm model", default=None
     )
     group.add_argument(

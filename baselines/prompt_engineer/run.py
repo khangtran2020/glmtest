@@ -239,22 +239,28 @@ class PromptEngineer:
         self.client = init_api(model=model, api_key=api_key)
 
     def build_prompt(
-        self, dataset: Data, split: str = "test_module", prompt_type: str = "zero_shot"
+        self,
+        dataset: Data,
+        split: str = "test_module",
+        prompt_type: str = "zero_shot",
+        on_processed_data: bool = False,
     ) -> List[Dict[str, str]]:
 
-        data = dataset.data[split]
         prompt_list = []
+        if on_processed_data:
+            data = dataset.processed_data[split]
+            # Add tqdm progress bar
+            for key in tqdm(data.keys()):
+                uuid = data[key]["uuid"]
+                tc_key = uuid.split("_testcase_")[-1]
+                tc_key = f"test_case_{tc_key}"
+                uuid = data[key]["uuid"].split("_testcase_")[0]
+                module_path = data[key]["module_path"]
+                code_path = data[key]["code_path"]
+                with open(code_path, "r") as f:
+                    module_code = f.read()
 
-        # Add tqdm progress bar
-        for key in tqdm(data.keys()):
-            uuid = data[key]["uuid"]
-            module_path = data[key]["module_path"]
-            code_path = data[key]["code_path"]
-            with open(code_path, "r") as f:
-                module_code = f.read()
-
-            for tc_key in data[key]["test_cases"].keys():
-                branch = data[key]["test_cases"][tc_key]["branch"]
+                branch = data[key]["branch"]
                 branch_line = ""
                 for i, branch_item in enumerate(branch):
                     branch_line += (
@@ -280,9 +286,51 @@ class PromptEngineer:
                         "prompt": prompt_text,
                     }
                 )
-        self.console.log(
-            f"[green]Built {len(prompt_list)} prompts for prompt engineering.[/green]"
-        )
+
+            self.console.log(
+                f"[green]Built {len(prompt_list)} prompts for prompt engineering.[/green]"
+            )
+        else:
+            data = dataset.data[split]
+            # Add tqdm progress bar
+            for key in tqdm(data.keys()):
+                uuid = data[key]["uuid"]
+                module_path = data[key]["module_path"]
+                code_path = data[key]["code_path"]
+                with open(code_path, "r") as f:
+                    module_code = f.read()
+
+                for tc_key in data[key]["test_cases"].keys():
+                    branch = data[key]["test_cases"][tc_key]["branch"]
+                    branch_line = ""
+                    for i, branch_item in enumerate(branch):
+                        branch_line += (
+                            f"Branch #{i+1}"
+                            + "->".join([str(item) for item in branch_item])
+                            + "\n"
+                        )
+                    if prompt_type == "cot":
+                        prompt_text = PROMPT_COT.format(
+                            module_code, module_path, branch_line
+                        )
+                    else:
+                        prompt_text = PROMPT_ZERO_SHOT.format(
+                            module_code, module_path, branch_line
+                        )
+
+                    prompt_list.append(
+                        {
+                            "instance_id": uuid,
+                            "module_path": module_path,
+                            "code_path": code_path,
+                            "branch_key": tc_key,
+                            "prompt": prompt_text,
+                        }
+                    )
+            self.console.log(
+                f"[green]Built {len(prompt_list)} prompts for prompt engineering.[/green]"
+            )
+
         return prompt_list
 
     def generate_responses(
@@ -403,11 +451,13 @@ class PromptEngineer:
         output_path: str,
         output_name: str,
         max_tokens: int,
+        on_processed_data: bool = False,
     ):
         prompt_list = self.build_prompt(
             dataset=dataset,
             split="test_module",
             prompt_type=prompt_type,
+            on_processed_data=on_processed_data,
         )
         self.console.log(
             f"[green]Built {len(prompt_list)} prompts for prompt engineering.[/green]"

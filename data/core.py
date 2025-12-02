@@ -24,7 +24,7 @@ from copy import deepcopy
 from model.gnn import GRAPH_KEYS
 
 # typing
-from typing import List, Union, Dict, Any
+from typing import List, Union, Dict, Any, Optional
 
 PROMPT_TEMPLATE = """# INSTRUCTION: You are an AI agent that generates executable Python test cases targeting a specific execution branch of a module.
 
@@ -1031,6 +1031,14 @@ class Data(object):
 
         processed_data = None
 
+        # load raw data
+        raw_data_path = os.path.join(self.data_path, "test_module.jsonl")
+        assert os.path.exists(raw_data_path), "Raw data for test generation not found!"
+
+        with open(raw_data_path, "r") as f:
+            raw_data = [json.loads(line) for line in f.readlines()]
+            raw_data_dict = {item["id"]: item for item in raw_data}
+
         if "graph" not in self.baseline_prompt:
             processed_data_file_path = os.path.join(
                 self.data_path,
@@ -1098,6 +1106,8 @@ class Data(object):
 
                     with open(dat["code_path"], "r") as file:
                         src_code = file.read()
+
+                    local_imports = raw_data_dict[uuid]["local_imports"]
 
                     module_path = dat.get("module_path", "N/A")
                     branches = get_all_branch(code=src_code, branch_limit=branch_limit)
@@ -1182,6 +1192,9 @@ class Data(object):
                                 ],
                                 "graph_path": graph_path,
                                 "num_tokens": num_token,
+                                "branch": branch,
+                                "module_path": module_path,
+                                "code_path": dat["code_path"],
                             }
 
                         else:
@@ -1192,6 +1205,8 @@ class Data(object):
                                 "mask": None,
                                 "graph_path": None,
                                 "num_tokens": num_token,
+                                "branch": None,
+                                "module_path": module_path,
                             }
 
                         data_name = f"{uuid}_testcase_{i}.json"
@@ -1390,6 +1405,7 @@ class Data(object):
         tokenizer: PreTrainedTokenizer,
         gnn_mode: str = "branch",
         testing: bool = False,
+        local_imports: Optional[List[str]] = None,
     ):
 
         # self.logger.log(
@@ -1398,29 +1414,32 @@ class Data(object):
         if not testing:
 
             # Extract imports from testcase_out
-            try:
-                tree = ast.parse(testcase_out)
-                import_lines = []
+            if local_imports is not None:
+                import_lines = "\n".join(local_imports)
+            else:
+                try:
+                    tree = ast.parse(testcase_out)
+                    import_lines = []
 
-                for node in ast.walk(tree):
-                    if isinstance(node, ast.Import):
-                        # Handle: import module, import module as alias
-                        import_lines.append(ast.unparse(node))
-                    elif isinstance(node, ast.ImportFrom):
-                        # Handle: from module import name, from module import name as alias
-                        import_lines.append(ast.unparse(node))
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.Import):
+                            # Handle: import module, import module as alias
+                            import_lines.append(ast.unparse(node))
+                        elif isinstance(node, ast.ImportFrom):
+                            # Handle: from module import name, from module import name as alias
+                            import_lines.append(ast.unparse(node))
 
-                import_lines = "\n".join(import_lines)
-            except Exception as e:
-                # Fallback: regex-based extraction if AST parsing fails
-                import re
+                    import_lines = "\n".join(import_lines)
+                except Exception as e:
+                    # Fallback: regex-based extraction if AST parsing fails
+                    import re
 
-                import_pattern = r"^(?:from\s+[\w.]+\s+)?import\s+.+$"
-                lines = testcase_out.split("\n")
-                import_lines = [
-                    line for line in lines if re.match(import_pattern, line.strip())
-                ]
-                import_lines = "\n".join(import_lines)
+                    import_pattern = r"^(?:from\s+[\w.]+\s+)?import\s+.+$"
+                    lines = testcase_out.split("\n")
+                    import_lines = [
+                        line for line in lines if re.match(import_pattern, line.strip())
+                    ]
+                    import_lines = "\n".join(import_lines)
 
             if gnn_mode == "branch":
                 graph_pad = ""
@@ -1546,29 +1565,33 @@ class Data(object):
             return task_prompt_input, task_prompt_output, task_prompt
         else:
             # Extract imports from testcase_out
-            try:
-                tree = ast.parse(testcase_out)
-                import_lines = []
 
-                for node in ast.walk(tree):
-                    if isinstance(node, ast.Import):
-                        # Handle: import module, import module as alias
-                        import_lines.append(ast.unparse(node))
-                    elif isinstance(node, ast.ImportFrom):
-                        # Handle: from module import name, from module import name as alias
-                        import_lines.append(ast.unparse(node))
+            if local_imports is not None:
+                import_lines = "\n".join(local_imports)
+            else:
+                try:
+                    tree = ast.parse(testcase_out)
+                    import_lines = []
 
-                import_lines = "\n".join(import_lines)
-            except (SyntaxError, ValueError):
-                # Fallback: regex-based extraction if AST parsing fails
-                import re
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.Import):
+                            # Handle: import module, import module as alias
+                            import_lines.append(ast.unparse(node))
+                        elif isinstance(node, ast.ImportFrom):
+                            # Handle: from module import name, from module import name as alias
+                            import_lines.append(ast.unparse(node))
 
-                import_pattern = r"^(?:from\s+[\w.]+\s+)?import\s+.+$"
-                lines = testcase_out.split("\n")
-                import_lines = [
-                    line for line in lines if re.match(import_pattern, line.strip())
-                ]
-                import_lines = "\n".join(import_lines)
+                    import_lines = "\n".join(import_lines)
+                except (SyntaxError, ValueError):
+                    # Fallback: regex-based extraction if AST parsing fails
+                    import re
+
+                    import_pattern = r"^(?:from\s+[\w.]+\s+)?import\s+.+$"
+                    lines = testcase_out.split("\n")
+                    import_lines = [
+                        line for line in lines if re.match(import_pattern, line.strip())
+                    ]
+                    import_lines = "\n".join(import_lines)
 
             if gnn_mode == "branch":
                 graph_pad = ""

@@ -83,7 +83,9 @@ def main() -> None:
         return
 
     if not args.baseline_skip_prepare_data:
-        if args.mode == "testgen":
+        if args.mode == "testgen" or (
+            args.mode == "baseline" and args.baseline_on_testgen
+        ):
             if args.module_path is None:
                 dataset.prepare_data_for_test_gen(branch_limit=args.branch_limit)
                 for data_n in dataset.processed_data.keys():
@@ -170,6 +172,7 @@ def main() -> None:
                 output_path=args.baseline_output_path,
                 output_name=args.baseline_output_name,
                 max_tokens=args.baseline_max_tokens,
+                on_processed_data=args.baseline_on_testgen,
             )
             console.log(
                 "Baseline Prompt Engineer completed. Exiting as mode is 'baseline'."
