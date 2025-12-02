@@ -259,7 +259,7 @@ class PromptEngineer:
                 uuid = dat["uuid"]
                 tc_key = uuid.split("_testcase_")[-1]
                 tc_key = f"test_case_{tc_key}"
-                uuid = dat.split("_testcase_")[0]
+                uuid = dat["uuid"].split("_testcase_")[0]
                 module_path = dat["module_path"]
                 code_path = dat["code_path"]
                 with open(code_path, "r") as f:
