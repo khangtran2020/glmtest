@@ -294,6 +294,8 @@ def main() -> None:
                     lr_scheduler=lr_scheduler,
                 )
             )
+        else:
+            start_step = -1
 
         train(
             args=args,
