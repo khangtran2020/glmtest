@@ -251,17 +251,21 @@ class PromptEngineer:
             data = dataset.processed_data[split]
             # Add tqdm progress bar
             for key in tqdm(data.keys()):
-                print(data[key].keys())
-                uuid = data[key]["uuid"]
+
+                path = data[key]["path"]
+                with open(path, "r") as f:
+                    dat = json.load(f)
+
+                uuid = dat["uuid"]
                 tc_key = uuid.split("_testcase_")[-1]
                 tc_key = f"test_case_{tc_key}"
-                uuid = data[key]["uuid"].split("_testcase_")[0]
-                module_path = data[key]["module_path"]
-                code_path = data[key]["code_path"]
+                uuid = dat.split("_testcase_")[0]
+                module_path = dat["module_path"]
+                code_path = dat["code_path"]
                 with open(code_path, "r") as f:
                     module_code = f.read()
 
-                branch = data[key]["branch"]
+                branch = dat["branch"]
                 branch_line = ""
                 for i, branch_item in enumerate(branch):
                     branch_line += (
