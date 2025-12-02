@@ -5,6 +5,7 @@ from model.glmffuzz import GLMFModelFuzzing
 from rich.console import Console
 from argparse import Namespace
 from transformers import PreTrainedTokenizer
+from train.utils import load_checkpoint
 from utils.constant import (
     GRAPH_START_TOKEN,
     GRAPH_PAD_TOKEN,
@@ -633,3 +634,98 @@ def get_model_testgen(
     else:
         model = None
     return model
+
+
+def continue_training_from_checkpoint(
+    args: Namespace,
+    model: torch.nn.Module,
+    rank: int,
+    console: Console,
+    optimizer: torch.optim.Optimizer,
+    lr_scheduler: torch.optim.lr_scheduler._LRScheduler,
+):
+    if args.continue_training:
+        if "best_model" in args.checkpoint_path:
+            model_path = None
+            for file in os.listdir(args.checkpoint_path):
+                if file.endswith(".pt"):
+                    model_path = os.path.join(args.checkpoint_path, file)
+                    break
+            state_dict = torch.load(
+                model_path,
+                map_location=f"cuda:{rank}" if torch.cuda.is_available() else "cpu",
+                weights_only=True,
+            )
+            # Get current model's state dict
+            model_dict = model.state_dict()
+
+            # Filter out mismatched keys or shapes
+            filtered_dict = {
+                k: v
+                for k, v in state_dict.items()
+                if k in model_dict and v.shape == model_dict[k].shape
+            }
+
+            # Update the model dict
+            model_dict.update(filtered_dict)
+            model.load_state_dict(model_dict)
+            start_step = int(model_path.split("step")[-1].split(".pt")[0])
+            console.log(
+                f"[cyan]Model weights loaded from {args.checkpoint_path}[/cyan]"
+            )
+        else:
+            assert (
+                args.checkpoint_path is not None
+            ), "Checkpoint path must be specified."
+            check_point = load_checkpoint(path=args.checkpoint_path, rank=rank)
+
+            # Load with strict=False to ignore quantization keys while keeping LoRA weights
+            missing_keys, unexpected_keys = model.load_state_dict(
+                check_point["model_state_dict"], strict=False
+            )
+
+            if missing_keys:
+                console.log(
+                    f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
+                )
+            if unexpected_keys:
+                console.log(
+                    f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
+                )
+                # Log sample of unexpected keys for debugging
+                sample_unexpected = list(unexpected_keys)[:3]
+                console.log(
+                    f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
+                )
+
+            # Load optimizer state if valid
+            try:
+                if "param_groups" in check_point["optimizer_state_dict"]:
+                    optimizer.load_state_dict(check_point["optimizer_state_dict"])
+                    console.log("[cyan]Optimizer state loaded successfully[/cyan]")
+                else:
+                    console.log(
+                        "[yellow]Invalid optimizer state in checkpoint, starting with fresh optimizer[/yellow]"
+                    )
+            except Exception as e:
+                console.log(
+                    f"[yellow]Failed to load optimizer state: {e}. Starting with fresh optimizer[/yellow]"
+                )
+
+            # Load scheduler state if valid
+            try:
+                lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
+                console.log("[cyan]Scheduler state loaded successfully[/cyan]")
+            except Exception as e:
+                console.log(
+                    f"[yellow]Failed to load scheduler state: {e}. Starting with fresh scheduler[/yellow]"
+                )
+
+            start_step = check_point["global_step"]
+            console.log(
+                f"[cyan]Checkpoint loaded from {args.checkpoint_path} at step {start_step}[/cyan]"
+            )
+    else:
+        start_step = -1
+
+    return model, start_step, optimizer, lr_scheduler
