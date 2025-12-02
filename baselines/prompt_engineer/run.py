@@ -255,7 +255,7 @@ class PromptEngineer:
                 path = data[key]["path"]
                 with open(path, "r") as f:
                     dat = json.load(f)
-
+                print(path)
                 print(dat.keys())
 
                 uuid = dat["uuid"]
