@@ -459,11 +459,11 @@ def get_model_test(
                 p.data = p.data.to(device)
 
     # console.log(f"Model is loaded to device: {model.device} - with type {model.dtype}")
-    for name, param in model.named_parameters():
-        if "gnn" in name:
-            console.log(
-                f"[yellow]Parameter {name}, dtype: {param.dtype}, devices: {param.device}[/yellow]"
-            )
+    # for name, param in model.named_parameters():
+    #     if "gnn" in name:
+    #         console.log(
+    #             f"[yellow]Parameter {name}, dtype: {param.dtype}, devices: {param.device}[/yellow]"
+    #         )
     return model
 
 

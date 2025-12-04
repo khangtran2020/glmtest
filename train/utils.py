@@ -282,8 +282,8 @@ def load_checkpoint(
 
 def extract_code_block(text):
     """
-    Extracts all code blocks enclosed in triple backticks from a string.
-    Returns a list of code block strings (without the backticks).
+    Extracts the last code block enclosed in triple backticks from a string.
+    Returns the last code block string (without the backticks).
     """
 
     # Regex:
@@ -292,6 +292,6 @@ def extract_code_block(text):
     pattern = r"```(?:[a-zA-Z0-9_+-]*)\n(.*?)```"
     extracted = re.findall(pattern, text, flags=re.DOTALL)
     if len(extracted) != 0:
-        return extracted[0]
+        return extracted[-1]
     else:
         return ""
