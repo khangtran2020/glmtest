@@ -616,23 +616,64 @@ def get_model_testgen(
             ]
 
         # take .pt file from the model_weight_path
-        console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
-        for file in os.listdir(args.model_weight_path):
-            if file.endswith(".pt"):
-                state_dict = torch.load(
-                    os.path.join(args.model_weight_path, file),
-                    map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-                )
+        if args.model_weight_path.endswith(".pt"):
+            console.log(f"[red]Loading weight from {args.model_weight_path}[/red]")
+            state_dict = torch.load(
+                args.model_weight_path,
+                map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+            )
+            console.log(f"[green]Using LoRA weights for testing: {use_lora}.[/green]")
+            missing_keys, unexpected_keys = model.load_state_dict(
+                state_dict, strict=False
+            )
+            if missing_keys:
                 console.log(
-                    f"[green]Using LoRA weights for testing: {use_lora}.[/green]"
+                    f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
                 )
-                # for key in list(state_dict.keys()):
-                if "current_checkpoint" in args.model_weight_path:
-                    state_dict = state_dict["model_state_dict"]
-                model.load_state_dict(state_dict, strict=True)
-                if use_lora:
-                    model.llm_model = model.llm_model.merge_and_unload()
-                console.log(f"[red]Model weights loaded from {file}[/red]")
+            if unexpected_keys:
+                console.log(
+                    f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
+                )
+                # Log sample of unexpected keys for debugging
+                sample_unexpected = list(unexpected_keys)[:3]
+                console.log(
+                    f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
+                )
+        else:
+            console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
+            for file in os.listdir(args.model_weight_path):
+                if file.endswith(".pt"):
+                    state_dict = torch.load(
+                        os.path.join(args.model_weight_path, file),
+                        map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+                    )
+                    console.log(
+                        f"[green]Using LoRA weights for testing: {use_lora}.[/green]"
+                    )
+                    # for key in list(state_dict.keys()):
+                    if "current_checkpoint" in args.model_weight_path:
+                        state_dict = state_dict["model_state_dict"]
+                        missing_keys, unexpected_keys = model.load_state_dict(
+                            state_dict, strict=False
+                        )
+
+                        if missing_keys:
+                            console.log(
+                                f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
+                            )
+                        if unexpected_keys:
+                            console.log(
+                                f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
+                            )
+                            # Log sample of unexpected keys for debugging
+                            sample_unexpected = list(unexpected_keys)[:3]
+                            console.log(
+                                f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
+                            )
+
+        if use_lora:
+            model.llm_model = model.llm_model.merge_and_unload()
+        console.log(f"[red]Model weights loaded from {args.model_weight_path}[/red]")
 
         # model = model.to(dtype=torch.float)
         # unifying dtype to avoid errors
