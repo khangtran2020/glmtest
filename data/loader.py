@@ -148,7 +148,7 @@ class GLMFDataset(Dataset):
         result = self.tokenizer(
             prompt,
             return_tensors="pt",
-            truncation=True,
+            truncation=True if self.max_seq_length is not None else False,
             max_length=self.max_seq_length,
         )
         pad_size = 0

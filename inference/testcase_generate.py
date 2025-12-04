@@ -127,7 +127,7 @@ def testcase_generate(
         te_mod_dataset = GLMFDataset(
             data=dataset.test_data["module"],
             tokenizer=dataset.llm_tokenizer,
-            max_seq_length=args.max_seq_length,
+            max_seq_length=None,
             debug=args.debug,
             n_hops=dataset.n_hops,
             testing=True,
@@ -138,7 +138,7 @@ def testcase_generate(
         te_proj_dataset = GLMFDataset(
             data=dataset.test_data["project"],
             tokenizer=dataset.llm_tokenizer,
-            max_seq_length=args.max_seq_length,
+            max_seq_length=None,
             debug=args.debug,
             n_hops=dataset.n_hops,
             testing=True,
