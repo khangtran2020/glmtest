@@ -314,23 +314,23 @@ def main() -> None:
         )
 
     elif args.mode == "test":
-        model = get_model(
-            args=args,
-            tokenizer=dataset.llm_tokenizer,
-            rank=rank,
-            device=device,
-            console=console,
-        )
+        # model = get_model(
+        #     args=args,
+        #     tokenizer=dataset.llm_tokenizer,
+        #     rank=rank,
+        #     device=device,
+        #     console=console,
+        # )
         test(args=args, dataset=dataset, model=model, console=console)
 
     elif args.mode == "testgen":
-        model = get_model(
-            args=args,
-            tokenizer=dataset.llm_tokenizer,
-            rank=rank,
-            device=device,
-            console=console,
-        )
+        # model = get_model(
+        #     args=args,
+        #     tokenizer=dataset.llm_tokenizer,
+        #     rank=rank,
+        #     device=device,
+        #     console=console,
+        # )
         testcase_generate(
             args=args,
             dataset=dataset,
