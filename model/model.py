@@ -234,6 +234,11 @@ def get_model_train(
                 if "current_checkpoint" in args.model_weight_path:
                     state_dict = state_dict["model_state_dict"]
 
+                # filter only keys that for GNN part
+                for key in list(state_dict.keys()):
+                    if "gnn" not in key:
+                        del state_dict[key]
+
                 missing_keys, unexpected_keys = model.load_state_dict(
                     state_dict, strict=False
                 )
