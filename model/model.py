@@ -235,7 +235,9 @@ def get_model_train(
                     state_dict = state_dict["model_state_dict"]
 
                 gnn_state_dict = {
-                    k: v for k, v in state_dict.items() if "gnn" in k.lower()
+                    k: v
+                    for k, v in state_dict.items()
+                    if (("gnn" in k.lower()) and ("last_layer" not in k.lower()))
                 }
 
                 missing_keys, unexpected_keys = model.load_state_dict(
