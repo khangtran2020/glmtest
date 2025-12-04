@@ -479,7 +479,9 @@ def get_model_testgen(
         args.model_weight_path is not None
     ), "Model directory must be specified for testing."
 
-    if "current_checkpoint" in args.model_weight_path:
+    if ("current_checkpoint" in args.model_weight_path) or (
+        "best_model" in args.model_weight_path
+    ):
         use_lora = True
     else:
         use_lora = False
@@ -689,9 +691,6 @@ def get_model_testgen(
                 if p.device != device:
                     p.data = p.data.to(device)
 
-        console.log(
-            f"Model is loaded to device: {model.device} - with type {model.dtype}"
-        )
         for name, param in model.named_parameters():
             console.log(
                 f"[yellow]Parameter {name}, dtype: {param.dtype}, device: {param.device}[/yellow]"
