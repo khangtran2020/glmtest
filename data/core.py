@@ -1149,6 +1149,11 @@ class Data(object):
                     for i, branch in enumerate(branches):
 
                         all_masks = self.get_mask_tensor(graph=graph, branch=branch)
+                        assert len(branch) == len(
+                            all_masks
+                        ), "Mask and branch length mismatch: {} vs {}".format(
+                            len(all_masks), len(branch)
+                        )
 
                         if all_masks is None:
                             self.logger.log(
