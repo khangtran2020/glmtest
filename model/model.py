@@ -231,6 +231,9 @@ def get_model_train(
                     os.path.join(args.model_weight_path, file),
                     map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
                 )
+                if "current_checkpoint" in args.model_weight_path:
+                    state_dict = state_dict["model_state_dict"]
+
                 missing_keys, unexpected_keys = model.load_state_dict(
                     state_dict, strict=False
                 )
