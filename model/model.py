@@ -231,7 +231,24 @@ def get_model_train(
                     os.path.join(args.model_weight_path, file),
                     map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
                 )
-                model.load_state_dict(state_dict, strict=False)
+                missing_keys, unexpected_keys = model.load_state_dict(
+                    state_dict, strict=False
+                )
+
+                if missing_keys:
+                    console.log(
+                        f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
+                    )
+                if unexpected_keys:
+                    console.log(
+                        f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
+                    )
+                    # Log sample of unexpected keys for debugging
+                    sample_unexpected = list(unexpected_keys)[:3]
+                    console.log(
+                        f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
+                    )
+
                 console.log(f"[red]Model weights loaded from {file}[/red]")
 
     return model
