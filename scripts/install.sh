@@ -20,3 +20,4 @@ pip install flash-attn==2.7.1-post4 --no-build-isolation
 
 # install other packages
 pip install rich numpy cpgqls_client nest-asyncio coverage scikit-learn
+pip install anthropic openai

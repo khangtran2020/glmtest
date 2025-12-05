@@ -1,12 +1,9 @@
 import os
-import io
 import gc
-import sys
 import time
 import torch
 import wandb
 import shutil
-import pickle
 import torch.distributed as dist
 from rich import print as pprint
 from rich.pretty import pretty_repr
@@ -514,13 +511,11 @@ def train_single_gpu_accelerate(
                     )
                     previous_checkpoint_step = global_step
                     save_checkpoint(
-                        model=model,
+                        model=unwrapped_model,
                         path=checkpoint_dir,
-                        optimizer=optimizer,
-                        scheduler=lr_scheduler,
                         global_step=global_step,
-                        max_num_checkpoint=max_num_checkpoint,
                         seed=args.seed,
+                        is_lora=args.use_lora,
                     )
                     if accelerator.is_main_process:
                         accelerator.print(f"Saving checkpoint to {checkpoint_dir}")
@@ -969,11 +964,9 @@ def train_multi_gpu_accelerate_ring_attn(
                         save_checkpoint(
                             model=unwrapped_model,
                             path=checkpoint_dir_new,
-                            optimizer=optimizer,
-                            scheduler=lr_scheduler,
                             global_step=global_step,
-                            max_num_checkpoint=max_num_checkpoint,
                             seed=args.seed,
+                            is_lora=args.use_lora,
                         )
                         accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
                         del unwrapped_model
@@ -1554,11 +1547,9 @@ def train_multi_gpu_accelerate(
                         save_checkpoint(
                             model=unwrapped_model,
                             path=checkpoint_dir_new,
-                            optimizer=optimizer,
-                            scheduler=lr_scheduler,
                             global_step=global_step,
-                            max_num_checkpoint=max_num_checkpoint,
                             seed=args.seed,
+                            is_lora=args.use_lora,
                         )
                         accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
                         del unwrapped_model
@@ -1600,12 +1591,24 @@ def train_multi_gpu_accelerate(
                                 k: v.cpu()
                                 for k, v in unwrapped_model.state_dict().items()
                             }
-                            torch.save(
-                                state_dict_cpu,
-                                os.path.join(
-                                    checkpoint_dir, f"model_weight_step{global_step}.pt"
-                                ),
-                            )
+                            if args.use_lora:
+                                lora_state_dict = {
+                                    k: v
+                                    for k, v in state_dict_cpu.items()
+                                    if ("lora_" in k) or ("gnn" in k) or ("nvib" in k)
+                                }
+                                torch.save(
+                                    lora_state_dict,
+                                    os.path.join(checkpoint_dir, f"model_weight.pt"),
+                                )
+                            else:
+                                torch.save(
+                                    state_dict_cpu,
+                                    os.path.join(
+                                        checkpoint_dir,
+                                        f"model_weight.pt",
+                                    ),
+                                )
 
                             tokenizer.save_pretrained(checkpoint_dir)
                             console.log(
@@ -1613,10 +1616,9 @@ def train_multi_gpu_accelerate(
                             )
                             del state_dict_cpu, unwrapped_model
                             del checkpoint_dir
+                            if args.use_lora:
+                                del lora_state_dict
                             gc.collect()
-
-                    # No need to restore dtypes - Accelerate handles mixed precision automatically
-                    # Converting quantized 4-bit/8-bit weights to bfloat16 would break quantization
 
             if accelerator.is_main_process:
                 if ((continue_training == True) and (global_step > start_step)) or (
@@ -1665,15 +1667,31 @@ def train_multi_gpu_accelerate(
             state_dict_cpu = {
                 k: v.cpu() for k, v in unwrapped_model.state_dict().items()
             }
-            torch.save(
-                state_dict_cpu,
-                os.path.join(checkpoint_dir, f"model_weight_step{global_step}.pt"),
-            )
+            if args.use_lora:
+                lora_state_dict = {
+                    k: v
+                    for k, v in state_dict_cpu.items()
+                    if ("lora_" in k) or ("gnn" in k) or ("nvib" in k)
+                }
+                torch.save(
+                    lora_state_dict,
+                    os.path.join(checkpoint_dir, f"model_weight.pt"),
+                )
+            else:
+                torch.save(
+                    state_dict_cpu,
+                    os.path.join(
+                        checkpoint_dir,
+                        f"model_weight.pt",
+                    ),
+                )
 
             tokenizer.save_pretrained(checkpoint_dir)
             console.log(f"[green]Saved best checkpoint to {checkpoint_dir}[/green]")
             del state_dict_cpu, unwrapped_model
             del checkpoint_dir
+            if args.use_lora:
+                del lora_state_dict
             gc.collect()
 
     # No need to restore dtypes - Accelerate handles mixed precision automatically
@@ -1689,11 +1707,8 @@ def train_multi_gpu_accelerate(
             os.makedirs(final_model_path, exist_ok=True)
 
         unwrapped_model = accelerator.unwrap_model(model)
-        best_model_path = os.path.join(save_path, "best_model")
-        for file in os.listdir(best_model_path):
-            if file.endswith(".pt"):
-                best_model_path = os.path.join(best_model_path, file)
-                break
+        best_model_path = os.path.join(save_path, "best_model", "model_weight.pt")
+
         if os.path.exists(best_model_path):
             console.log(
                 f"Loading best model from {best_model_path} for final evaluation"

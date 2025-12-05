@@ -622,13 +622,31 @@ class Data(object):
 
             for data_n in self.data.keys():  # train, test_module, test_project
 
+                # load raw data
+                raw_data_path = os.path.join(self.data_path, f"{data_n}.jsonl")
+
+                if not os.path.exists(raw_data_path):
+                    self.logger.log(
+                        f"[red]Raw data path {raw_data_path} does not exist[/red]"
+                    )
+                    continue
+
+                with open(raw_data_path, "r") as f:
+                    raw_data = [json.loads(line) for line in f.readlines()]
+                    raw_data_dict = {
+                        item["id"]: item["local_imports"] for item in raw_data
+                    }
+
                 self.processed_data[data_n] = {}
 
                 for uuid, dat in tqdm(
                     self.data[data_n].items(), position=0, leave=True
                 ):
+
                     with open(dat["code_path"], "r") as file:
                         src_code = file.read()
+
+                    local_imports = raw_data_dict[uuid]["local_imports"]
 
                     module_path = dat.get("module_path", "N/A")
                     all_masks = torch.load(
@@ -697,6 +715,7 @@ class Data(object):
                             module_path=module_path,
                             branch=branch_line,
                             gnn_mode=self.gnn_mode,
+                            local_imports=local_imports,
                         )
                         if result is None:
                             num_discarded += 1
