@@ -1697,43 +1697,43 @@ def train_multi_gpu_accelerate(
     # No need to restore dtypes - Accelerate handles mixed precision automatically
     # Converting quantized 4-bit/8-bit weights to bfloat16 would break quantization
 
-    accelerator.wait_for_everyone()
-    if accelerator.is_main_process:
+    # accelerator.wait_for_everyone()
+    # if accelerator.is_main_process:
 
-        final_model_path = os.path.join(save_path, "final_model")
-        console.log(f"Saving final model to {final_model_path}...")
+    #     final_model_path = os.path.join(save_path, "final_model")
+    #     console.log(f"Saving final model to {final_model_path}...")
 
-        if not os.path.exists(final_model_path):
-            os.makedirs(final_model_path, exist_ok=True)
+    #     if not os.path.exists(final_model_path):
+    #         os.makedirs(final_model_path, exist_ok=True)
 
-        unwrapped_model = accelerator.unwrap_model(model)
-        best_model_path = os.path.join(save_path, "best_model", "model_weight.pt")
+    #     unwrapped_model = accelerator.unwrap_model(model)
+    #     best_model_path = os.path.join(save_path, "best_model", "model_weight.pt")
 
-        if os.path.exists(best_model_path):
-            console.log(
-                f"Loading best model from {best_model_path} for final evaluation"
-            )
-            state_dict = torch.load(best_model_path, map_location="cpu")
-            missing_keys, unexpected_keys = unwrapped_model.load_state_dict(
-                state_dict, strict=False
-            )
-            if len(missing_keys) > 0:
-                console.log(f"Missing keys when loading best model: {missing_keys}")
-            if len(unexpected_keys) > 0:
-                console.log(
-                    f"Unexpected keys when loading best model: {unexpected_keys}"
-                )
-            console.log("Best model loaded successfully")
+    #     if os.path.exists(best_model_path):
+    #         console.log(
+    #             f"Loading best model from {best_model_path} for final evaluation"
+    #         )
+    #         state_dict = torch.load(best_model_path, map_location="cpu")
+    #         missing_keys, unexpected_keys = unwrapped_model.load_state_dict(
+    #             state_dict, strict=False
+    #         )
+    #         if len(missing_keys) > 0:
+    #             console.log(f"Missing keys when loading best model: {missing_keys}")
+    #         if len(unexpected_keys) > 0:
+    #             console.log(
+    #                 f"Unexpected keys when loading best model: {unexpected_keys}"
+    #             )
+    #         console.log("Best model loaded successfully")
 
-        if unwrapped_model.config.use_lora == True:
-            unwrapped_model.llm_model = unwrapped_model.llm_model.merge_and_unload()
-            unwrapped_model.config.use_lora = False
+    #     if unwrapped_model.config.use_lora == True:
+    #         unwrapped_model.llm_model = unwrapped_model.llm_model.merge_and_unload()
+    #         unwrapped_model.config.use_lora = False
 
-        torch.save(
-            unwrapped_model.state_dict(),
-            os.path.join(final_model_path, "model_weight.pt"),
-        )
-        tokenizer.save_pretrained(final_model_path)
-        console.log(f"Final model saved to {final_model_path}")
+    #     torch.save(
+    #         unwrapped_model.state_dict(),
+    #         os.path.join(final_model_path, "model_weight.pt"),
+    #     )
+    #     tokenizer.save_pretrained(final_model_path)
+    #     console.log(f"Final model saved to {final_model_path}")
 
     accelerator.end_training()
