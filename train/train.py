@@ -1436,7 +1436,7 @@ def train_multi_gpu_accelerate(
                     torch.cuda.empty_cache()
 
                 # Update global step and logging
-                global_step += batch_size
+                global_step += 1
 
                 # Clean up batch
                 del batch
