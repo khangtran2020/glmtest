@@ -646,7 +646,7 @@ class Data(object):
                     with open(dat["code_path"], "r") as file:
                         src_code = file.read()
 
-                    local_imports = raw_data_dict[uuid]["local_imports"]
+                    local_imports = raw_data_dict[uuid]
 
                     module_path = dat.get("module_path", "N/A")
                     all_masks = torch.load(
