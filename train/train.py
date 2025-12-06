@@ -1104,8 +1104,22 @@ def train_multi_gpu_accelerate(
     if args.use_deepspeed and os.path.exists(args.deepspeed_config):
         from accelerate import DeepSpeedPlugin
 
+        # Auto-select BF16 config for GPT models to avoid FP16 loss scaling issues
+        deepspeed_config_path = args.deepspeed_config
+        if "gpt" in args.llm_model.lower():
+            bf16_config = args.deepspeed_config.replace(".json", "_bf16.json")
+            if os.path.exists(bf16_config):
+                deepspeed_config_path = bf16_config
+                console.log(
+                    f"[green]Detected GPT model - using BF16 config: {bf16_config}[/green]"
+                )
+            else:
+                console.log(
+                    f"[yellow]Warning: GPT model detected but BF16 config not found at {bf16_config}. Using default config.[/yellow]"
+                )
+
         deepspeed_plugin = DeepSpeedPlugin(
-            hf_ds_config=args.deepspeed_config,
+            hf_ds_config=deepspeed_config_path,
             zero3_init_flag=False,
         )
         accelerator = Accelerator(

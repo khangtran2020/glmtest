@@ -14,15 +14,10 @@
     "round_robin_gradients": false
   },
   "fp16": {
-    "enabled": true,
-    "loss_scale": 0,
-    "initial_scale_power": 16,
-    "loss_scale_window": 1000,
-    "hysteresis": 2,
-    "min_loss_scale": 1
+    "enabled": false
   },
   "bf16": {
-    "enabled": false
+    "enabled": true
   },
   "zero_allow_untested_optimizer": true,
   "wall_clock_breakdown": false,
