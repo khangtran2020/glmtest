@@ -246,7 +246,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             config.model_name,
             torch_dtype=torch_dtype,
             device_map=f"cuda:{rank}",
-            attn_implementation="flash_attention_2",
+            attn_implementation=(
+                "flash_attention_2" if "gpt" not in config.model_name else "sdpa"
+            ),
         )
 
         if self.is_training:
