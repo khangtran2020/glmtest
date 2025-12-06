@@ -717,7 +717,10 @@ def train_multi_gpu_accelerate_ring_attn(
 
     if not isinstance(tr_dataset, torch.utils.data.IterableDataset):
         dataloader_params["drop_last"] = True
-        dataloader_params["worker_init_fn"] = seed_worker
+        # Fix for transformers >= 4.46.0: seed_worker now requires (worker_id, num_workers, rank)
+        dataloader_params["worker_init_fn"] = lambda worker_id: seed_worker(
+            worker_id, num_workers=4, rank=accelerator.process_index
+        )
 
     tr_loader = DataLoader(tr_dataset, **dataloader_params)
     va_loader = DataLoader(
@@ -1230,7 +1233,10 @@ def train_multi_gpu_accelerate(
 
     if not isinstance(tr_dataset, torch.utils.data.IterableDataset):
         dataloader_params["drop_last"] = True
-        dataloader_params["worker_init_fn"] = seed_worker
+        # Fix for transformers >= 4.46.0: seed_worker now requires (worker_id, num_workers, rank)
+        dataloader_params["worker_init_fn"] = lambda worker_id: seed_worker(
+            worker_id, num_workers=1, rank=accelerator.process_index
+        )
         # Note: shuffle is not compatible with sampler, sampler handles sampling strategy
 
     tr_loader = DataLoader(tr_dataset, **dataloader_params)
