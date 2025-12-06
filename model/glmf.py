@@ -44,18 +44,11 @@ class GLMFModelConfig(PretrainedConfig):
         dropout: float = 0.2,
         dtype: str = "float32",
         device_map=None,
-        # LoRA parameters
         use_lora: bool = False,
         lora_r: int = 4,
         lora_alpha: int = 32,
         lora_dropout: float = 0.1,
         lora_target_modules: List[str] = None,
-        # Quantization parameters (QLoRA)
-        load_in_4bit: bool = False,
-        load_in_8bit: bool = False,
-        bnb_4bit_compute_dtype: str = "bfloat16",
-        bnb_4bit_quant_type: str = "nf4",
-        bnb_4bit_use_double_quant: bool = False,
         debug: bool = False,
         **kwargs,
     ):
@@ -66,13 +59,6 @@ class GLMFModelConfig(PretrainedConfig):
             raise ValueError("`llm_model` must be provided to GLMFModelConfig.")
 
         config = AutoConfig.from_pretrained(llm_model).to_dict()
-
-        # if "_attn_implementation_autoset" in kwargs:
-        #     config.pop("_attn_implementation_autoset", None)
-
-        # for key in kwargs:
-        #     if key in config.keys():
-        #         config.pop(key, None)
 
         for key in list(kwargs):
             config.pop(key, None)
@@ -118,37 +104,7 @@ class GLMFModelConfig(PretrainedConfig):
         self.lora_dropout = lora_dropout
         self.lora_target_modules = lora_target_modules
 
-        # Quantization config
-        self.load_in_4bit = load_in_4bit
-        self.load_in_8bit = load_in_8bit
-        self.bnb_4bit_compute_dtype = bnb_4bit_compute_dtype
-        self.bnb_4bit_quant_type = bnb_4bit_quant_type
-        self.bnb_4bit_use_double_quant = bnb_4bit_use_double_quant
-
-        # Validate quantization settings
-        if self.load_in_4bit and self.load_in_8bit:
-            raise ValueError(
-                "Cannot enable both `load_in_4bit` and `load_in_8bit`. "
-                "Please choose one quantization method."
-            )
-
-        # Warn if quantization without LoRA
-        if (self.load_in_4bit or self.load_in_8bit) and not self.use_lora:
-            import warnings
-
-            warnings.warn(
-                "Using quantization without LoRA is not recommended for training. "
-                "Consider enabling LoRA for QLoRA training.",
-                UserWarning,
-            )
-
-        # self.dtype = dtype
-        # self.graph_token_id = [92302, 92303, 92304]
-        # super().__init__(**config, **kwargs)
-
     def to_diff_dict(self):
-        # Instead of comparing with a default instance (which fails),
-        # simply return the full dict.
         return self.to_dict()
 
     def _get_non_default_generation_parameters(self) -> Dict[str, Any]:
@@ -177,11 +133,6 @@ class GLMFModelConfig(PretrainedConfig):
                 lora_alpha=self.lora_alpha,
                 lora_dropout=self.lora_dropout,
                 lora_target_modules=self.lora_target_modules,
-                load_in_4bit=self.load_in_4bit,
-                load_in_8bit=self.load_in_8bit,
-                bnb_4bit_compute_dtype=self.bnb_4bit_compute_dtype,
-                bnb_4bit_quant_type=self.bnb_4bit_quant_type,
-                bnb_4bit_use_double_quant=self.bnb_4bit_use_double_quant,
                 debug=self.debug,
             )
         except ValueError:
@@ -284,63 +235,16 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     dropout=config.dropout,
                 )
 
-        # Prepare quantization config if needed (QLoRA)
-        quantization_config = None
-        if config.load_in_4bit or config.load_in_8bit:
-
-            if config.load_in_4bit and config.load_in_8bit:
-                raise ValueError(
-                    "Cannot enable both `load_in_4bit` and `load_in_8bit`. "
-                    "Please choose one quantization method."
-                )
-
-            pprint(
-                f"[yellow]Loading model with quantization: 4bit={config.load_in_4bit}, 8bit={config.load_in_8bit}[/yellow]"
-            )
-
-            # Map string dtype to torch dtype
-            compute_dtype_map = {
-                "bfloat16": torch.bfloat16,
-                "float16": torch.float16,
-                "float32": torch.float32,
-            }
-
-            compute_dtype = compute_dtype_map.get(
-                config.bnb_4bit_compute_dtype, torch.bfloat16
-            )
-
-            if config.load_in_8bit:
-                quantization_config = BitsAndBytesConfig(
-                    load_in_4bit=False,
-                    load_in_8bit=config.load_in_8bit,
-                    bnb_4bit_compute_dtype=compute_dtype,
-                    bnb_4bit_quant_type=config.bnb_4bit_quant_type,
-                    bnb_4bit_use_double_quant=config.bnb_4bit_use_double_quant,
-                )
-            else:  # 4-bit quantization
-                quantization_config = BitsAndBytesConfig(
-                    load_in_4bit=config.load_in_4bit,
-                    load_in_8bit=False,
-                    bnb_4bit_compute_dtype=compute_dtype,
-                    bnb_4bit_quant_type=config.bnb_4bit_quant_type,
-                    bnb_4bit_use_double_quant=config.bnb_4bit_use_double_quant,
-                )
-
-        # Determine torch dtype (quantization overrides this)
-        if quantization_config is not None:
-            torch_dtype = None  # Let quantization config handle dtype
-        elif config.dtype == "fp16":
+        if config.dtype == "fp16":
             torch_dtype = torch.float16
         elif config.dtype == "bf16":
             torch_dtype = torch.bfloat16
         else:
             torch_dtype = None
 
-        # Load model with optional quantization
         self.llm_model = AutoModelForCausalLM.from_pretrained(
             config.model_name,
             torch_dtype=torch_dtype,
-            quantization_config=quantization_config,
             device_map=f"cuda:{rank}",
             attn_implementation="flash_attention_2",
         )
@@ -424,10 +328,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         inputs_embeds: torch.Tensor,
     ) -> Tensor:
 
-        # Clone to avoid in-place operation errors with quantized models
-        if inputs_embeds.requires_grad and inputs_embeds.is_leaf:
-            inputs_embeds = inputs_embeds.clone()
-
         batch_size = inputs_embeds.size(0)
         for i in range(batch_size):
             graph_token_index = graph_token_indices[i]
@@ -479,10 +379,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         graph_masks: List[torch.Tensor],
         inputs_embeds: torch.Tensor,
     ) -> Tensor:
-
-        # Clone to avoid in-place operation errors with quantized models
-        if inputs_embeds.requires_grad and inputs_embeds.is_leaf:
-            inputs_embeds = inputs_embeds.clone()
 
         batch_size = inputs_embeds.size(0)
         for i in range(batch_size):

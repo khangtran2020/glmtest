@@ -178,28 +178,6 @@ def add_model_group(group):
         default=None,
     )
     group.add_argument(
-        "--load_in_4bit",
-        action="store_true",
-        help="load model in 4-bit quantization (QLoRA)",
-    )
-    group.add_argument(
-        "--load_in_8bit",
-        action="store_true",
-        help="load model in 8-bit quantization",
-    )
-    group.add_argument(
-        "--bnb_4bit_compute_dtype",
-        type=str,
-        help="compute dtype for 4-bit quantization (bfloat16, float16, float32)",
-        default="bfloat16",
-    )
-    group.add_argument(
-        "--bnb_4bit_quant_type",
-        type=str,
-        help="quantization type for 4-bit (nf4 or fp4)",
-        default="nf4",
-    )
-    group.add_argument(
         "--max_num_checkpoint",
         type=int,
         help="maximum number of checkpoints",
