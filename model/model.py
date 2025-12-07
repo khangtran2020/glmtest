@@ -410,7 +410,7 @@ def get_model_test(
             console.log(
                 f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
             )
-            sample_missing_keys = list(missing_keys)[:3]
+            sample_missing_keys = list(missing_keys)[:10]
             console.log(
                 f"[yellow]Sample missing keys: {sample_missing_keys}...[/yellow]"
             )
@@ -419,7 +419,7 @@ def get_model_test(
                 f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
             )
             # Log sample of unexpected keys for debugging
-            sample_unexpected = list(unexpected_keys)[:3]
+            sample_unexpected = list(unexpected_keys)[:10]
             console.log(
                 f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
             )
