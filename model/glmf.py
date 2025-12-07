@@ -50,6 +50,7 @@ class GLMFModelConfig(PretrainedConfig):
         lora_dropout: float = 0.1,
         lora_target_modules: List[str] = None,
         debug: bool = False,
+        use_flash_attn: bool = False,
         **kwargs,
     ):
         # super().__init__(**kwargs)
@@ -85,6 +86,7 @@ class GLMFModelConfig(PretrainedConfig):
         self.dtype = dtype
         self.device_map = device_map
         self.debug = debug
+        self.use_flash_attn = use_flash_attn
 
         if lora_target_modules is None:
             # This can be adjusted depending on your underlying model's architecture.
@@ -247,7 +249,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             torch_dtype=torch_dtype,
             device_map=f"cuda:{rank}",
             attn_implementation=(
-                "flash_attention_2" if "gpt" not in config.model_name else "sdpa"
+                "flash_attention_2" if config.use_flash_attn else "sdpa"
             ),
         )
 

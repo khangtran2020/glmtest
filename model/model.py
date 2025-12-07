@@ -64,6 +64,7 @@ def get_model_train(
             lora_dropout=args.lora_dropout,
             lora_target_modules=args.lora_target_modules,
             device_map="cuda" if torch.cuda.is_available() else "cpu",
+            use_flash_attn=args.use_flash_attn,
         )
 
         layer_indices = [
@@ -111,6 +112,7 @@ def get_model_train(
             lora_dropout=args.lora_dropout,
             lora_target_modules=args.lora_target_modules,
             device_map="cuda" if torch.cuda.is_available() else "cpu",
+            use_flash_attn=args.use_flash_attn,
         )
 
         config.graph_token_id = [
@@ -170,6 +172,7 @@ def get_model_train(
             lora_dropout=args.lora_dropout,
             lora_target_modules=args.lora_target_modules,
             device_map="cuda" if torch.cuda.is_available() else "cpu",
+            use_flash_attn=args.use_flash_attn,
         )
 
         model = GLMFModelForCausalLM(
@@ -297,6 +300,7 @@ def get_model_test(
             lora_dropout=args.lora_dropout,
             lora_target_modules=args.lora_target_modules,
             device_map="cuda" if torch.cuda.is_available() else "cpu",
+            use_flash_attn=args.use_flash_attn,
         )
 
         layer_indices = [
@@ -373,6 +377,7 @@ def get_model_test(
             lora_dropout=args.lora_dropout,
             lora_target_modules=args.lora_target_modules,
             device_map="cuda",
+            use_flash_attn=args.use_flash_attn,
         )
 
         model = GLMFModelForCausalLM(
@@ -513,6 +518,7 @@ def get_model_testgen(
                 lora_dropout=args.lora_dropout,
                 lora_target_modules=args.lora_target_modules,
                 device_map="cuda" if torch.cuda.is_available() else "cpu",
+                use_flash_attn=args.use_flash_attn,
             )
 
             layer_indices = [
@@ -550,6 +556,7 @@ def get_model_testgen(
                 lora_dropout=args.lora_dropout,
                 lora_target_modules=args.lora_target_modules,
                 device_map="cuda" if torch.cuda.is_available() else "cpu",
+                use_flash_attn=args.use_flash_attn,
             )
 
             config.graph_token_id = [
@@ -589,6 +596,7 @@ def get_model_testgen(
                 lora_dropout=args.lora_dropout,
                 lora_target_modules=args.lora_target_modules,
                 device_map="cuda",
+                use_flash_attn=args.use_flash_attn,
             )
 
             model = GLMFModelForCausalLM(

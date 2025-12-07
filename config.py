@@ -244,6 +244,11 @@ def add_model_group(group):
         action="store_true",
         help="use ring attention",
     )
+    group.add_argument(
+        "--use_flash_attn",
+        action="store_true",
+        help="use flash attention",
+    )
 
 
 def add_training_group(group):
