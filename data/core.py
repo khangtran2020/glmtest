@@ -1,14 +1,19 @@
 import os
+import re
+import sys
 import ast
 import dgl
 import json
 import torch
+import random
+import anthropic
 import numpy as np
 import pandas as pd
 import networkx as nx
 from tqdm import tqdm
 from rich.progress import Progress
 from rich.console import Console
+from rich.pretty import pretty_repr
 from graph.core import Graph
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from branch.utils import run_coverage, get_all_branch
@@ -19,73 +24,83 @@ from copy import deepcopy
 from model.gnn import GRAPH_KEYS
 
 # typing
-from typing import List, Union, Dict, Any
+from typing import List, Union, Dict, Any, Optional
 
-PYNGUIN_TEMPLATE = """docker run --rm -v {}:/input:ro -v {}:/output -v {}:/package:ro {} \
-    --module-name {} --coverage_metrics BRANCH --maximum_search_time {} --report-dir /output --project_path /input --output-path /output --output_variables TargetModule,CoverageTimeline --assertion-generation NONE"""
+PROMPT_TEMPLATE = """# INSTRUCTION: You are an AI agent that generates executable Python test cases targeting a specific execution branch of a module.
 
-PROMPT_CODE = """Given a code script and an execution code lines, generate the test case for the corresponding code snippet:
+Inputs:
+- Module source: source code of the target module (Could be truncated to related line only).
+- Execution branch information: the lines of the target module executed.
+- Module path: a valid, importable path from the PYTHONPATH directory.
+- Code Property Graph (CPG) embeddings (Optional): semantic and structural information about the code elements related to the branch.
+
+Tasks:
+1. Generate a runnable Python test file that executes the specified branch of the module.
+2. Include meaningful assertions that confirm correct behavior and should pass for the given branch.
+3. Output only the final, runnable Python test code—no explanations or reasoning text.
+
+Requirements:
+- All imports must be valid and correspond to existing modules; do not invent or hallucinate any packages.
+- Use standard testing practices (unittest, pytest, or assert statements).
+- Keep the code clear, minimal, and maintainable.
+
+------------------------------------------------------------
+
+# INPUTS:
+
+## Module Source:
 ```
 {}
 ```
 
-Here is the execution code lines:
+## Execution Branches Information (Line to Line executed):
 {}
+
+
+## Module Path:
+{}
+
+## Code Property Graph (CPG) Node Embeddings:
+{}
+
+## Here's how to import the target module:
+```
+{}
+```
+
+------------------------------------------------------------"""
+
+RESPONSE_TEMPLATE = """# OUTPUTS: 
+
+Since the target module is imported from `{}`, the test code should be structured to correctly reference this module. Furthermore, the targeted module can be imported using the following code snippet:
+```
+{}
+```
+
+The test case should not hallucinate any imports and use valid functions/classes from the module.
+
+Here is the generated Python test code targeting the specified execution branch
+```
+{}
+```
 """
 
-PROMPT_CODE_TR = """Generate the test case for the code snippet:
-```
+REASONING_TEMPLATE_PROMPT = """Given a data sample (including input and output), generate a reasoning explanation (within 100 words) that describes the analytical process for deriving the output from the input. This reasoning will be placed before the #OUTPUTS tag to train LLMs for reasoning.
+
+Your reasoning should:
+1. Explain how you analyze the input components (module source, execution branches, module path, CPG embeddings)
+2. Describe how you synthesize this information to generate the output
+3. Incorporate graph embedding information: each <|graph_pad|> represents a CPG node embedding for that branch. When embeddings are provided, explain how they encode semantic/structural relationships (e.g., control flow, data dependencies, variable interactions) that guide the output generation
+4. Connect the execution branch patterns to the generated test code logic
+
+Focus on the reasoning process, not describing what the test does.
+
+# DATA SAMPLE:
 {}
-```
-"""
 
-PROMPT_GRAPH = """Generate the test case for the graph embedding of a targeted execution branch below:
-{}
-"""
-
-PROMPT_CODE_GRAPH = """Generate the test case for the code below and the corresponding graph embedding of a targeted execution branch:
-
-Here is the code:
-```
-{}
-```
-
-Here is the graph embedding:
-{}
-"""
-
-RESPONSE_TEMPLATE = """Here is the test case:
-```
-{}
-```
-"""
-
-PROMPT_COT = """Generate a test case for the following module such that:
-- The test case use the pytest framework and executable.
-- The test case will be put in the `tests/` directory which is place in the root of the project.
-- The test case will need to execute the provided branch of execution in the provided module.
-
-Here is the module:
-```python
-{module}
-```
-
-Here is the execution branch. The execution branch is a sequence of executable line number in the module:
-{execution_branch}
-
-THINK STEP-BY-STEP and provide your response in the following format:
-
-```json
-{{
-  "test_case": <YOUR ANSWER FOR THE TEST CASE - JUST ONLY THE EXECUTABLE PYTHON CODE>
-}}
-```
-"""
-
-RESPONSE_BASELINE_TEMPLATE = """```json
-{{
-  "test_case": {}
-}}
+# OUTPUT INSTRUCTION: Return only the reasoning in this form:
+````json
+{{"reason": <YOUR ANSWER>}}
 ```
 """
 
@@ -144,6 +159,7 @@ class Data(object):
         graph: Graph,
         num_cpu: int,
         model_name: str,
+        llm_model_name: str,
         feat_model: PreTrainedModel = None,
         feat_tokenizer: PreTrainedTokenizer = None,
         llm_tokenizer: PreTrainedTokenizer = None,
@@ -155,6 +171,7 @@ class Data(object):
         n_hops: int = 2,
         gnn_mode: str = "node",
         data_fuzz: bool = False,
+        repo: str = None,
     ) -> None:
         self.name = name  # name of the data
         self.path = path  # path of the raw data
@@ -163,6 +180,7 @@ class Data(object):
         self.num_cpu = num_cpu
         self.debug = debug
         self.model_name = model_name
+        self.llm_model_name = llm_model_name
         self.feat_model = feat_model
         self.feat_tokenizer = feat_tokenizer
         self.llm_tokenizer = llm_tokenizer
@@ -173,6 +191,7 @@ class Data(object):
         self.max_tokens = max_tokens
         self.gnn_mode = gnn_mode
         self.data_fuzz = data_fuzz
+        self.repo = repo
 
     def crawl(self) -> None:
         """
@@ -330,18 +349,6 @@ class Data(object):
         # get the data and analyze the data
         return module_results_info
 
-    def get_pynguin_command_for_module(self, module_info: dict) -> str:
-
-        pynguin_command = PYNGUIN_TEMPLATE.format(
-            os.path.abspath(module_info["code_path"]),
-            os.path.abspath(module_info["output_test_path"]),
-            os.path.abspath(module_info["package_path"]),
-            self.docker_image,
-            module_info["module_name_test_gen"],
-            self.run_time,
-        )
-        return pynguin_command
-
     def count_test_cases(self, test_file: str) -> int:
 
         try:
@@ -400,26 +407,28 @@ class Data(object):
             print(f"An error occurred: {e}")
             return -1
 
-    def get_mask_tensor(self, graph: Dict, branch: List) -> torch.Tensor:
+    def get_mask_tensor(
+        self, graph: Dict, branch: List[List[int]]
+    ) -> List[torch.Tensor]:
 
-        mask = np.zeros(len(graph["nodes"]))
-        depth = get_depth(branch)
-        if depth > 2:
-            line_list = list(
-                set(np.concatenate(np.array(branch, dtype=object)).tolist())
-            )
-        else:
-            line_list = list(set(branch))
-        for i in range(len(graph["nodes"])):
-            node = graph["nodes"][i]
-            if node["location"]["filename"] == "N/A":
+        all_mask = []
+        # branch_to_remove = []
+        for j, branch_item in enumerate(branch):
+            mask = np.zeros(len(graph["nodes"]))
+            line_list = list(set(branch_item))
+            for i in range(len(graph["nodes"])):
+                node = graph["nodes"][i]
+                # if node["location"]["filename"] == "N/A":
                 try:
                     if node["properties"]["LINE_NUMBER"] in line_list:
                         mask[i] = 1
                 except:
                     mask[i] = 0
-        mask = torch.Tensor([mask])
-        return mask
+            all_mask.append(mask)
+
+        if len(all_mask) == 1:
+            return None
+        return all_mask
 
     def get_node_features(self, graph: Dict) -> torch.Tensor:
         df = self.preprocess(graph)
@@ -557,11 +566,21 @@ class Data(object):
         assert self.data is not None
 
         processed_data = None
-        processed_data_file_path = os.path.join(
-            self.data_path,
-            f"{self.baseline_prompt}_{self.max_tokens}_{self.model_name}",
-            "processed_data.json",
-        )
+        if "graph" not in self.baseline_prompt:
+            processed_data_file_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.llm_model_name}",
+                "original",
+                "processed_data.json",
+            )
+        else:
+            processed_data_file_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                "original",
+                "processed_data.json",
+            )
+
         if os.path.exists(processed_data_file_path):
             with open(
                 processed_data_file_path,
@@ -574,10 +593,18 @@ class Data(object):
                 self.data_path,
                 f"raw",
             )
-            processed_prompt_path = os.path.join(
-                self.data_path,
-                f"{self.baseline_prompt}_{self.max_tokens}_{self.model_name}",
-            )
+            if "graph" not in self.baseline_prompt:
+                processed_prompt_path = os.path.join(
+                    self.data_path,
+                    f"{self.baseline_prompt}_{self.llm_model_name}",
+                    "original",
+                )
+            else:
+                processed_prompt_path = os.path.join(
+                    self.data_path,
+                    f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                    "original",
+                )
 
             os.makedirs(processed_data_path, exist_ok=True)
             os.makedirs(processed_prompt_path, exist_ok=True)
@@ -593,42 +620,45 @@ class Data(object):
             num_tokens = []
             num_discarded = 0
 
-            if ("graph" in self.baseline_prompt) and self.debug:
-                graph_stats = {}
-                for key in GRAPH_KEYS:
-                    graph_stats[key] = {
-                        "num_nodes": [],
-                        "num_edges": [],
-                        "in_max_degrees": [],
-                        "out_max_degrees": [],
-                        "in_min_degrees": [],
-                        "out_min_degrees": [],
-                        "num_components": [],
-                    }
+            for data_n in self.data.keys():  # train, test_module, test_project
 
-            for data_n in self.data.keys():
+                # load raw data
+                raw_data_path = os.path.join(self.data_path, f"{data_n}.jsonl")
+
+                if not os.path.exists(raw_data_path):
+                    self.logger.log(
+                        f"[red]Raw data path {raw_data_path} does not exist[/red]"
+                    )
+                    continue
+
+                with open(raw_data_path, "r") as f:
+                    raw_data = [json.loads(line) for line in f.readlines()]
+                    raw_data_dict = {
+                        item["id"]: item["local_imports"] for item in raw_data
+                    }
 
                 self.processed_data[data_n] = {}
 
-                for uuid, dat in self.data[data_n].items():
+                for uuid, dat in tqdm(
+                    self.data[data_n].items(), position=0, leave=True
+                ):
+
                     with open(dat["code_path"], "r") as file:
                         src_code = file.read()
 
-                    mask = torch.load(dat["graph"]["mask_path"], weights_only=True)
-                    self.logger.log(
-                        f"Loaded mask for {uuid}: {len(mask)} and {len(dat['test_cases'])}"
+                    local_imports = raw_data_dict[uuid]
+
+                    module_path = dat.get("module_path", "N/A")
+                    all_masks = torch.load(
+                        dat["graph"]["mask_path"], weights_only=False
                     )
-                    assert len(mask) == len(dat["test_cases"])
+                    assert len(all_masks) == len(dat["test_cases"])
 
                     if "graph" in self.baseline_prompt:
                         graph_name = f"{uuid}_graph.pt"
                         graph_path = os.path.join(processed_data_path, graph_name)
 
-                        if os.path.exists(graph_path):
-                            self.logger.log(
-                                f"[yellow]Graph already exists for {uuid}, loading...[/yellow]"
-                            )
-                        else:
+                        if not os.path.exists(graph_path):
                             graph = self.read_graph(dat)
 
                             check_graph_exist_dict = {}
@@ -655,31 +685,6 @@ class Data(object):
                                 continue
                             torch.save(graph_dict, graph_path)
 
-                        if self.debug:
-                            gstats = self.get_graph_stats(graph_dict)
-                            for key in gstats.keys():
-                                graph_stats[key]["num_nodes"].append(
-                                    gstats[key]["num_nodes"]
-                                )
-                                graph_stats[key]["num_edges"].append(
-                                    gstats[key]["num_edges"]
-                                )
-                                graph_stats[key]["in_max_degrees"].append(
-                                    gstats[key]["in_max_degrees"]
-                                )
-                                graph_stats[key]["out_max_degrees"].append(
-                                    gstats[key]["out_max_degrees"]
-                                )
-                                graph_stats[key]["in_min_degrees"].append(
-                                    gstats[key]["in_min_degrees"]
-                                )
-                                graph_stats[key]["out_min_degrees"].append(
-                                    gstats[key]["out_min_degrees"]
-                                )
-                                graph_stats[key]["num_components"].append(
-                                    gstats[key]["num_components"]
-                                )
-
                     for testcase in dat["test_cases"].keys():
                         test_code = dat["test_cases"][testcase]["test_case"]
                         if self.data_fuzz:
@@ -688,10 +693,14 @@ class Data(object):
                             num_discarded += 1
                             continue
                         mask_key = int(testcase.split("_")[-1])
-                        branch = mask[mask_key]
+                        branch_masks: List[torch.Tensor] = all_masks[mask_key]
                         branch_line = dat["test_cases"][testcase]["branch"]
-                        active_node = get_index_by_value(a=branch[0], val=1)
-                        if active_node.size(0) == 0:
+                        # print(branch_masks)
+                        active_nodes = [
+                            get_index_by_value(a=branch_masks[i], val=1)
+                            for i in range(len(branch_masks))
+                        ]
+                        if len(active_nodes) == 0:
                             self.logger.log(
                                 f"Active node empty at uuid: {uuid} testcase: {testcase}"
                             )
@@ -701,10 +710,12 @@ class Data(object):
                         result = self.get_prompt(
                             src_code=src_code,
                             testcase_out=test_code,
-                            mask=active_node,
+                            active_nodes=active_nodes,
                             tokenizer=self.llm_tokenizer,
+                            module_path=module_path,
                             branch=branch_line,
                             gnn_mode=self.gnn_mode,
+                            local_imports=local_imports,
                         )
                         if result is None:
                             num_discarded += 1
@@ -720,9 +731,15 @@ class Data(object):
                                 "prompt": prompt,
                                 "response": response,
                                 "full_text": full_text,
-                                "active_node": active_node.tolist(),
-                                "mask": mask[mask_key].tolist(),
+                                "active_node": [
+                                    active_node.tolist() for active_node in active_nodes
+                                ],
+                                "mask": [
+                                    all_masks[mask_key][i].tolist()
+                                    for i in range(len(all_masks[mask_key]))
+                                ],
                                 "graph_path": graph_path,
+                                "num_tokens": num_token,
                             }
                         else:
                             data = {
@@ -733,6 +750,7 @@ class Data(object):
                                 "active_node": None,
                                 "mask": None,
                                 "graph_path": None,
+                                "num_tokens": num_token,
                             }
 
                         data_name = f"{uuid}_testcase_{testcase}.json"
@@ -740,13 +758,10 @@ class Data(object):
                         with open(data_path, "w") as file:
                             json.dump(data, file, indent=4)
 
-                        self.logger.log(
-                            f"Data is saved to {data_path} for uuid - {uuid}, testcase - {testcase}"
-                        )
-
-                        self.processed_data[data_n][
-                            f"{uuid}_testcase_{testcase}"
-                        ] = data_path
+                        self.processed_data[data_n][f"{uuid}_testcase_{testcase}"] = {
+                            "num_tokens": num_token,
+                            "path": data_path,
+                        }
 
         with open(processed_data_file_path, "w") as file:
             json.dump(self.processed_data, file, indent=4)
@@ -763,28 +778,27 @@ class Data(object):
             f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_tokens)}"
         )
 
-        if "graph" in self.baseline_prompt and self.debug:
-            for key in graph_stats.keys():
-                self.logger.log(f"============= For graph {key}: =============")
-                for skey in graph_stats[key].keys():
-                    quartiles = np.quantile(
-                        graph_stats[key][skey], [0, 0.25, 0.5, 0.75, 1]
-                    )
-                    max_num = max(graph_stats[key][skey])
-                    min_num = min(graph_stats[key][skey])
-                    self.logger.log(
-                        f"Statistics of {skey}: {quartiles}, max: {max_num}, min: {min_num}, num_data: {len(graph_stats[key][skey])}"
-                    )
+    def prepare_reasoning_data(self) -> None:
 
-    def prepare_data_for_test_gen(self):
         assert self.data is not None
 
-        processed_data = None
-        processed_data_file_path = os.path.join(
-            self.data_path,
-            f"{self.baseline_prompt}_{self.max_tokens}_{self.model_name}",
-            "processed_data_for_test_gen.json",
-        )
+        processed_data = False
+
+        if "graph" not in self.baseline_prompt:
+            processed_data_file_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.llm_model_name}",
+                "reasoning",
+                "processed_data.json",
+            )
+        else:
+            processed_data_file_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                "reasoning",
+                "processed_data.json",
+            )
+
         if os.path.exists(processed_data_file_path):
             with open(
                 processed_data_file_path,
@@ -797,10 +811,292 @@ class Data(object):
                 self.data_path,
                 f"raw",
             )
-            processed_prompt_path = os.path.join(
+            if "graph" not in self.baseline_prompt:
+                processed_prompt_path = os.path.join(
+                    self.data_path,
+                    f"{self.baseline_prompt}_{self.llm_model_name}",
+                    "reasoning",
+                )
+            else:
+                processed_prompt_path = os.path.join(
+                    self.data_path,
+                    f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                    "reasoning",
+                )
+
+            os.makedirs(processed_data_path, exist_ok=True)
+            os.makedirs(processed_prompt_path, exist_ok=True)
+
+        if processed_data:
+            self.logger.log("[green]Data is already processed![/green]")
+            self.logger.log(f"Size of data data: {len(self.processed_data)}")
+            return
+
+        reasoning_path = os.path.join(
+            self.data_path,
+            "reasoning.jsonl",
+        )
+        assert os.path.exists(
+            reasoning_path
+        ), "Reasoning file not found, please generate it first."
+        with open(reasoning_path, "r") as f:
+            reasoning_data = [json.loads(line) for line in f.readlines()]
+
+        reasoning_dict = {}
+        for obj in reasoning_data:
+            key = list(obj.keys())[0]
+            reasoning_dict[key] = obj[key]
+
+        generated_keys = sorted(
+            list(set([list(obj.keys())[0] for obj in reasoning_data]))
+        )
+
+        with self.logger.status("[green]Preparing reasoning data...[/green]"):
+
+            self.processed_data = {}
+            num_tokens = []
+            num_discarded = 0
+
+            for data_n in self.data.keys():  # train, test_module, test_project
+
+                self.processed_data[data_n] = {}
+
+                for uuid, dat in tqdm(
+                    self.data[data_n].items(), position=0, leave=True
+                ):
+                    with open(dat["code_path"], "r") as file:
+                        src_code = file.read()
+
+                    module_path = dat.get("module_path", "N/A")
+                    all_masks = torch.load(
+                        dat["graph"]["mask_path"], weights_only=False
+                    )
+                    assert len(all_masks) == len(dat["test_cases"])
+
+                    if "graph" in self.baseline_prompt:
+                        graph_name = f"{uuid}_graph.pt"
+                        graph_path = os.path.join(processed_data_path, graph_name)
+
+                        if not os.path.exists(graph_path):
+                            graph = self.read_graph(dat)
+
+                            check_graph_exist_dict = {}
+                            graph_dict = {}
+                            for key in GRAPH_KEYS:
+                                check_graph_exist_dict[key] = False
+
+                            for key in graph.keys():
+                                if isinstance(graph[key], dgl.DGLGraph):
+                                    graph_dict[key] = graph[key]
+                                    check_graph_exist_dict[key] = True
+
+                            exist_atleast_one = False
+                            for key in check_graph_exist_dict.keys():
+                                if check_graph_exist_dict[key] == True:
+                                    exist_atleast_one = True
+                                    break
+
+                            if not exist_atleast_one:
+                                self.logger.log(
+                                    f"[red]Graph is not generated for {uuid}[/red]"
+                                )
+                                num_discarded += len(dat["test_cases"])
+                                continue
+                            torch.save(graph_dict, graph_path)
+
+                    for testcase in dat["test_cases"].keys():
+
+                        if data_n == "train":
+
+                            if f"{uuid}_testcase_{testcase}" not in generated_keys:
+                                self.logger.log(
+                                    f"Reasoning not found for uuid: {uuid} testcase: {testcase}"
+                                )
+                                num_discarded += 1
+                                continue
+
+                        test_code = dat["test_cases"][testcase]["test_case"]
+                        if self.data_fuzz:
+                            test_code = self.add_fuzz_tags(test_code)
+                        if test_code == "N/A":
+                            num_discarded += 1
+                            continue
+                        mask_key = int(testcase.split("_")[-1])
+                        branch_masks: List[torch.Tensor] = all_masks[mask_key]
+                        branch_line = dat["test_cases"][testcase]["branch"]
+                        # print(branch_masks)
+                        active_nodes = [
+                            get_index_by_value(a=branch_masks[i], val=1)
+                            for i in range(len(branch_masks))
+                        ]
+                        if len(active_nodes) == 0:
+                            self.logger.log(
+                                f"Active node empty at uuid: {uuid} testcase: {testcase}"
+                            )
+                            num_discarded += 1
+                            continue
+
+                        result = self.get_prompt(
+                            src_code=src_code,
+                            testcase_out=test_code,
+                            active_nodes=active_nodes,
+                            tokenizer=self.llm_tokenizer,
+                            module_path=module_path,
+                            branch=branch_line,
+                            gnn_mode=self.gnn_mode,
+                        )
+
+                        if result is None:
+                            num_discarded += 1
+                            continue
+
+                        prompt, response, full_text = result
+
+                        if data_n == "train":
+                            reasoning = reasoning_dict[f"{uuid}_testcase_{testcase}"]
+                            if "<|graph_pad|>" in reasoning:
+                                reasoning = reasoning.replace(
+                                    "<|graph_pad|>", "CPG embedding(s)"
+                                ).strip()
+
+                            insert_text = f"\n\n<think>\n{reasoning}\n</think>\n"
+                            text_before = full_text.split(
+                                "Here is the generated Python test code targeting the specified execution branch"
+                            )[0]
+                            text_after = full_text.split(
+                                "Here is the generated Python test code targeting the specified execution branch"
+                            )[1]
+                            new_full_text = (
+                                text_before
+                                + insert_text
+                                + "From the above reason, here is the generated Python test code targeting the specified execution branch"
+                                + text_after
+                            )
+                            full_text = new_full_text
+
+                            text_before = response.split(
+                                "Here is the generated Python test code targeting the specified execution branch"
+                            )[0]
+                            text_after = response.split(
+                                "Here is the generated Python test code targeting the specified execution branch"
+                            )[1]
+                            new_response = (
+                                text_before
+                                + insert_text
+                                + "From the above reason, here is the generated Python test code targeting the specified execution branch"
+                                + text_after
+                            )
+                            response = new_response
+
+                        num_token = len(self.llm_tokenizer.tokenize(full_text))
+                        num_tokens.append(num_token)
+
+                        if "graph" in self.baseline_prompt:
+                            data = {
+                                "uuid": f"{uuid}_{testcase}",
+                                "prompt": prompt,
+                                "response": response,
+                                "full_text": full_text,
+                                "active_node": [
+                                    active_node.tolist() for active_node in active_nodes
+                                ],
+                                "mask": [
+                                    all_masks[mask_key][i].tolist()
+                                    for i in range(len(all_masks[mask_key]))
+                                ],
+                                "graph_path": graph_path,
+                                "num_tokens": num_token,
+                            }
+                        else:
+                            data = {
+                                "uuid": f"{uuid}_{testcase}",
+                                "prompt": prompt,
+                                "response": response,
+                                "full_text": full_text,
+                                "active_node": None,
+                                "mask": None,
+                                "graph_path": None,
+                                "num_tokens": num_token,
+                            }
+
+                        data_name = f"{uuid}_testcase_{testcase}.json"
+                        data_path = os.path.join(processed_prompt_path, data_name)
+                        with open(data_path, "w") as file:
+                            json.dump(data, file, indent=4)
+
+                        self.processed_data[data_n][f"{uuid}_testcase_{testcase}"] = {
+                            "num_tokens": num_token,
+                            "path": data_path,
+                        }
+
+        with open(processed_data_file_path, "w") as file:
+            json.dump(self.processed_data, file, indent=4)
+
+        self.logger.log("[green]Data is ready![/green]")
+        self.logger.log(
+            f"Size of processed data: {len(self.processed_data)}, num_discarded: {num_discarded}"
+        )
+
+        quartiles = np.quantile(num_tokens, [0, 0.25, 0.5, 0.75, 1])
+        max_num_tokens = max(num_tokens)
+        min_num_tokens = min(num_tokens)
+        self.logger.log(
+            f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_tokens)}"
+        )
+
+    def prepare_data_for_test_gen(self, branch_limit: int = 100) -> None:
+
+        assert self.data is not None
+
+        processed_data = None
+
+        # load raw data
+        raw_data_path = os.path.join(self.data_path, "test_module.jsonl")
+        assert os.path.exists(raw_data_path), "Raw data for test generation not found!"
+
+        with open(raw_data_path, "r") as f:
+            raw_data = [json.loads(line) for line in f.readlines()]
+            raw_data_dict = {item["id"]: item for item in raw_data}
+
+        if "graph" not in self.baseline_prompt:
+            processed_data_file_path = os.path.join(
                 self.data_path,
-                f"{self.baseline_prompt}_{self.max_tokens}_{self.model_name}",
+                f"{self.baseline_prompt}_{self.llm_model_name}",
+                "testgen",
+                "processed_data_for_test_gen.json",
             )
+        else:
+            processed_data_file_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                "testgen",
+                "processed_data_for_test_gen.json",
+            )
+
+        if os.path.exists(processed_data_file_path):
+            with open(
+                processed_data_file_path,
+                "r",
+            ) as file:
+                self.processed_data = json.load(file)
+            processed_data = True
+        else:
+            processed_data_path = os.path.join(
+                self.data_path,
+                f"raw",
+            )
+            if "graph" not in self.baseline_prompt:
+                processed_prompt_path = os.path.join(
+                    self.data_path,
+                    f"{self.baseline_prompt}_{self.llm_model_name}",
+                    "testgen",
+                )
+            else:
+                processed_prompt_path = os.path.join(
+                    self.data_path,
+                    f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                    "testgen",
+                )
 
             os.makedirs(processed_data_path, exist_ok=True)
             os.makedirs(processed_prompt_path, exist_ok=True)
@@ -815,6 +1111,8 @@ class Data(object):
             self.processed_data = {}
             num_tokens = []
             num_discarded = 0
+            num_branch_total = 0
+            num_testcase_total = 0
 
             for data_n in self.data.keys():
 
@@ -824,20 +1122,21 @@ class Data(object):
                 self.processed_data[data_n] = {}
 
                 for uuid, dat in self.data[data_n].items():
+
                     with open(dat["code_path"], "r") as file:
                         src_code = file.read()
 
-                    branches = get_all_branch(code=src_code)
+                    local_imports = raw_data_dict[uuid]["local_imports"]
+
+                    module_path = dat.get("module_path", "N/A")
+                    branches = get_all_branch(code=src_code, branch_limit=branch_limit)
+                    num_branch_total += len(branches)
 
                     if "graph" in self.baseline_prompt:
                         graph_name = f"{uuid}_graph.pt"
                         graph_path = os.path.join(processed_data_path, graph_name)
 
                         if os.path.exists(graph_path):
-                            self.logger.log(
-                                f"[yellow]Graph already exists for {uuid}, loading...[/yellow]"
-                            )
-                            # load graph
                             with open(dat["graph"]["src_graph_path"], "r") as file:
                                 graph = json.load(file)
                         else:
@@ -867,41 +1166,62 @@ class Data(object):
                             torch.save(graph_dict, graph_path)
 
                     for i, branch in enumerate(branches):
-                        mask = self.get_mask_tensor(graph=graph, branch=branch)
-                        assert len(mask.shape) == 2, f"Mask shape is {mask.shape}"
-                        active_node = get_index_by_value(a=mask[0], val=1)
-                        if active_node.size(0) == 0:
+
+                        all_masks = self.get_mask_tensor(graph=graph, branch=branch)
+                        assert len(branch) == len(
+                            all_masks
+                        ), "Mask and branch length mismatch: {} vs {}".format(
+                            len(all_masks), len(branch)
+                        )
+
+                        if all_masks is None:
                             self.logger.log(
-                                f"Active node empty at uuid: {uuid} for branch: {branch}"
+                                f"Only import branch at uuid: {uuid}, testcase: {i}"
                             )
-                            num_discarded += 1
-                            continue
+
+                        active_nodes = [
+                            get_index_by_value(a=all_masks[j], val=1)
+                            for j in range(len(all_masks))
+                        ]
 
                         result = self.get_prompt(
                             src_code=src_code,
                             testcase_out=None,
-                            mask=active_node,
+                            active_nodes=active_nodes,
                             tokenizer=self.llm_tokenizer,
+                            module_path=module_path,
                             branch=branch,
                             gnn_mode=self.gnn_mode,
                             testing=True,
+                            local_imports=local_imports,
                         )
+
                         if result is None:
                             num_discarded += 1
                             continue
-                        prompt = result
 
+                        prompt = result
                         num_token = len(self.llm_tokenizer.tokenize(prompt))
                         num_tokens.append(num_token)
 
                         if "graph" in self.baseline_prompt:
+
                             data = {
                                 "uuid": f"{uuid}_testcase_{i}",
                                 "prompt": prompt,
-                                "active_node": active_node.tolist(),
-                                "mask": mask.tolist(),
+                                "active_node": [
+                                    active_node.tolist() for active_node in active_nodes
+                                ],
+                                "mask": [
+                                    all_masks[i].tolist() for i in range(len(all_masks))
+                                ],
                                 "graph_path": graph_path,
+                                "num_tokens": num_token,
+                                "branch": branch,
+                                "module_path": module_path,
+                                "code_path": dat["code_path"],
                             }
+
                         else:
                             data = {
                                 "uuid": f"{uuid}_testcase_{i}",
@@ -909,18 +1229,22 @@ class Data(object):
                                 "active_node": None,
                                 "mask": None,
                                 "graph_path": None,
+                                "num_tokens": num_token,
+                                "branch": None,
+                                "module_path": module_path,
                             }
 
                         data_name = f"{uuid}_testcase_{i}.json"
                         data_path = os.path.join(processed_prompt_path, data_name)
                         with open(data_path, "w") as file:
                             json.dump(data, file, indent=4)
+                            print(f"Saved data to {data_path}")
 
-                        self.logger.log(
-                            f"Data is saved to {data_path} for uuid - {uuid}, testcase - {i}"
-                        )
-
-                        self.processed_data[data_n][f"{uuid}_testcase_{i}"] = data_path
+                        self.processed_data[data_n][f"{uuid}_testcase_{i}"] = {
+                            "num_tokens": num_token,
+                            "path": data_path,
+                        }
+                        num_testcase_total += 1
 
         with open(processed_data_file_path, "w") as file:
             json.dump(self.processed_data, file, indent=4)
@@ -936,6 +1260,122 @@ class Data(object):
         self.logger.log(
             f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_tokens)}"
         )
+
+    def filter_by_max_min_tokens(self, max_tokens: int, min_tokens: int) -> None:
+        self.logger.log(f"[green]Filtering data by max tokens {max_tokens}...[/green]")
+        assert self.processed_data is not None
+        filtered_data = {}
+        need_to_save = False
+        for data_n in self.processed_data.keys():
+            filtered_data[data_n] = {}
+            for key in tqdm(self.processed_data[data_n].keys()):
+                if isinstance(self.processed_data[data_n][key], dict):
+                    if (
+                        self.processed_data[data_n][key]["num_tokens"] <= max_tokens
+                    ) and (
+                        self.processed_data[data_n][key]["num_tokens"] >= min_tokens
+                    ):
+                        filtered_data[data_n][key] = self.processed_data[data_n][key]
+                else:
+                    path = self.processed_data[data_n][key]
+                    with open(path, "r") as file:
+                        data = json.load(file)
+                        num_token = data["num_tokens"]
+                    if (num_token <= max_tokens) and (num_token >= min_tokens):
+                        filtered_data[data_n][key] = self.processed_data[data_n][key]
+                    self.processed_data[data_n][key] = {
+                        "num_tokens": num_token,
+                        "path": path,
+                    }
+                    need_to_save = True
+
+        if need_to_save:
+            processed_data_file_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                "processed_data.json",
+            )
+            with open(processed_data_file_path, "w") as file:
+                json.dump(self.processed_data, file, indent=4)
+
+        self.processed_data = filtered_data
+        self.logger.log(
+            f"[green]Data is filtered by max tokens {max_tokens}! New size: train - {len(self.processed_data['train'])} - test {len(self.processed_data['test_module'])}[/green]"
+        )
+
+    def sample_for_reasoning(self, max_samples: int) -> None:
+        self.logger.log(f"[green]Filtering data for reasoning...[/green]")
+        assert self.processed_data is not None
+        filtered_data = {}
+        data_n = "train"
+        filtered_data = {}
+
+        # get num data point by repo:
+        total_data = len(self.processed_data[data_n].keys())
+        repo_stats = {}
+        data_point_by_repo = {}
+        for key in self.processed_data[data_n].keys():
+            repo = key.split("-")[0]
+            if repo not in repo_stats.keys():
+                repo_stats[repo] = 0
+            if repo not in data_point_by_repo.keys():
+                data_point_by_repo[repo] = []
+            repo_stats[repo] += 1
+            data_point_by_repo[repo].append(key)
+
+        self.logger.log(f"Total data points: {total_data}")
+        self.logger.log(f"Data points by repo: {pretty_repr(repo_stats)}")
+
+        for repo in data_point_by_repo.keys():
+            repo_data_points = data_point_by_repo[repo]
+            num_data_points = len(repo_data_points)
+            num_samples = int((num_data_points / total_data) * max_samples)
+            self.logger.log(
+                f"Randomly selecting {num_samples} samples from repo {repo} with {num_data_points} data points"
+            )
+            selected_data_points = random.sample(
+                repo_data_points, min(num_samples, num_data_points)
+            )
+            for data_point in selected_data_points:
+                filtered_data[data_point] = self.processed_data[data_n][data_point]
+
+        self.processed_data[data_n] = filtered_data
+        self.logger.log(
+            f"[green]Data is filtered for reasoning! New size: {len(filtered_data)}[/green]"
+        )
+
+    def add_reasoning(self, reasoning_dict: dict) -> None:
+        # add reasoning to the training data
+        self.logger.log(f"[green]Adding reasoning to the data...[/green]")
+        assert self.processed_data is not None
+
+        samples = self.processed_data["train"]
+        for key in tqdm(samples.keys()):
+            if key in reasoning_dict.keys():
+                data_path = samples[key]["path"]
+                with open(data_path, "r") as file:
+                    data = json.load(file)
+                reasoning = reasoning_dict[key]
+
+                # processing full text
+                full_text = data["full_text"]
+                insert_text = f"\n\n# Thinking:\n<think>\n{reasoning}\n</think>\n"
+                text_before = full_text.split(
+                    "Here is the generated Python test code targeting the specified execution branch"
+                )[0]
+                text_after = full_text.split(
+                    "Here is the generated Python test code targeting the specified execution branch"
+                )[1]
+                new_full_text = (
+                    text_before
+                    + insert_text
+                    + "From the above reason, here is the generated Python test code targeting the specified execution branch"
+                    + text_after
+                )
+                data["full_text"] = new_full_text
+                # save data
+                with open(data_path, "w") as file:
+                    json.dump(data, file, indent=4)
 
     def read_graph(self, data: dict) -> dict:
 
@@ -985,47 +1425,142 @@ class Data(object):
         self,
         src_code: str,
         testcase_out: str,
-        mask: torch.Tensor,
+        active_nodes: List[torch.Tensor],
         branch: List,
+        module_path: str,
         tokenizer: PreTrainedTokenizer,
-        gnn_mode: str = "graph",
+        gnn_mode: str = "branch",
         testing: bool = False,
+        local_imports: Optional[List[str]] = None,
     ):
 
         # self.logger.log(
         #     f"Preparing prompts with baseline_prompt: {self.baseline_prompt}"
         # )
         if not testing:
-            if gnn_mode == "graph":
-                graph_pad = "<|graph_pad|>"
+
+            # Extract imports from testcase_out
+            if local_imports is not None:
+                import_lines = "\n".join(local_imports)
             else:
-                graph_pad = "<|graph_pad|>" * mask.size(0)
+                try:
+                    tree = ast.parse(testcase_out)
+                    import_lines = []
+
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.Import):
+                            # Handle: import module, import module as alias
+                            import_lines.append(ast.unparse(node))
+                        elif isinstance(node, ast.ImportFrom):
+                            # Handle: from module import name, from module import name as alias
+                            import_lines.append(ast.unparse(node))
+
+                    import_lines = "\n".join(import_lines)
+                except Exception as e:
+                    # Fallback: regex-based extraction if AST parsing fails
+                    import re
+
+                    import_pattern = r"^(?:from\s+[\w.]+\s+)?import\s+.+$"
+                    lines = testcase_out.split("\n")
+                    import_lines = [
+                        line for line in lines if re.match(import_pattern, line.strip())
+                    ]
+                    import_lines = "\n".join(import_lines)
+
+            if gnn_mode == "branch":
+                graph_pad = ""
+                for i, item in enumerate(active_nodes):
+                    if i == 0:
+                        if len(active_nodes) >= 1:
+                            graph_pad += "Import branch: <|graph_pad|>" + "\n"
+                        else:
+                            graph_pad += "Import branch: Not Available" + "\n"
+                    else:
+                        if len(active_nodes) >= 1:
+                            graph_pad += f"Branch #{i}: <|graph_pad|>\n"
+                        else:
+                            graph_pad += f"Branch #{i}: Not Available\n"
+            else:
+                graph_pad = ""
+                for i, item in enumerate(active_nodes):
+                    if i == 0:
+                        if len(active_nodes) >= 1:
+                            graph_pad += (
+                                "Import branch: "
+                                + "<|graph_pad|>" * item.size(0)
+                                + "\n"
+                            )
+                        else:
+                            graph_pad += "Import branch: Not Available" + "\n"
+                    else:
+                        if len(active_nodes) >= 1:
+                            graph_pad += (
+                                f"Branch #{i}: " + "<|graph_pad|>" * item.size(0) + "\n"
+                            )
+                        else:
+                            graph_pad += f"Branch #{i}: Not Available\n"
+            branch_line = ""
+            for i, branch_item in enumerate(branch):
+                if i == 0:
+                    branch_line += (
+                        f"Import branch: "
+                        + "->".join([str(item) for item in branch_item])
+                        + "\n"
+                    )
+                    continue
+                branch_line += (
+                    f"Branch #{i}: "
+                    + "->".join([str(item) for item in branch_item])
+                    + "\n"
+                )
             if self.baseline_prompt == "code":
-                code_line = self.generate_code_line(branch)
-                text = PROMPT_CODE.format(src_code, code_line)
-                response = RESPONSE_TEMPLATE.format(testcase_out)
+                text = PROMPT_TEMPLATE.format(
+                    src_code, branch_line, module_path, "Not Available", import_lines
+                )
+                response = RESPONSE_TEMPLATE.format(
+                    module_path, import_lines, testcase_out
+                )
             elif self.baseline_prompt == "graph":
-                text = PROMPT_GRAPH.format(graph_pad)
-                response = RESPONSE_TEMPLATE.format(testcase_out)
+                text = PROMPT_TEMPLATE.format(
+                    "Not Available",
+                    "Not Available",
+                    module_path,
+                    graph_pad,
+                    import_lines,
+                )
+                response = RESPONSE_TEMPLATE.format(
+                    module_path, import_lines, testcase_out
+                )
             elif self.baseline_prompt == "code_graph":
-                text = PROMPT_CODE_GRAPH.format(src_code, graph_pad)
-                response = RESPONSE_TEMPLATE.format(testcase_out)
+                text = PROMPT_TEMPLATE.format(
+                    src_code, branch_line, module_path, graph_pad, import_lines
+                )
+                response = RESPONSE_TEMPLATE.format(
+                    module_path, import_lines, testcase_out
+                )
             elif self.baseline_prompt == "code_tr":
-                # self.logger.log("Truncating code...")
-                trucated_code = self.truncate_code(src_code=src_code, branch=branch)
-                if trucated_code is None:
+                truncated_code = self.truncate_code(src_code=src_code, branch=branch)
+                if truncated_code is None:
                     self.logger.log("Truncated code is None")
                     return None
-                text = PROMPT_CODE_TR.format(trucated_code)
-                response = RESPONSE_TEMPLATE.format(testcase_out)
+                text = PROMPT_TEMPLATE.format(
+                    truncated_code,
+                    branch_line,
+                    module_path,
+                    "Not Available",
+                    import_lines,
+                )
+                response = RESPONSE_TEMPLATE.format(
+                    module_path, import_lines, testcase_out
+                )
             elif self.baseline_prompt == "graph_tr":
-                trucated_code = self.truncate_code(src_code=src_code, branch=branch)
-                text = PROMPT_CODE_GRAPH.format(trucated_code, graph_pad)
-                response = RESPONSE_TEMPLATE.format(testcase_out)
-            elif self.baseline_prompt == "code_baseline":
-                code_line = self.generate_code_line(branch)
-                text = PROMPT_COT.format(module=src_code, execution_branch=code_line)
-                response = RESPONSE_BASELINE_TEMPLATE.format(testcase_out)
+                truncated_code = self.truncate_code(src_code=src_code, branch=branch)
+                text = PROMPT_TEMPLATE.format(
+                    truncated_code, branch_line, module_path, graph_pad, import_lines
+                )
+                response = RESPONSE_TEMPLATE.format(
+                    module_path, import_lines, testcase_out
+                )
 
             task_prompt = tokenizer.apply_chat_template(
                 [
@@ -1036,7 +1571,9 @@ class Data(object):
             )
 
             task_prompt_input = tokenizer.apply_chat_template(
-                [{"role": "user", "content": text}],
+                [
+                    {"role": "user", "content": text},
+                ],
                 tokenize=False,
             )
 
@@ -1045,49 +1582,135 @@ class Data(object):
                 tokenize=False,
             )
 
-            if len(self.llm_tokenizer.tokenize(task_prompt)) > self.max_tokens:
-                self.logger.log(
-                    f"[red]Task is too long: {len(self.llm_tokenizer.tokenize(task_prompt))} > {self.max_tokens}[/red]"
-                )
-                return None
+            # if len(self.llm_tokenizer.tokenize(task_prompt)) > self.max_tokens:
+            #     self.logger.log(
+            #         f"[red]Task is too long: {len(self.llm_tokenizer.tokenize(task_prompt))} > {self.max_tokens}[/red]"
+            #     )
+            #     return None
 
             return task_prompt_input, task_prompt_output, task_prompt
         else:
-            if gnn_mode == "graph":
-                graph_pad = "<|graph_pad|>"
+            # Extract imports from testcase_out
+
+            if local_imports is not None:
+                import_lines = "\n".join(local_imports)
             else:
-                graph_pad = "<|graph_pad|>" * mask.size(0)
+                try:
+                    tree = ast.parse(testcase_out)
+                    import_lines = []
+
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.Import):
+                            # Handle: import module, import module as alias
+                            import_lines.append(ast.unparse(node))
+                        elif isinstance(node, ast.ImportFrom):
+                            # Handle: from module import name, from module import name as alias
+                            import_lines.append(ast.unparse(node))
+
+                    import_lines = "\n".join(import_lines)
+                except (SyntaxError, ValueError):
+                    # Fallback: regex-based extraction if AST parsing fails
+                    import re
+
+                    import_pattern = r"^(?:from\s+[\w.]+\s+)?import\s+.+$"
+                    lines = testcase_out.split("\n")
+                    import_lines = [
+                        line for line in lines if re.match(import_pattern, line.strip())
+                    ]
+                    import_lines = "\n".join(import_lines)
+
+            if gnn_mode == "branch":
+                graph_pad = ""
+                for i, item in enumerate(active_nodes):
+                    if i == 0:
+                        if len(active_nodes) >= 1:
+                            graph_pad += "Import branch: <|graph_pad|>" + "\n"
+                        else:
+                            graph_pad += "Import branch: Not Available" + "\n"
+                    else:
+                        if len(active_nodes) >= 1:
+                            graph_pad += f"Branch #{i}: <|graph_pad|>\n"
+                        else:
+                            graph_pad += f"Branch #{i}: Not Available\n"
+            else:
+                graph_pad = ""
+                for i, item in enumerate(active_nodes):
+                    if i == 0:
+                        if len(active_nodes) >= 1:
+                            graph_pad += (
+                                "Import branch: "
+                                + "<|graph_pad|>" * item.size(0)
+                                + "\n"
+                            )
+                        else:
+                            graph_pad += "Import branch: Not Available" + "\n"
+                    else:
+                        if len(active_nodes) >= 1:
+                            graph_pad += (
+                                f"Branch #{i}: " + "<|graph_pad|>" * item.size(0) + "\n"
+                            )
+                        else:
+                            graph_pad += f"Branch #{i}: Not Available\n"
+            branch_line = ""
+            for i, branch_item in enumerate(branch):
+                if i == 0:
+                    branch_line += (
+                        f"Import branch: "
+                        + "->".join([str(item) for item in branch_item])
+                        + "\n"
+                    )
+                    continue
+                branch_line += (
+                    f"Branch #{i}: "
+                    + "->".join([str(item) for item in branch_item])
+                    + "\n"
+                )
             if self.baseline_prompt == "code":
-                code_line = self.generate_code_line(branch)
-                text = PROMPT_CODE.format(src_code, code_line)
+                text = PROMPT_TEMPLATE.format(
+                    src_code, branch_line, module_path, "Not Available", import_lines
+                )
             elif self.baseline_prompt == "graph":
-                text = PROMPT_GRAPH.format(graph_pad)
+                text = PROMPT_TEMPLATE.format(
+                    "Not Available",
+                    "Not Available",
+                    module_path,
+                    graph_pad,
+                    import_lines,
+                )
             elif self.baseline_prompt == "code_graph":
-                text = PROMPT_CODE_GRAPH.format(src_code, graph_pad)
+                text = PROMPT_TEMPLATE.format(
+                    src_code, branch_line, module_path, graph_pad, import_lines
+                )
             elif self.baseline_prompt == "code_tr":
-                # self.logger.log("Truncating code...")
-                trucated_code = self.truncate_code(src_code=src_code, branch=branch)
-                if trucated_code is None:
+                truncated_code = self.truncate_code(src_code=src_code, branch=branch)
+                if truncated_code is None:
                     self.logger.log("Truncated code is None")
                     return None
-                text = PROMPT_CODE_TR.format(trucated_code)
+                text = PROMPT_TEMPLATE.format(
+                    truncated_code,
+                    branch_line,
+                    module_path,
+                    "Not Available",
+                    import_lines,
+                )
             elif self.baseline_prompt == "graph_tr":
-                trucated_code = self.truncate_code(src_code=src_code, branch=branch)
-                text = PROMPT_CODE_GRAPH.format(trucated_code, graph_pad)
-            elif self.baseline_prompt == "code_baseline":
-                code_line = self.generate_code_line(branch)
-                text = PROMPT_COT.format(module=src_code, execution_branch=code_line)
+                truncated_code = self.truncate_code(src_code=src_code, branch=branch)
+                text = PROMPT_TEMPLATE.format(
+                    truncated_code, branch_line, module_path, graph_pad, import_lines
+                )
 
             task_prompt_input = tokenizer.apply_chat_template(
-                [{"role": "user", "content": text}],
+                [
+                    {"role": "user", "content": text},
+                ],
                 tokenize=False,
             )
 
-            if len(self.llm_tokenizer.tokenize(task_prompt_input)) > self.max_tokens:
-                self.logger.log(
-                    f"[red]Task is too long: {len(self.llm_tokenizer.tokenize(task_prompt_input))} > {self.max_tokens}[/red]"
-                )
-                return None
+            # if len(self.llm_tokenizer.tokenize(task_prompt_input)) > self.max_tokens:
+            #     self.logger.log(
+            #         f"[red]Task is too long: {len(self.llm_tokenizer.tokenize(task_prompt_input))} > {self.max_tokens}[/red]"
+            #     )
+            #     return None
 
             return task_prompt_input
 
@@ -1111,8 +1734,16 @@ class Data(object):
         # TODO: Data splitting from the splitted directory must be implemented
         if test_only:
             self.logger.log("[green]Using only the test set, no need to split[/green]")
-            test_data_by_project = self.processed_data["test_project"]
-            test_data_by_module = self.processed_data["test_module"]
+            test_data_by_project = (
+                self.processed_data["test_project"]
+                if "test_project" in self.processed_data.keys()
+                else {}
+            )
+            test_data_by_module = (
+                self.processed_data["test_module"]
+                if "test_module" in self.processed_data.keys()
+                else {}
+            )
 
             self.test_data = {
                 "project": test_data_by_project,
@@ -1132,14 +1763,36 @@ class Data(object):
 
             # split train and val
             keys_list = list(self.processed_data["train"].keys())
-            np.random.shuffle(keys_list)
-            val_keys = keys_list[:num_val]
-            train_keys = keys_list[num_val:]
+            repo_dict = {}
+            for key in keys_list:
+                repo = key.split("-")[0]
+                if repo not in repo_dict:
+                    repo_dict[repo] = []
+                repo_dict[repo].append(key)
+
+            num_repo = len(repo_dict.keys())
+            num_val_per_repo = max(1, num_val // num_repo)
+
+            val_keys = []
+            for repo in repo_dict.keys():
+                repo_keys = repo_dict[repo]
+                np.random.shuffle(repo_keys)
+                val_keys.extend(repo_keys[:num_val_per_repo])
+
+            train_keys = [key for key in keys_list if key not in val_keys]
 
             train_data = {}
             val_data = {}
-            test_data_by_project = self.processed_data["test_project"]
-            test_data_by_module = self.processed_data["test_module"]
+            test_data_by_project = (
+                self.processed_data["test_project"]
+                if "test_project" in self.processed_data.keys()
+                else {}
+            )
+            test_data_by_module = (
+                self.processed_data["test_module"]
+                if "test_module" in self.processed_data.keys()
+                else {}
+            )
             for key in train_keys:
                 train_data[key] = self.processed_data["train"][key]
             for key in val_keys:
@@ -1298,3 +1951,58 @@ class Data(object):
                 end = getattr(node, "end_lineno", start)
                 import_lines.extend(source_lines[start - 1 : end])
         return "\n".join(import_lines)
+
+
+def get_reasoning(
+    samples: Dict[str, dict],
+    api_key: str,
+    model: str,
+    max_tokens: int = 512,
+    console: Console = None,
+    temperature: float = 0.7,
+    save_path: str = None,
+) -> str:
+    client = anthropic.Anthropic(api_key=api_key)
+    reason_dict = {}
+    with open(save_path, "a") as file:
+        for key in tqdm(samples.keys()):
+            data_path = samples[key]["path"]
+            with open(data_path, "r") as f:
+                sample = json.load(f)
+            full_text = sample["full_text"]
+            prompt = REASONING_TEMPLATE_PROMPT.format(full_text)
+            # Anthropic's messages.create API
+            messages = [{"role": "user", "content": prompt}]
+            kwargs = {
+                "model": model,
+                "max_tokens": max_tokens,  # Anthropic uses max_tokens, not max_output_tokens
+                "temperature": temperature,
+                "messages": messages,
+            }
+            response = client.messages.create(**kwargs)
+
+            fence = re.compile(
+                r"```(?:json)?\s*([\s\S]*?\{[\s\S]*?\})\s*```", re.MULTILINE
+            )
+            m = fence.search(response.content[0].text)
+            payload = m.group(1) if m else response.content[0].text
+
+            # 3) Try JSON first:
+            try:
+                data = json.loads(payload)
+            except json.JSONDecodeError:
+                data = payload
+                print(f"Failed to extract json payload: {payload}")
+
+            if ("reason" not in data) or (not isinstance(data, dict)):
+                print(f"Failed to extract reason in payload: {payload}")
+                reason_dict[key] = data
+            else:
+                reason_dict[key] = data["reason"]
+            console.log(
+                f"[green]Reasoning generated for sample {key}[/green]: {reason_dict[key]}"
+            )
+            file.write(json.dumps({key: reason_dict[key]}))
+            file.write("\n")
+            console.log(f"[yellow]Reasoning saved to {save_path}[/yellow]")
+    return reason_dict

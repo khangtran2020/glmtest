@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# Blank install script for matplotlib 3.4
+pip install "sphinx>=1.8.1,!=2.0.0,<4.3.0" colorspacious ipython ipywidgets "numpydoc>=0.8" "packaging>=20" "pyparsing<3.0.0" mpl-sphinx-theme "sphinxcontrib-svg2pdfconverter>=1.1.0" "sphinx-gallery>=0.10" sphinx-copybutton sphinx-panels scipy certifi coverage "pytest!=4.6.0,!=5.4.0" pytest-cov pytest-rerunfailures pytest-timeout pytest-xdist python-dateutil tornado ipykernel "nbconvert[execute]!=6.0.0,!=6.0.1" "nbformat!=5.0.0,!=5.0.1" "pandas!=0.25.0" pikepdf pytz pywin32 "flake8>=3.8" "pydocstyle>=5.1.0" "flake8-docstrings>=1.4.0"
+
+
+pip install coverage cosmic-ray
+python -m pip install -e .

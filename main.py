@@ -1,10 +1,13 @@
 import os
+import json
 import torch
+import random
 import warnings
 from config import parse_args
 from utils.console import console
 from utils.utils import print_args, seed_everything
 from data.utils import get_dataset
+from data.core import get_reasoning
 from graph.utils import get_graph
 from train.train import train
 from model.model import get_model
@@ -13,9 +16,12 @@ from inference.testcase_generate import testcase_generate
 from train.utils import load_checkpoint
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.optim import AdamW
-from utils.utils import log_ram_usage
 from datetime import timedelta
 from torch.distributed import init_process_group
+
+# baseline
+from baselines.prompt_engineer.run import PromptEngineer
+from baselines.codamosa.run import run_codamosa
 
 warnings.filterwarnings("ignore")
 
@@ -55,6 +61,7 @@ def main() -> None:
         docker_image=args.docker_image,
         num_cpu=args.num_cpu,
         graph=graph,
+        llm_model_name=args.llm_model_name,
         model_name=args.model_name,
         data_max_length=args.max_seq_length,
         baseline_prompt=args.baseline_prompt,
@@ -67,12 +74,13 @@ def main() -> None:
         repo=args.repo,
     )
     if dataset is None:
-        console.log("Dataset not found, exiting...")
+        console.log("[red]Dataset not found, exiting...[/red]")
         return
 
-    if args.debug:
-        ram_usage = log_ram_usage()
-        console.log(f"Dataset loaded - RAM usage: {ram_usage:.2f} MB")
+    if args.mode == "data":
+        dataset.process_raw()
+        console.log("Data processing completed. Exiting as mode is 'data'.")
+        return
 
     if args.mode == "testgen":
         if args.module_path is None:
@@ -86,8 +94,6 @@ def main() -> None:
     dataset.train_test_split(
         val_split=100, test_only=True if args.mode == "testgen" else False
     )
-
-    console.log(f"Broadcasted args and dataset to all processes.")
 
     if torch.cuda.is_available():
         # Check if distributed training is enabled (this is the case when using Accelerate or torchrun with multi-node)
@@ -124,10 +130,6 @@ def main() -> None:
         local_rank = 0
         args.num_gpu = 0
 
-    if args.num_gpu > 1:
-        timeout_long_ncll = timedelta(seconds=90000)  # 100 minutes
-        init_process_group("nccl", timeout=timeout_long_ncll)
-
     # Debugging tokenizer:
     console.log(
         f"[cyan]Tokenizer special tokens:[/cyan]\n{dataset.llm_tokenizer.special_tokens_map}"
@@ -160,19 +162,16 @@ def main() -> None:
         lr_scheduler = CosineAnnealingLR(optimizer, T_max=100, eta_min=5e-8)
 
         if args.continue_training:
-            assert (
-                args.checkpoint_path is not None
-            ), "Checkpoint path must be specified."
-            check_point = load_checkpoint(path=args.checkpoint_path, rank=local_rank)
-
-            model.load_state_dict(check_point["model_state_dict"])
-            optimizer.load_state_dict(check_point["optimizer_state_dict"])
-            lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
-            start_step = check_point["global_step"]
-            if args.debug:
-                console.log(
-                    f"Checkpoint loaded from {args.checkpoint_path}, starting from step {start_step}."
+            model, start_step, optimizer, lr_scheduler = (
+                continue_training_from_checkpoint(
+                    args=args,
+                    model=model,
+                    rank=rank,
+                    console=console,
+                    optimizer=optimizer,
+                    lr_scheduler=lr_scheduler,
                 )
+            )
         else:
             start_step = -1
 
@@ -186,18 +185,12 @@ def main() -> None:
             continue_training=args.continue_training,
             start_step=start_step,
             max_num_checkpoint=args.max_num_checkpoint,
-            mixed_precision="bf16",
+            mixed_precision="bf16" if args.dtype == "bf16" else "fp16",
         )
 
     elif args.mode == "test":
 
         test(args=args, dataset=dataset, model=model, console=console)
-
-    elif args.mode == "metric":
-        assert (
-            args.gen_file_path is not None
-        ), "File-path must be specified for metric mode."
-        eval_bleu_score(args=args, dataset=dataset, console=console)
 
     elif args.mode == "testgen":
 

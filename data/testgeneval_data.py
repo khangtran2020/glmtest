@@ -26,6 +26,7 @@ class TestGenEval(Data):
         tokenizer: PreTrainedTokenizer,
         llm_tokenizer: PreTrainedTokenizer,
         model_name: str,
+        llm_model_name: str,
         debug: bool = False,
         baseline_prompt: str = "code",
         graph_sampling: bool = False,
@@ -44,6 +45,7 @@ class TestGenEval(Data):
             feat_model=model,
             feat_tokenizer=tokenizer,
             llm_tokenizer=llm_tokenizer,
+            llm_model_name=llm_model_name,
             num_cpu=-1,
             debug=debug,
             model_name=model_name,
@@ -51,6 +53,7 @@ class TestGenEval(Data):
             graph_sampling=graph_sampling,
             max_tokens=max_tokens,
             gnn_mode=gnn_mode,
+            repo=repo,
             **kwargs,
         )
         self.data_path = os.path.join(path, self.name)
@@ -110,9 +113,7 @@ class TestGenEval(Data):
             raise FileNotFoundError("train.jsonl not found, please crawl the data")
 
         if not os.path.exists(os.path.join(self.data_path, "test_project.jsonl")):
-            raise FileNotFoundError(
-                "test_project.jsonl not found, please crawl the data"
-            )
+            self.logger.log("test_project.jsonl not found, please crawl the data")
 
         if not os.path.exists(os.path.join(self.data_path, "test_module.jsonl")):
             raise FileNotFoundError(
@@ -140,8 +141,16 @@ class TestGenEval(Data):
 
         data_name = ["train", "test_project", "test_module"]
         for data_n in data_name:
+
+            if not os.path.exists(os.path.join(self.data_path, f"{data_n}.jsonl")):
+                continue
+
             with open(os.path.join(self.data_path, f"{data_n}.jsonl"), "r") as file:
                 raw_data = [json.loads(l) for l in file.readlines()]
+
+            for i, task in enumerate(raw_data):
+                if NEW_KEY_ID not in task.keys():
+                    task[NEW_KEY_ID] = task[KEY_ID]
 
             raw_data = {task[NEW_KEY_ID]: task for task in raw_data}
 
@@ -168,6 +177,8 @@ class TestGenEval(Data):
                     dat["graph"]["mask_path"] = os.path.join(
                         graph_path, f"{raw_data[key][NEW_KEY_ID]}_mask.pt"
                     )
+                    # dat["repo"] = raw_data[key]["repo"]
+                    dat["module_path"] = raw_data[key]["code_file"]
 
                     if (not os.path.exists(dat["code_path"])) or (
                         os.path.exists(dat["code_path"]) and self.raw_overwrite
@@ -230,8 +241,10 @@ class TestGenEval(Data):
                         overwrite=self.raw_overwrite,
                     )
 
+                    num_nodes = len(graph["nodes"])
                     if not os.path.exists(dat["graph"]["node_feature_path"]):
                         node_feat = self.get_node_features(graph=graph)
+                        assert node_feat.size(0) == num_nodes
 
                     all_mask = []
                     idx = 0
@@ -256,8 +269,29 @@ class TestGenEval(Data):
                         mask = self.get_mask_tensor(
                             graph=graph, branch=raw_data[key]["branches"][tkey]
                         )
+
+                        if mask is None:
+                            self.logger.log(
+                                f"[red]Mask is empty for {key} test case {tkey}[/red]"
+                            )
+                            continue
+
+                        assert len(dat["test_cases"][nkey]["branch"]) == len(
+                            mask
+                        ), "Mask and branch length mismatch: {} vs {}".format(
+                            len(dat["test_cases"][nkey]["branch"]), len(mask)
+                        )
+
                         all_mask.append(mask)
                         idx += 1
+
+                    if len(all_mask) == 0:
+                        self.logger.log(f"[red]No valid test cases for {key}[/red]")
+                        continue
+
+                    # for tkey in key_to_remove:
+                    #     dat
+
                     self.logger.log(f"Generated masks for {key}: {len(all_mask)}")
                     torch.save(all_mask, dat["graph"]["mask_path"])
                     torch.save(node_feat, dat["graph"]["node_feature_path"])

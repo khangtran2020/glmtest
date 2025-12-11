@@ -1,13 +1,12 @@
 import os
-import json
-import argparse
+import re
 import ast
+import json
 import openai
 import anthropic
-import google.generativeai as genai
-import re
-
-# from utils.utils import console
+from tqdm import tqdm
+from rich.console import Console
+from data.core import Data
 from typing import List, Dict, Any, Optional, Union
 
 PROMPT_ZERO_SHOT = """Generate a test case for the following module such that:
@@ -19,6 +18,9 @@ Here is the module:
 ```python
 {}
 ```
+
+The module is from this path:
+{}
 
 Here is the execution branch. The execution branch is a sequence of executable line number in the module:
 {}
@@ -39,13 +41,17 @@ PROMPT_COT = """Generate a test case for the following module such that:
 
 Here is the module:
 ```python
-{module}
+{}
 ```
 
-Here is the execution branch. The execution branch is a sequence of executable line number in the module:
-{execution_branch}
+The module is from this path:
+{}
 
-THINK STEP-BY-STEP and provide your response in the following format:
+Here is the execution branch. The execution branch is a sequence of executable line number in the module:
+{}
+
+Carefully consider the problem internally, but do NOT output any chain-of-thought or intermediate reasoning.
+Provide only the final answer in the following JSON format:
 
 ```json
 {{
@@ -67,12 +73,12 @@ def extract_test_case(raw: Union[str, dict]) -> str:
     """
     # 1) If it's already a dict, just pull it out:
     if isinstance(raw, dict):
-        return raw['test_case']
+        return raw["test_case"]
 
     # 2) If it's a string, strip any Markdown fences around the JSON:
     if isinstance(raw, str):
         # look for ```json … { … } … ```
-        fence = re.compile(r'```(?:json)?\s*([\s\S]*?\{[\s\S]*?\})\s*```', re.MULTILINE)
+        fence = re.compile(r"```(?:json)?\s*([\s\S]*?\{[\s\S]*?\})\s*```", re.MULTILINE)
         m = fence.search(raw)
         payload = m.group(1) if m else raw
 
@@ -84,97 +90,16 @@ def extract_test_case(raw: Union[str, dict]) -> str:
             try:
                 data = ast.literal_eval(payload)
             except Exception as e:
-                raise ValueError("Could not parse payload as JSON or Python literal") from e
+                print(f"Failed to parse payload: {payload}")
+                raise ValueError(
+                    "Could not parse payload as JSON or Python literal"
+                ) from e
 
-        if 'test_case' not in data:
+        if "test_case" not in data:
             raise KeyError("No 'test_case' key found")
-        return data['test_case']
+        return data["test_case"]
 
     raise TypeError(f"Expected str or dict, got {type(raw)}")
-
-
-    
-# --- GeminiClient Class (re-defined for this integration) ---
-class GeminiClient:
-    """
-    A client for interacting with the Google Gemini API.
-
-    Encapsulates API configuration and common generative AI operations.
-    """
-
-    def __init__(
-        self, api_key: Optional[str] = None, default_model: str = "gemini-pro"
-    ):
-        """
-        Initializes the GeminiClient.
-
-        Args:
-            api_key (str, optional): Your Google Gemini API key. If not provided,
-                                     it attempts to load from the GOOGLE_API_KEY
-                                     environment variable.
-            default_model (str): The default Gemini model to use for operations.
-                                 Defaults to "gemini-pro".
-        Raises:
-            ValueError: If no API key is provided or found in environment variables.
-        """
-        if api_key is None:
-            api_key = os.getenv("GOOGLE_API_KEY")
-            if not api_key:
-                raise ValueError(
-                    "Google API Key not provided. Please provide it as an argument "
-                    "or set the GOOGLE_API_KEY environment variable."
-                )
-
-        genai.configure(api_key=api_key)
-        self.default_model = default_model
-        self._models = {}  # Cache models to avoid re-initializing them unnecessarily
-
-    def _get_model(self, model_name: str) -> genai.GenerativeModel:
-        """Helper to get or create a GenerativeModel instance."""
-        if model_name not in self._models:
-            self._models[model_name] = genai.GenerativeModel(model_name)
-        return self._models[model_name]
-
-    def generate_content(
-        self, prompt: str | List[Any], model_name: Optional[str] = None, **kwargs: Any
-    ) -> genai.types.GenerateContentResponse:
-        """
-        Generates content based on a given prompt (text or multimodal).
-        This method is adjusted to return the raw API response object for more details.
-
-        Args:
-            prompt (str | List[Any]): The text prompt or a list of multimodal content parts.
-            model_name (str, optional): The specific model to use for this request.
-                                        Defaults to the client's default_model.
-            **kwargs: Additional keyword arguments for `model.generate_content()`,
-                      e.g., `temperature`, `max_output_tokens`, `safety_settings`.
-
-        Returns:
-            genai.types.GenerateContentResponse: The raw response object from the Gemini API.
-
-        Raises:
-            Exception: If the API call fails.
-        """
-        model_to_use = model_name if model_name else self.default_model
-        model = self._get_model(model_to_use)
-
-        try:
-            # For Gemini, max_tokens is `max_output_tokens` in generation_config
-            generation_config = kwargs.pop("generation_config", {})
-            if "max_tokens" in kwargs:
-                generation_config["max_output_tokens"] = kwargs.pop("max_tokens")
-
-            # The temperature parameter is also part of generation_config for Gemini
-            if "temperature" in kwargs:
-                generation_config["temperature"] = kwargs.pop("temperature")
-
-            response = model.generate_content(
-                prompt, generation_config=generation_config, **kwargs
-            )
-            return response
-        except Exception as e:
-            print(f"Error generating content with Gemini model '{model_to_use}': {e}")
-            raise
 
 
 # --- Modified init_api function ---
@@ -192,13 +117,13 @@ def init_api(model: str, api_key: str):
     Raises:
         ValueError: If an unsupported model is provided.
     """
-    if model.startswith("o3-mini") or ("gpt" in model) or ("deepseek" in model):
+    if ("o3-mini" in model) or ("gpt" in model) or ("deepseek" in model):
         client = openai.OpenAI(api_key=api_key)
     elif "claude" in model:
         client = anthropic.Anthropic(api_key=api_key)
     elif "gemini" in model:
-        # Pass the API key to our custom GeminiClient
-        client = GeminiClient(api_key=api_key)
+        # Gemini models are not supported in this runtime. Raise to make behavior explicit.
+        raise ValueError("Gemini models are not supported by this script")
     else:
         raise ValueError(f"Unsupported model: {model}")
     return client
@@ -206,7 +131,11 @@ def init_api(model: str, api_key: str):
 
 # --- Modified query_prompt function ---
 def query_prompt(
-    prompt: str, model: str, max_tokens: int, temperature: float, client: Any, reasoning: str,
+    prompt: str,
+    model: str,
+    max_tokens: int,
+    temperature: float,
+    client: Any,
 ) -> Dict[str, Any]:
     """
     Queries the respective LLM API with the given prompt and parameters.
@@ -231,10 +160,16 @@ def query_prompt(
             kwargs = {
                 "model": model,
                 "max_completion_tokens": max_tokens,
-                "temperature": temperature,
                 "messages": messages,
-                "reasoning_effort": reasoning,
             }
+
+            # For o3-mini models, set reasoning_effort to "low" to minimize thinking
+            if "o3-mini" in model:
+                kwargs["reasoning_effort"] = "low"
+            else:
+                # Only add temperature for non-o3-mini models
+                kwargs["temperature"] = temperature
+
             response = client.chat.completions.create(**kwargs)
 
             # OpenAI's chat.completions.create returns a Completion object
@@ -247,7 +182,9 @@ def query_prompt(
                     "output_tokens": response.usage.completion_tokens,
                 },
                 "stop_reason": response.choices[0].finish_reason,
-                "extract_content": extract_test_case(response.choices[0].message.content),
+                "extract_content": extract_test_case(
+                    response.choices[0].message.content
+                ),
             }
 
         elif isinstance(client, anthropic.Anthropic):
@@ -258,7 +195,6 @@ def query_prompt(
                 "max_tokens": max_tokens,  # Anthropic uses max_tokens, not max_output_tokens
                 "temperature": temperature,
                 "messages": messages,
-                "reasoning": reasoning,
             }
             response = client.messages.create(**kwargs)
 
@@ -275,71 +211,16 @@ def query_prompt(
                 "extract_content": extract_test_case(response.content[0].text),
             }
 
-        elif isinstance(client, GeminiClient):
-            # GeminiClient's generate_content
-            # Note: Gemini's prompt format for direct content generation is a string or list of parts.
-            # We will pass the `max_tokens` and `temperature` directly to the `generate_content` method
-            # as kwargs, which the GeminiClient will map to `generation_config`.
-
-            gemini_response = client.generate_content(
-                prompt,
-                model_name=model,
-                max_tokens=max_tokens,  # Mapped to max_output_tokens internally
-                temperature=temperature,
-                reasoning=reasoning,
-            )
-
-            # Extract details from the raw Gemini response object
-            generated_content = ""
-            if gemini_response.candidates:
-                # Ensure the response has at least one candidate and its content is valid
-                if (
-                    gemini_response.candidates[0].content
-                    and gemini_response.candidates[0].content.parts
-                ):
-                    # Concatenate text from all parts if there are multiple (e.g., for tool outputs)
-                    generated_content = "".join(
-                        part.text
-                        for part in gemini_response.candidates[0].content.parts
-                        if part.text
-                    )
-
-            # Usage metadata can be found in response.usage_metadata
-            input_tokens = (
-                gemini_response.usage_metadata.prompt_token_count
-                if gemini_response.usage_metadata
-                else 0
-            )
-            output_tokens = (
-                gemini_response.usage_metadata.candidates_token_count
-                if gemini_response.usage_metadata
-                else 0
-            )
-
-            # Stop reason is in candidates[0].finish_reason
-            stop_reason = (
-                gemini_response.candidates[0].finish_reason
-                if gemini_response.candidates
-                else None
-            )
-
-            return {
-                "success": True,
-                "content": generated_content,
-                "model": model,  # Gemini response object doesn't directly return model name in same field
-                "usage": {
-                    "input_tokens": input_tokens,
-                    "output_tokens": output_tokens,
-                },
-                "stop_reason": stop_reason,
-                "extract_content": extract_test_case(generated_content),
-            }
+        # Note: Gemini client support has been removed. If you need Gemini, add a custom client implementation.
 
         else:
             raise TypeError("Unsupported client type provided.")
 
     except Exception as e:
         print(f"An error occurred during query: {e}")
+        # import traceback
+
+        # traceback.print_exc()
         return {
             "success": False,
             "content": str(e),
@@ -349,88 +230,254 @@ def query_prompt(
         }
 
 
-def run(args):
-    print(
-        {
-            "input_file": args.input_file,
-            "output_file": args.output_file,
-            "model": args.model,
-        }
-    )
-    # api_dict = None
-    with open(args.api_file) as f:
-        api_dict = json.load(f)
+class PromptEngineer:
 
-    if args.model.startswith("o3-mini") or "gpt" in args.model:
-        api_key = api_dict["gpt"]
-    elif "deepseek" in args.model:
-        api_key = api_dict["deepseek"]
-    elif "gemini" in args.model:
-        api_key = api_dict["gemini"]
-    elif "claude" in args.model:
-        api_key = api_dict["claude"]
+    def __init__(self, args, model: str, api_key: str, console: Console):
+        self.args = args
+        self.console = console
+        self.model = model
+        self.client = init_api(model=model, api_key=api_key)
 
-    client = init_api(model=args.model, api_key=api_key)
+    def build_prompt(
+        self,
+        dataset: Data,
+        split: str = "test_module",
+        prompt_type: str = "zero_shot",
+        on_processed_data: bool = False,
+    ) -> List[Dict[str, str]]:
 
-    # read data: the json file from the input_file
-    input_data = []
-    with open(args.input_file) as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            input_data.append(json.loads(line))
+        prompt_list = []
+        if on_processed_data:
+            data = dataset.processed_data[split]
+            # Add tqdm progress bar
+            for key in tqdm(data.keys()):
 
-    result_dict = {}
+                path = data[key]["path"]
+                with open(path, "r") as f:
+                    dat = json.load(f)
+                print(path)
+                print(dat.keys())
 
-    # process each data point to query:
-    for inputTemp in input_data:
-        uuid = inputTemp["uuid"]
-        module = inputTemp["code_src"]
-        branch = inputTemp["branches"]
-        for item in branch:
-            key = KEY_TEMPLATE.format(uuid, item)
-            print(f"Key: {key}")
-            execution_branch = ""
-            test = branch[item]
-            for t_branch in test:
-                item_str = '->'.join(str(x) for x in t_branch)
-                execution_branch += f"{item_str}\n"
-    
-            prompt = PROMPT_COT.format(module=module, execution_branch=execution_branch)
-            response = query_prompt(
-                prompt=prompt,
-                client=client,
-                model=args.model,
-                temperature=args.temperature,
-                max_tokens=args.max_tokens,
-                reasoning=args.reasoning,
+                uuid = dat["uuid"]
+                tc_key = uuid.split("_testcase_")[-1]
+                tc_key = f"test_case_{tc_key}"
+                uuid = dat["uuid"].split("_testcase_")[0]
+                module_path = dat["module_path"]
+                code_path = dat["code_path"]
+                with open(code_path, "r") as f:
+                    module_code = f.read()
+
+                branch = dat["branch"]
+                branch_line = ""
+                for i, branch_item in enumerate(branch):
+                    branch_line += (
+                        f"Branch #{i+1}"
+                        + "->".join([str(item) for item in branch_item])
+                        + "\n"
+                    )
+                if prompt_type == "cot":
+                    prompt_text = PROMPT_COT.format(
+                        module_code, module_path, branch_line
+                    )
+                else:
+                    prompt_text = PROMPT_ZERO_SHOT.format(
+                        module_code, module_path, branch_line
+                    )
+
+                prompt_list.append(
+                    {
+                        "instance_id": uuid,
+                        "module_path": module_path,
+                        "code_path": code_path,
+                        "branch_key": tc_key,
+                        "prompt": prompt_text,
+                    }
+                )
+
+            self.console.log(
+                f"[green]Built {len(prompt_list)} prompts for prompt engineering.[/green]"
             )
-            result_dict[key] = response
+        else:
+            data = dataset.data[split]
+            # Add tqdm progress bar
+            for key in tqdm(data.keys()):
+                uuid = data[key]["uuid"]
+                module_path = data[key]["module_path"]
+                code_path = data[key]["code_path"]
+                with open(code_path, "r") as f:
+                    module_code = f.read()
 
-            # write the result_dict to the output file
-            with open(args.output_file, "w") as f:
-                json.dump(result_dict, f, indent=2)
+                for tc_key in data[key]["test_cases"].keys():
+                    branch = data[key]["test_cases"][tc_key]["branch"]
+                    branch_line = ""
+                    for i, branch_item in enumerate(branch):
+                        branch_line += (
+                            f"Branch #{i+1}"
+                            + "->".join([str(item) for item in branch_item])
+                            + "\n"
+                        )
+                    if prompt_type == "cot":
+                        prompt_text = PROMPT_COT.format(
+                            module_code, module_path, branch_line
+                        )
+                    else:
+                        prompt_text = PROMPT_ZERO_SHOT.format(
+                            module_code, module_path, branch_line
+                        )
 
+                    prompt_list.append(
+                        {
+                            "instance_id": uuid,
+                            "module_path": module_path,
+                            "code_path": code_path,
+                            "branch_key": tc_key,
+                            "prompt": prompt_text,
+                        }
+                    )
+            self.console.log(
+                f"[green]Built {len(prompt_list)} prompts for prompt engineering.[/green]"
+            )
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Process some prompts.")
-    parser.add_argument("--input_file", type=str, help="Path to the input file")
-    parser.add_argument("--output_file", type=str, help="Path to the output file")
-    parser.add_argument(
-        "--api_file", type=str, help="API File"
-    )
-    parser.add_argument(
-        "--model", type=str, default="o3-mini-2025-01-31", help="Model to use for generation"
-    )
-    parser.add_argument(
-        "--temperature", type=float, default=1, help="Temperature for generation"
-    )
-    parser.add_argument(
-        "--max_tokens", type=int, default=4096, help="Maximum tokens for generation"
-    )
-    parser.add_argument(
-        "--reasoning", type=str, default="medium", help="Reasoning Effort"
-    )
-    args = parser.parse_args()
-    run(args)
+        return prompt_list
+
+    def generate_responses(
+        self,
+        prompt_list: List[Dict[str, str]],
+        max_tokens: int,
+        temperature: float,
+        output_path: Optional[str] = None,
+        output_name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        responses: List[Dict[str, Any]] = []
+
+        # Prepare output files if requested and discover already-processed keys
+        output_file = None
+        test_case_file = None
+        processed_keys = set()
+        if output_path is not None and output_name is not None:
+            os.makedirs(output_path, exist_ok=True)
+            output_file = os.path.join(output_path, f"{output_name}_responses.jsonl")
+            test_case_file = os.path.join(
+                output_path, f"{output_name}_test_cases.jsonl"
+            )
+
+            # If responses file exists, read processed keys to skip
+            if os.path.exists(output_file):
+                try:
+                    with open(output_file, "r") as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                rec = json.loads(line)
+                                iid = rec.get("instance_id")
+                                bkey = rec.get("branch_key")
+                                if iid is not None and bkey is not None:
+                                    processed_keys.add(KEY_TEMPLATE.format(iid, bkey))
+                            except Exception:
+                                # ignore malformed lines
+                                continue
+                except Exception:
+                    # If reading fails, proceed without skipping
+                    processed_keys = set()
+
+        skipped = 0
+        generated = 0
+
+        for prompt_item in tqdm(prompt_list):
+            iid = prompt_item["instance_id"]
+            bkey = prompt_item["branch_key"]
+            key = KEY_TEMPLATE.format(iid, bkey)
+
+            if key in processed_keys:
+                skipped += 1
+                continue
+
+            prompt_text = prompt_item["prompt"]
+            response = query_prompt(
+                prompt=prompt_text,
+                client=self.client,
+                model=self.model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+
+            response_record = {
+                "instance_id": iid,
+                "module_path": prompt_item["module_path"],
+                "branch_key": bkey,
+                "response": response,
+            }
+
+            # Append to responses list (in-memory)
+            responses.append(response_record)
+
+            # Persist immediately (append mode) so we can resume later
+            if output_file is not None:
+                try:
+                    with open(output_file, "a") as f:
+                        f.write(json.dumps(response_record) + "\n")
+                except Exception as e:
+                    self.console.log(
+                        f"[red]Failed to append to responses file: {e}[/red]"
+                    )
+
+            # Persist extracted test case as a small mapping {uuid: test_case}
+            if test_case_file is not None:
+                try:
+                    uuid = f"{iid}_test_case_{bkey.split('_')[-1]}"
+                    extract_content = ""
+                    try:
+                        extract_content = response.get("extract_content", "")
+                    except Exception:
+                        extract_content = ""
+                    test_case_record = {uuid: extract_content}
+                    with open(test_case_file, "a") as f:
+                        f.write(json.dumps(test_case_record) + "\n")
+                except Exception as e:
+                    self.console.log(
+                        f"[red]Failed to append to test case file: {e}[/red]"
+                    )
+
+            # Mark as processed so we don't re-run in the same session
+            processed_keys.add(key)
+            generated += 1
+
+        self.console.log(
+            f"[green]Generated {generated} new responses (skipped {skipped})[/green]"
+        )
+
+        return responses
+
+    def run_prompt_engineering(
+        self,
+        dataset,
+        prompt_type: str,
+        temperature: float,
+        output_path: str,
+        output_name: str,
+        max_tokens: int,
+        on_processed_data: bool = False,
+    ):
+        prompt_list = self.build_prompt(
+            dataset=dataset,
+            split="test_module",
+            prompt_type=prompt_type,
+            on_processed_data=on_processed_data,
+        )
+        self.console.log(
+            f"[green]Built {len(prompt_list)} prompts for prompt engineering.[/green]"
+        )
+
+        # print one prompt for debugging
+        self.console.log(f"[yellow]Sample Prompt:[/yellow]\n{prompt_list[0]['prompt']}")
+
+        self.generate_responses(
+            prompt_list=prompt_list,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            output_path=output_path,
+            output_name=output_name,
+        )
+        self.console.log(f"[green]Generated responses and saved[/green]")

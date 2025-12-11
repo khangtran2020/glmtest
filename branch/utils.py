@@ -1,8 +1,10 @@
 import re
 import os
 import ast
+import sys
 import networkx as nx
 from rich import print as pprint
+from rich.pretty import pretty_repr
 from copy import deepcopy
 from networkx import DiGraph
 from rich.console import Console
@@ -154,7 +156,7 @@ def parse_code(code: str) -> DiGraph:
                 if try_start < line < first_except:
                     for ex_start, _ in block["excepts"]:
                         G.add_edge(line, ex_start)
-    return G, sorted(list(set_of_endlines))
+    return G, sorted(list(set_of_endlines)), arcs
 
 
 def DFS_branch(
@@ -186,11 +188,85 @@ def DFS_branch(
     visited_nodes.pop()
 
 
+def is_name_main_check(node):
+    """Check if node is: if __name__ == "__main__": or similar"""
+    if not isinstance(node, ast.If):
+        return False
+
+    test = node.test
+
+    # Check for: __name__ == "__main__"
+    if isinstance(test, ast.Compare):
+        if (
+            isinstance(test.left, ast.Name)
+            and test.left.id == "__name__"
+            and len(test.ops) == 1
+            and isinstance(test.ops[0], ast.Eq)
+            and len(test.comparators) == 1
+            and isinstance(test.comparators[0], ast.Constant)
+            and test.comparators[0].value == "__main__"
+        ):
+            return True
+
+        # Check for: "__main__" == __name__
+        if (
+            isinstance(test.left, ast.Constant)
+            and test.left.value == "__main__"
+            and len(test.ops) == 1
+            and isinstance(test.ops[0], ast.Eq)
+            and len(test.comparators) == 1
+            and isinstance(test.comparators[0], ast.Name)
+            and test.comparators[0].id == "__name__"
+        ):
+            return True
+
+    return False
+
+
+def get_init_lines(source_code: str):
+    try:
+        tree = ast.parse(source_code)
+    except SyntaxError as e:
+        print(f"Syntax error: {e}")
+        return []
+
+    num_lines = len(source_code.split("\n"))
+    executed_line_numbers = set()
+
+    for node in tree.body:
+        # Skip if __name__ == "__main__" blocks
+        if is_name_main_check(node):
+            continue
+
+        # Skip function and class definitions entirely (including decorators)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            continue
+
+        # Everything else at top level executes
+        if node.lineno and node.end_lineno:
+            for line_num in range(node.lineno, node.end_lineno + 1):
+                executed_line_numbers.add(line_num)
+
+    # Return sorted list of (line_number, line_content)
+    result = []
+    for line_num in sorted(executed_line_numbers):
+        if line_num <= num_lines:
+            result.append(line_num)
+
+    return result
+
+
 def get_all_branch(
-    code: str = None, filepath: str = None, console: Console = None
+    code: str = None,
+    filepath: str = None,
+    console: Console = None,
+    batch_size: int = 10,
+    branch_limit: int = 1000,
 ) -> Dict:
 
-    pprint("[green]Extracting branches...[/green]")
+    # pprint("[green]Extracting branches...[/green]")
+    # pprint("-------------------------")
+    # pprint(f"[blue]Processing code:[/blue]\n {code}")
 
     if code is None and filepath is None:
         raise ValueError("Either code or filepath must be provided.")
@@ -199,14 +275,52 @@ def get_all_branch(
         code = read_module(filepath=filepath)
 
     line_dict = analyze_code(code=code)
-    G, set_of_endline = parse_code(code=code)
+
+    # Debugging
+    # pprint(f"[green]Analyzed line dict:[/green] {pretty_repr(line_dict)}")
+
+    new_code = []
+    for i, line in enumerate(code.split("\n")):
+        new_code.append(f"{i+1}: {line}")
+    new_code = "\n".join(new_code)
+
+    # pprint(f"[green]Source code:[/green]\n{new_code}")
+
+    G, set_of_endline, arcs = parse_code(code=code)
+
+    # Debugging
+    # pprint(f"[green]Parsed arcs:[/green] {pretty_repr(arcs)}")
+    # pprint(f"[green]Set of end lines:[/green] {pretty_repr(set_of_endline)}")
+    # pprint(f"[green]Parsed graph nodes:[/green] {pretty_repr(G.nodes())}")
+    # pprint(f"[green]Parsed graph edges:[/green] {pretty_repr(G.edges())}")
+
+    init_lines = get_init_lines(source_code=code)
+
+    init_branch = []
+    init_arcs = []
+    for i, arc in enumerate(arcs):
+        if arc[0] in init_lines and arc[1] in init_lines:
+            init_arcs.append(arc)
+
+    for arc in init_arcs:
+        if arc[0] not in init_branch:
+            init_branch.append(arc[0])
+        if arc[1] not in init_branch:
+            init_branch.append(arc[1])
+
+    init_branch = sorted(init_branch)
 
     branches = []
     num_branch = 0
     # process func
     if console is not None:
         console.log("Processing Function")
+
     for func_name in line_dict["functions"].keys():
+
+        batch_branches = []
+        branch_idx = 0
+
         set_of_end = [
             e
             for e in set_of_endline
@@ -215,6 +329,7 @@ def get_all_branch(
         ]
         if len(set_of_end) == 0:
             continue
+
         for branch in DFS_branch(
             G=G,
             node=line_dict["functions"][func_name][0],
@@ -222,17 +337,37 @@ def get_all_branch(
             current_path=[],
             visited_nodes=[],
         ):
-            if branch[:-1] not in branches:
+            if branch[:-1] not in batch_branches:
                 num_branch += 1
-                pprint(f"[blue]Found branch: {num_branch} - {len(branch)} [/blue]")
-                branches.append(branch[:-1])  # remove the end node
-            if num_branch >= 1000:
+                branch_idx += 1
+                batch_branches.append(branch[:-1])  # remove the end node
+                if branch_idx >= batch_size:
+                    batch_branches = [init_branch] + batch_branches
+                    branches.append(batch_branches)
+                    batch_branches = []
+                    branch_idx = 0
+
+            if num_branch >= branch_limit:
                 break
+
+        if len(batch_branches) > 0:
+            batch_branches = [init_branch] + batch_branches
+            branches.append(batch_branches)
+
+    # Debugging
+    # pprint(f"[green]Total branches found so far:[/green] {num_branch}")
+    # pprint(f"[green]Branches so far:[/green] {pretty_repr(branches)}")
+    # sys.exit(0)
 
     # process async func
     if console is not None:
         console.log("Processing Async Function")
+
     for func_name in line_dict["async_functions"].keys():
+
+        batch_branches = []
+        branch_idx = 0
+
         set_of_end = [
             e
             for e in set_of_endline
@@ -241,6 +376,7 @@ def get_all_branch(
         ]
         if len(set_of_end) == 0:
             continue
+
         for branch in DFS_branch(
             G=G,
             node=line_dict["async_functions"][func_name][0],
@@ -248,14 +384,26 @@ def get_all_branch(
             current_path=[],
             visited_nodes=[],
         ):
-            if branch[:-1] not in branches:
+            if branch[:-1] not in batch_branches:
                 num_branch += 1
-                pprint(f"[blue]Found branch: {num_branch} - {len(branch)}[/blue]")
-                branches.append(branch[:-1])  # remove the end node
-            if num_branch >= 1000:
+                branch_idx += 1
+                batch_branches.append(branch[:-1])  # remove the end node
+                if branch_idx >= batch_size:
+                    batch_branches = [init_branch] + batch_branches
+                    branches.append(batch_branches)
+                    batch_branches = []
+                    branch_idx = 0
+
+            if num_branch >= branch_limit:
                 break
 
-    pprint(f"[green]Total branches found: {num_branch}[/green]")
+        if len(batch_branches) > 0:
+            batch_branches = [init_branch] + batch_branches
+            branches.append(batch_branches)
+
+    pprint(
+        f"[green]For file {filepath}: total branches found {num_branch} seperated to {len(branches)} batches[/green]"
+    )
 
     return branches
 

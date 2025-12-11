@@ -9,6 +9,7 @@ from utils.constant import GRAPH_PAD_TOKEN
 
 
 class GLMFDataset(Dataset):
+
     def __init__(
         self,
         data: List[Dict[str, Any]],
@@ -45,37 +46,49 @@ class GLMFDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
+        import time
 
-        data_path = self.data[self.index_to_key_dict[idx]]
+        start_time = time.time()
+
+        data_path = self.data[self.index_to_key_dict[idx]]["path"]
         with open(data_path, "r") as f:
             sample = json.load(f)
         graph_path = sample["graph_path"]
-        # print("Loading graph from:", graph_path)
         graph = torch.load(graph_path) if graph_path is not None else None
-        active_node = (
-            torch.Tensor(sample["active_node"])
-            if sample["active_node"] is not None
-            else None
-        )
-        graph_mask = (
-            torch.Tensor(sample["mask"]).to(
-                dtype=torch.bfloat16 if self.dtype == "bf16" else torch.float16
-            )
-            if sample["mask"] is not None
-            else None
-        )
+
+        if sample["active_node"] is not None:
+            active_nodes = []
+            for active_node in sample["active_node"]:
+                active_nodes.append(torch.Tensor(active_node))
+        else:
+            active_nodes = None
+
+        graph_masks = []
+        if sample["mask"] is not None:
+            for mask in sample["mask"]:
+                graph_masks.append(torch.Tensor(mask))
+        else:
+            graph_masks = None
 
         if graph is not None:
+            act_node = None
+            for i, active_node in enumerate(active_nodes):
+                if i == 0:
+                    act_node = active_node
+                else:
+                    act_node = torch.cat((act_node, active_node), dim=0)
+
             for key in graph.keys():
                 graph[key] = sampling_neighbor(
                     graph=graph[key],
-                    mask=active_node,
+                    mask=act_node,
                     n_hops=self.n_hops,
                 )
-                graph[key].ndata["feat"] = (
-                    graph[key]
-                    .ndata["feat"]
-                    .to(dtype=torch.bfloat16 if self.dtype == "bf16" else torch.float16)
+                # Force features to CPU and materialize to avoid DGL lazy loading issues with DataLoader workers
+                feat = graph[key].ndata["feat"]
+                graph[key].ndata["feat"] = feat.to(
+                    device="cpu",
+                    dtype=torch.bfloat16 if self.dtype == "bf16" else torch.float16,
                 )
 
         if self.testing == False:
@@ -104,7 +117,9 @@ class GLMFDataset(Dataset):
                 "text": full_text,
                 "input": tokenized,
                 "graph": graph,  # Should be a dictionary of graph structures
-                "graph_mask": (graph_mask if graph_mask is not None else None),
+                "graph_mask": (graph_masks if graph_masks is not None else None),
+                "active_nodes": (active_nodes if active_nodes is not None else None),
+                "data_load_time": time.time() - start_time,
             }
         else:
             prompt = sample["prompt"]
@@ -122,7 +137,9 @@ class GLMFDataset(Dataset):
                 "text": prompt,
                 "input": tokenized,
                 "graph": graph,
-                "graph_mask": (graph_mask if graph_mask is not None else None),
+                "graph_mask": (graph_masks if graph_masks is not None else None),
+                "active_nodes": (active_nodes if active_nodes is not None else None),
+                "data_load_time": time.time() - start_time,
             }
             return (uuid, batch)
 
@@ -131,7 +148,7 @@ class GLMFDataset(Dataset):
         result = self.tokenizer(
             prompt,
             return_tensors="pt",
-            truncation=True,
+            truncation=True if self.max_seq_length is not None else False,
             max_length=self.max_seq_length,
         )
         pad_size = 0
@@ -172,28 +189,32 @@ def pad(
     pad_value: int,
     padding_side: str = "left",
 ) -> torch.Tensor:
-    num_dims = len(input_tensors[0].shape)
-    if num_dims == 1:
-        max_length = max(tensor.size(0) for tensor in input_tensors)
-    else:
+    # Normalize tensors to 1D by squeezing once
+    if input_tensors[0].dim() > 1:
         input_tensors = [tensor.squeeze(0) for tensor in input_tensors]
-        max_length = max(tensor.size(0) for tensor in input_tensors)
 
+    # Get lengths using a single tensor operation
+    lengths = torch.tensor([t.size(0) for t in input_tensors], dtype=torch.long)
+    max_length = lengths.max().item()
+
+    # Pre-allocate output tensor
     padded_tensors = torch.full(
-        (len(input_tensors), max_length), pad_value, dtype=input_tensors[0].dtype
+        (len(input_tensors), max_length),
+        pad_value,
+        dtype=input_tensors[0].dtype,
+        device=input_tensors[0].device,
     )
-    for i, tensor in enumerate(input_tensors):
-        if padding_side == "left":
-            seq_start = max_length - tensor.shape[0]
-        elif padding_side == "right":
-            seq_start = 0
-        else:
-            raise ValueError("padding_side must be 'left' or 'right'")
 
-        # Define the slices
-        seq_slice = slice(seq_start, seq_start + tensor.shape[0])
-        slices = (seq_slice,) + tuple(slice(0, s) for s in tensor.shape[1:])
-        padded_tensors[i][slices] = tensor
+    if padding_side == "left":
+        # Vectorized left padding using advanced indexing
+        for i, (tensor, length) in enumerate(zip(input_tensors, lengths)):
+            padded_tensors[i, max_length - length :] = tensor
+    elif padding_side == "right":
+        # Vectorized right padding using advanced indexing
+        for i, (tensor, length) in enumerate(zip(input_tensors, lengths)):
+            padded_tensors[i, :length] = tensor
+    else:
+        raise ValueError("padding_side must be 'left' or 'right'")
 
     return padded_tensors
 
@@ -204,11 +225,6 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
     if not isinstance(batch[0], tuple):
         # print(batch)
         collated_input = {}
-
-        # for sample in batch:
-        #     pprint(
-        #         f"[cyan]Sample input_ids length: {sample['input']['input_ids'].shape}[/cyan]"
-        #     )
 
         input_ids = [sample["input"]["input_ids"] for sample in batch]
         attention_mask = [sample["input"]["attention_mask"] for sample in batch]
@@ -229,6 +245,7 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
             "graph": (
                 [x["graph"] for x in batch] if batch[0]["graph"] is not None else None
             ),
+            "data_load_time": [x.get("data_load_time", 0.0) for x in batch],
         }
         return collated
     else:
@@ -256,5 +273,6 @@ def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> di
             "graph": (
                 [x["graph"] for x in batch] if batch[0]["graph"] is not None else None
             ),
+            "data_load_time": [x.get("data_load_time", 0.0) for x in batch],
         }
         return uuid, collated

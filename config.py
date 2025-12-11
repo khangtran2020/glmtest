@@ -82,7 +82,19 @@ def add_model_group(group):
         default="node",
     )
     group.add_argument(
+        "--gnn_type",
+        type=str,
+        help="type of gnn: gat, graphsage",
+        default="gat",
+    )
+    group.add_argument(
         "--model_name",
+        type=str,
+        help="name of the LLM",
+        default="qwen2_5-1_5b",
+    )
+    group.add_argument(
+        "--llm_model_name",
         type=str,
         help="name of the LLM",
         default="qwen2_5-1_5b",
@@ -145,7 +157,7 @@ def add_model_group(group):
         "--max_num_checkpoint",
         type=int,
         help="maximum number of checkpoints",
-        default=2,
+        default=5,
     )
     group.add_argument(
         "--model_weight_path", type=str, help="path to the model weight", default=None
@@ -203,6 +215,16 @@ def add_model_group(group):
         help="kl regularization for dirichlet",
         default=0.001,
     )
+    group.add_argument(
+        "--ring_attn",
+        action="store_true",
+        help="use ring attention",
+    )
+    group.add_argument(
+        "--use_flash_attn",
+        action="store_true",
+        help="use flash attention",
+    )
 
 
 def add_training_group(group):
@@ -218,7 +240,12 @@ def add_training_group(group):
         help="max sequence length",
         default=12000,
     )
-
+    group.add_argument(
+        "--min_seq_length",
+        type=int,
+        help="max sequence length",
+        default=0,
+    )
     group.add_argument(
         "--temp",
         type=float,
@@ -248,6 +275,17 @@ def add_training_group(group):
         type=int,
         help="gradient accumulation steps",
         default=16,
+    )
+    group.add_argument(
+        "--use_deepspeed",
+        action="store_true",
+        help="use DeepSpeed for training optimization (ZeRO-2 for 20-40%% speedup)",
+    )
+    group.add_argument(
+        "--deepspeed_config",
+        type=str,
+        help="path to DeepSpeed config file",
+        default="configs/deepspeed_zero2.json",
     )
     group.add_argument(
         "--num_gpu",
@@ -360,7 +398,7 @@ def add_training_group(group):
         "--logging_steps",
         type=int,
         help="number of steps to logs",
-        default=200,
+        default=128,
     )
     group.add_argument(
         "--save_steps",
@@ -389,6 +427,16 @@ def add_training_group(group):
         "--only_nvib",
         action="store_true",
         help="Train only the NVIB layers",
+    )
+    group.add_argument(
+        "--only_gnn",
+        action="store_true",
+        help="Train only the GNN layers",
+    )
+    group.add_argument(
+        "--train_reasoning",
+        action="store_true",
+        help="Train with reasoning",
     )
 
 
@@ -429,6 +477,7 @@ def parse_args():
     testgen_group = parser.add_argument_group(
         title="Test-case generation configuration"
     )
+    baseline_group = parser.add_argument_group(title="Baseline configuration")
 
     add_joern_group(joern_group)
     add_data_group(data_group)
@@ -436,5 +485,6 @@ def parse_args():
     add_training_group(training_group)
     add_model_group(model_group)
     add_testgen_group(testgen_group)
+    add_baseline_group(baseline_group)
 
     return parser.parse_args()

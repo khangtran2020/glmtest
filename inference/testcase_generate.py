@@ -10,13 +10,7 @@ from utils.utils import get_index_by_value
 from graph.core import Graph
 from graph.utils import get_graph
 from data.core import Data
-from data.core import (
-    PROMPT_CODE,
-    PROMPT_GRAPH,
-    PROMPT_CODE_GRAPH,
-    PROMPT_CODE_TR,
-    PROMPT_COT,
-)
+from data.core import PROMPT_TEMPLATE
 from accelerate import Accelerator
 from inference.test import generate_and_save_on_one_dataset
 from inference.verifier import verify_test_case
@@ -44,7 +38,7 @@ def testcase_generate(
     mixed_precision: str = "bf16",
     do_generate: bool = True,
 ):
-
+    config = model.config
     accelerator = Accelerator(
         mixed_precision=mixed_precision,
         log_with="wandb",
@@ -82,11 +76,11 @@ def testcase_generate(
             dataset=te_dataset,
             model=model,
             args=args,
+            config=config,
             console=console,
             device=device,
             tokenizer=dataset.llm_tokenizer,
             collate_fn_=collate_fn_,
-            accelerator=accelerator,
             suffix="independent_module",
             do_save=True,
         )
@@ -126,21 +120,14 @@ def testcase_generate(
                 json.dump(generated_text, f, ensure_ascii=False, indent=4)
 
     if dataset is not None:
+
+        console.log("Preparing to generate test case for predefined dataset...")
+
         # dataset.prepare_data_for_test_gen()
         te_mod_dataset = GLMFDataset(
             data=dataset.test_data["module"],
             tokenizer=dataset.llm_tokenizer,
-            max_seq_length=args.max_seq_length,
-            debug=args.debug,
-            n_hops=dataset.n_hops,
-            testing=True,
-            dtype=args.dtype,
-            num_gpus=args.num_gpu,
-        )
-        te_proj_dataset = GLMFDataset(
-            data=dataset.test_data["project"],
-            tokenizer=dataset.llm_tokenizer,
-            max_seq_length=args.max_seq_length,
+            max_seq_length=None,
             debug=args.debug,
             n_hops=dataset.n_hops,
             testing=True,
@@ -148,25 +135,49 @@ def testcase_generate(
             num_gpus=args.num_gpu,
         )
 
+        te_proj_dataset = GLMFDataset(
+            data=dataset.test_data["project"],
+            tokenizer=dataset.llm_tokenizer,
+            max_seq_length=None,
+            debug=args.debug,
+            n_hops=dataset.n_hops,
+            testing=True,
+            dtype=args.dtype,
+            num_gpus=args.num_gpu,
+        )
+
+        console.log(
+            f"[yellow]Length of module test case dataset:[/yellow] {len(te_mod_dataset)}"
+        )
+        console.log(
+            f"[yellow]Length of project test case dataset:[/yellow] {len(te_proj_dataset)}"
+        )
+
         if do_generate:
             generated_dict = generate_and_save_on_one_dataset(
                 dataset=te_mod_dataset,
                 model=model,
                 args=args,
+                config=config,
                 console=console,
                 device=device,
                 tokenizer=dataset.llm_tokenizer,
                 collate_fn_=collate_fn_,
-                accelerator=accelerator,
-                suffix="module",
+                suffix="module_testcase",
                 do_save=True,
             )
         else:
-            if os.path.exists(os.path.join(args.gen_dir, f"{args.name}_module.json")):
+            generated_dict = None
+            if os.path.exists(os.path.join(args.gen_dir, f"{args.name}_module.jsonl")):
                 with open(
-                    os.path.join(args.gen_dir, f"{args.name}_module.json"), "r"
+                    os.path.join(args.gen_dir, f"{args.name}_module.jsonl"), "r"
                 ) as f:
-                    generated_dict = json.load(f)
+                    for line in f.readlines():
+                        instance = json.loads(line)
+                        if generated_dict is None:
+                            generated_dict = instance
+                        else:
+                            generated_dict.update(instance)
             else:
                 generated_dict = None
 
@@ -193,10 +204,27 @@ def testcase_generate(
                     refactored_code = verification_result["refactored_code"]
                     project_dict[k.split("_testcase_")[0]].append(refactored_code)
 
-            generated_testsrc_dict = {}
-            for k, v in project_dict.items():
-                test_src = merge_testcases(codes=v)
-                generated_testsrc_dict[k] = test_src
+                if args.verifier_model is None:
+                    project_dict[k.split("_testcase_")[0]].append(
+                        extract_code_block(text=v)
+                    )
+                else:
+                    # verify the test case
+                    with console.status(f"Verifying test case {k}..."):
+                        verification_result = verify_test_case(
+                            test_case=extract_code_block(text=v),
+                            model=args.verifier_model,
+                            temperature=0.2,
+                            api_key=args.verifier_api_key,
+                            max_tokens=2048,
+                        )
+                    refactored_code = verification_result["refactored_code"]
+                    project_dict[k.split("_testcase_")[0]].append(refactored_code)
+
+            # generated_testsrc_dict = {}
+            # for k, v in project_dict.items():
+            #     test_src = merge_testcases(codes=v)
+            #     generated_testsrc_dict[k] = test_src
 
             # save the generated test source code
             save_dir = os.path.join(
@@ -204,7 +232,7 @@ def testcase_generate(
             )
             with open(save_dir, "w", encoding="utf-8") as f:
                 # save as json file
-                json.dump(generated_testsrc_dict, f, ensure_ascii=False, indent=4)
+                json.dump(project_dict, f, ensure_ascii=False, indent=4)
         else:
             console.log(
                 f"[red]No generated test cases found for modules. Please check the path {os.path.join(args.gen_dir, f'{args.name}_module.json')}[/red]"
@@ -215,20 +243,26 @@ def testcase_generate(
                 dataset=te_proj_dataset,
                 model=model,
                 args=args,
+                config=config,
                 console=console,
                 device=device,
                 tokenizer=dataset.llm_tokenizer,
                 collate_fn_=collate_fn_,
-                accelerator=accelerator,
-                suffix="project",
+                suffix="project_testcase",
                 do_save=True,
             )
         else:
-            if os.path.exists(os.path.join(args.gen_dir, f"{args.name}_project.json")):
+            generated_dict = None
+            if os.path.exists(os.path.join(args.gen_dir, f"{args.name}_project.jsonl")):
                 with open(
-                    os.path.join(args.gen_dir, f"{args.name}_project.json"), "r"
+                    os.path.join(args.gen_dir, f"{args.name}_project.jsonl"), "r"
                 ) as f:
-                    generated_dict = json.load(f)
+                    for line in f.readlines():
+                        instance = json.loads(line)
+                        if generated_dict is None:
+                            generated_dict = instance
+                        else:
+                            generated_dict.update(instance)
             else:
                 generated_dict = None
 
@@ -242,22 +276,14 @@ def testcase_generate(
         for k, v in generated_dict.items():
             if k.split("_testcase_")[0] not in project_dict.keys():
                 project_dict[k.split("_testcase_")[0]] = []
-            project_dict[k.split("_testcase_")[0]].append(
-                extract_code_block(markdown=v)
-            )
+            project_dict[k.split("_testcase_")[0]].append(extract_code_block(text=v))
 
-        generated_testsrc_dict = {}
-        for k, v in project_dict.items():
-            test_src = merge_testcases(codes=v)
-            generated_testsrc_dict[k] = test_src
-
-        # save the generated test source code
         save_dir = os.path.join(
             args.gen_dir, f"{args.name}_generated_testcase_project.json"
         )
         with open(save_dir, "w", encoding="utf-8") as f:
             # save as json file
-            json.dump(generated_testsrc_dict, f, ensure_ascii=False, indent=4)
+            json.dump(project_dict, f, ensure_ascii=False, indent=4)
 
 
 def prepare_module(
@@ -487,36 +513,78 @@ def get_prompt(
     src_code: str,
     mask: torch.Tensor,
     branch: List,
+    module_path: str,
     tokenizer: PreTrainedTokenizer,
     gnn_mode: str = "graph",
     baseline_prompt: str = "graph_tr",
     max_tokens: int = 2048,
 ):
-
-    if gnn_mode == "graph":
-        graph_pad = "<|graph_pad|>"
+    if gnn_mode == "branch":
+        graph_pad = ""
+        for i, item in enumerate(mask):
+            if i == 0:
+                if len(mask) >= 1:
+                    graph_pad += "Import branch: <|graph_pad|>" + "\n"
+                else:
+                    graph_pad += "Import branch: Not Available" + "\n"
+            else:
+                if len(mask) >= 1:
+                    graph_pad += f"Branch #{i}: <|graph_pad|>\n"
+                else:
+                    graph_pad += f"Branch #{i}: Not Available\n"
     else:
-        graph_pad = "<|graph_pad|>" * mask.size(0)
-    if baseline_prompt == "code":
-        code_line = generate_code_line(branch)
-        text = PROMPT_CODE.format(src_code, code_line)
-    elif baseline_prompt == "graph":
-        text = PROMPT_GRAPH.format(graph_pad)
-    elif baseline_prompt == "code_graph":
-        text = PROMPT_CODE_GRAPH.format(src_code, graph_pad)
-    elif baseline_prompt == "code_tr":
-        # logger.log("Truncating code...")
-        trucated_code = truncate_code(src_code=src_code, branch=branch)
-        if trucated_code is None:
-            return None
-        text = PROMPT_CODE_TR.format(trucated_code)
-    elif baseline_prompt == "graph_tr":
-        trucated_code = truncate_code(src_code=src_code, branch=branch)
-        text = PROMPT_CODE_GRAPH.format(trucated_code, graph_pad)
-    elif baseline_prompt == "code_baseline":
-        code_line = generate_code_line(branch)
-        text = PROMPT_COT.format(module=src_code, execution_branch=code_line)
+        graph_pad = ""
+        for i, item in enumerate(mask):
+            if i == 0:
+                if len(mask) >= 1:
+                    graph_pad += (
+                        "Import branch: " + "<|graph_pad|>" * item.size(0) + "\n"
+                    )
+                else:
+                    graph_pad += "Import branch: Not Available" + "\n"
+            else:
+                if len(mask) >= 1:
+                    graph_pad += (
+                        f"Branch #{i}: " + "<|graph_pad|>" * item.size(0) + "\n"
+                    )
+                else:
+                    graph_pad += f"Branch #{i}: Not Available\n"
 
+    branch_line = ""
+    for i, branch_item in enumerate(branch):
+        if i == 0:
+            branch_line += (
+                f"Import branch: "
+                + "->".join([str(item) for item in branch_item])
+                + "\n"
+            )
+            continue
+        branch_line += (
+            f"Branch #{i}: " + "->".join([str(item) for item in branch_item]) + "\n"
+        )
+
+    if baseline_prompt == "code":
+        text = PROMPT_TEMPLATE.format(
+            src_code, branch_line, module_path, "Not Available"
+        )
+    elif baseline_prompt == "graph":
+        text = PROMPT_TEMPLATE.format(
+            "Not Available", "Not Available", module_path, graph_pad
+        )
+    elif baseline_prompt == "code_graph":
+        text = PROMPT_TEMPLATE.format(src_code, branch_line, module_path, graph_pad)
+    elif baseline_prompt == "code_tr":
+        truncated_code = truncate_code(src_code=src_code, branch=branch)
+        if truncated_code is None:
+            return None
+        text = PROMPT_TEMPLATE.format(
+            truncated_code, branch_line, module_path, "Not Available"
+        )
+    elif baseline_prompt == "graph_tr":
+        truncated_code = truncate_code(src_code=src_code, branch=branch)
+        text = PROMPT_TEMPLATE.format(
+            truncated_code, branch_line, module_path, graph_pad
+        )
     task_prompt_input = tokenizer.apply_chat_template(
         [{"role": "user", "content": text}],
         tokenize=False,

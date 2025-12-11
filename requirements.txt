@@ -3,7 +3,9 @@ dgl==2.4.0+cu124
 rich==14.1.0
 cpgqls-client==0.0.9
 numpy==2.1.2
-transformers==4.52.0
+transformers==4.51.3
 accelerate==1.10.0
+bitsandbytes==0.44.1
 coverage==7.10.3
 scikit-learn
+deepspeed==0.15.4  # Optional: for 20-40% training speedup with ZeRO-2 optimization

@@ -232,23 +232,34 @@ def move_model_to_device(model, device):
 def save_checkpoint(
     model: torch.nn.Module,
     path: str,
-    optimizer: Optimizer,
-    scheduler: LRScheduler,
     global_step: int,
-    max_num_checkpoint: int,
     seed: int,
+    is_lora: Optional[bool] = True,
 ):
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
 
     save_name = os.path.join(path, f"checkpoint-{global_step}.pt")
 
+    full_state_dict = model.state_dict()
+    if is_lora == False:
+        filtered_state_dict = full_state_dict
+    else:
+        lora_state_dict = {
+            k: v
+            for k, v in full_state_dict.items()
+            if ("lora_" in k) or ("gnn" in k) or ("nvib" in k)
+        }
+        filtered_state_dict = lora_state_dict
+        # Print out the keys being saved
+        print("Saving the following LoRA parameters:")
+        for key in lora_state_dict.keys():
+            print(f" - {key}")
+
     checkpoint = {
         "seed": seed,
         "global_step": global_step,
-        "model_state_dict": model.state_dict(),
-        "optimizer_state_dict": optimizer.state_dict(),
-        "scheduler_state_dict": scheduler.state_dict(),
+        "model_state_dict": filtered_state_dict,
     }
 
     # save checkpoint
@@ -269,12 +280,18 @@ def load_checkpoint(
     return checkpoint
 
 
-def extract_code_block(markdown: str) -> Optional[str]:
-    cleaned = re.sub(r"<\|/?fuzz\|>", "", markdown)
+def extract_code_block(text):
+    """
+    Extracts the last code block enclosed in triple backticks from a string.
+    Returns the last code block string (without the backticks).
+    """
 
-    pattern = r"```(?:\w+)?\n([\s\S]*?)```"
-    match = re.search(pattern, cleaned)
-    if match:
-        return match.group(1)
-
-    return cleaned
+    # Regex:
+    # ``` (optional language identifier) newline
+    # (capture everything until next ``` )
+    pattern = r"```(?:[a-zA-Z0-9_+-]*)\n(.*?)```"
+    extracted = re.findall(pattern, text, flags=re.DOTALL)
+    if len(extracted) != 0:
+        return extracted[-1]
+    else:
+        return ""
