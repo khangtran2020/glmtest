@@ -11,7 +11,6 @@ from utils.utils import seed_everything
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
-# from model.model import GLMFModelForCausalLM
 from transformers.models.qwen2.modeling_qwen2 import Qwen2RotaryEmbedding
 from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding
 from ring_flash_attn.zigzag_ring_flash_attn import zigzag_ring_flash_attn_func

@@ -5,6 +5,7 @@ from model.glmffuzz import GLMFModelFuzzing
 from rich.console import Console
 from argparse import Namespace
 from transformers import PreTrainedTokenizer
+from train.utils import load_checkpoint
 from utils.constant import (
     GRAPH_START_TOKEN,
     GRAPH_PAD_TOKEN,
@@ -20,9 +21,13 @@ def get_model(
     device: torch.device,
 ):
     if args.mode == "train":
-        return get_model_train(args=args, console=console, tokenizer=tokenizer, rank=rank)
+        return get_model_train(
+            args=args, console=console, tokenizer=tokenizer, rank=rank
+        )
     elif args.mode == "test":
-        return get_model_test(args=args, console=console, tokenizer=tokenizer, rank=rank)
+        return get_model_test(
+            args=args, console=console, tokenizer=tokenizer, rank=rank
+        )
     elif args.mode == "testgen":
         return get_model_testgen(
             args=args,
@@ -561,3 +566,25 @@ def get_model_testgen(
     else:
         model = None
     return model
+
+
+def continue_training_from_checkpoint(
+    args: Namespace,
+    model: GLMFModelForCausalLM,
+    optimizer: torch.optim.Optimizer,
+    lr_scheduler: torch.optim.lr_scheduler._LRScheduler,
+    local_rank: int,
+):
+    if args.continue_training:
+
+        assert args.checkpoint_path is not None, "Checkpoint path must be specified."
+        check_point = load_checkpoint(path=args.checkpoint_path, rank=local_rank)
+
+        model.load_state_dict(check_point["model_state_dict"])
+        optimizer.load_state_dict(check_point["optimizer_state_dict"])
+        lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
+        start_step = check_point["global_step"]
+    else:
+        start_step = -1
+
+    return model, optimizer, lr_scheduler, start_step
