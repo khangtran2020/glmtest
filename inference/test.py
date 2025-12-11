@@ -463,11 +463,13 @@ def validate(
                 if multi_gpu:
                     all_losses = accelerator.gather(loss)
                     all_losses = torch.where(torch.isnan(all_losses), 0.0, all_losses)
+                    all_losses = all_losses.to("cpu").detach().float()
                     total_loss = torch.sum(all_losses)
-                    batch_loss += total_loss.item()
-                    del all_losses, total_loss
+                    batch_loss += total_loss.to("cpu").detach().float().item()
                 else:
-                    batch_loss += loss.item()
+                    batch_loss += loss.to("cpu").detach().float().item()
+
+                # logging_gpu_usage(step=step, console=console)
 
                 for key in micro_input.keys():
                     micro_input[key] = micro_input[key].to("cpu")

@@ -5,7 +5,6 @@ from model.glmffuzz import GLMFModelFuzzing
 from rich.console import Console
 from argparse import Namespace
 from transformers import PreTrainedTokenizer
-from train.utils import load_checkpoint
 from utils.constant import (
     GRAPH_START_TOKEN,
     GRAPH_PAD_TOKEN,
@@ -21,13 +20,9 @@ def get_model(
     device: torch.device,
 ):
     if args.mode == "train":
-        return get_model_train(
-            args=args, console=console, tokenizer=tokenizer, rank=rank
-        )
+        return get_model_train(args=args, console=console, tokenizer=tokenizer, rank=rank)
     elif args.mode == "test":
-        return get_model_test(
-            args=args, console=console, tokenizer=tokenizer, rank=rank
-        )
+        return get_model_test(args=args, console=console, tokenizer=tokenizer, rank=rank)
     elif args.mode == "testgen":
         return get_model_testgen(
             args=args,
@@ -64,7 +59,6 @@ def get_model_train(
             lora_dropout=args.lora_dropout,
             lora_target_modules=args.lora_target_modules,
             device_map="cuda" if torch.cuda.is_available() else "cpu",
-            use_flash_attn=args.use_flash_attn,
         )
 
         layer_indices = [
@@ -77,7 +71,6 @@ def get_model_train(
             baseline_prompt=args.baseline_prompt,
             debug=args.debug,
             rank=rank,
-            gnn_type=args.gnn_type,
             multi_gpu=True if args.num_gpu > 1 else False,
             is_training=True,
         )
@@ -94,6 +87,7 @@ def get_model_train(
                     state_dict = torch.load(
                         os.path.join(args.model_weight_path, file),
                         map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+                        weights_only=True,
                     )
                     glmf_model.load_state_dict(state_dict)
 
@@ -112,7 +106,6 @@ def get_model_train(
             lora_dropout=args.lora_dropout,
             lora_target_modules=args.lora_target_modules,
             device_map="cuda" if torch.cuda.is_available() else "cpu",
-            use_flash_attn=args.use_flash_attn,
         )
 
         config.graph_token_id = [
@@ -152,39 +145,84 @@ def get_model_train(
                 if "nvib_layer" in name:
                     param.requires_grad = True
                     console.log(f"Parameter {name} is set to be trainable.")
-
     else:
+        if args.model_weight_path is not None:
 
-        use_lora = False if args.only_gnn else args.use_lora
+            config = GLMFModelConfig(
+                llm_model=args.llm_model,
+                use_lora=False,
+                dtype=args.dtype,
+                mode=args.gnn_mode,
+                in_feats=args.in_feats,
+                n_hidden=args.n_hidden,
+                n_layers=args.n_layers,
+                num_head=args.num_head,
+                dropout=args.dropout,
+                lora_r=args.lora_r,
+                lora_alpha=args.lora_alpha,
+                lora_dropout=args.lora_dropout,
+                lora_target_modules=args.lora_target_modules,
+                device_map="cuda" if torch.cuda.is_available() else "cpu",
+            )
 
-        config = GLMFModelConfig(
-            llm_model=args.llm_model,
-            use_lora=use_lora,
-            dtype=args.dtype,
-            mode=args.gnn_mode,
-            in_feats=args.in_feats,
-            n_hidden=args.n_hidden,
-            n_layers=args.n_layers,
-            num_head=args.num_head,
-            dropout=args.dropout,
-            lora_r=args.lora_r,
-            lora_alpha=args.lora_alpha,
-            lora_dropout=args.lora_dropout,
-            lora_target_modules=args.lora_target_modules,
-            device_map="cuda" if torch.cuda.is_available() else "cpu",
-            use_flash_attn=args.use_flash_attn,
-        )
+            model = GLMFModelForCausalLM(
+                config=config,
+                tokenizer=tokenizer,
+                baseline_prompt=args.baseline_prompt,
+                multi_gpu=True if args.num_gpu > 1 else False,
+                debug=args.debug,
+                rank=rank,
+                is_training=False,
+            )
 
-        model = GLMFModelForCausalLM(
-            config=config,
-            tokenizer=tokenizer,
-            baseline_prompt=args.baseline_prompt,
-            multi_gpu=True if args.num_gpu > 1 else False,
-            debug=args.debug,
-            rank=rank,
-            gnn_type=args.gnn_type,
-            is_training=True,
-        )
+            for file in os.listdir(args.model_weight_path):
+                if file.endswith(".pt"):
+                    state_dict = torch.load(
+                        os.path.join(args.model_weight_path, file),
+                        map_location="cpu",
+                        weights_only=True,
+                    )
+                    model.load_state_dict(state_dict)
+                    console.log(
+                        f"[red]Model weights loaded from {os.path.join(args.model_weight_path, file)}[/red]"
+                    )
+
+            model.init_for_train(tokenizer=tokenizer, rank=rank)
+            # make the model to bf16/fp16
+            for n, p in model.named_parameters():
+                if args.dtype == "bf16":
+                    if p.dtype != torch.bfloat16:
+                        p.data = p.data.to(torch.bfloat16)
+                elif args.dtype == "fp16":
+                    if p.dtype != torch.float16:
+                        p.data = p.data.to(torch.float16)
+
+        else:
+            config = GLMFModelConfig(
+                llm_model=args.llm_model,
+                use_lora=args.use_lora,
+                dtype=args.dtype,
+                mode=args.gnn_mode,
+                in_feats=args.in_feats,
+                n_hidden=args.n_hidden,
+                n_layers=args.n_layers,
+                num_head=args.num_head,
+                dropout=args.dropout,
+                lora_r=args.lora_r,
+                lora_alpha=args.lora_alpha,
+                lora_dropout=args.lora_dropout,
+                lora_target_modules=args.lora_target_modules,
+                device_map="cuda" if torch.cuda.is_available() else "cpu",
+            )
+            model = GLMFModelForCausalLM(
+                config=config,
+                tokenizer=tokenizer,
+                baseline_prompt=args.baseline_prompt,
+                multi_gpu=True if args.num_gpu > 1 else False,
+                debug=args.debug,
+                rank=rank,
+                is_training=True,
+            )
 
         model.llm_model.gradient_checkpointing_enable()
         model.config.graph_token_id = [
@@ -196,63 +234,6 @@ def get_model_train(
         console.log(
             f"Attention implementation of the model is: {model.llm_model.config._attn_implementation}"
         )
-
-    if args.only_gnn:
-
-        # freeze all params first
-        for param in model.parameters():
-            param.requires_grad = False
-
-        # unfreeze GNN params
-        for name, param in model.named_parameters():
-            if "gnn" in name:
-                param.requires_grad = True
-                console.log(f"Parameter {name} is set to be trainable.")
-
-        # Count trainable parameters
-        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        console.log(
-            f"[blue] Only GNN training mode activated. Total trainable parameters: {trainable_params} [/blue]"
-        )
-
-    if args.train_reasoning:
-        console.log(f"[blue] Training with reasoning mode activated. [/blue]")
-    if args.model_weight_path is not None:
-        for file in os.listdir(args.model_weight_path):
-            if file.endswith(".pt"):
-                state_dict = torch.load(
-                    os.path.join(args.model_weight_path, file),
-                    map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-                )
-                if "current_checkpoint" in args.model_weight_path:
-                    state_dict = state_dict["model_state_dict"]
-
-                gnn_state_dict = {
-                    k: v
-                    for k, v in state_dict.items()
-                    if (("gnn" in k.lower()) and ("last_layer" not in k.lower()))
-                }
-
-                missing_keys, unexpected_keys = model.load_state_dict(
-                    gnn_state_dict, strict=False
-                )
-
-                if missing_keys:
-                    console.log(
-                        f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
-                    )
-                if unexpected_keys:
-                    console.log(
-                        f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
-                    )
-                    # Log sample of unexpected keys for debugging
-                    sample_unexpected = list(unexpected_keys)[:3]
-                    console.log(
-                        f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
-                    )
-
-                console.log(f"[red]Model weights loaded from {file}[/red]")
-
     return model
 
 
@@ -262,21 +243,13 @@ def get_model_test(
     tokenizer: PreTrainedTokenizer,
     rank: int,
 ):
-    if rank == -1:
-        device = torch.device("cpu")
-    else:
-        device = torch.device(f"cuda:{rank}")
     # load model
     assert (
         args.model_weight_path is not None
     ), "Model directory must be specified for testing."
 
-    if (
-        "current_checkpoint" in args.model_weight_path
-        or "best_model" in args.model_weight_path
-    ):
+    if "current_checkpoint" in args.model_weight_path:
         use_lora = True
-        console.log(f"[green]Using LoRA weights for testing.[/green]")
     else:
         use_lora = False
 
@@ -300,7 +273,6 @@ def get_model_test(
             lora_dropout=args.lora_dropout,
             lora_target_modules=args.lora_target_modules,
             device_map="cuda" if torch.cuda.is_available() else "cpu",
-            use_flash_attn=args.use_flash_attn,
         )
 
         layer_indices = [
@@ -312,7 +284,6 @@ def get_model_test(
             baseline_prompt=args.baseline_prompt,
             debug=args.debug,
             rank=rank,
-            gnn_type=args.gnn_type,
             multi_gpu=True if args.num_gpu > 1 else False,
             is_training=False,
         )
@@ -377,7 +348,6 @@ def get_model_test(
             lora_dropout=args.lora_dropout,
             lora_target_modules=args.lora_target_modules,
             device_map="cuda",
-            use_flash_attn=args.use_flash_attn,
         )
 
         model = GLMFModelForCausalLM(
@@ -386,7 +356,6 @@ def get_model_test(
             baseline_prompt=args.baseline_prompt,
             debug=args.debug,
             rank=rank,
-            gnn_type=args.gnn_type,
             multi_gpu=True if args.num_gpu > 1 else False,
             is_training=False,
         )
@@ -398,66 +367,17 @@ def get_model_test(
         ]
 
     # take .pt file from the model_weight_path
-    if args.model_weight_path.endswith(".pt"):
-        console.log(f"[red]Loading weight from {args.model_weight_path}[/red]")
-        state_dict = torch.load(
-            args.model_weight_path,
-            map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-        )
-        console.log(f"[green]Using LoRA weights for testing: {use_lora}.[/green]")
-        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
-        if missing_keys:
-            console.log(
-                f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
+    console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
+    for file in os.listdir(args.model_weight_path):
+        if file.endswith(".pt"):
+            state_dict = torch.load(
+                os.path.join(args.model_weight_path, file),
+                map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
             )
-            sample_missing_keys = list(missing_keys)[:10]
-            console.log(
-                f"[yellow]Sample missing keys: {sample_missing_keys}...[/yellow]"
-            )
-        if unexpected_keys:
-            console.log(
-                f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
-            )
-            # Log sample of unexpected keys for debugging
-            sample_unexpected = list(unexpected_keys)[:10]
-            console.log(
-                f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
-            )
-    else:
-        console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
-        for file in os.listdir(args.model_weight_path):
-            if file.endswith(".pt"):
-                state_dict = torch.load(
-                    os.path.join(args.model_weight_path, file),
-                    map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-                )
-                console.log(
-                    f"[green]Using LoRA weights for testing: {use_lora}.[/green]"
-                )
-                # for key in list(state_dict.keys()):
-                if "current_checkpoint" in args.model_weight_path:
-                    state_dict = state_dict["model_state_dict"]
-                    missing_keys, unexpected_keys = model.load_state_dict(
-                        state_dict, strict=False
-                    )
-
-                    if missing_keys:
-                        console.log(
-                            f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
-                        )
-                    if unexpected_keys:
-                        console.log(
-                            f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
-                        )
-                        # Log sample of unexpected keys for debugging
-                        sample_unexpected = list(unexpected_keys)[:3]
-                        console.log(
-                            f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
-                        )
-
-    if use_lora:
-        model.llm_model = model.llm_model.merge_and_unload()
-    console.log(f"[red]Model weights loaded from {args.model_weight_path}[/red]")
+            model.load_state_dict(state_dict)
+            if use_lora:
+                model.llm_model = model.llm_model.merge_and_unload()
+            console.log(f"[red]Model weights loaded from {file}[/red]")
 
     # model = model.to(dtype=torch.float)
     # unifying dtype to avoid errors
@@ -465,20 +385,13 @@ def get_model_test(
         if args.dtype == "bf16":
             if p.dtype != torch.bfloat16:
                 p.data = p.data.to(torch.bfloat16)
-            if p.device != device:
-                p.data = p.data.to(device)
         elif args.dtype == "fp16":
             if p.dtype != torch.float16:
                 p.data = p.data.to(torch.float16)
-            if p.device != device:
-                p.data = p.data.to(device)
 
-    # console.log(f"Model is loaded to device: {model.device} - with type {model.dtype}")
-    # for name, param in model.named_parameters():
-    #     if "gnn" in name:
-    #         console.log(
-    #             f"[yellow]Parameter {name}, dtype: {param.dtype}, devices: {param.device}[/yellow]"
-    #         )
+    console.log(f"Model is loaded to device: {model.device} - with type {model.dtype}")
+    for name, param in model.named_parameters():
+        console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
     return model
 
 
@@ -494,9 +407,7 @@ def get_model_testgen(
         args.model_weight_path is not None
     ), "Model directory must be specified for testing."
 
-    if ("current_checkpoint" in args.model_weight_path) or (
-        "best_model" in args.model_weight_path
-    ):
+    if "current_checkpoint" in args.model_weight_path:
         use_lora = True
     else:
         use_lora = False
@@ -522,7 +433,6 @@ def get_model_testgen(
                 lora_dropout=args.lora_dropout,
                 lora_target_modules=args.lora_target_modules,
                 device_map="cuda" if torch.cuda.is_available() else "cpu",
-                use_flash_attn=args.use_flash_attn,
             )
 
             layer_indices = [
@@ -534,7 +444,6 @@ def get_model_testgen(
                 baseline_prompt=args.baseline_prompt,
                 debug=args.debug,
                 rank=rank,
-                gnn_type=args.gnn_type,
                 multi_gpu=True if args.num_gpu > 1 else False,
                 is_training=False,
             )
@@ -560,7 +469,6 @@ def get_model_testgen(
                 lora_dropout=args.lora_dropout,
                 lora_target_modules=args.lora_target_modules,
                 device_map="cuda" if torch.cuda.is_available() else "cpu",
-                use_flash_attn=args.use_flash_attn,
             )
 
             config.graph_token_id = [
@@ -600,7 +508,6 @@ def get_model_testgen(
                 lora_dropout=args.lora_dropout,
                 lora_target_modules=args.lora_target_modules,
                 device_map="cuda",
-                use_flash_attn=args.use_flash_attn,
             )
 
             model = GLMFModelForCausalLM(
@@ -609,7 +516,6 @@ def get_model_testgen(
                 baseline_prompt=args.baseline_prompt,
                 debug=args.debug,
                 rank=rank,
-                gnn_type=args.gnn_type,
                 multi_gpu=True if args.num_gpu > 1 else False,
                 is_training=False,
             )
@@ -619,66 +525,17 @@ def get_model_testgen(
                 tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
                 tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
             ]
-
-        # take .pt file from the model_weight_path
-        if args.model_weight_path.endswith(".pt"):
-            console.log(f"[red]Loading weight from {args.model_weight_path}[/red]")
-            state_dict = torch.load(
-                args.model_weight_path,
-                map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-            )
-            console.log(f"[green]Using LoRA weights for testing: {use_lora}.[/green]")
-            missing_keys, unexpected_keys = model.load_state_dict(
-                state_dict, strict=False
-            )
-            if missing_keys:
-                console.log(
-                    f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
+        console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
+        for file in os.listdir(args.model_weight_path):
+            if file.endswith(".pt"):
+                state_dict = torch.load(
+                    os.path.join(args.model_weight_path, file),
+                    map_location=f"cuda:{rank}" if args.num_gpu >= 1 else "cpu",
                 )
-            if unexpected_keys:
-                console.log(
-                    f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
-                )
-                # Log sample of unexpected keys for debugging
-                sample_unexpected = list(unexpected_keys)[:3]
-                console.log(
-                    f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
-                )
-        else:
-            console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
-            for file in os.listdir(args.model_weight_path):
-                if file.endswith(".pt"):
-                    state_dict = torch.load(
-                        os.path.join(args.model_weight_path, file),
-                        map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-                    )
-                    console.log(
-                        f"[green]Using LoRA weights for testing: {use_lora}.[/green]"
-                    )
-                    # for key in list(state_dict.keys()):
-                    if "current_checkpoint" in args.model_weight_path:
-                        state_dict = state_dict["model_state_dict"]
-                        missing_keys, unexpected_keys = model.load_state_dict(
-                            state_dict, strict=False
-                        )
-
-                        if missing_keys:
-                            console.log(
-                                f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
-                            )
-                        if unexpected_keys:
-                            console.log(
-                                f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
-                            )
-                            # Log sample of unexpected keys for debugging
-                            sample_unexpected = list(unexpected_keys)[:3]
-                            console.log(
-                                f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
-                            )
-
-        if use_lora:
-            model.llm_model = model.llm_model.merge_and_unload()
-        console.log(f"[red]Model weights loaded from {args.model_weight_path}[/red]")
+                model.load_state_dict(state_dict)
+                if use_lora:
+                    model.llm_model = model.llm_model.merge_and_unload()
+                console.log(f"[red]Model weights loaded from {file}[/red]")
 
         # model = model.to(dtype=torch.float)
         # unifying dtype to avoid errors
@@ -694,6 +551,9 @@ def get_model_testgen(
                 if p.device != device:
                     p.data = p.data.to(device)
 
+        console.log(
+            f"Model is loaded to device: {model.device} - with type {model.dtype}"
+        )
         for name, param in model.named_parameters():
             console.log(
                 f"[yellow]Parameter {name}, dtype: {param.dtype}, device: {param.device}[/yellow]"
@@ -701,97 +561,3 @@ def get_model_testgen(
     else:
         model = None
     return model
-
-
-def continue_training_from_checkpoint(
-    args: Namespace,
-    model: torch.nn.Module,
-    rank: int,
-    console: Console,
-    optimizer: torch.optim.Optimizer,
-    lr_scheduler: torch.optim.lr_scheduler._LRScheduler,
-):
-    if args.continue_training:
-        if "best_model" in args.checkpoint_path:
-            model_path = None
-            for file in os.listdir(args.checkpoint_path):
-                if file.endswith(".pt"):
-                    model_path = os.path.join(args.checkpoint_path, file)
-                    break
-            state_dict = torch.load(
-                model_path,
-                map_location=f"cuda:{rank}" if torch.cuda.is_available() else "cpu",
-                weights_only=True,
-            )
-            # Get current model's state dict
-            model_dict = model.state_dict()
-
-            # Filter out mismatched keys or shapes
-            filtered_dict = {
-                k: v
-                for k, v in state_dict.items()
-                if k in model_dict and v.shape == model_dict[k].shape
-            }
-
-            # Update the model dict
-            model_dict.update(filtered_dict)
-            model.load_state_dict(model_dict)
-            start_step = int(model_path.split("step")[-1].split(".pt")[0])
-            console.log(
-                f"[cyan]Model weights loaded from {args.checkpoint_path}[/cyan]"
-            )
-        else:
-            assert (
-                args.checkpoint_path is not None
-            ), "Checkpoint path must be specified."
-            check_point = load_checkpoint(path=args.checkpoint_path, rank=rank)
-
-            missing_keys, unexpected_keys = model.load_state_dict(
-                check_point["model_state_dict"], strict=False
-            )
-
-            if missing_keys:
-                console.log(
-                    f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
-                )
-            if unexpected_keys:
-                console.log(
-                    f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
-                )
-                # Log sample of unexpected keys for debugging
-                sample_unexpected = list(unexpected_keys)[:3]
-                console.log(
-                    f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
-                )
-
-            # Load optimizer state if valid
-            try:
-                if "param_groups" in check_point["optimizer_state_dict"]:
-                    optimizer.load_state_dict(check_point["optimizer_state_dict"])
-                    console.log("[cyan]Optimizer state loaded successfully[/cyan]")
-                else:
-                    console.log(
-                        "[yellow]Invalid optimizer state in checkpoint, starting with fresh optimizer[/yellow]"
-                    )
-            except Exception as e:
-                console.log(
-                    f"[yellow]Failed to load optimizer state: {e}. Starting with fresh optimizer[/yellow]"
-                )
-
-            # Load scheduler state if valid
-            try:
-                lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
-                console.log("[cyan]Scheduler state loaded successfully[/cyan]")
-            except Exception as e:
-                console.log(
-                    f"[yellow]Failed to load scheduler state: {e}. Starting with fresh scheduler[/yellow]"
-                )
-
-            start_step = check_point["global_step"]
-            console.log(
-                f"[cyan]Checkpoint loaded from {args.checkpoint_path} at step {start_step}[/cyan]"
-            )
-    else:
-        start_step = -1
-
-    return model, start_step, optimizer, lr_scheduler

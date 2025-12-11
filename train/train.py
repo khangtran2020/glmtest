@@ -1,6 +1,6 @@
 import os
 import gc
-import time
+import sys
 import torch
 import wandb
 import shutil
@@ -242,6 +242,8 @@ def train_single_gpu_accelerate(
     device = accelerator.device
     accelerator.print(f"Using {accelerator.num_processes} devices")
     accelerator.print(f"Mixed precision: {mixed_precision}")
+    for name, param in model.named_parameters():
+        console.log(f"Parameter {name} is of dtype {param.dtype}")
 
     tr_dataset = GLMFDataset(
         data=dataset.train_data,
@@ -390,8 +392,10 @@ def train_single_gpu_accelerate(
                     graph_masks = None
                     graph_token_indices = None
 
-                with accelerator.accumulate(model):
-                    forward_start = time.time()
+                with accelerator.accumulate(model), torch.autocast(
+                    device_type="cuda",
+                    dtype=torch.float16 if args.dtype == "fp16" else torch.bfloat16,
+                ):
                     outputs = model(
                         **micro_input,
                         step=global_step,
@@ -686,6 +690,11 @@ def train_multi_gpu_accelerate_ring_attn(
         console.log(f"Distributed type: {accelerator.distributed_type}")
         console.log(f"Number of processes: {accelerator.num_processes}")
         console.log(f"Mixed precision: {mixed_precision}")
+
+        # # Check model dtype
+        # for name, param in model.named_parameters():
+        #     console.log(f"Parameter {name} is of dtype {param.dtype}")
+
     tokenizer = dataset.llm_tokenizer
     tr_dataset = GLMFDataset(
         data=dataset.train_data,
@@ -714,6 +723,11 @@ def train_multi_gpu_accelerate_ring_attn(
         "pin_memory": True,
         "persistent_workers": True,
     }
+
+    if accelerator.is_main_process:
+        logging_train_data(
+            console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
+        )
 
     if not isinstance(tr_dataset, torch.utils.data.IterableDataset):
         dataloader_params["drop_last"] = True
@@ -817,6 +831,12 @@ def train_multi_gpu_accelerate_ring_attn(
                     graph_token_indices = []
 
                     for i in range(batch_size):
+                        graph = batch["graph"][i]
+                        for key in GRAPH_KEYS:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to(device)
+
+                        graph_mask = batch["graph_mask"][i].to(device)
                         graph_token_index = torch.where(
                             micro_input["input_ids"][i] == config.graph_token_id[1]
                         )[0].tolist()
@@ -835,7 +855,10 @@ def train_multi_gpu_accelerate_ring_attn(
 
                 accelerator.wait_for_everyone()
 
-                with accelerator.accumulate(model):
+                with accelerator.accumulate(model), torch.autocast(
+                    device_type="cuda",
+                    dtype=torch.float16 if args.dtype == "fp16" else torch.bfloat16,
+                ):
 
                     outputs = model(
                         **micro_input,
@@ -844,6 +867,7 @@ def train_multi_gpu_accelerate_ring_attn(
                         graph_masks=graph_masks,
                         graph_token_indices=graph_token_indices,
                         step=global_step,
+                        output_hidden_states=True,
                         accelerator=accelerator,
                         ring_attn=True,
                     )
@@ -855,6 +879,20 @@ def train_multi_gpu_accelerate_ring_attn(
                     #     f"Loss at rank {accelerator.process_index} - step {global_step}: {loss.item()}"
                     # )
                     accelerator.wait_for_everyone()
+
+                    # # check gradient:
+                    # if accelerator.is_main_process:
+                    #     for name, param in model.named_parameters():
+                    #         if param.requires_grad:
+                    #             if param.grad is not None:
+                    #                 console.log(
+                    #                     f"After backward - Parameter {name} grad is {param.grad.norm().item():.4f}"
+                    #                 )
+                    #             else:
+                    #                 console.log(
+                    #                     f"After backward - Parameter {name} grad is None"
+                    #                 )
+                    # sys.exit(0)
 
                 if accelerator.sync_gradients:
 
@@ -872,7 +910,8 @@ def train_multi_gpu_accelerate_ring_attn(
                         torch.isnan(all_losses),
                         torch.zeros_like(all_losses),
                         all_losses,
-                    )
+                    ).to("cpu")
+                    console.log(f"Step {global_step}: gathered losses: {all_losses}")
                     total_loss = torch.sum(all_losses)
                     batch_loss += total_loss.detach().float().item()
 
@@ -986,39 +1025,47 @@ def train_multi_gpu_accelerate_ring_attn(
                     )
                     accelerator.wait_for_everyone()
 
+                    # check model type
+                    # with torch.no_grad():
+                    #     if accelerator.is_main_process:
+                    #         for name, param in model.named_parameters():
+                    #             console.log(
+                    #                 f"After validation - Parameter {name} is of dtype {param.dtype}"
+                    #             )
+
                     if accelerator.is_main_process:
-                        wandb.log({"val_loss": val_loss})
-                        console.log(
-                            f"Validation loss: {val_loss:.4f} at step {global_step}"
-                        )
-
-                        if val_loss < best_val_loss:
-                            best_val_loss = val_loss
+                        with torch.no_grad():
+                            wandb.log({"val_loss": val_loss})
                             console.log(
-                                f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
-                            )
-                            checkpoint_dir = os.path.join(
-                                save_path,
-                                f"best_model",
+                                f"Validation loss: {val_loss:.4f} at step {global_step}"
                             )
 
-                            if not os.path.exists(checkpoint_dir):
-                                os.makedirs(checkpoint_dir, exist_ok=True)
+                            if val_loss < best_val_loss:
+                                best_val_loss = val_loss
+                                console.log(
+                                    f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
+                                )
+                                checkpoint_dir = os.path.join(
+                                    save_path,
+                                    f"best_model",
+                                )
 
-                            unwrapped_model = accelerator.unwrap_model(model)
-                            torch.save(
-                                unwrapped_model.state_dict(),
-                                os.path.join(
-                                    checkpoint_dir, f"model_weight_step{global_step}.pt"
-                                ),
-                            )
-                            tokenizer.save_pretrained(checkpoint_dir)
-                            console.log(
-                                f"[green]Saved best checkpoint to {checkpoint_dir}[/green]"
-                            )
-                            del unwrapped_model
-                            del checkpoint_dir
-                            gc.collect()
+                                if not os.path.exists(checkpoint_dir):
+                                    os.makedirs(checkpoint_dir, exist_ok=True)
+
+                                unwrapped_model = accelerator.unwrap_model(model)
+                                torch.save(
+                                    unwrapped_model.state_dict(),
+                                    os.path.join(checkpoint_dir, "model_weight.pt"),
+                                )
+                                tokenizer.save_pretrained(checkpoint_dir)
+                                accelerator.print(
+                                    f"Saving best checkpoint to {checkpoint_dir}"
+                                )
+                                del unwrapped_model
+                                del checkpoint_dir
+                                gc.collect()
+                    # model.train()
 
                     # No need to restore dtypes - Accelerate handles mixed precision automatically
                     # Converting quantized 4-bit/8-bit weights to bfloat16 would break quantization

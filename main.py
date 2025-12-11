@@ -10,9 +10,10 @@ from data.utils import get_dataset
 from data.core import get_reasoning
 from graph.utils import get_graph
 from train.train import train
-from model.model import get_model, continue_training_from_checkpoint
+from model.model import get_model
 from inference.test import test, eval_bleu_score
 from inference.testcase_generate import testcase_generate
+from train.utils import load_checkpoint
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.optim import AdamW
 from datetime import timedelta
@@ -70,7 +71,6 @@ def main() -> None:
         n_hops=args.n_layers,
         max_tokens=args.max_seq_length,
         raw_overwrite=args.raw_overwrite,
-        gnn_mode=args.gnn_mode,
         repo=args.repo,
     )
     if dataset is None:
@@ -82,122 +82,17 @@ def main() -> None:
         console.log("Data processing completed. Exiting as mode is 'data'.")
         return
 
-    if not args.baseline_skip_prepare_data:
-        if args.mode == "testgen" or (
-            args.mode == "baseline" and args.baseline_on_testgen
-        ):
-            if args.module_path is None:
-                dataset.prepare_data_for_test_gen(branch_limit=args.branch_limit)
-                for data_n in dataset.processed_data.keys():
-                    console.log(
-                        f"[blue]Number of test cases for {data_n}: {len(dataset.processed_data[data_n])}[/blue]"
-                    )
-        elif (args.mode == "prepare_reasoning") or (
-            (args.mode == "train") and args.train_reasoning
-        ):
-            dataset.prepare_reasoning_data()
-        else:
-            dataset.prepare_data()
-
-    if args.mode == "generate_reasoning":
-        dataset.filter_by_max_min_tokens(max_tokens=8192, min_tokens=100)
-        dataset.sample_for_reasoning(max_samples=10000)
-        reasoning_save_path = os.path.join(
-            dataset.data_path,
-            "reasoning.jsonl",
-        )
-        if os.path.exists(reasoning_save_path):
-            console.log(
-                f"[yellow]Reasoning file already exists at {reasoning_save_path}[/yellow]"
-            )
-            with open(reasoning_save_path, "r") as f:
-                generated_reasoning = [json.loads(line) for line in f.readlines()]
-
-            generated_keys = list(
-                set([list(obj.keys())[0] for obj in generated_reasoning])
-            )
-            samples = dataset.processed_data["train"]
-            repo_dict = {}
-            for key in samples.keys():
-                repo = key.split("-")[0]
-                if repo not in repo_dict:
-                    repo_dict[repo] = []
-                repo_dict[repo].append(key)
-
-            removed_keys = []
-            for key in generated_keys:
-                repo = key.split("-")[0]
-                if key in repo_dict[repo]:
-                    repo_dict[repo].remove(key)
-                    removed_keys.append(key)
-
-            remain_keys = [key for key in generated_keys if key not in removed_keys]
-            for key in remain_keys:
-                repo = key.split("-")[0]
-                chosen_key = random.choice(repo_dict[repo])
-                repo_dict[repo].remove(chosen_key)
-
-            samples_to_generate = {}
-            for repo in repo_dict:
-                for key in repo_dict[repo]:
-                    samples_to_generate[key] = samples[key]
-        else:
-            samples_to_generate = dataset.processed_data["train"]
-
-        console.log(
-            f"[green]Generating reasoning for dataset and saving to {reasoning_save_path}[/green]"
-        )
-        reason_dict = get_reasoning(
-            samples=samples_to_generate,
-            api_key=args.reason_api_key,
-            console=console,
-            max_tokens=512,
-            model=args.reason_model,
-            save_path=reasoning_save_path,
-        )
-        return  # exit after getting reasoning
-
-    if args.mode == "baseline":
-        if args.baseline_prompt_type == "prompt_engineer":
-            pe = PromptEngineer(
-                args=args,
-                model=args.baseline_llm_model,
-                api_key=args.baseline_api_key,
-                console=console,
-            )
-            pe.run_prompt_engineering(
-                dataset=dataset,
-                prompt_type=args.baseline_prompt_type,
-                temperature=args.baseline_temp,
-                output_path=args.baseline_output_path,
-                output_name=args.baseline_output_name,
-                max_tokens=args.baseline_max_tokens,
-                on_processed_data=args.baseline_on_testgen,
-            )
-            console.log(
-                "Baseline Prompt Engineer completed. Exiting as mode is 'baseline'."
-            )
-            return
-        elif args.baseline_prompt_type == "codamosa":
-            if not os.path.exists(os.path.join(dataset.data_path, "test_module.jsonl")):
-                raise FileNotFoundError(
-                    "test_module.jsonl not found, please crawl the data"
-                )
-            with open(os.path.join(dataset.data_path, "test_module.jsonl"), "r") as f:
-                task_instances = [json.loads(line) for line in f.readlines()]
-            run_codamosa(args=args, task_instances=task_instances, console=console)
-            return
-
-    if args.mode != "testgen":
-        dataset.filter_by_max_min_tokens(
-            max_tokens=args.max_seq_length, min_tokens=args.min_seq_length
-        )
+    if args.mode == "testgen":
+        if args.module_path is None:
+            dataset.prepare_data_for_test_gen()
+    else:
+        dataset.prepare_data()
 
     if args.repo is not None:
         dataset.prepare_data_by_repo()
 
     dataset.train_test_split(
-        val_split=int(1000), test_only=True if "test" in args.mode else False
+        val_split=100, test_only=True if args.mode == "testgen" else False
     )
 
     if torch.cuda.is_available():
@@ -247,45 +142,25 @@ def main() -> None:
             value = [dataset.llm_tokenizer.convert_tokens_to_ids(v) for v in value]
             console.log(f"[cyan]{key}[/cyan]: {value}")
 
-    # unifying dtype to avoid errors
     model = get_model(
         args=args,
-        tokenizer=dataset.llm_tokenizer,
-        rank=rank,
-        device=device,
         console=console,
+        tokenizer=dataset.llm_tokenizer,
+        rank=local_rank,
+        device=device,
     )
 
-    for n, p in model.named_parameters():
-        if args.dtype == "bf16":
-            if p.dtype != torch.bfloat16:
-                p.data = p.data.to(torch.bfloat16)
-        elif args.dtype == "fp16":
-            if p.dtype != torch.float16:
-                p.data = p.data.to(torch.float16)
-
-    # for name, param in model.named_parameters():
-    #     console.log(f"[blue]RANK {rank}: Parameter {name}, dtype {param.dtype}[/blue]")
-
     if args.mode == "train":
-        if args.num_gpu > 1:
-            timeout_long_ncll = timedelta(seconds=90000)  # 100 minutes
-            init_process_group("nccl", timeout=timeout_long_ncll)
 
-        optimizer = AdamW(
-            filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
-        )
+        if args.debug:
+            console.log("Model & tokenizer loaded")
+            console.log(
+                f"Special tokens added to tokenizer and model: {model.config.graph_token_id}"
+            )
+
+        optimizer = AdamW(model.parameters(), lr=args.learning_rate)
         lr_scheduler = CosineAnnealingLR(optimizer, T_max=100, eta_min=5e-8)
 
-        num_params = 0
-        for i, param_group in enumerate(optimizer.param_groups):
-            group_params = sum(
-                p.numel() for p in param_group["params"] if p.requires_grad
-            )
-            num_params += group_params
-        console.log(
-            f"[yellow]Total parameters tracked by optimizer: {num_params}[/yellow]"
-        )
         if args.continue_training:
             model, start_step, optimizer, lr_scheduler = (
                 continue_training_from_checkpoint(
@@ -314,23 +189,12 @@ def main() -> None:
         )
 
     elif args.mode == "test":
-        # model = get_model(
-        #     args=args,
-        #     tokenizer=dataset.llm_tokenizer,
-        #     rank=rank,
-        #     device=device,
-        #     console=console,
-        # )
+
         test(args=args, dataset=dataset, model=model, console=console)
 
     elif args.mode == "testgen":
-        # model = get_model(
-        #     args=args,
-        #     tokenizer=dataset.llm_tokenizer,
-        #     rank=rank,
-        #     device=device,
-        #     console=console,
-        # )
+
+        console.log(f"[green]Using device: {device}[/green]")
         testcase_generate(
             args=args,
             dataset=dataset,

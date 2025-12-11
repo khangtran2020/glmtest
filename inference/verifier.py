@@ -135,6 +135,16 @@ def query_prompt(
     else:
         raise TypeError("Unsupported client type provided.")
 
+    # except Exception as e:
+    #     print(f"An error occurred during query: {e}")
+    #     return {
+    #         "success": False,
+    #         "content": str(e),
+    #         "model": model,
+    #         "usage": {"input_tokens": 0, "output_tokens": 0},
+    #         "stop_reason": None,
+    #     }
+
 
 def verify_test_case(
     test_case: str,
@@ -157,3 +167,91 @@ def verify_test_case(
         "refactored_code": refactored_code,
         "varifier_output": varifier_output,
     }
+
+
+# def run(args):
+#     print(
+#         {
+#             "input_file": args.input_file,
+#             "output_file": args.output_file,
+#             "model": args.model,
+#         }
+#     )
+#     # api_dict = None
+#     with open(args.api_file) as f:
+#         api_dict = json.load(f)
+
+#     if args.model.startswith("o3-mini") or "gpt" in args.model:
+#         api_key = api_dict["gpt"]
+#     elif "deepseek" in args.model:
+#         api_key = api_dict["deepseek"]
+#     elif "gemini" in args.model:
+#         api_key = api_dict["gemini"]
+#     elif "claude" in args.model:
+#         api_key = api_dict["claude"]
+
+#     client = init_api(model=args.model, api_key=api_key)
+
+#     # read data: the json file from the input_file
+#     input_data = []
+#     with open(args.input_file) as f:
+#         for line in f:
+#             line = line.strip()
+#             if not line:
+#                 continue
+#             input_data.append(json.loads(line))
+
+#     result_dict = {}
+
+#     # process each data point to query:
+#     for inputTemp in input_data:
+#         uuid = inputTemp["uuid"]
+#         module = inputTemp["code_src"]
+#         branch = inputTemp["branches"]
+#         for item in branch:
+#             key = KEY_TEMPLATE.format(uuid, item)
+#             print(f"Key: {key}")
+#             execution_branch = ""
+#             test = branch[item]
+#             for t_branch in test:
+#                 item_str = "->".join(str(x) for x in t_branch)
+#                 execution_branch += f"{item_str}\n"
+
+#             prompt = PROMPT_COT.format(module=module, execution_branch=execution_branch)
+#             response = query_prompt(
+#                 prompt=prompt,
+#                 client=client,
+#                 model=args.model,
+#                 temperature=args.temperature,
+#                 max_tokens=args.max_tokens,
+#                 reasoning=args.reasoning,
+#             )
+#             result_dict[key] = response
+
+#             # write the result_dict to the output file
+#             with open(args.output_file, "w") as f:
+#                 json.dump(result_dict, f, indent=2)
+
+
+# if __name__ == "__main__":
+#     parser = argparse.ArgumentParser(description="Process some prompts.")
+#     parser.add_argument("--input_file", type=str, help="Path to the input file")
+#     parser.add_argument("--output_file", type=str, help="Path to the output file")
+#     parser.add_argument("--api_file", type=str, help="API File")
+#     parser.add_argument(
+#         "--model",
+#         type=str,
+#         default="o3-mini-2025-01-31",
+#         help="Model to use for generation",
+#     )
+#     parser.add_argument(
+#         "--temperature", type=float, default=1, help="Temperature for generation"
+#     )
+#     parser.add_argument(
+#         "--max_tokens", type=int, default=4096, help="Maximum tokens for generation"
+#     )
+#     parser.add_argument(
+#         "--reasoning", type=str, default="medium", help="Reasoning Effort"
+#     )
+#     args = parser.parse_args()
+#     run(args)

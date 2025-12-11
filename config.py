@@ -59,30 +59,6 @@ def add_data_group(group):
         help="repo to use for training",
         default=None,
     )
-    group.add_argument(
-        "--old_data_path", type=str, help="path to old data for graph sampling"
-    )
-    group.add_argument("--get_reason", action="store_true", help="get reason from llm")
-    group.add_argument(
-        "--reason_model", type=str, help="model to get reason", default=None
-    )
-    group.add_argument(
-        "--reason_api_key", type=str, help="api key for reason model", default=None
-    )
-    group.add_argument(
-        "--prefetch_data",
-        action="store_true",
-        help="prefetch all data into memory for faster loading",
-    )
-    group.add_argument(
-        "--data_cache_size",
-        type=int,
-        default=128,
-        help="LRU cache size for data loading",
-    )
-    # group.add_argument(
-    #     "--reasoning_save_path", type=str, help="api key for reason model", default=None
-    # )
 
 
 def add_joern_group(group):
@@ -488,71 +464,6 @@ def add_testgen_group(group):
         type=str,
         help="api key for the verifier model",
         default=None,
-    )
-    group.add_argument("--branch_limit", type=int, help="branch limit", default=10000)
-
-
-def add_baseline_group(group):
-    group.add_argument(
-        "--baseline_type",
-        type=str,
-        help="type of baseline to use",
-        default="prompt_engineer",
-    )
-    group.add_argument(
-        "--baseline_on_testgen",
-        action="store_true",
-        help="use baseline on test case generation",
-    )
-    group.add_argument(
-        "--baseline_llm_model", type=str, help="baseline llm model", default=None
-    )
-    group.add_argument(
-        "--baseline_api_key",
-        type=str,
-        help="api key for the baseline llm model",
-        default=None,
-    )
-    group.add_argument(
-        "--baseline_output_path",
-        type=str,
-        help="path to save baseline outputs",
-        default=None,
-    )
-    group.add_argument(
-        "--baseline_sif_path",
-        type=str,
-        help="path to jif file for baseline generation",
-        default=None,
-    )
-    group.add_argument(
-        "--baseline_output_name",
-        type=str,
-        help="file path for baseline generation",
-        default=None,
-    )
-    group.add_argument(
-        "--baseline_prompt_type",
-        type=str,
-        help="type of prompt to use",
-        default="zero_shot",
-    )
-    group.add_argument(
-        "--baseline_temp", type=float, help="temperature for baseline", default=0.01
-    )
-    group.add_argument(
-        "--baseline_max_tokens", type=int, help="max tokens for baseline", default=512
-    )
-    group.add_argument(
-        "--baseline_tmp_dir",
-        type=str,
-        help="temp dir for baseline",
-        default="./results/temp",
-    )
-    group.add_argument(
-        "--baseline_skip_prepare_data",
-        action="store_true",
-        help="skip data preparation for baseline",
     )
 
 
