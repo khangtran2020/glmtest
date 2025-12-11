@@ -18,4 +18,4 @@ pip install ring-flash-attn
 pip install flash-attn==2.7.2.post1 --no-build-isolation
 
 # install other packages
-pip install rich numpy pandas cpgqls_client nest-asyncio coverage scikit-learn anthropic openai GitPython
+pip install rich numpy pandas cpgqls_client nest-asyncio coverage scikit-learn anthropic openai GitPython wandb

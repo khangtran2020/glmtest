@@ -1,6 +1,5 @@
 import os
 import re
-import sys
 import ast
 import json
 import torch
@@ -8,23 +7,19 @@ import random
 import anthropic
 import numpy as np
 import pandas as pd
-import networkx as nx
 from tqdm import tqdm
 from torch_geometric.data import HeteroData
-from rich.progress import Progress
 from rich.console import Console
 from rich.pretty import pretty_repr
 from graph.core import Graph
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from branch.utils import run_coverage, get_all_branch
 from utils.utils import run_command, get_index_by_value, get_depth
-from utils.code_analyzer import analyze_code, remove_method_from_class
 from sklearn.preprocessing import LabelEncoder
 from copy import deepcopy
-from model.gnn import GRAPH_KEYS
 
 # typing
-from typing import List, Union, Dict, Any, Optional
+from typing import List, Union, Dict, Optional
 
 PROMPT_TEMPLATE = """# INSTRUCTION: You are an AI agent that generates executable Python test cases targeting a specific execution branch of a module.
 

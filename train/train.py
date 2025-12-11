@@ -1,12 +1,11 @@
 import os
 import gc
-import sys
+import json
+import time
 import torch
 import wandb
 import shutil
-import torch.distributed as dist
 from rich import print as pprint
-from rich.pretty import pretty_repr
 from functools import partial
 from model.gnn import GRAPH_KEYS
 from torch.utils.data import DataLoader, WeightedRandomSampler
@@ -14,6 +13,7 @@ from data.core import Data
 from data.loader import GLMFDataset, collate_fn
 from model.model import GLMFModelForCausalLM
 from accelerate import Accelerator
+from accelerate import DeepSpeedPlugin
 from transformers.trainer_utils import seed_worker
 from rich.progress import (
     Progress,
@@ -25,10 +25,7 @@ from rich.progress import (
     MofNCompleteColumn,
     TaskProgressColumn,
 )
-from train.utils import (
-    patch_model,
-    save_checkpoint,
-)
+from train.utils import save_checkpoint
 from inference.test import validate
 from utils.utils import log_ram_usage
 from collections import deque
@@ -97,34 +94,19 @@ def train(
             collate_fn=collate_fn_,
         )
     else:
-        if args.ring_attn:
-            train_multi_gpu_accelerate_ring_attn(
-                args=args,
-                dataset=dataset,
-                console=console,
-                optimizer=optimizer,
-                lr_scheduler=lr_scheduler,
-                continue_training=continue_training,
-                start_step=start_step,
-                mixed_precision=mixed_precision,
-                model=model,
-                max_num_checkpoint=max_num_checkpoint,
-                collate_fn=collate_fn_,
-            )
-        else:
-            train_multi_gpu_accelerate(
-                args=args,
-                dataset=dataset,
-                console=console,
-                optimizer=optimizer,
-                lr_scheduler=lr_scheduler,
-                continue_training=continue_training,
-                start_step=start_step,
-                mixed_precision=mixed_precision,
-                model=model,
-                max_num_checkpoint=max_num_checkpoint,
-                collate_fn=collate_fn_,
-            )
+        train_multi_gpu_accelerate(
+            args=args,
+            dataset=dataset,
+            console=console,
+            optimizer=optimizer,
+            lr_scheduler=lr_scheduler,
+            continue_training=continue_training,
+            start_step=start_step,
+            mixed_precision=mixed_precision,
+            model=model,
+            max_num_checkpoint=max_num_checkpoint,
+            collate_fn=collate_fn_,
+        )
 
 
 def logging_train_data(
@@ -242,8 +224,6 @@ def train_single_gpu_accelerate(
     device = accelerator.device
     accelerator.print(f"Using {accelerator.num_processes} devices")
     accelerator.print(f"Mixed precision: {mixed_precision}")
-    for name, param in model.named_parameters():
-        console.log(f"Parameter {name} is of dtype {param.dtype}")
 
     tr_dataset = GLMFDataset(
         data=dataset.train_data,
@@ -392,10 +372,8 @@ def train_single_gpu_accelerate(
                     graph_masks = None
                     graph_token_indices = None
 
-                with accelerator.accumulate(model), torch.autocast(
-                    device_type="cuda",
-                    dtype=torch.float16 if args.dtype == "fp16" else torch.bfloat16,
-                ):
+                with accelerator.accumulate(model):
+                    forward_start = time.time()
                     outputs = model(
                         **micro_input,
                         step=global_step,
@@ -643,492 +621,6 @@ def train_single_gpu_accelerate(
     accelerator.end_training()
 
 
-def train_multi_gpu_accelerate_ring_attn(
-    args: Namespace,
-    dataset: Data,
-    console: Console,
-    model: GLMFModelForCausalLM,
-    optimizer: torch.optim.Optimizer,
-    lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
-    continue_training: bool = False,
-    start_step: int = -1,
-    max_num_checkpoint: int = 5,
-    collate_fn: callable = collate_fn,
-    mixed_precision: str = "bf16",
-):
-    accelerator = Accelerator(
-        gradient_accumulation_steps=args.gradient_accumulation_steps,
-        mixed_precision=mixed_precision,
-        log_with="wandb",
-        project_dir=args.log_dir,
-    )
-
-    process_group = dist.group.WORLD
-    if accelerator.is_main_process:
-        accelerator.init_trackers(
-            project_name="GLMFuzz",
-            config={
-                "model_name": args.llm_model,
-                "dataset": args.data,
-                "learning_rate": args.learning_rate,
-                "batch_size": args.batch_size,
-                "gradient_accumulation_steps": args.gradient_accumulation_steps,
-                "effective_batch_size": args.batch_size
-                * args.gradient_accumulation_steps
-                * accelerator.num_processes,
-                "max_steps": args.num_train_epochs,
-                "mixed_precision": mixed_precision,
-                "seed": args.seed,
-            },
-            init_kwargs={"wandb": {"name": args.name}},
-        )
-        save_path = os.path.join(args.output_dir, args.name)
-        if os.path.exists(save_path):
-            if continue_training == False:
-                shutil.rmtree(save_path)
-        os.makedirs(save_path, exist_ok=True)
-        console.log(f"Distributed type: {accelerator.distributed_type}")
-        console.log(f"Number of processes: {accelerator.num_processes}")
-        console.log(f"Mixed precision: {mixed_precision}")
-
-        # # Check model dtype
-        # for name, param in model.named_parameters():
-        #     console.log(f"Parameter {name} is of dtype {param.dtype}")
-
-    tokenizer = dataset.llm_tokenizer
-    tr_dataset = GLMFDataset(
-        data=dataset.train_data,
-        tokenizer=dataset.llm_tokenizer,
-        max_seq_length=args.max_seq_length,
-        debug=args.debug,
-        n_hops=dataset.n_hops,
-        logger=console,
-        dtype=args.dtype,
-        num_gpus=args.num_gpu,
-    )
-    va_dataset = GLMFDataset(
-        data=dataset.val_data,
-        tokenizer=dataset.llm_tokenizer,
-        max_seq_length=args.max_seq_length,
-        debug=args.debug,
-        n_hops=dataset.n_hops,
-        logger=console,
-        dtype=args.dtype,
-        num_gpus=args.num_gpu,
-    )
-    dataloader_params = {
-        "batch_size": args.batch_size,
-        "collate_fn": collate_fn,
-        "num_workers": 4,
-        "pin_memory": True,
-        "persistent_workers": True,
-    }
-
-    if accelerator.is_main_process:
-        logging_train_data(
-            console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
-        )
-
-    if not isinstance(tr_dataset, torch.utils.data.IterableDataset):
-        dataloader_params["drop_last"] = True
-        # Fix for transformers >= 4.46.0: seed_worker now requires (worker_id, num_workers, rank)
-        dataloader_params["worker_init_fn"] = lambda worker_id: seed_worker(
-            worker_id, num_workers=4, rank=accelerator.process_index
-        )
-
-    tr_loader = DataLoader(tr_dataset, **dataloader_params)
-    va_loader = DataLoader(
-        va_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn
-    )
-
-    if accelerator.is_main_process:
-        logging_train_data(
-            console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
-        )
-
-    patch_model(process_group=process_group)
-    device = accelerator.device
-    config = model.config
-
-    # Prepare LLM for k-bit training if using quantization (CRITICAL for QLoRA)
-    # Only affects model.llm_model, GNN remains unaffected
-    if hasattr(config, "load_in_4bit") and (config.load_in_4bit or config.load_in_8bit):
-        from peft import prepare_model_for_kbit_training
-
-        model.llm_model = prepare_model_for_kbit_training(model.llm_model)
-        if accelerator.is_main_process:
-            console.log("[green]LLM prepared for k-bit training (QLoRA)[/green]")
-
-    model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
-
-    # console.log(f"Model prepared with accelerator: {model}")
-    global_step = 0
-    previous_checkpoint_step = -1
-    best_val_loss = 10000.0
-
-    with Progress(
-        SpinnerColumn(),  # Shows a spinner
-        TextColumn(
-            "[progress.description]{task.description}"
-        ),  # Displays additional info
-        BarColumn(),  # Displays a progress bar
-        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),  # Shows percentage
-        transient=True,
-    ) as progress:
-
-        if accelerator.is_main_process:
-            train_task = progress.add_task("Training...", total=args.num_train_epochs)
-
-        for epoch in range(args.num_train_epochs):
-
-            model.train()
-            if accelerator.is_main_process:
-                train_epoch_task = progress.add_task(
-                    f"Epoch {epoch + 1}/{args.num_train_epochs}",
-                    total=len(tr_loader),
-                )
-            epoch_loss = 0.0
-            num_items = 0.0
-
-            for step, batch in enumerate(tr_loader):
-
-                if (continue_training == True) and (global_step <= start_step):
-
-                    global_step += args.batch_size
-                    ram_usage = log_ram_usage()
-
-                    if accelerator.is_main_process:
-
-                        progress.update(
-                            train_epoch_task,
-                            advance=1,
-                            description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
-                        )
-
-                    continue
-
-                accelerator.wait_for_everyone()
-                global_step += args.batch_size
-                batch_loss = 0.0
-                batch_size = batch["input"]["input_ids"].size(0)
-
-                accelerator.wait_for_everyone()
-
-                if "token_type_ids" in batch["input"]:
-                    batch["input"].pop("token_type_ids")
-
-                micro_input = {
-                    "input_ids": batch["input"]["input_ids"],
-                    "attention_mask": batch["input"]["attention_mask"],
-                    "labels": batch["input"]["labels"],
-                }
-
-                accelerator.wait_for_everyone()
-
-                if "graph" in args.baseline_prompt:
-                    graphs = batch["graph"]
-                    graph_masks = batch["graph_mask"]
-                    graph_token_indices = []
-
-                    for i in range(batch_size):
-                        graph = batch["graph"][i]
-                        for key in GRAPH_KEYS:
-                            if key in graph.keys():
-                                graph[key] = graph[key].to(device)
-
-                        graph_mask = batch["graph_mask"][i].to(device)
-                        graph_token_index = torch.where(
-                            micro_input["input_ids"][i] == config.graph_token_id[1]
-                        )[0].tolist()
-                        graph_token_indices.append(graph_token_index)
-
-                else:
-                    graphs = None
-                    graph_masks = None
-                    graph_token_indices = None
-
-                position_ids = (
-                    torch.arange(micro_input["input_ids"].shape[1])
-                    .unsqueeze(0)
-                    .expand(micro_input["input_ids"].shape[0], -1)
-                )
-
-                accelerator.wait_for_everyone()
-
-                with accelerator.accumulate(model), torch.autocast(
-                    device_type="cuda",
-                    dtype=torch.float16 if args.dtype == "fp16" else torch.bfloat16,
-                ):
-
-                    outputs = model(
-                        **micro_input,
-                        position_ids=position_ids.to(device),
-                        graphs=graphs,
-                        graph_masks=graph_masks,
-                        graph_token_indices=graph_token_indices,
-                        step=global_step,
-                        output_hidden_states=True,
-                        accelerator=accelerator,
-                        ring_attn=True,
-                    )
-
-                    accelerator.wait_for_everyone()
-                    loss = outputs.loss
-                    accelerator.backward(loss)
-                    # print(
-                    #     f"Loss at rank {accelerator.process_index} - step {global_step}: {loss.item()}"
-                    # )
-                    accelerator.wait_for_everyone()
-
-                    # # check gradient:
-                    # if accelerator.is_main_process:
-                    #     for name, param in model.named_parameters():
-                    #         if param.requires_grad:
-                    #             if param.grad is not None:
-                    #                 console.log(
-                    #                     f"After backward - Parameter {name} grad is {param.grad.norm().item():.4f}"
-                    #                 )
-                    #             else:
-                    #                 console.log(
-                    #                     f"After backward - Parameter {name} grad is None"
-                    #                 )
-                    # sys.exit(0)
-
-                if accelerator.sync_gradients:
-
-                    accelerator.wait_for_everyone()
-                    accelerator.clip_grad_norm_(model.parameters(), args.max_grad_norm)
-                    optimizer.step()
-                    lr_scheduler.step()
-                    optimizer.zero_grad(set_to_none=True)
-                    model.zero_grad(set_to_none=True)
-
-                with torch.no_grad():
-                    all_losses = accelerator.gather(loss)
-                    # print(f"All losses at step {global_step}: {all_losses}")
-                    all_losses = torch.where(
-                        torch.isnan(all_losses),
-                        torch.zeros_like(all_losses),
-                        all_losses,
-                    ).to("cpu")
-                    console.log(f"Step {global_step}: gathered losses: {all_losses}")
-                    total_loss = torch.sum(all_losses)
-                    batch_loss += total_loss.detach().float().item()
-
-                for key in micro_input.keys():
-                    micro_input[key] = micro_input[key].to("cpu")
-
-                if "graph" in args.baseline_prompt:
-                    for graph in graphs:
-                        for key in GRAPH_KEYS:
-                            if key in graph.keys():
-                                graph[key] = graph[key].to("cpu")
-                                graph.pop(key, None)
-                    for graph_mask in graph_masks:
-                        for mask in graph_mask:
-                            mask = mask.to("cpu")
-                    del graph_masks, graphs, graph_token_indices
-
-                outputs.logits = outputs.logits.to("cpu")
-                loss = loss.to("cpu")
-                del outputs, loss, micro_input, batch
-                gc.collect()
-                torch.cuda.empty_cache()
-
-                avg_batch_loss = batch_loss / batch_size
-                if accelerator.is_main_process:
-                    ram_usage = log_ram_usage()
-                    # console.log(
-                    #     f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
-                    # )
-                    progress.update(
-                        train_epoch_task,
-                        advance=1,
-                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.10f} - RAM usage: {ram_usage:.1f} MB",
-                    )
-                epoch_loss += avg_batch_loss * batch_size
-                num_items += batch_size
-
-                if (
-                    global_step % args.logging_steps == 0
-                ) and accelerator.is_main_process:
-                    current_lr = lr_scheduler.get_last_lr()[0]
-                    if accelerator.is_main_process:
-                        accelerator.log(
-                            {
-                                "train/loss": avg_batch_loss,
-                                "train/learning_rate": current_lr,
-                                "train/step": global_step,
-                            },
-                            step=global_step,
-                        )
-                        console.print(
-                            f"[yellow]Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}[/yellow]"
-                        )
-
-                if global_step % args.save_steps == 0:
-                    accelerator.wait_for_everyone()
-
-                    if (previous_checkpoint_step != -1) and (
-                        accelerator.is_main_process
-                    ):
-
-                        old_dir = os.path.join(
-                            save_path,
-                            f"current_checkpoint",
-                        )
-                        new_dir = os.path.join(
-                            save_path,
-                            f"checkpoint-{previous_checkpoint_step}",
-                        )
-                        os.rename(old_dir, new_dir)
-
-                    if accelerator.is_main_process:
-                        checkpoint_dir_new = os.path.join(
-                            save_path,
-                            f"current_checkpoint",
-                        )
-                        previous_checkpoint_step = global_step
-
-                        while len(os.listdir(save_path)) >= max_num_checkpoint:
-                            oldest_checkpoint = min(
-                                [
-                                    os.path.join(save_path, f)
-                                    for f in os.listdir(save_path)
-                                    if f.startswith("checkpoint-")
-                                ],
-                                key=os.path.getctime,
-                            )
-                            # print(f"Removing oldest checkpoint: {oldest_checkpoint}")
-                            shutil.rmtree(oldest_checkpoint)
-
-                        unwrapped_model = accelerator.unwrap_model(model)
-                        save_checkpoint(
-                            model=unwrapped_model,
-                            path=checkpoint_dir_new,
-                            global_step=global_step,
-                            seed=args.seed,
-                            is_lora=args.use_lora,
-                        )
-                        accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
-                        del unwrapped_model
-
-                if global_step % args.validating_steps == 0:
-                    accelerator.wait_for_everyone()
-                    val_loss = validate(
-                        args=args,
-                        loader=va_loader,
-                        model=model,
-                        config=config,
-                        accelerator=accelerator,
-                        progress=progress,
-                    )
-                    accelerator.wait_for_everyone()
-
-                    # check model type
-                    # with torch.no_grad():
-                    #     if accelerator.is_main_process:
-                    #         for name, param in model.named_parameters():
-                    #             console.log(
-                    #                 f"After validation - Parameter {name} is of dtype {param.dtype}"
-                    #             )
-
-                    if accelerator.is_main_process:
-                        with torch.no_grad():
-                            wandb.log({"val_loss": val_loss})
-                            console.log(
-                                f"Validation loss: {val_loss:.4f} at step {global_step}"
-                            )
-
-                            if val_loss < best_val_loss:
-                                best_val_loss = val_loss
-                                console.log(
-                                    f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
-                                )
-                                checkpoint_dir = os.path.join(
-                                    save_path,
-                                    f"best_model",
-                                )
-
-                                if not os.path.exists(checkpoint_dir):
-                                    os.makedirs(checkpoint_dir, exist_ok=True)
-
-                                unwrapped_model = accelerator.unwrap_model(model)
-                                torch.save(
-                                    unwrapped_model.state_dict(),
-                                    os.path.join(checkpoint_dir, "model_weight.pt"),
-                                )
-                                tokenizer.save_pretrained(checkpoint_dir)
-                                accelerator.print(
-                                    f"Saving best checkpoint to {checkpoint_dir}"
-                                )
-                                del unwrapped_model
-                                del checkpoint_dir
-                                gc.collect()
-                    # model.train()
-
-                    # No need to restore dtypes - Accelerate handles mixed precision automatically
-                    # Converting quantized 4-bit/8-bit weights to bfloat16 would break quantization
-                    accelerator.wait_for_everyone()
-
-            if accelerator.is_main_process:
-                if ((continue_training == True) and (global_step > start_step)) or (
-                    continue_training == False
-                ):
-                    progress.update(train_epoch_task, visible=False)
-                    progress.remove_task(train_epoch_task)
-                    progress.update(
-                        train_task,
-                        advance=1,
-                        description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
-                    )
-
-    accelerator.wait_for_everyone()
-
-    if accelerator.is_main_process:
-
-        final_model_path = os.path.join(save_path, "final_model")
-        console.log(f"Saving final model to {final_model_path}...")
-
-        if not os.path.exists(final_model_path):
-            os.makedirs(final_model_path, exist_ok=True)
-
-        unwrapped_model = accelerator.unwrap_model(model)
-        best_model_path = os.path.join(save_path, "best_model")
-        for file in os.listdir(best_model_path):
-            if file.endswith(".pt"):
-                best_model_path = os.path.join(best_model_path, file)
-                break
-        if os.path.exists(best_model_path):
-            console.log(
-                f"Loading best model from {best_model_path} for final evaluation"
-            )
-            state_dict = torch.load(best_model_path, map_location="cpu")
-            missing_keys, unexpected_keys = unwrapped_model.load_state_dict(
-                state_dict, strict=False
-            )
-            if len(missing_keys) > 0:
-                console.log(f"Missing keys when loading best model: {missing_keys}")
-            if len(unexpected_keys) > 0:
-                console.log(
-                    f"Unexpected keys when loading best model: {unexpected_keys}"
-                )
-            console.log("Best model loaded successfully")
-
-        if unwrapped_model.config.use_lora == True:
-            unwrapped_model.llm_model = unwrapped_model.llm_model.merge_and_unload()
-            unwrapped_model.config.use_lora = False
-
-        torch.save(
-            unwrapped_model.state_dict(),
-            os.path.join(final_model_path, "model_weight.pt"),
-        )
-        tokenizer.save_pretrained(final_model_path)
-        console.log(f"Final model saved to {final_model_path}")
-
-    accelerator.end_training()
-
-
 def train_multi_gpu_accelerate(
     args: Namespace,
     dataset: Data,
@@ -1143,15 +635,7 @@ def train_multi_gpu_accelerate(
     mixed_precision: str = "bf16",
 ):
 
-    # num_device = torch.cuda.device_count()
-    # Use batch_size as gradient_accumulation_steps for micro-batching
-    # This allows WeightedRandomSampler to work with larger batches while processing samples one-by-one
-
-    # Configure DeepSpeed if enabled for 20-40% speedup on forward/backward passes
     if args.use_deepspeed and os.path.exists(args.deepspeed_config):
-        from accelerate import DeepSpeedPlugin
-
-        # Auto-select BF16 config for GPT models to avoid FP16 loss scaling issues
         deepspeed_config_path = args.deepspeed_config
         if "gpt" in args.llm_model.lower():
             bf16_config = args.deepspeed_config.replace(".json", "_bf16.json")
@@ -1165,9 +649,22 @@ def train_multi_gpu_accelerate(
                     f"[yellow]Warning: GPT model detected but BF16 config not found at {bf16_config}. Using default config.[/yellow]"
                 )
 
+        # Detect ZeRO stage from config file
+        import json
+
+        with open(deepspeed_config_path, "r") as f:
+            ds_config = json.load(f)
+        zero_stage = ds_config.get("zero_optimization", {}).get("stage", 0)
+        zero3_init_flag = zero_stage == 3
+
+        if zero3_init_flag:
+            console.log(
+                f"[green]DeepSpeed ZeRO-3 detected - enabling zero3_init_flag for model initialization[/green]"
+            )
+
         deepspeed_plugin = DeepSpeedPlugin(
             hf_ds_config=deepspeed_config_path,
-            zero3_init_flag=False,
+            zero3_init_flag=zero3_init_flag,
         )
         accelerator = Accelerator(
             gradient_accumulation_steps=args.batch_size,
@@ -1210,9 +707,20 @@ def train_multi_gpu_accelerate(
         console.log(f"Number of processes: {accelerator.num_processes}")
         console.log(f"Mixed precision: {mixed_precision}")
         if args.use_deepspeed:
-            console.log(
-                f"[green]DeepSpeed ZeRO-2 enabled: Expect 20-40% speedup on forward/backward passes[/green]"
-            )
+            with open(args.deepspeed_config, "r") as f:
+                ds_config = json.load(f)
+            zero_stage = ds_config.get("zero_optimization", {}).get("stage", 0)
+
+            if zero_stage == 3:
+                console.log(
+                    f"[green]DeepSpeed ZeRO-3 enabled: Full parameter sharding with CPU offloading for maximum memory efficiency[/green]"
+                )
+            elif zero_stage == 2:
+                console.log(
+                    f"[green]DeepSpeed ZeRO-2 enabled: Expect 20-40% speedup on forward/backward passes[/green]"
+                )
+            else:
+                console.log(f"[green]DeepSpeed ZeRO-{zero_stage} enabled[/green]")
         console.log(
             f"[yellow]Micro-batching enabled: Processing {args.batch_size} samples individually, "
             f"accumulating gradients before optimizer step[/yellow]"
@@ -1243,21 +751,17 @@ def train_multi_gpu_accelerate(
         num_gpus=args.num_gpu,
     )
 
-    # Compute repo and create sample weights for imbalanced dataset
-    # Optimize: extract UUIDs directly from data dict without triggering __getitem__
     repos = []
     for idx in range(len(tr_dataset)):
         uuid = list(tr_dataset.data.keys())[idx]
         repo = uuid.split("-")[0]
         repos.append(repo)
 
-    # Count occurrences of each repo
     repo_to_idx = {repo: idx for idx, repo in enumerate(set(repos))}
     repo_index_tensor = torch.tensor([repo_to_idx[repo] for repo in repos])
     repo_counts = torch.bincount(repo_index_tensor)
     weights = 1.0 / repo_counts.float()
 
-    # create dict with key is repo and value is weight
     repo_weights = {repo: weights[idx].item() for repo, idx in repo_to_idx.items()}
     sample_weights = [repo_weights[repo] for repo in repos]
 
@@ -1277,7 +781,6 @@ def train_multi_gpu_accelerate(
             f"[cyan]Using WeightedRandomSampler for balanced repo sampling[/cyan]"
         )
 
-    # Create WeightedRandomSampler
     sampler = WeightedRandomSampler(
         sample_weights, num_samples=len(repos), replacement=True
     )
@@ -1304,17 +807,7 @@ def train_multi_gpu_accelerate(
     va_loader = DataLoader(
         va_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
     )
-
-    # if accelerator.is_main_process:
-    #     logging_train_data(
-    #         console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
-    #     )
-
-    device = accelerator.device
     config = model.config
-
-    # Prepare LLM for k-bit training if using quantization (CRITICAL for QLoRA)
-    # Only affects model.llm_model, GNN remains unaffected
     if hasattr(config, "load_in_4bit") and (config.load_in_4bit or config.load_in_8bit):
         from peft import prepare_model_for_kbit_training
 
@@ -1325,13 +818,9 @@ def train_multi_gpu_accelerate(
     model, optimizer, lr_scheduler, tr_loader, va_loader = accelerator.prepare(
         model, optimizer, lr_scheduler, tr_loader, va_loader
     )
-
-    # console.log(f"Model prepared with accelerator: {model}")
     global_step = 0
     previous_checkpoint_step = -1
     best_val_loss = 10000.0
-
-    # Initialize step timer for performance tracking
     step_timer = StepTimer(window_size=100)
 
     with Progress(
@@ -1761,46 +1250,447 @@ def train_multi_gpu_accelerate(
                 del lora_state_dict
             gc.collect()
 
-    # No need to restore dtypes - Accelerate handles mixed precision automatically
-    # Converting quantized 4-bit/8-bit weights to bfloat16 would break quantization
-
-    # accelerator.wait_for_everyone()
-    # if accelerator.is_main_process:
-
-    #     final_model_path = os.path.join(save_path, "final_model")
-    #     console.log(f"Saving final model to {final_model_path}...")
-
-    #     if not os.path.exists(final_model_path):
-    #         os.makedirs(final_model_path, exist_ok=True)
-
-    #     unwrapped_model = accelerator.unwrap_model(model)
-    #     best_model_path = os.path.join(save_path, "best_model", "model_weight.pt")
-
-    #     if os.path.exists(best_model_path):
-    #         console.log(
-    #             f"Loading best model from {best_model_path} for final evaluation"
-    #         )
-    #         state_dict = torch.load(best_model_path, map_location="cpu")
-    #         missing_keys, unexpected_keys = unwrapped_model.load_state_dict(
-    #             state_dict, strict=False
-    #         )
-    #         if len(missing_keys) > 0:
-    #             console.log(f"Missing keys when loading best model: {missing_keys}")
-    #         if len(unexpected_keys) > 0:
-    #             console.log(
-    #                 f"Unexpected keys when loading best model: {unexpected_keys}"
-    #             )
-    #         console.log("Best model loaded successfully")
-
-    #     if unwrapped_model.config.use_lora == True:
-    #         unwrapped_model.llm_model = unwrapped_model.llm_model.merge_and_unload()
-    #         unwrapped_model.config.use_lora = False
-
-    #     torch.save(
-    #         unwrapped_model.state_dict(),
-    #         os.path.join(final_model_path, "model_weight.pt"),
-    #     )
-    #     tokenizer.save_pretrained(final_model_path)
-    #     console.log(f"Final model saved to {final_model_path}")
-
     accelerator.end_training()
+
+
+"""def train_multi_gpu_accelerate_ring_attn(
+    args: Namespace,
+    dataset: Data,
+    console: Console,
+    model: GLMFModelForCausalLM,
+    optimizer: torch.optim.Optimizer,
+    lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
+    continue_training: bool = False,
+    start_step: int = -1,
+    max_num_checkpoint: int = 5,
+    collate_fn: callable = collate_fn,
+    mixed_precision: str = "bf16",
+):
+    accelerator = Accelerator(
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
+        mixed_precision=mixed_precision,
+        log_with="wandb",
+        project_dir=args.log_dir,
+    )
+
+    process_group = dist.group.WORLD
+    if accelerator.is_main_process:
+        accelerator.init_trackers(
+            project_name="GLMFuzz",
+            config={
+                "model_name": args.llm_model,
+                "dataset": args.data,
+                "learning_rate": args.learning_rate,
+                "batch_size": args.batch_size,
+                "gradient_accumulation_steps": args.gradient_accumulation_steps,
+                "effective_batch_size": args.batch_size
+                * args.gradient_accumulation_steps
+                * accelerator.num_processes,
+                "max_steps": args.num_train_epochs,
+                "mixed_precision": mixed_precision,
+                "seed": args.seed,
+            },
+            init_kwargs={"wandb": {"name": args.name}},
+        )
+        save_path = os.path.join(args.output_dir, args.name)
+        if os.path.exists(save_path):
+            if continue_training == False:
+                shutil.rmtree(save_path)
+        os.makedirs(save_path, exist_ok=True)
+        console.log(f"Distributed type: {accelerator.distributed_type}")
+        console.log(f"Number of processes: {accelerator.num_processes}")
+        console.log(f"Mixed precision: {mixed_precision}")
+    tokenizer = dataset.llm_tokenizer
+    tr_dataset = GLMFDataset(
+        data=dataset.train_data,
+        tokenizer=dataset.llm_tokenizer,
+        max_seq_length=args.max_seq_length,
+        debug=args.debug,
+        n_hops=dataset.n_hops,
+        logger=console,
+        dtype=args.dtype,
+        num_gpus=args.num_gpu,
+    )
+    va_dataset = GLMFDataset(
+        data=dataset.val_data,
+        tokenizer=dataset.llm_tokenizer,
+        max_seq_length=args.max_seq_length,
+        debug=args.debug,
+        n_hops=dataset.n_hops,
+        logger=console,
+        dtype=args.dtype,
+        num_gpus=args.num_gpu,
+    )
+    dataloader_params = {
+        "batch_size": args.batch_size,
+        "collate_fn": collate_fn,
+        "num_workers": 4,
+        "pin_memory": True,
+        "persistent_workers": True,
+    }
+
+    if not isinstance(tr_dataset, torch.utils.data.IterableDataset):
+        dataloader_params["drop_last"] = True
+        # Fix for transformers >= 4.46.0: seed_worker now requires (worker_id, num_workers, rank)
+        dataloader_params["worker_init_fn"] = lambda worker_id: seed_worker(
+            worker_id, num_workers=4, rank=accelerator.process_index
+        )
+
+    tr_loader = DataLoader(tr_dataset, **dataloader_params)
+    va_loader = DataLoader(
+        va_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn
+    )
+
+    if accelerator.is_main_process:
+        logging_train_data(
+            console=console, datasets=(tr_dataset, va_dataset), tokenizer=tokenizer
+        )
+
+    patch_model(process_group=process_group)
+    device = accelerator.device
+    config = model.config
+
+    # Prepare LLM for k-bit training if using quantization (CRITICAL for QLoRA)
+    # Only affects model.llm_model, GNN remains unaffected
+    if hasattr(config, "load_in_4bit") and (config.load_in_4bit or config.load_in_8bit):
+        from peft import prepare_model_for_kbit_training
+
+        model.llm_model = prepare_model_for_kbit_training(model.llm_model)
+        if accelerator.is_main_process:
+            console.log("[green]LLM prepared for k-bit training (QLoRA)[/green]")
+
+    model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
+
+    # console.log(f"Model prepared with accelerator: {model}")
+    global_step = 0
+    previous_checkpoint_step = -1
+    best_val_loss = 10000.0
+
+    with Progress(
+        SpinnerColumn(),  # Shows a spinner
+        TextColumn(
+            "[progress.description]{task.description}"
+        ),  # Displays additional info
+        BarColumn(),  # Displays a progress bar
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),  # Shows percentage
+        transient=True,
+    ) as progress:
+
+        if accelerator.is_main_process:
+            train_task = progress.add_task("Training...", total=args.num_train_epochs)
+
+        for epoch in range(args.num_train_epochs):
+
+            model.train()
+            if accelerator.is_main_process:
+                train_epoch_task = progress.add_task(
+                    f"Epoch {epoch + 1}/{args.num_train_epochs}",
+                    total=len(tr_loader),
+                )
+            epoch_loss = 0.0
+            num_items = 0.0
+
+            for step, batch in enumerate(tr_loader):
+
+                if (continue_training == True) and (global_step <= start_step):
+
+                    global_step += args.batch_size
+                    ram_usage = log_ram_usage()
+
+                    if accelerator.is_main_process:
+
+                        progress.update(
+                            train_epoch_task,
+                            advance=1,
+                            description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
+                        )
+
+                    continue
+
+                accelerator.wait_for_everyone()
+                global_step += args.batch_size
+                batch_loss = 0.0
+                batch_size = batch["input"]["input_ids"].size(0)
+
+                accelerator.wait_for_everyone()
+
+                if "token_type_ids" in batch["input"]:
+                    batch["input"].pop("token_type_ids")
+
+                micro_input = {
+                    "input_ids": batch["input"]["input_ids"],
+                    "attention_mask": batch["input"]["attention_mask"],
+                    "labels": batch["input"]["labels"],
+                }
+
+                accelerator.wait_for_everyone()
+
+                if "graph" in args.baseline_prompt:
+                    graphs = batch["graph"]
+                    graph_masks = batch["graph_mask"]
+                    graph_token_indices = []
+
+                    for i in range(batch_size):
+                        graph_token_index = torch.where(
+                            micro_input["input_ids"][i] == config.graph_token_id[1]
+                        )[0].tolist()
+                        graph_token_indices.append(graph_token_index)
+
+                else:
+                    graphs = None
+                    graph_masks = None
+                    graph_token_indices = None
+
+                position_ids = (
+                    torch.arange(micro_input["input_ids"].shape[1])
+                    .unsqueeze(0)
+                    .expand(micro_input["input_ids"].shape[0], -1)
+                )
+
+                accelerator.wait_for_everyone()
+
+                with accelerator.accumulate(model):
+
+                    outputs = model(
+                        **micro_input,
+                        position_ids=position_ids.to(device),
+                        graphs=graphs,
+                        graph_masks=graph_masks,
+                        graph_token_indices=graph_token_indices,
+                        step=global_step,
+                        accelerator=accelerator,
+                        ring_attn=True,
+                    )
+
+                    accelerator.wait_for_everyone()
+                    loss = outputs.loss
+                    accelerator.backward(loss)
+                    # print(
+                    #     f"Loss at rank {accelerator.process_index} - step {global_step}: {loss.item()}"
+                    # )
+                    accelerator.wait_for_everyone()
+
+                if accelerator.sync_gradients:
+
+                    accelerator.wait_for_everyone()
+                    accelerator.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+                    optimizer.step()
+                    lr_scheduler.step()
+                    optimizer.zero_grad(set_to_none=True)
+                    model.zero_grad(set_to_none=True)
+
+                with torch.no_grad():
+                    all_losses = accelerator.gather(loss)
+                    # print(f"All losses at step {global_step}: {all_losses}")
+                    all_losses = torch.where(
+                        torch.isnan(all_losses),
+                        torch.zeros_like(all_losses),
+                        all_losses,
+                    )
+                    total_loss = torch.sum(all_losses)
+                    batch_loss += total_loss.detach().float().item()
+
+                for key in micro_input.keys():
+                    micro_input[key] = micro_input[key].to("cpu")
+
+                if "graph" in args.baseline_prompt:
+                    for graph in graphs:
+                        for key in GRAPH_KEYS:
+                            if key in graph.keys():
+                                graph[key] = graph[key].to("cpu")
+                                graph.pop(key, None)
+                    for graph_mask in graph_masks:
+                        for mask in graph_mask:
+                            mask = mask.to("cpu")
+                    del graph_masks, graphs, graph_token_indices
+
+                outputs.logits = outputs.logits.to("cpu")
+                loss = loss.to("cpu")
+                del outputs, loss, micro_input, batch
+                gc.collect()
+                torch.cuda.empty_cache()
+
+                avg_batch_loss = batch_loss / batch_size
+                if accelerator.is_main_process:
+                    ram_usage = log_ram_usage()
+                    # console.log(
+                    #     f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} - RAM usage: {ram_usage:.1f} MB"
+                    # )
+                    progress.update(
+                        train_epoch_task,
+                        advance=1,
+                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.10f} - RAM usage: {ram_usage:.1f} MB",
+                    )
+                epoch_loss += avg_batch_loss * batch_size
+                num_items += batch_size
+
+                if (
+                    global_step % args.logging_steps == 0
+                ) and accelerator.is_main_process:
+                    current_lr = lr_scheduler.get_last_lr()[0]
+                    if accelerator.is_main_process:
+                        accelerator.log(
+                            {
+                                "train/loss": avg_batch_loss,
+                                "train/learning_rate": current_lr,
+                                "train/step": global_step,
+                            },
+                            step=global_step,
+                        )
+                        console.print(
+                            f"[yellow]Step {global_step}: Loss: {avg_batch_loss:.4f}, LR: {current_lr:.6f}[/yellow]"
+                        )
+
+                if global_step % args.save_steps == 0:
+                    accelerator.wait_for_everyone()
+
+                    if (previous_checkpoint_step != -1) and (
+                        accelerator.is_main_process
+                    ):
+
+                        old_dir = os.path.join(
+                            save_path,
+                            f"current_checkpoint",
+                        )
+                        new_dir = os.path.join(
+                            save_path,
+                            f"checkpoint-{previous_checkpoint_step}",
+                        )
+                        os.rename(old_dir, new_dir)
+
+                    if accelerator.is_main_process:
+                        checkpoint_dir_new = os.path.join(
+                            save_path,
+                            f"current_checkpoint",
+                        )
+                        previous_checkpoint_step = global_step
+
+                        while len(os.listdir(save_path)) >= max_num_checkpoint:
+                            oldest_checkpoint = min(
+                                [
+                                    os.path.join(save_path, f)
+                                    for f in os.listdir(save_path)
+                                    if f.startswith("checkpoint-")
+                                ],
+                                key=os.path.getctime,
+                            )
+                            # print(f"Removing oldest checkpoint: {oldest_checkpoint}")
+                            shutil.rmtree(oldest_checkpoint)
+
+                        unwrapped_model = accelerator.unwrap_model(model)
+                        save_checkpoint(
+                            model=unwrapped_model,
+                            path=checkpoint_dir_new,
+                            global_step=global_step,
+                            seed=args.seed,
+                            is_lora=args.use_lora,
+                        )
+                        accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
+                        del unwrapped_model
+
+                if global_step % args.validating_steps == 0:
+                    accelerator.wait_for_everyone()
+                    val_loss = validate(
+                        args=args,
+                        loader=va_loader,
+                        model=model,
+                        config=config,
+                        accelerator=accelerator,
+                        progress=progress,
+                    )
+                    accelerator.wait_for_everyone()
+
+                    if accelerator.is_main_process:
+                        wandb.log({"val_loss": val_loss})
+                        console.log(
+                            f"Validation loss: {val_loss:.4f} at step {global_step}"
+                        )
+
+                        if val_loss < best_val_loss:
+                            best_val_loss = val_loss
+                            console.log(
+                                f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
+                            )
+                            checkpoint_dir = os.path.join(
+                                save_path,
+                                f"best_model",
+                            )
+
+                            if not os.path.exists(checkpoint_dir):
+                                os.makedirs(checkpoint_dir, exist_ok=True)
+
+                            unwrapped_model = accelerator.unwrap_model(model)
+                            torch.save(
+                                unwrapped_model.state_dict(),
+                                os.path.join(
+                                    checkpoint_dir, f"model_weight_step{global_step}.pt"
+                                ),
+                            )
+                            tokenizer.save_pretrained(checkpoint_dir)
+                            console.log(
+                                f"[green]Saved best checkpoint to {checkpoint_dir}[/green]"
+                            )
+                            del unwrapped_model
+                            del checkpoint_dir
+                            gc.collect()
+
+                    # No need to restore dtypes - Accelerate handles mixed precision automatically
+                    # Converting quantized 4-bit/8-bit weights to bfloat16 would break quantization
+                    accelerator.wait_for_everyone()
+
+            if accelerator.is_main_process:
+                if ((continue_training == True) and (global_step > start_step)) or (
+                    continue_training == False
+                ):
+                    progress.update(train_epoch_task, visible=False)
+                    progress.remove_task(train_epoch_task)
+                    progress.update(
+                        train_task,
+                        advance=1,
+                        description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
+                    )
+
+    accelerator.wait_for_everyone()
+
+    if accelerator.is_main_process:
+
+        final_model_path = os.path.join(save_path, "final_model")
+        console.log(f"Saving final model to {final_model_path}...")
+
+        if not os.path.exists(final_model_path):
+            os.makedirs(final_model_path, exist_ok=True)
+
+        unwrapped_model = accelerator.unwrap_model(model)
+        best_model_path = os.path.join(save_path, "best_model")
+        for file in os.listdir(best_model_path):
+            if file.endswith(".pt"):
+                best_model_path = os.path.join(best_model_path, file)
+                break
+        if os.path.exists(best_model_path):
+            console.log(
+                f"Loading best model from {best_model_path} for final evaluation"
+            )
+            state_dict = torch.load(best_model_path, map_location="cpu")
+            missing_keys, unexpected_keys = unwrapped_model.load_state_dict(
+                state_dict, strict=False
+            )
+            if len(missing_keys) > 0:
+                console.log(f"Missing keys when loading best model: {missing_keys}")
+            if len(unexpected_keys) > 0:
+                console.log(
+                    f"Unexpected keys when loading best model: {unexpected_keys}"
+                )
+            console.log("Best model loaded successfully")
+
+        if unwrapped_model.config.use_lora == True:
+            unwrapped_model.llm_model = unwrapped_model.llm_model.merge_and_unload()
+            unwrapped_model.config.use_lora = False
+
+        torch.save(
+            unwrapped_model.state_dict(),
+            os.path.join(final_model_path, "model_weight.pt"),
+        )
+        tokenizer.save_pretrained(final_model_path)
+        console.log(f"Final model saved to {final_model_path}")
+
+    accelerator.end_training()"""

@@ -320,12 +320,12 @@ def add_training_group(group):
     group.add_argument(
         "--use_deepspeed",
         action="store_true",
-        help="use DeepSpeed for training optimization (ZeRO-2 for 20-40%% speedup)",
+        help="use DeepSpeed for training optimization (ZeRO-2 for 20-40%% speedup, ZeRO-3 for maximum memory efficiency)",
     )
     group.add_argument(
         "--deepspeed_config",
         type=str,
-        help="path to DeepSpeed config file",
+        help="path to DeepSpeed config file (supports ZeRO-2 and ZeRO-3)",
         default="configs/deepspeed_zero2.json",
     )
     group.add_argument(
