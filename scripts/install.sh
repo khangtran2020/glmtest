@@ -8,6 +8,7 @@ pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https
 # pip install  dgl -f https://data.dgl.ai/wheels/torch-2.4/cu124/repo.html
 
 # install pytorch-geometric
+pip install torch_geometric
 pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.6.0+cu124.html
 
 # installing transformers + accelerate + peft

@@ -1,6 +1,6 @@
 import json
+import time
 import torch
-from rich import print as pprint
 from data.utils import sampling_neighbor
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizer
@@ -46,7 +46,6 @@ class GLMFDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        import time
 
         start_time = time.time()
 
@@ -78,18 +77,11 @@ class GLMFDataset(Dataset):
                 else:
                     act_node = torch.cat((act_node, active_node), dim=0)
 
-            for key in graph.keys():
-                graph[key] = sampling_neighbor(
-                    graph=graph[key],
-                    mask=act_node,
-                    n_hops=self.n_hops,
-                )
-                # Force features to CPU and materialize to avoid DGL lazy loading issues with DataLoader workers
-                feat = graph[key].ndata["feat"]
-                graph[key].ndata["feat"] = feat.to(
-                    device="cpu",
-                    dtype=torch.bfloat16 if self.dtype == "bf16" else torch.float16,
-                )
+            graph = sampling_neighbor(
+                graph=graph,
+                active_node=act_node.long(),
+                n_hops=self.n_hops,
+            )
 
         if self.testing == False:
             full_text = sample["full_text"]
