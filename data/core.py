@@ -655,6 +655,7 @@ class Data(object):
 
                         if not os.path.exists(graph_path):
                             graph = self.read_graph(dat)
+                            print(graph)
                             torch.save(graph, graph_path)
 
                     for testcase in dat["test_cases"].keys():
