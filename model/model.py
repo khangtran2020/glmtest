@@ -33,7 +33,7 @@ def get_model(
     use_zero3: bool = False,
 ):
     if args.mode == "train":
-        return get_model_train(
+        model = get_model_train(
             args=args,
             console=console,
             tokenizer=tokenizer,
@@ -42,7 +42,7 @@ def get_model(
             use_zero3=use_zero3,
         )
     elif args.mode == "test":
-        return get_model_test(
+        model = get_model_test(
             args=args,
             console=console,
             tokenizer=tokenizer,
@@ -50,7 +50,7 @@ def get_model(
             metadata=metadata,
         )
     elif args.mode == "testgen":
-        return get_model_testgen(
+        model = get_model_testgen(
             args=args,
             console=console,
             rank=rank,
@@ -61,6 +61,9 @@ def get_model(
     else:
         console.log(f"Mode {args.mode} not using model.")
         return None
+    for name, param in model.named_parameters():
+        console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
+    return model
 
 
 def get_model_train(
@@ -297,9 +300,6 @@ def get_model_train(
         elif args.dtype == "fp16":
             if p.dtype != torch.float16:
                 p.data = p.data.to(torch.float16)
-
-    for name, param in model.named_parameters():
-        console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
 
     return model
 
