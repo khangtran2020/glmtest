@@ -347,7 +347,14 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                         graph[node_type].x = graph[node_type].x.half()
 
                 graph_embeds = self.gnn(graph.x_dict, graph.edge_index_dict)
-                graph_embeds = graph_embeds["node"][overall_indices, :]
+                graph_embeds = graph_embeds["node"]
+
+                print("Size of graph embeds:", graph_embeds.size())
+                print(
+                    "Max and min of overall_indices:",
+                    overall_indices.max(),
+                    overall_indices.min(),
+                )
 
                 if self.gnn_mode == "node":
                     for j, mask in enumerate(graph_mask):
