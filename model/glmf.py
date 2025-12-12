@@ -359,15 +359,15 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 if self.gnn_mode == "node":
                     for j, mask in enumerate(graph_mask):
 
-                        if self.rank == 0:
-                            for idx_k in mask_idx[j]:
-                                if idx_k >= graph_embeds.size(0):
-                                    print(
-                                        f"Error: idx_k {idx_k} out of bounds for graph_embeds with size {graph_embeds.size(0)}"
-                                    )
-                            print(
-                                f"Mask idx {j}: {mask_idx[j]}, graph_embeds shape: {graph_embeds.shape}"
-                            )
+                        # if self.rank == 0:
+                        # for idx_k in mask_idx[j]:
+                        #     if idx_k >= graph_embeds.size(0):
+                        #         print(
+                        #             f"Error: idx_k {idx_k} out of bounds for graph_embeds with size {graph_embeds.size(0)}"
+                        #         )
+                        # print(
+                        #     f"Mask idx {j}: {mask_idx[j]}, graph_embeds shape: {graph_embeds.shape}"
+                        # )
                         embeds = graph_embeds[mask_idx[j], :]
                         assert embeds.size(0) == len(mask_idx[j])
                         embeds = embeds.to(inputs_embeds.device)
