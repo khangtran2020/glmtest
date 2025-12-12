@@ -7,7 +7,6 @@ import wandb
 import shutil
 from rich import print as pprint
 from functools import partial
-from model.gnn import GRAPH_KEYS
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from data.core import Data
 from data.loader import GLMFDataset, collate_fn
@@ -648,10 +647,6 @@ def train_multi_gpu_accelerate(
                 console.log(
                     f"[yellow]Warning: GPT model detected but BF16 config not found at {bf16_config}. Using default config.[/yellow]"
                 )
-
-        # Detect ZeRO stage from config file
-        import json
-
         with open(deepspeed_config_path, "r") as f:
             ds_config = json.load(f)
         zero_stage = ds_config.get("zero_optimization", {}).get("stage", 0)
