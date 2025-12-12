@@ -23,7 +23,11 @@ def get_model(
 ):
     if args.mode == "train":
         return get_model_train(
-            args=args, console=console, tokenizer=tokenizer, rank=rank, use_zero3=use_zero3
+            args=args,
+            console=console,
+            tokenizer=tokenizer,
+            rank=rank,
+            use_zero3=use_zero3,
         )
     elif args.mode == "test":
         return get_model_test(
@@ -43,7 +47,11 @@ def get_model(
 
 
 def get_model_train(
-    args: Namespace, console: Console, tokenizer: PreTrainedTokenizer, rank: int, use_zero3: bool = False
+    args: Namespace,
+    console: Console,
+    tokenizer: PreTrainedTokenizer,
+    rank: int,
+    use_zero3: bool = False,
 ):
     if args.fuzz_model:
 
@@ -218,7 +226,11 @@ def get_model_train(
                 lora_alpha=args.lora_alpha,
                 lora_dropout=args.lora_dropout,
                 lora_target_modules=args.lora_target_modules,
-                device_map=None if use_zero3 else ("cuda" if torch.cuda.is_available() else "cpu"),
+                device_map=(
+                    None
+                    if use_zero3
+                    else ("cuda" if torch.cuda.is_available() else "cpu")
+                ),
             )
             model = GLMFModelForCausalLM(
                 config=config,

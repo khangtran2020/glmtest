@@ -243,12 +243,14 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
         # For ZeRO-3, device_map must be None as DeepSpeed handles device placement
         model_kwargs = {
-            "torch_dtype": torch_dtype,
-            "attn_implementation": "flash_attention_2" if config.use_flash_attn else "sdpa",
+            "dtype": torch_dtype,
+            "attn_implementation": (
+                "flash_attention_2" if config.use_flash_attn else "sdpa"
+            ),
         }
         if not use_zero3:
             model_kwargs["device_map"] = f"cuda:{rank}"
-        
+
         self.llm_model = AutoModelForCausalLM.from_pretrained(
             config.model_name,
             **model_kwargs,
