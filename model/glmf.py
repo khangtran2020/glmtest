@@ -1,8 +1,6 @@
 import os
-import gc
 import time
 import torch
-from torch import nn, Tensor
 from transformers import AutoModelForCausalLM, AutoConfig
 from transformers.configuration_utils import PretrainedConfig
 from transformers import AutoModelForCausalLM, PreTrainedTokenizer
@@ -18,6 +16,7 @@ from transformers.loss.loss_utils import fixed_cross_entropy
 from model.gnn import GAT, SAGE
 from train.utils import extract_local
 from peft import get_peft_model, LoraConfig, TaskType
+from utils.utils import get_index_by_value
 
 
 # typing
@@ -348,17 +347,17 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                         graph[node_type].x = graph[node_type].x.half()
 
                 # print("Inputs emebdding:", graph.x_dict)
-                for key in graph.x_dict:
-                    print(f"Graph node type: {key}, dtype: {graph.x_dict[key].dtype}")
+                # for key in graph.x_dict:
+                #     print(f"Graph node type: {key}, dtype: {graph.x_dict[key].dtype}")
 
-                for key in graph.edge_index_dict:
-                    print(
-                        f"Graph edge type: {key}, dtype: {graph.edge_index_dict[key].dtype}"
-                    )
+                # for key in graph.edge_index_dict:
+                #     print(
+                #         f"Graph edge type: {key}, dtype: {graph.edge_index_dict[key].dtype}"
+                #     )
 
                 graph_embeds = self.gnn(graph.x_dict, graph.edge_index_dict)
 
-                node_idx = self.get_index_by_value(overall_mask, 1)
+                node_idx = get_index_by_value(overall_mask, 1)
                 graph_embeds = graph_embeds["node"][node_idx, :]
 
                 if self.gnn_mode == "node":
