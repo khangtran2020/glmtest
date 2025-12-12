@@ -45,7 +45,7 @@ class GAT(torch.nn.Module):
         # Convert input to match model dtype (for mixed precision training)
         target_dtype = next(self.parameters()).dtype
 
-        with torch.autocast(dtype=target_dtype):
+        with torch.autocast(device_type="cuda", dtype=target_dtype):
             h = x
             for i in range(0, self.n_layers):
                 h = self.layers[i](h, edge_index)
