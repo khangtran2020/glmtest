@@ -649,7 +649,9 @@ def continue_training_from_checkpoint(
 
 def extract_metadata_from_graph(dataset: Data):
     # Get 1 graph from the dataset to make the GNN model become heterogeneous
-    data_path = dataset["train"][list(dataset["train"].keys())[0]]["data_path"]
+    data_path = dataset.processed_data["train"][list(dataset["train"].keys())[0]][
+        "data_path"
+    ]
     with open(data_path, "r") as f:
         sample = json.load(f)
     graph_path = sample["graph_path"]
