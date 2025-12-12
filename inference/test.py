@@ -4,7 +4,6 @@ import json
 import time
 import torch
 from itertools import islice
-from model.gnn import GRAPH_KEYS
 from tqdm import tqdm
 from rich import print as pprint
 from data.core import Data
@@ -223,12 +222,13 @@ def generate_and_save_on_one_dataset(
 
                     for i in range(batch_size):
                         graph = batch["graph"][i]
-                        for key in GRAPH_KEYS:
-                            if key in graph.keys():
-                                graph[key] = graph[key].to(device)
-                                graph[key].ndata["feat"] = (
-                                    graph[key].ndata["feat"].to(device)
-                                )
+                        graph = graph.to(device)
+                        # for key in GRAPH_KEYS:
+                        #     if key in graph.keys():
+                        #         graph[key] = graph[key].to(device)
+                        #         graph[key].ndata["feat"] = (
+                        #             graph[key].ndata["feat"].to(device)
+                        #         )
 
                         graph_mask = [
                             mask.to(device) for mask in batch["graph_mask"][i]
@@ -302,10 +302,11 @@ def generate_and_save_on_one_dataset(
                         micro_input[key] = micro_input[key].to("cpu")
                 if "graph" in args.baseline_prompt:
                     for graph in graphs:
-                        for key in GRAPH_KEYS:
-                            if key in graph.keys():
-                                graph[key] = graph[key].to("cpu")
-                                graph.pop(key, None)
+                        graph = graph.to("cpu")
+                        # for key in GRAPH_KEYS:
+                        #     if key in graph.keys():
+                        #         graph[key] = graph[key].to("cpu")
+                        #         graph.pop(key, None)
                     for graph_mask in graph_masks:
                         for mask in graph_mask:
                             mask = mask.to("cpu")
@@ -475,10 +476,11 @@ def validate(
                     micro_input[key] = micro_input[key].to("cpu")
                 if "graph" in args.baseline_prompt:
                     for graph in graphs:
-                        for key in GRAPH_KEYS:
-                            if key in graph.keys():
-                                graph[key] = graph[key].to("cpu")
-                                graph.pop(key, None)
+                        graph = graph.to("cpu")
+                        # for key in GRAPH_KEYS:
+                        #     if key in graph.keys():
+                        #         graph[key] = graph[key].to("cpu")
+                        #         graph.pop(key, None)
                     for graph_mask in graph_masks:
                         for mask in graph_mask:
                             mask = mask.to("cpu")
