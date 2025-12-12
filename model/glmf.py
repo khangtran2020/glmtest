@@ -342,6 +342,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
                 overall_mask = overall_mask.long().to(self.llm_model.device)
                 graph = graph.to(self.llm_model.device)
+
                 for node_type in graph.node_types:
                     if "x" in graph[node_type]:
                         graph[node_type].x = graph[node_type].x.half()
@@ -350,6 +351,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 graph_embeds = graph_embeds["node"]
 
                 if self.rank == 0:
+                    print("Graph total number of nodes:", graph.num_nodes)
                     print("Size of graph embeds:", graph_embeds.size())
                     print(
                         "Max and min of overall_indices:",

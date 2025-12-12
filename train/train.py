@@ -863,20 +863,20 @@ def train_multi_gpu_accelerate(
     #     transient=False,
     # ) as progress:
 
-    if accelerator.is_main_process:
-        train_task = progress.add_task(
-            "Training...", total=args.num_train_epochs, step_time=0.0
-        )
+    # if accelerator.is_main_process:
+    #     train_task = progress.add_task(
+    #         "Training...", total=args.num_train_epochs, step_time=0.0
+    #     )
 
     for epoch in range(args.num_train_epochs):
 
         model.train()
-        if accelerator.is_main_process:
-            train_epoch_task = progress.add_task(
-                f"Epoch {epoch + 1}/{args.num_train_epochs}",
-                total=len(tr_loader),
-                step_time=0.0,
-            )
+        # if accelerator.is_main_process:
+        #     train_epoch_task = progress.add_task(
+        #         f"Epoch {epoch + 1}/{args.num_train_epochs}",
+        #         total=len(tr_loader),
+        #         step_time=0.0,
+        #     )
         epoch_loss = 0.0
         num_items = 0.0
 
@@ -893,16 +893,16 @@ def train_multi_gpu_accelerate(
 
             if (continue_training == True) and (global_step <= start_step):
                 global_step += args.batch_size
-                ram_usage = log_ram_usage()
+                # ram_usage = log_ram_usage()
 
-                if accelerator.is_main_process:
-                    progress.update(
-                        train_epoch_task,
-                        advance=1,
-                        step_time=0.0,
-                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
-                    )
-                step_timer.end()
+                # if accelerator.is_main_process:
+                #     progress.update(
+                #         train_epoch_task,
+                #         advance=1,
+                #         step_time=0.0,
+                #         description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
+                #     )
+                # step_timer.end()
                 continue
 
             # Get data loading time from batch (measured in __getitem__)
@@ -1036,12 +1036,12 @@ def train_multi_gpu_accelerate(
             if accelerator.is_main_process:
                 ram_usage = log_ram_usage()
                 avg_time = step_timer.avg_time()
-                progress.update(
-                    train_epoch_task,
-                    advance=1,
-                    step_time=avg_time,
-                    description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} | Data: {data_load_time:.3f}s | Emb: {embedding_time:.3f}s | Fwd: {forward_time:.3f}s | Bwd: {backward_time:.3f}s | RAM: {ram_usage:.1f}MB",
-                )
+                # progress.update(
+                #     train_epoch_task,
+                #     advance=1,
+                #     step_time=avg_time,
+                #     description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} | Data: {data_load_time:.3f}s | Emb: {embedding_time:.3f}s | Fwd: {forward_time:.3f}s | Bwd: {backward_time:.3f}s | RAM: {ram_usage:.1f}MB",
+                # )
                 accelerator.print(
                     f"Step {global_step} - Loss: {avg_batch_loss:.4f} | "
                     f"Data: {data_load_time:.3f}s | Emb: {embedding_time:.3f}s | "
@@ -1133,7 +1133,7 @@ def train_multi_gpu_accelerate(
                     model=model,
                     config=config,
                     accelerator=accelerator,
-                    progress=progress,
+                    progress=None,
                 )
                 accelerator.wait_for_everyone()
 
@@ -1190,17 +1190,17 @@ def train_multi_gpu_accelerate(
                             del lora_state_dict
                         gc.collect()
 
-        if accelerator.is_main_process:
-            if ((continue_training == True) and (global_step > start_step)) or (
-                continue_training == False
-            ):
-                progress.update(train_epoch_task, visible=False)
-                progress.remove_task(train_epoch_task)
-                progress.update(
-                    train_task,
-                    advance=1,
-                    description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
-                )
+        # if accelerator.is_main_process:
+        #     if ((continue_training == True) and (global_step > start_step)) or (
+        #         continue_training == False
+        #     ):
+        #         progress.update(train_epoch_task, visible=False)
+        #         progress.remove_task(train_epoch_task)
+        #         progress.update(
+        #             train_task,
+        #             advance=1,
+        #             description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
+        #         )
 
     # One more validation at the end of training
     val_loss = validate(
