@@ -334,10 +334,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 mask_idx = []
                 for j, mask in enumerate(graph_mask):
                     mask_indices = (mask == 1).nonzero(as_tuple=True)[0]
-                    idx_in_overall = []
-                    for k, idx in enumerate(mask_indices):
-                        if idx in overall_indices:
-                            idx_in_overall.append(k)
+                    # Find positions of mask_indices in overall_indices
+                    idx_in_overall = torch.searchsorted(overall_indices, mask_indices)
                     mask_idx.append(idx_in_overall)
 
                 overall_mask = overall_mask.long().to(self.llm_model.device)
@@ -351,11 +349,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
                 if self.gnn_mode == "node":
                     for j, mask in enumerate(graph_mask):
-                        print(
-                            f"Mask idx {j}: {mask_idx[j]}, graph_embeds shape: {graph_embeds.shape}"
-                        )
                         embeds = graph_embeds[mask_idx[j], :]
-                        assert embeds.size(0) == len(mask_idx[j])
+                        assert embeds.size(0) == mask_idx[j].size(0)
                         embeds = embeds.to(inputs_embeds.device)
                         inputs_embeds[i, ranges[j][0] : ranges[j][1] + 1, :] = (
                             embeds.to(inputs_embeds.dtype)
@@ -363,7 +358,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 else:  # branch mode
                     for j, mask in enumerate(graph_mask):
                         embeds = graph_embeds[mask_idx[j], :]
-                        assert embeds.size(0) == len(mask_idx[j])
+                        assert embeds.size(0) == mask_idx[j].size(0)
                         inputs_embeds[
                             i, graph_token_index[j] : graph_token_index[j] + 1, :
                         ] = embeds.to(inputs_embeds.dtype).mean(dim=0, keepdim=True)
