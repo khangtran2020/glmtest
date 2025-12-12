@@ -53,7 +53,11 @@ class GLMFDataset(Dataset):
         with open(data_path, "r") as f:
             sample = json.load(f)
         graph_path = sample["graph_path"]
-        graph = torch.load(graph_path) if graph_path is not None else None
+        graph = (
+            torch.load(graph_path, weights_only=True)
+            if graph_path is not None
+            else None
+        )
 
         if sample["active_node"] is not None:
             active_nodes = []
