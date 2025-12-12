@@ -109,6 +109,9 @@ def get_model_train(
 
         if metadata is not None:
             glmf_model.gnn = to_hetero(glmf_model.gnn, metadata=metadata, aggr="sum")
+            console.log(
+                f"[blue]Converted GNN to heterogeneous with metadata: {metadata}[/blue]"
+            )
 
         glmf_model.config.graph_token_id = [
             tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
@@ -212,6 +215,9 @@ def get_model_train(
 
             if metadata is not None:
                 model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
+                console.log(
+                    f"[blue]Converted GNN to heterogeneous with metadata: {metadata}[/blue]"
+                )
 
             for file in os.listdir(args.model_weight_path):
                 if file.endswith(".pt"):
@@ -269,6 +275,9 @@ def get_model_train(
 
             if metadata is not None:
                 model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
+                console.log(
+                    f"[blue]Converted GNN to heterogeneous with metadata: {metadata}[/blue]"
+                )
 
         model.llm_model.gradient_checkpointing_enable()
         model.config.graph_token_id = [
@@ -349,6 +358,9 @@ def get_model_test(
 
         if metadata is not None:
             glmf_model.gnn = to_hetero(glmf_model.gnn, metadata=metadata, aggr="sum")
+            console.log(
+                f"[blue]Converted GNN to heterogeneous with metadata: {metadata}[/blue]"
+            )
 
         glmf_model.config.graph_token_id = [
             tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
@@ -424,6 +436,9 @@ def get_model_test(
 
         if metadata is not None:
             model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
+            console.log(
+                f"[blue]Converted GNN to heterogeneous with metadata: {metadata}[/blue]"
+            )
 
         model.config.graph_token_id = [
             tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
@@ -518,6 +533,9 @@ def get_model_testgen(
                 glmf_model.gnn = to_hetero(
                     glmf_model.gnn, metadata=metadata, aggr="sum"
                 )
+                console.log(
+                    f"[blue]Converted GNN to heterogeneous with metadata: {metadata}[/blue]"
+                )
 
             glmf_model.config.graph_token_id = [
                 tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
@@ -593,6 +611,9 @@ def get_model_testgen(
 
             if metadata is not None:
                 model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
+                console.log(
+                    f"[blue]Converted GNN to heterogeneous with metadata: {metadata}[/blue]"
+                )
 
             model.config.graph_token_id = [
                 tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
