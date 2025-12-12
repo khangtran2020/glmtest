@@ -41,7 +41,7 @@ class GAT(torch.nn.Module):
             )
         self.activation = torch.nn.SELU()
 
-    def forward(self, x: Dict[torch.Tensor], edge_index: torch.Tensor):
+    def forward(self, x: Dict[str, torch.Tensor], edge_index: torch.Tensor):
         h = x
         for i in range(0, self.n_layers):
             if len(h.keys()) == 1:
