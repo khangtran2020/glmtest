@@ -417,7 +417,7 @@ def validate(
         val_loss = 0.0
         num_item = 0
 
-        if accelerator.is_main_process:
+        if accelerator.is_main_process and progress is not None:
             val_task = progress.add_task(
                 "Validating...", total=len(loader), step_time=0.0
             )
@@ -497,7 +497,7 @@ def validate(
                 torch.cuda.empty_cache()
                 continue
 
-            if accelerator.is_main_process:
+            if accelerator.is_main_process and progress is not None:
                 progress.update(
                     val_task,
                     advance=1,
@@ -511,7 +511,7 @@ def validate(
             if step % 10 == 0:
                 torch.cuda.empty_cache()
 
-        if accelerator.is_main_process:
+        if accelerator.is_main_process and progress is not None:
             progress.update(val_task, visible=False)
         val_loss /= num_item
     model.train()
