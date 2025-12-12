@@ -449,6 +449,7 @@ def train_single_gpu_accelerate(
 
                     for i in range(batch_size):
                         graph = batch["graph"][i]
+                        graph = graph.pin_memory()
                         graph = graph.to(device, non_blocking=True)
 
                         graph_mask = [mask for mask in batch["graph_mask"][i]]
@@ -958,9 +959,7 @@ def train_multi_gpu_accelerate(
                             graphs=micro_graphs,
                             graph_masks=micro_graph_masks,
                             graph_token_indices=micro_graph_token_indices,
-                            step=global_step,
                             accelerator=accelerator,
-                            ring_attn=False,
                         )
                         forward_time = time.time() - forward_start
                         total_forward_time += forward_time

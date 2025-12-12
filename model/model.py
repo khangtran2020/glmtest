@@ -1,11 +1,21 @@
 import os
+import json
 import torch
 from model.glmf import GLMFModelConfig, GLMFModelForCausalLM
 from model.glmffuzz import GLMFModelFuzzing
+from data.core import Data
 from rich.console import Console
 from argparse import Namespace
 from transformers import PreTrainedTokenizer
 from train.utils import load_checkpoint
+from torch_geometric.nn import to_hetero
+from torch_geometric.data import HeteroData
+from torch_geometric.data.storage import (
+    BaseStorage,
+    GlobalStorage,
+    NodeStorage,
+    EdgeStorage,
+)
 from utils.constant import (
     GRAPH_START_TOKEN,
     GRAPH_PAD_TOKEN,
@@ -19,6 +29,7 @@ def get_model(
     tokenizer: PreTrainedTokenizer,
     rank: int,
     device: torch.device,
+    metadata: tuple = None,
     use_zero3: bool = False,
 ):
     if args.mode == "train":
@@ -27,11 +38,16 @@ def get_model(
             console=console,
             tokenizer=tokenizer,
             rank=rank,
+            metadata=metadata,
             use_zero3=use_zero3,
         )
     elif args.mode == "test":
         return get_model_test(
-            args=args, console=console, tokenizer=tokenizer, rank=rank
+            args=args,
+            console=console,
+            tokenizer=tokenizer,
+            rank=rank,
+            metadata=metadata,
         )
     elif args.mode == "testgen":
         return get_model_testgen(
@@ -39,6 +55,7 @@ def get_model(
             console=console,
             rank=rank,
             tokenizer=tokenizer,
+            metadata=metadata,
             device=device,
         )
     else:
@@ -51,6 +68,7 @@ def get_model_train(
     console: Console,
     tokenizer: PreTrainedTokenizer,
     rank: int,
+    metadata: tuple = None,
     use_zero3: bool = False,
 ):
     if args.fuzz_model:
@@ -88,6 +106,9 @@ def get_model_train(
             multi_gpu=True if args.num_gpu > 1 else False,
             is_training=True,
         )
+
+        if metadata is not None:
+            glmf_model.gnn = to_hetero(glmf_model.gnn, metadata=metadata, aggr="sum")
 
         glmf_model.config.graph_token_id = [
             tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
@@ -189,6 +210,9 @@ def get_model_train(
                 is_training=False,
             )
 
+            if metadata is not None:
+                model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
+
             for file in os.listdir(args.model_weight_path):
                 if file.endswith(".pt"):
                     state_dict = torch.load(
@@ -243,6 +267,9 @@ def get_model_train(
                 use_zero3=use_zero3,
             )
 
+            if metadata is not None:
+                model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
+
         model.llm_model.gradient_checkpointing_enable()
         model.config.graph_token_id = [
             tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
@@ -261,6 +288,7 @@ def get_model_test(
     console: Console,
     tokenizer: PreTrainedTokenizer,
     rank: int,
+    metadata: tuple = None,
 ):
     # load model
     assert (
@@ -306,6 +334,9 @@ def get_model_test(
             multi_gpu=True if args.num_gpu > 1 else False,
             is_training=False,
         )
+
+        if metadata is not None:
+            glmf_model.gnn = to_hetero(glmf_model.gnn, metadata=metadata, aggr="sum")
 
         glmf_model.config.graph_token_id = [
             tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
@@ -379,6 +410,9 @@ def get_model_test(
             is_training=False,
         )
 
+        if metadata is not None:
+            model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
+
         model.config.graph_token_id = [
             tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
             tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
@@ -420,6 +454,7 @@ def get_model_testgen(
     rank: int,
     tokenizer: PreTrainedTokenizer,
     device: torch.device,
+    metadata: tuple = None,
 ):
     # load model
     assert (
@@ -466,6 +501,11 @@ def get_model_testgen(
                 multi_gpu=True if args.num_gpu > 1 else False,
                 is_training=False,
             )
+
+            if metadata is not None:
+                glmf_model.gnn = to_hetero(
+                    glmf_model.gnn, metadata=metadata, aggr="sum"
+                )
 
             glmf_model.config.graph_token_id = [
                 tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
@@ -539,6 +579,9 @@ def get_model_testgen(
                 is_training=False,
             )
 
+            if metadata is not None:
+                model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
+
             model.config.graph_token_id = [
                 tokenizer.convert_tokens_to_ids(GRAPH_START_TOKEN),
                 tokenizer.convert_tokens_to_ids(GRAPH_PAD_TOKEN),
@@ -602,3 +645,20 @@ def continue_training_from_checkpoint(
         start_step = -1
 
     return model, optimizer, lr_scheduler, start_step
+
+
+def extract_metadata_from_graph(dataset: Data):
+    # Get 1 graph from the dataset to make the GNN model become heterogeneous
+    data_path = dataset["train"][list(dataset["train"].keys())[0]]["data_path"]
+    with open(data_path, "r") as f:
+        sample = json.load(f)
+    graph_path = sample["graph_path"]
+    # Load graph with PyG classes allowlisted
+    if graph_path is not None:
+        with torch.serialization.safe_globals(
+            [HeteroData, BaseStorage, GlobalStorage, NodeStorage, EdgeStorage]
+        ):
+            graph = torch.load(graph_path, weights_only=True)
+    else:
+        graph = None
+    return graph.metadata()

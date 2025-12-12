@@ -10,7 +10,7 @@ from data.utils import get_dataset
 from data.core import get_reasoning
 from graph.utils import get_graph
 from train.train import train
-from model.model import get_model
+from model.model import get_model, extract_metadata_from_graph
 from inference.test import test
 from inference.testcase_generate import testcase_generate
 from baselines.prompt_engineer.run import PromptEngineer
@@ -237,6 +237,12 @@ def main() -> None:
         if isinstance(value, list):
             value = [dataset.llm_tokenizer.convert_tokens_to_ids(v) for v in value]
             console.log(f"[cyan]{key}[/cyan]: {value}")
+
+    graph_metadata = (
+        extract_metadata_from_graph(dataset=dataset)
+        if "graph" in args.baseline_prompt
+        else None
+    )
 
     if args.mode == "train":
         train(

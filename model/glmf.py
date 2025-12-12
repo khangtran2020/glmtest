@@ -526,150 +526,150 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             **kwargs,
         )
 
-    # def forward_llm(
-    #     self,
-    #     input_ids: torch.LongTensor = None,
-    #     attention_mask: Optional[torch.Tensor] = None,
-    #     position_ids: Optional[torch.LongTensor] = None,
-    #     past_key_values: Optional[List[torch.FloatTensor]] = None,
-    #     inputs_embeds: Optional[torch.FloatTensor] = None,
-    #     labels: Optional[torch.LongTensor] = None,
-    #     use_cache: Optional[bool] = None,
-    #     output_attentions: Optional[bool] = None,
-    #     output_hidden_states: Optional[bool] = None,
-    #     return_dict: Optional[bool] = None,
-    #     cache_position: Optional[torch.LongTensor] = None,
-    #     step: int = 0,
-    #     accelerator: Optional[Accelerator] = None,
-    #     logits_to_keep: Union[int, slice] = 0,
-    #     **kwargs,
-    # ) -> Union[Tuple, CausalLMOutputWithPast]:
+    """def forward_llm(
+        self,
+        input_ids: torch.LongTensor = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        past_key_values: Optional[List[torch.FloatTensor]] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
+        use_cache: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+        cache_position: Optional[torch.LongTensor] = None,
+        step: int = 0,
+        accelerator: Optional[Accelerator] = None,
+        logits_to_keep: Union[int, slice] = 0,
+        **kwargs,
+    ) -> Union[Tuple, CausalLMOutputWithPast]:
 
-    #     process_group = dist.group.WORLD
-    #     ignore_index = -100
+        process_group = dist.group.WORLD
+        ignore_index = -100
 
-    #     # print("Input embeds requires_grad:", inputs_embeds.requires_grad)
+        # print("Input embeds requires_grad:", inputs_embeds.requires_grad)
 
-    #     if labels is not None:
-    #         labels = nn.functional.pad(labels, (0, 1), value=ignore_index)
-    #         labels = labels[..., 1:].contiguous()
+        if labels is not None:
+            labels = nn.functional.pad(labels, (0, 1), value=ignore_index)
+            labels = labels[..., 1:].contiguous()
 
-    #     seq_len = inputs_embeds.shape[-2]
-    #     rank = self.rank
+        seq_len = inputs_embeds.shape[-2]
+        rank = self.rank
 
-    #     num_processes = dist.get_world_size()
-    #     # pprint(f"[blue]Number of processes: {num_processes}[/blue]")
-    #     inputs_embeds, cu_seqlens_emb = extract_local(
-    #         inputs_embeds, rank, num_processes, inputs_embeds.device
-    #     )
+        num_processes = dist.get_world_size()
+        # pprint(f"[blue]Number of processes: {num_processes}[/blue]")
+        inputs_embeds, cu_seqlens_emb = extract_local(
+            inputs_embeds, rank, num_processes, inputs_embeds.device
+        )
 
-    #     if labels is not None:
-    #         labels, cu_seqlens_lab = extract_local(
-    #             labels, rank, num_processes, labels.device
-    #         )
-    #         assert (
-    #             cu_seqlens_emb - cu_seqlens_lab
-    #         ).sum().item() == 0, (
-    #             f"cu_seqlens_emb: {cu_seqlens_emb}, cu_seqlens_lab: {cu_seqlens_lab}"
-    #         )
+        if labels is not None:
+            labels, cu_seqlens_lab = extract_local(
+                labels, rank, num_processes, labels.device
+            )
+            assert (
+                cu_seqlens_emb - cu_seqlens_lab
+            ).sum().item() == 0, (
+                f"cu_seqlens_emb: {cu_seqlens_emb}, cu_seqlens_lab: {cu_seqlens_lab}"
+            )
 
-    #     if position_ids is None:
-    #         position_ids = (
-    #             torch.arange(seq_len, device=inputs_embeds.device, dtype=torch.long)
-    #             .unsqueeze(0)
-    #             .expand(inputs_embeds.shape[0], -1)
-    #         )
+        if position_ids is None:
+            position_ids = (
+                torch.arange(seq_len, device=inputs_embeds.device, dtype=torch.long)
+                .unsqueeze(0)
+                .expand(inputs_embeds.shape[0], -1)
+            )
 
-    #     position_ids, cu_seqlens_pos = extract_local(
-    #         position_ids, rank, num_processes, inputs_embeds.device
-    #     )
-    #     assert (
-    #         cu_seqlens_emb - cu_seqlens_pos
-    #     ).sum().item() == 0, (
-    #         f"cu_seqlens_emb: {cu_seqlens_emb}, cu_seqlens_pos: {cu_seqlens_pos}"
-    #     )
-    #     update_ring_flash_attn_params(
-    #         cu_seqlens=cu_seqlens_emb, process_group=process_group
-    #     )
-    #     if accelerator is not None:
-    #         accelerator.wait_for_everyone()
+        position_ids, cu_seqlens_pos = extract_local(
+            position_ids, rank, num_processes, inputs_embeds.device
+        )
+        assert (
+            cu_seqlens_emb - cu_seqlens_pos
+        ).sum().item() == 0, (
+            f"cu_seqlens_emb: {cu_seqlens_emb}, cu_seqlens_pos: {cu_seqlens_pos}"
+        )
+        update_ring_flash_attn_params(
+            cu_seqlens=cu_seqlens_emb, process_group=process_group
+        )
+        if accelerator is not None:
+            accelerator.wait_for_everyone()
 
-    #     if self.is_training:
-    #         if self.use_lora:
-    #             outputs = self.llm_model.base_model.model.model(
-    #                 input_ids=input_ids,
-    #                 attention_mask=attention_mask,
-    #                 position_ids=position_ids,
-    #                 past_key_values=past_key_values,
-    #                 inputs_embeds=inputs_embeds,
-    #                 use_cache=use_cache,
-    #                 output_attentions=output_attentions,
-    #                 output_hidden_states=output_hidden_states,
-    #                 return_dict=return_dict,
-    #                 cache_position=cache_position,
-    #             )
-    #         else:
-    #             outputs = self.llm_model.model(
-    #                 input_ids=input_ids,
-    #                 attention_mask=attention_mask,
-    #                 position_ids=position_ids,
-    #                 past_key_values=past_key_values,
-    #                 inputs_embeds=inputs_embeds,
-    #                 use_cache=use_cache,
-    #                 output_attentions=output_attentions,
-    #                 output_hidden_states=output_hidden_states,
-    #                 return_dict=return_dict,
-    #                 cache_position=cache_position,
-    #             )
-    #     else:
-    #         outputs = self.llm_model.model(
-    #             input_ids=input_ids,
-    #             attention_mask=attention_mask,
-    #             position_ids=position_ids,
-    #             past_key_values=past_key_values,
-    #             inputs_embeds=inputs_embeds,
-    #             use_cache=use_cache,
-    #             output_attentions=output_attentions,
-    #             output_hidden_states=output_hidden_states,
-    #             return_dict=return_dict,
-    #             cache_position=cache_position,
-    #         )
+        if self.is_training:
+            if self.use_lora:
+                outputs = self.llm_model.base_model.model.model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    position_ids=position_ids,
+                    past_key_values=past_key_values,
+                    inputs_embeds=inputs_embeds,
+                    use_cache=use_cache,
+                    output_attentions=output_attentions,
+                    output_hidden_states=output_hidden_states,
+                    return_dict=return_dict,
+                    cache_position=cache_position,
+                )
+            else:
+                outputs = self.llm_model.model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    position_ids=position_ids,
+                    past_key_values=past_key_values,
+                    inputs_embeds=inputs_embeds,
+                    use_cache=use_cache,
+                    output_attentions=output_attentions,
+                    output_hidden_states=output_hidden_states,
+                    return_dict=return_dict,
+                    cache_position=cache_position,
+                )
+        else:
+            outputs = self.llm_model.model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_values=past_key_values,
+                inputs_embeds=inputs_embeds,
+                use_cache=use_cache,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+                cache_position=cache_position,
+            )
 
-    #     hidden_states = outputs.last_hidden_state
+        hidden_states = outputs.last_hidden_state
 
-    #     slice_indices = (
-    #         slice(-logits_to_keep, None)
-    #         if isinstance(logits_to_keep, int)
-    #         else logits_to_keep
-    #     )
-    #     if self.is_training and self.use_lora:
-    #         logits = self.llm_model.base_model.model.lm_head(
-    #             hidden_states[:, slice_indices, :]
-    #         )
-    #     else:
-    #         logits = self.llm_model.lm_head(hidden_states[:, slice_indices, :])
+        slice_indices = (
+            slice(-logits_to_keep, None)
+            if isinstance(logits_to_keep, int)
+            else logits_to_keep
+        )
+        if self.is_training and self.use_lora:
+            logits = self.llm_model.base_model.model.lm_head(
+                hidden_states[:, slice_indices, :]
+            )
+        else:
+            logits = self.llm_model.lm_head(hidden_states[:, slice_indices, :])
 
-    #     loss = None
-    #     if labels is not None:
-    #         logits = logits.float()
-    #         logits = logits.view(-1, self.config.vocab_size)
-    #         labels = labels.view(-1)
-    #         labels = labels.to(logits.device)
-    #         loss = fixed_cross_entropy(
-    #             logits,
-    #             labels,
-    #             num_items_in_batch=None,
-    #             ignore_index=ignore_index,
-    #             **kwargs,
-    #         )
+        loss = None
+        if labels is not None:
+            logits = logits.float()
+            logits = logits.view(-1, self.config.vocab_size)
+            labels = labels.view(-1)
+            labels = labels.to(logits.device)
+            loss = fixed_cross_entropy(
+                logits,
+                labels,
+                num_items_in_batch=None,
+                ignore_index=ignore_index,
+                **kwargs,
+            )
 
-    #     return CausalLMOutputWithPast(
-    #         loss=loss,
-    #         logits=logits,
-    #         past_key_values=outputs.past_key_values,
-    #         hidden_states=outputs.hidden_states,
-    #         attentions=outputs.attentions,
-    #     )
+        return CausalLMOutputWithPast(
+            loss=loss,
+            logits=logits,
+            past_key_values=outputs.past_key_values,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )"""
 
     def init_for_train(self, tokenizer: PreTrainedTokenizer):
 
