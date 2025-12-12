@@ -342,7 +342,10 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     mask_idx.append(idx_in_overall)
 
                 overall_mask = overall_mask.long().to(self.llm_model.device)
-                graph = graph.to(self.llm_model.device).half()
+                graph = graph.to(self.llm_model.device)
+                for node_type in graph.node_types:
+                    if "x" in graph[node_type]:
+                        graph[node_type].x = graph[node_type].x.half()
 
                 # print("Inputs emebdding:", graph.x_dict)
                 for key in graph.x_dict:
