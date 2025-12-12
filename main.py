@@ -251,6 +251,7 @@ def main() -> None:
             console=console,
             continue_training=args.continue_training,
             max_num_checkpoint=args.max_num_checkpoint,
+            metadata=graph_metadata,
             mixed_precision="bf16" if args.dtype == "bf16" else "fp16",
         )
     elif args.mode == "test":
@@ -259,6 +260,7 @@ def main() -> None:
             console=console,
             tokenizer=dataset.llm_tokenizer,
             rank=local_rank,
+            metadata=graph_metadata,
             device=device,
         )
         test(args=args, dataset=dataset, model=model, console=console)
@@ -268,6 +270,7 @@ def main() -> None:
             console=console,
             tokenizer=dataset.llm_tokenizer,
             rank=local_rank,
+            metadata=graph_metadata,
             device=device,
         )
         testcase_generate(

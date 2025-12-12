@@ -51,8 +51,6 @@ class GAT(torch.nn.Module):
 
         h = x
         for i in range(0, self.n_layers):
-            if len(h.keys()) == 1:
-                h = (h["node"], h["node"])
             h = self.layers[i](h, edge_index)
             h = self.activation(h)
         h = self.last_layer(h)

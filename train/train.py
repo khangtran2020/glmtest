@@ -75,6 +75,7 @@ def train(
     continue_training: bool = False,
     max_num_checkpoint: int = 5,
     mixed_precision: str = "fp16",
+    metadata: tuple = None,
     collate_fn: callable = collate_fn,
 ):
     # init accelerator
@@ -153,6 +154,7 @@ def train(
         tokenizer=dataset.llm_tokenizer,
         rank=accelerator.process_index,
         device=accelerator.device,
+        metadata=metadata,
         use_zero3=use_zero3,
     )
 
