@@ -202,6 +202,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         multi_gpu: bool = False,
         debug: bool = False,
         is_training: bool = False,
+        use_zero3: bool = False,
     ):
 
         super().__init__(config)
@@ -240,13 +241,17 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         else:
             torch_dtype = None
 
+        # For ZeRO-3, device_map must be None as DeepSpeed handles device placement
+        model_kwargs = {
+            "torch_dtype": torch_dtype,
+            "attn_implementation": "flash_attention_2" if config.use_flash_attn else "sdpa",
+        }
+        if not use_zero3:
+            model_kwargs["device_map"] = f"cuda:{rank}"
+        
         self.llm_model = AutoModelForCausalLM.from_pretrained(
             config.model_name,
-            torch_dtype=torch_dtype,
-            device_map=f"cuda:{rank}",
-            attn_implementation=(
-                "flash_attention_2" if config.use_flash_attn else "sdpa"
-            ),
+            **model_kwargs,
         )
 
         if self.is_training:

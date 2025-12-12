@@ -134,12 +134,26 @@ def train(
                 project_dir=args.log_dir,
             )
 
+    # Check if we're using ZeRO-3 for model initialization
+    use_zero3 = False
+    if args.use_deepspeed and os.path.exists(args.deepspeed_config):
+        deepspeed_config_path = args.deepspeed_config
+        if ("gpt" in args.llm_model.lower()) or (mixed_precision == "bf16"):
+            bf16_config = args.deepspeed_config.replace(".json", "_bf16.json")
+            if os.path.exists(bf16_config):
+                deepspeed_config_path = bf16_config
+
+        with open(deepspeed_config_path, "r") as f:
+            ds_config = json.load(f)
+        use_zero3 = ds_config.get("zero_optimization", {}).get("stage", 0) == 3
+
     model = get_model(
         args=args,
         console=console,
         tokenizer=dataset.llm_tokenizer,
         rank=accelerator.process_index,
         device=accelerator.device,
+        use_zero3=use_zero3,
     )
 
     optimizer = AdamW(
