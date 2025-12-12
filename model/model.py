@@ -1,5 +1,4 @@
 import os
-import json
 import torch
 from model.glmf import GLMFModelConfig, GLMFModelForCausalLM
 from model.glmffuzz import GLMFModelFuzzing
@@ -649,12 +648,9 @@ def continue_training_from_checkpoint(
 
 def extract_metadata_from_graph(dataset: Data):
     # Get 1 graph from the dataset to make the GNN model become heterogeneous
-    data_path = dataset.processed_data["train"][
+    graph_path = dataset.processed_data["train"][
         list(dataset.processed_data["train"].keys())[0]
-    ]["data_path"]
-    with open(data_path, "r") as f:
-        sample = json.load(f)
-    graph_path = sample["graph_path"]
+    ]["graph_path"]
     # Load graph with PyG classes allowlisted
     if graph_path is not None:
         with torch.serialization.safe_globals(
