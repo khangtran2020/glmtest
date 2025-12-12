@@ -23,7 +23,7 @@ class GAT(torch.nn.Module):
         self.layers = nn.ModuleList()
         self.layers.append(
             GATConv(
-                in_channels=(in_feats, in_feats),
+                in_channels=in_feats,
                 out_channels=n_hidden,
                 heads=num_head,
                 dropout=dropout,
@@ -32,7 +32,7 @@ class GAT(torch.nn.Module):
         for i in range(0, n_layers - 1):
             self.layers.append(
                 GATConv(
-                    in_channels=(num_head * n_hidden, num_head * n_hidden),
+                    in_channels=num_head * n_hidden,
                     out_channels=n_hidden,
                     heads=num_head,
                     dropout=dropout,
@@ -43,7 +43,7 @@ class GAT(torch.nn.Module):
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor):
         h = x
         for i in range(0, self.n_layers):
-            h = self.layers[i](x, edge_index)
+            h = self.layers[i](h, edge_index)
             h = self.activation(h)
         h = self.last_layer(h)
         return h

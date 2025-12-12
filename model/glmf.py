@@ -343,6 +343,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
                 overall_mask = overall_mask.long().to(self.llm_model.device)
                 # assert isinstance(self.gnn,)
+                print("Inputs emebdding:", graph.x_dict)
                 graph_embeds = self.gnn(graph.x_dict, graph.edge_index_dict)
 
                 node_idx = self.get_index_by_value(overall_mask, 1)
