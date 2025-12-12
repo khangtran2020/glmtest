@@ -345,7 +345,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 graph_embeds = self.gnn(graph.x_dict, graph.edge_index_dict)
 
                 node_idx = self.get_index_by_value(overall_mask, 1)
-                graph_embeds = graph_embeds[node_idx, :]
+                graph_embeds = graph_embeds["node"][node_idx, :]
 
                 if self.gnn_mode == "node":
                     for j, mask in enumerate(graph_mask):
