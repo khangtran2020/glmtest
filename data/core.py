@@ -1311,7 +1311,7 @@ class Data(object):
         with open(graph_path, "r") as file:
             graph = json.load(file)
 
-        graph_dict = {}
+        # graph_dict = {}
         num_nodes = len(graph["nodes"])
         feat = torch.load(data["graph"]["node_feature_path"], weights_only=True)
 
@@ -1333,6 +1333,7 @@ class Data(object):
         # graph_dict["num_nodes"] = num_nodes
         # graph_dict["feat_size"] = feat.size()
         # return graph_dict
+        assert graph_data.num_nodes == num_nodes, "Number of nodes mismatch!"
         return graph_data
 
     def read_edge(self, graph: dict) -> dict:
