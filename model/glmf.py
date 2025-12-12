@@ -342,6 +342,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     mask_idx.append(idx_in_overall)
 
                 overall_mask = overall_mask.long().to(self.llm_model.device)
+                # assert isinstance(self.gnn,)
                 graph_embeds = self.gnn(graph.x_dict, graph.edge_index_dict)
 
                 node_idx = self.get_index_by_value(overall_mask, 1)
