@@ -353,9 +353,7 @@ def train_single_gpu_accelerate(
 
                     for i in range(batch_size):
                         graph = batch["graph"][i]
-                        for key in GRAPH_KEYS:
-                            if key in graph.keys():
-                                graph[key] = graph[key].to(device, non_blocking=True)
+                        graph = graph.to(device, non_blocking=True)
 
                         graph_mask = [mask for mask in batch["graph_mask"][i]]
 
@@ -428,10 +426,7 @@ def train_single_gpu_accelerate(
 
                 if "graph" in args.baseline_prompt:
                     for graph in graphs:
-                        for key in GRAPH_KEYS:
-                            if key in graph.keys():
-                                graph[key] = graph[key].to("cpu")
-                                graph.pop(key, None)
+                        graph = graph.to("cpu")
                     for graph_mask in graph_masks:
                         for mask in graph_mask:
                             mask = mask.to("cpu")
@@ -970,10 +965,7 @@ def train_multi_gpu_accelerate(
 
                     if "graph" in args.baseline_prompt and micro_graphs is not None:
                         for graph in micro_graphs:
-                            for key in GRAPH_KEYS:
-                                if key in graph.keys():
-                                    graph[key] = graph[key].to("cpu")
-                                    graph.pop(key, None)
+                            graph = graph.to("cpu")
                         if micro_graph_masks is not None:
                             for mask in micro_graph_masks:
                                 for m in mask:
