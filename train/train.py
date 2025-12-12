@@ -8,9 +8,16 @@ import shutil
 from rich import print as pprint
 from functools import partial
 from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim import AdamW
+from datetime import timedelta
 from data.core import Data
 from data.loader import GLMFDataset, collate_fn
-from model.model import GLMFModelForCausalLM
+from model.model import (
+    GLMFModelForCausalLM,
+    get_model,
+    continue_training_from_checkpoint,
+)
 from accelerate import Accelerator
 from accelerate import DeepSpeedPlugin
 from transformers.trainer_utils import seed_worker
@@ -65,22 +72,100 @@ def train(
     args: Namespace,
     dataset: GLMFDataset,
     console: Console,
-    model: GLMFModelForCausalLM,
-    optimizer: torch.optim.Optimizer,
-    lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
     continue_training: bool = False,
-    start_step: int = -1,
     max_num_checkpoint: int = 5,
-    mixed_precision: str = "bf16",
+    mixed_precision: str = "fp16",
     collate_fn: callable = collate_fn,
 ):
+    # init accelerator
+    if args.num_gpu == 1:
+        accelerator = Accelerator(
+            gradient_accumulation_steps=args.gradient_accumulation_steps,
+            mixed_precision=mixed_precision,
+            log_with="wandb",
+            project_dir=args.log_dir,
+        )
+    else:
+        if args.use_deepspeed and os.path.exists(args.deepspeed_config):
+            deepspeed_config_path = args.deepspeed_config
+            if not os.path.exists(deepspeed_config_path):
+                raise FileNotFoundError(
+                    f"DeepSpeed config file not found at {deepspeed_config_path}."
+                )
+
+            if ("gpt" in args.llm_model.lower()) or (mixed_precision == "bf16"):
+                bf16_config = args.deepspeed_config.replace(".json", "_bf16.json")
+                if not os.path.exists(bf16_config):
+                    raise FileNotFoundError(f"BF16 config not found at {bf16_config}.")
+                deepspeed_config_path = bf16_config
+                console.log(f"[green]Using BF16 config: {bf16_config}[/green]")
+
+            with open(deepspeed_config_path, "r") as f:
+                ds_config = json.load(f)
+
+            zero_stage = ds_config.get("zero_optimization", {}).get("stage", 0)
+            zero3_init_flag = zero_stage == 3
+
+            if zero3_init_flag:
+                console.log(
+                    f"[green]DeepSpeed ZeRO-3 detected - enabling zero3_init_flag for model initialization[/green]"
+                )
+            else:
+                console.log(
+                    f"[green]DeepSpeed ZeRO stage {zero_stage} detected[/green]"
+                )
+
+            deepspeed_plugin = DeepSpeedPlugin(
+                hf_ds_config=deepspeed_config_path,
+                zero3_init_flag=zero3_init_flag,
+            )
+            accelerator = Accelerator(
+                gradient_accumulation_steps=args.batch_size,
+                mixed_precision=mixed_precision,
+                log_with="wandb",
+                project_dir=args.log_dir,
+                deepspeed_plugin=deepspeed_plugin,
+            )
+        else:
+            accelerator = Accelerator(
+                gradient_accumulation_steps=args.batch_size,
+                mixed_precision=mixed_precision,
+                log_with="wandb",
+                project_dir=args.log_dir,
+            )
+
+    model = get_model(
+        args=args,
+        console=console,
+        tokenizer=dataset.llm_tokenizer,
+        rank=accelerator.process_index,
+        device=accelerator.device,
+    )
+
+    optimizer = AdamW(
+        filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
+    )
+    lr_scheduler = CosineAnnealingLR(optimizer, T_max=100, eta_min=5e-8)
+
+    if args.continue_training:
+        model, start_step, optimizer, lr_scheduler = continue_training_from_checkpoint(
+            args=args,
+            model=model,
+            rank=accelerator.process_index,
+            console=console,
+            optimizer=optimizer,
+            lr_scheduler=lr_scheduler,
+        )
+    else:
+        start_step = -1
+
     collate_fn_ = partial(
         collate_fn, tokenizer=dataset.llm_tokenizer, max_seq_length=args.max_seq_length
     )
     if args.num_gpu == 1:
-        console.log("Training on single GPU with mode: train_single_gpu_accelerate")
         train_single_gpu_accelerate(
             args=args,
+            accelerator=accelerator,
             dataset=dataset,
             console=console,
             optimizer=optimizer,
@@ -95,6 +180,7 @@ def train(
     else:
         train_multi_gpu_accelerate(
             args=args,
+            accelerator=accelerator,
             dataset=dataset,
             console=console,
             optimizer=optimizer,
@@ -173,6 +259,7 @@ def logging_gpu_usage(step: int, console: Console):
 
 def train_single_gpu_accelerate(
     args: Namespace,
+    accelerator: Accelerator,
     dataset: Data,
     console: Console,
     model: GLMFModelForCausalLM,
@@ -186,21 +273,6 @@ def train_single_gpu_accelerate(
 ):
 
     # init wandb
-    accelerator = Accelerator(
-        gradient_accumulation_steps=args.gradient_accumulation_steps,
-        mixed_precision=mixed_precision,
-        log_with="wandb",
-        project_dir=args.log_dir,
-    )
-
-    save_path = os.path.join(args.output_dir, args.name)
-    console.log(f"Model will be saved to {save_path}...")
-    if not os.path.exists(save_path):
-        os.makedirs(save_path, exist_ok=True)
-    if os.path.exists(save_path):
-        if continue_training == False:
-            shutil.rmtree(save_path)
-            os.makedirs(save_path, exist_ok=True)
     accelerator.init_trackers(
         project_name="GLMFuzz",
         config={
@@ -218,6 +290,16 @@ def train_single_gpu_accelerate(
         },
         init_kwargs={"wandb": {"name": args.name}},
     )
+
+    # Create save directory
+    save_path = os.path.join(args.output_dir, args.name)
+    console.log(f"Model will be saved to {save_path}...")
+    if not os.path.exists(save_path):
+        os.makedirs(save_path, exist_ok=True)
+    if os.path.exists(save_path):
+        if continue_training == False:
+            shutil.rmtree(save_path)
+            os.makedirs(save_path, exist_ok=True)
 
     tokenizer = dataset.llm_tokenizer
     device = accelerator.device
@@ -617,6 +699,7 @@ def train_single_gpu_accelerate(
 
 def train_multi_gpu_accelerate(
     args: Namespace,
+    accelerator: Accelerator,
     dataset: Data,
     console: Console,
     model: GLMFModelForCausalLM,
@@ -628,50 +711,8 @@ def train_multi_gpu_accelerate(
     collate_fn: callable = collate_fn,
     mixed_precision: str = "bf16",
 ):
-
-    if args.use_deepspeed and os.path.exists(args.deepspeed_config):
-        deepspeed_config_path = args.deepspeed_config
-        if "gpt" in args.llm_model.lower():
-            bf16_config = args.deepspeed_config.replace(".json", "_bf16.json")
-            if os.path.exists(bf16_config):
-                deepspeed_config_path = bf16_config
-                console.log(
-                    f"[green]Detected GPT model - using BF16 config: {bf16_config}[/green]"
-                )
-            else:
-                console.log(
-                    f"[yellow]Warning: GPT model detected but BF16 config not found at {bf16_config}. Using default config.[/yellow]"
-                )
-        with open(deepspeed_config_path, "r") as f:
-            ds_config = json.load(f)
-        zero_stage = ds_config.get("zero_optimization", {}).get("stage", 0)
-        zero3_init_flag = zero_stage == 3
-
-        if zero3_init_flag:
-            console.log(
-                f"[green]DeepSpeed ZeRO-3 detected - enabling zero3_init_flag for model initialization[/green]"
-            )
-
-        deepspeed_plugin = DeepSpeedPlugin(
-            hf_ds_config=deepspeed_config_path,
-            zero3_init_flag=zero3_init_flag,
-        )
-        accelerator = Accelerator(
-            gradient_accumulation_steps=args.batch_size,
-            mixed_precision=mixed_precision,
-            log_with="wandb",
-            project_dir=args.log_dir,
-            deepspeed_plugin=deepspeed_plugin,
-        )
-    else:
-        accelerator = Accelerator(
-            gradient_accumulation_steps=args.batch_size,
-            mixed_precision=mixed_precision,
-            log_with="wandb",
-            project_dir=args.log_dir,
-        )
-
     if accelerator.is_main_process:
+        # init wandb
         accelerator.init_trackers(
             project_name="GLMFuzz",
             config={
@@ -688,36 +729,13 @@ def train_multi_gpu_accelerate(
             },
             init_kwargs={"wandb": {"name": args.name}},
         )
+
+        # Create save directory
         save_path = os.path.join(args.output_dir, args.name)
         if os.path.exists(save_path):
             if continue_training == False:
                 shutil.rmtree(save_path)
         os.makedirs(save_path, exist_ok=True)
-        console.log(f"Distributed type: {accelerator.distributed_type}")
-        console.log(f"Number of processes: {accelerator.num_processes}")
-        console.log(f"Mixed precision: {mixed_precision}")
-        if args.use_deepspeed:
-            with open(args.deepspeed_config, "r") as f:
-                ds_config = json.load(f)
-            zero_stage = ds_config.get("zero_optimization", {}).get("stage", 0)
-
-            if zero_stage == 3:
-                console.log(
-                    f"[green]DeepSpeed ZeRO-3 enabled: Full parameter sharding with CPU offloading for maximum memory efficiency[/green]"
-                )
-            elif zero_stage == 2:
-                console.log(
-                    f"[green]DeepSpeed ZeRO-2 enabled: Expect 20-40% speedup on forward/backward passes[/green]"
-                )
-            else:
-                console.log(f"[green]DeepSpeed ZeRO-{zero_stage} enabled[/green]")
-        console.log(
-            f"[yellow]Micro-batching enabled: Processing {args.batch_size} samples individually, "
-            f"accumulating gradients before optimizer step[/yellow]"
-        )
-        console.log(
-            f"[yellow]Effective batch size: {args.batch_size * accelerator.num_processes}[/yellow]"
-        )
 
     tokenizer = dataset.llm_tokenizer
     tr_dataset = GLMFDataset(
