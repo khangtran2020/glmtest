@@ -346,23 +346,14 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     if "x" in graph[node_type]:
                         graph[node_type].x = graph[node_type].x.half()
 
-                # print("Inputs emebdding:", graph.x_dict)
-                # for key in graph.x_dict:
-                #     print(f"Graph node type: {key}, dtype: {graph.x_dict[key].dtype}")
-
-                # for key in graph.edge_index_dict:
-                #     print(
-                #         f"Graph edge type: {key}, dtype: {graph.edge_index_dict[key].dtype}"
-                #     )
-
                 graph_embeds = self.gnn(graph.x_dict, graph.edge_index_dict)
-                node_idx = get_index_by_value(overall_mask, 1)
-                graph_embeds = graph_embeds["node"][node_idx, :]
-
-                print(f"Graph embedding: {graph_embeds.dtype}, {graph_embeds.size()}")
+                graph_embeds = graph_embeds["node"][overall_indices, :]
 
                 if self.gnn_mode == "node":
                     for j, mask in enumerate(graph_mask):
+                        print(
+                            f"Mask idx {j}: {mask_idx[j]}, graph_embeds shape: {graph_embeds.shape}"
+                        )
                         embeds = graph_embeds[mask_idx[j], :]
                         assert embeds.size(0) == len(mask_idx[j])
                         embeds = embeds.to(inputs_embeds.device)
