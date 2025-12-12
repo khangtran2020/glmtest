@@ -6,6 +6,13 @@ from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizer
 from typing import List, Dict, Any
 from utils.constant import GRAPH_PAD_TOKEN
+from torch_geometric.data import HeteroData
+from torch_geometric.data.storage import (
+    BaseStorage,
+    GlobalStorage,
+    NodeStorage,
+    EdgeStorage,
+)
 
 
 class GLMFDataset(Dataset):
@@ -53,11 +60,15 @@ class GLMFDataset(Dataset):
         with open(data_path, "r") as f:
             sample = json.load(f)
         graph_path = sample["graph_path"]
-        graph = (
-            torch.load(graph_path, weights_only=True)
-            if graph_path is not None
-            else None
-        )
+
+        # Load graph with PyG classes allowlisted
+        if graph_path is not None:
+            with torch.serialization.safe_globals(
+                [HeteroData, BaseStorage, GlobalStorage, NodeStorage, EdgeStorage]
+            ):
+                graph = torch.load(graph_path, weights_only=True)
+        else:
+            graph = None
 
         if sample["active_node"] is not None:
             active_nodes = []
