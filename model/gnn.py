@@ -44,14 +44,19 @@ class GAT(torch.nn.Module):
     def forward(self, x: Dict[str, torch.Tensor], edge_index: torch.Tensor):
         # Convert input to match model dtype (for mixed precision training)
         target_dtype = next(self.parameters()).dtype
-
-        with torch.autocast(device_type="cuda", dtype=target_dtype):
-            h = x
-            for i in range(0, self.n_layers):
-                h = self.layers[i](h, edge_index)
-                h = self.activation(h)
-            h = self.last_layer(h)
-            return h
+        print(f"Target dtype: {target_dtype}")
+        for k, v in x.items():
+            print(f"Key: {k}, dtype: {v.dtype}")
+            x[k] = v.to(dtype=target_dtype)
+        h = x
+        for i in range(0, self.n_layers):
+            h = self.layers[i](h, edge_index)
+            for k, v in h.items():
+                print(f"Key: {k}, dtype: {v.dtype}")
+            x[k] = v.to(dtype=target_dtype)
+            h = self.activation(h)
+        h = self.last_layer(h)
+        return h
 
 
 class SAGE(torch.nn.Module):
