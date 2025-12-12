@@ -158,8 +158,8 @@ def train(
         use_zero3=use_zero3,
     )
 
-    for name, param in model.named_parameters():
-        console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
+    # for name, param in model.named_parameters():
+    #     console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
 
     optimizer = AdamW(
         filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
