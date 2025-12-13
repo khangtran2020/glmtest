@@ -766,6 +766,7 @@ def train_multi_gpu_accelerate(
         n_hops=dataset.n_hops,
         logger=console,
         dtype=args.dtype,
+        metadata=model.metadata,
         num_gpus=args.num_gpu,
     )
     va_dataset = GLMFDataset(
@@ -776,6 +777,7 @@ def train_multi_gpu_accelerate(
         n_hops=dataset.n_hops,
         logger=console,
         dtype=args.dtype,
+        metadata=model.metadata,
         num_gpus=args.num_gpu,
     )
 
