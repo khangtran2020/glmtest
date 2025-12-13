@@ -453,12 +453,19 @@ def validate(
                 graph_masks = None
                 graph_token_indices = None
 
-            outputs = model(
-                **micro_input,
-                graphs=graphs,
-                graph_masks=graph_masks,
-                graph_token_indices=graph_token_indices,
-            )
+            try:
+                outputs = model(
+                    **micro_input,
+                    graphs=graphs,
+                    graph_masks=graph_masks,
+                    graph_token_indices=graph_token_indices,
+                )
+            except RuntimeError as e:
+                print(f"RuntimeError during validation at step {step}: {e}")
+                for graph in graphs:
+                    print(graph.edge_index_dict)
+                raise e
+
             loss = outputs.loss
             if multi_gpu:
                 all_losses = accelerator.gather(loss)
