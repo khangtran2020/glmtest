@@ -660,10 +660,11 @@ class Data(object):
                         if not os.path.exists(graph_path):
                             graph = self.read_graph(dat)
                             torch.save(graph, graph_path)
-                            if redo_graph:
-                                continue
                         else:
                             graph = None
+
+                        if redo_graph:
+                            continue
 
                     for testcase in dat["test_cases"].keys():
                         test_code = dat["test_cases"][testcase]["test_case"]
