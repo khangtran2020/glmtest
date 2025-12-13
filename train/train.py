@@ -1200,7 +1200,6 @@ def train_multi_gpu_accelerate(
                             if args.use_lora:
                                 del lora_state_dict
                             gc.collect()
-                    break
 
             if accelerator.is_main_process:
                 if ((continue_training == True) and (global_step > start_step)) or (
