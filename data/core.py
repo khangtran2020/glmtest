@@ -637,6 +637,20 @@ class Data(object):
                 for uuid, dat in tqdm(
                     self.data[data_n].items(), position=0, leave=True
                 ):
+                    data_name = f"{uuid}_testcase_{testcase}.json"
+                    data_path = os.path.join(processed_prompt_path, data_name)
+
+                    if os.path.exists(data_path):
+                        with open(data_path, "r") as file:
+                            data = json.load(file)
+                        num_token = data["num_tokens"]
+                        num_tokens.append(num_token)
+
+                        self.processed_data[data_n][f"{uuid}_testcase_{testcase}"] = {
+                            "num_tokens": num_token,
+                            "path": data_path,
+                        }
+
                     with open(dat["code_path"], "r") as file:
                         src_code = file.read()
 
@@ -734,8 +748,6 @@ class Data(object):
                                 "num_tokens": num_token,
                             }
 
-                        data_name = f"{uuid}_testcase_{testcase}.json"
-                        data_path = os.path.join(processed_prompt_path, data_name)
                         with open(data_path, "w") as file:
                             json.dump(data, file, indent=4)
 
