@@ -158,6 +158,8 @@ def train(
         use_zero3=use_zero3,
     )
 
+    console.log(f"Metadata used for model initialization: {metadata}")
+
     # for name, param in model.named_parameters():
     #     console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
 
