@@ -326,8 +326,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 graph = graphs[i]
                 overall_mask = None  # merge graph_mask
                 for j, mask in enumerate(graph_mask):
-                    if self.rank == 0:
-                        print(f"Graph mask {j} shape:", mask.size())
                     if j == 0:
                         overall_mask = mask.to(torch.bool)
                     else:
