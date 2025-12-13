@@ -74,8 +74,8 @@ class GLMFDataset(Dataset):
         else:
             graph = None
 
-        list_of_node_type, list_of_edge_type = self.metadata
-        node_type, edge_type = graph.metadata()
+        _, list_of_edge_type = self.metadata
+        _, edge_type = graph.metadata()
 
         for etype in list_of_edge_type:
             if etype not in edge_type:
