@@ -6,7 +6,7 @@ from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizer
 from typing import List, Dict, Any
 from utils.constant import GRAPH_PAD_TOKEN
-from torch_geometric.transforms import add_self_loops
+from torch_geometric.transforms import AddSelfLoops
 from torch_geometric.data import HeteroData
 from torch_geometric.data.storage import (
     BaseStorage,
@@ -42,6 +42,7 @@ class GLMFDataset(Dataset):
         self.num_gpus = num_gpus
         self.logger = logger
         self.dtype = dtype
+        self.loop_transform = AddSelfLoops()
         self.index_to_key_dict = dict(zip(range(len(self.data)), self.data.keys()))
 
         if self.logger is not None:
@@ -93,7 +94,7 @@ class GLMFDataset(Dataset):
                 else:
                     act_node = torch.cat((act_node, active_node), dim=0)
 
-            graph = add_self_loops(graph)
+            graph = self.loop_transform(graph)
 
             # print(f"Number of nodes before sampling: {graph.num_nodes}")
             # graph = sampling_neighbor(
