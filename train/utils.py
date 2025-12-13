@@ -244,10 +244,10 @@ def save_checkpoint(
             if ("lora_" in k) or ("gnn" in k) or ("nvib" in k)
         }
         filtered_state_dict = lora_state_dict
-        # Print out the keys being saved
-        print("Saving the following LoRA parameters:")
-        for key in lora_state_dict.keys():
-            print(f" - {key}")
+        # # Print out the keys being saved
+        # print("Saving the following LoRA parameters:")
+        # for key in lora_state_dict.keys():
+        #     print(f" - {key}")
 
     checkpoint = {
         "seed": seed,
