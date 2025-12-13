@@ -80,9 +80,9 @@ def add_data_group(group):
         default=128,
         help="LRU cache size for data loading",
     )
-    group.add_argument(
-        "--redo_graph", action="store_true", help="recreate the graph data"
-    )
+    # group.add_argument(
+    #     "--redo_graph", action="store_true", help="recreate the graph data"
+    # )
 
 
 def add_joern_group(group):
