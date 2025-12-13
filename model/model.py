@@ -110,6 +110,8 @@ def get_model_train(
             is_training=True,
         )
 
+        # set metadata as property of glmf_model
+        glmf_model.metadata = metadata
         if metadata is not None:
             glmf_model.gnn = to_hetero(glmf_model.gnn, metadata=metadata, aggr="sum")
             console.log(
@@ -216,6 +218,7 @@ def get_model_train(
                 is_training=False,
             )
 
+            model.metadata = metadata
             if metadata is not None:
                 model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
                 console.log(
@@ -275,7 +278,7 @@ def get_model_train(
                 is_training=True,
                 use_zero3=use_zero3,
             )
-
+            model.metadata = metadata
             if metadata is not None:
                 model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
                 console.log(
@@ -355,7 +358,7 @@ def get_model_test(
             multi_gpu=True if args.num_gpu > 1 else False,
             is_training=False,
         )
-
+        glmf_model.metadata = metadata
         if metadata is not None:
             glmf_model.gnn = to_hetero(glmf_model.gnn, metadata=metadata, aggr="sum")
             console.log(
@@ -434,6 +437,7 @@ def get_model_test(
             is_training=False,
         )
 
+        model.metadata = metadata
         if metadata is not None:
             model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
             console.log(
@@ -528,7 +532,7 @@ def get_model_testgen(
                 multi_gpu=True if args.num_gpu > 1 else False,
                 is_training=False,
             )
-
+            glmf_model.metadata = metadata
             if metadata is not None:
                 glmf_model.gnn = to_hetero(
                     glmf_model.gnn, metadata=metadata, aggr="sum"
@@ -609,6 +613,7 @@ def get_model_testgen(
                 is_training=False,
             )
 
+            model.metadata = metadata
             if metadata is not None:
                 model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
                 console.log(

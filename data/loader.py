@@ -29,6 +29,7 @@ class GLMFDataset(Dataset):
         testing: bool = False,
         num_gpus: int = 1,
         dtype: str = "bf16",
+        metadata: tuple = None,
         logger=None,
     ):
         self.data = data
@@ -42,6 +43,7 @@ class GLMFDataset(Dataset):
         self.num_gpus = num_gpus
         self.logger = logger
         self.dtype = dtype
+        self.metadata = metadata
         self.loop_transform = AddSelfLoops()
         self.index_to_key_dict = dict(zip(range(len(self.data)), self.data.keys()))
 
@@ -71,6 +73,15 @@ class GLMFDataset(Dataset):
                 graph = torch.load(graph_path, weights_only=True)
         else:
             graph = None
+
+        list_of_node_type, list_of_edge_type = self.metadata
+        node_type, edge_type = graph.metadata()
+
+        for etype in list_of_edge_type:
+            if etype not in edge_type:
+                graph[etype].edge_index = torch.empty(
+                    (2, 0), dtype=torch.long
+                )  # Add empty edge_index
 
         if sample["active_node"] is not None:
             active_nodes = []
