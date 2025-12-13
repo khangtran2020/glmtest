@@ -650,6 +650,10 @@ class Data(object):
                         assert len(all_masks) == len(dat["test_cases"])
 
                     if "graph" in self.baseline_prompt:
+                        processed_data_path = os.path.join(
+                            self.data_path,
+                            f"raw-pyg",
+                        )
                         graph_name = f"{uuid}_graph.pt"
                         graph_path = os.path.join(processed_data_path, graph_name)
 
