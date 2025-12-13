@@ -663,18 +663,25 @@ class Data(object):
                         data_name = f"{uuid}_testcase_{testcase}.json"
                         data_path = os.path.join(processed_prompt_path, data_name)
 
-                        # if os.path.exists(data_path):
-                        #     with open(data_path, "r") as file:
-                        #         data = json.load(file)
-                        #     num_token = data["num_tokens"]
-                        #     num_tokens.append(num_token)
+                        if os.path.exists(data_path):
 
-                        #     self.processed_data[data_n][
-                        #         f"{uuid}_testcase_{testcase}"
-                        #     ] = {
-                        #         "num_tokens": num_token,
-                        #         "path": data_path,
-                        #     }
+                            try:
+                                with open(data_path, "r") as file:
+                                    data = json.load(file)
+                                num_token = data["num_tokens"]
+                                num_tokens.append(num_token)
+
+                                self.processed_data[data_n][
+                                    f"{uuid}_testcase_{testcase}"
+                                ] = {
+                                    "num_tokens": num_token,
+                                    "path": data_path,
+                                }
+                                continue
+                            except:
+                                self.logger.log(
+                                    f"[red]Error loading existing data at {data_path}, will re-generate[/red]"
+                                )
 
                         test_code = dat["test_cases"][testcase]["test_case"]
                         if self.data_fuzz:
