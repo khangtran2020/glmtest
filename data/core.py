@@ -655,7 +655,7 @@ class Data(object):
 
                         if not os.path.exists(graph_path):
                             graph = self.read_graph(dat)
-                            print(graph)
+                            # print(graph)
                             torch.save(graph, graph_path)
 
                     for testcase in dat["test_cases"].keys():
@@ -667,6 +667,10 @@ class Data(object):
                             continue
                         mask_key = int(testcase.split("_")[-1])
                         branch_masks: List[torch.Tensor] = all_masks[mask_key]
+                        for mask in branch_masks:
+                            assert (
+                                mask.size(0) == graph.num_nodes
+                            ), "Mask size mismatch!"
                         branch_line = dat["test_cases"][testcase]["branch"]
                         # print(branch_masks)
                         active_nodes = [
@@ -1333,6 +1337,9 @@ class Data(object):
         # graph_dict["num_nodes"] = num_nodes
         # graph_dict["feat_size"] = feat.size()
         # return graph_dict
+        print(
+            f"Number of nodes in graph: {graph_data.num_nodes}, num nodes: {num_nodes}"
+        )
         assert graph_data.num_nodes == num_nodes, "Number of nodes mismatch!"
         return graph_data
 
