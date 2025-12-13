@@ -554,7 +554,7 @@ class Data(object):
             "test_project": new_test_project if new_test_project is not None else {},
         }
 
-    def prepare_data(self) -> None:
+    def prepare_data(self, redo_graph: bool = False) -> None:
         """
         Prepare the training data for the model
         """
@@ -604,7 +604,7 @@ class Data(object):
             os.makedirs(processed_data_path, exist_ok=True)
             os.makedirs(processed_prompt_path, exist_ok=True)
 
-        if processed_data:
+        if processed_data and not redo_graph:
             self.logger.log("[green]Data is already processed![/green]")
             self.logger.log(f"Size of data data: {len(self.processed_data)}")
             return
@@ -637,17 +637,17 @@ class Data(object):
                 for uuid, dat in tqdm(
                     self.data[data_n].items(), position=0, leave=True
                 ):
+                    if not redo_graph:
+                        with open(dat["code_path"], "r") as file:
+                            src_code = file.read()
 
-                    with open(dat["code_path"], "r") as file:
-                        src_code = file.read()
+                        local_imports = raw_data_dict[uuid]
 
-                    local_imports = raw_data_dict[uuid]
-
-                    module_path = dat.get("module_path", "N/A")
-                    all_masks = torch.load(
-                        dat["graph"]["mask_path"], weights_only=False
-                    )
-                    assert len(all_masks) == len(dat["test_cases"])
+                        module_path = dat.get("module_path", "N/A")
+                        all_masks = torch.load(
+                            dat["graph"]["mask_path"], weights_only=False
+                        )
+                        assert len(all_masks) == len(dat["test_cases"])
 
                     if "graph" in self.baseline_prompt:
                         graph_name = f"{uuid}_graph.pt"
@@ -655,8 +655,9 @@ class Data(object):
 
                         if not os.path.exists(graph_path):
                             graph = self.read_graph(dat)
-                            # print(graph)
                             torch.save(graph, graph_path)
+                            if redo_graph:
+                                continue
                         else:
                             graph = None
 

@@ -89,7 +89,7 @@ def main() -> None:
         ):
             dataset.prepare_reasoning_data()
         else:
-            dataset.prepare_data()
+            dataset.prepare_data(redo_graph=args.redo_graph)
 
     if args.mode == "generate_reasoning":
         dataset.filter_by_max_min_tokens(max_tokens=8192, min_tokens=100)

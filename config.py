@@ -80,9 +80,9 @@ def add_data_group(group):
         default=128,
         help="LRU cache size for data loading",
     )
-    # group.add_argument(
-    #     "--reasoning_save_path", type=str, help="api key for reason model", default=None
-    # )
+    group.add_argument(
+        "--redo_graph", action="store_true", help="recreate the graph data"
+    )
 
 
 def add_joern_group(group):
