@@ -42,7 +42,6 @@ class GAT(torch.nn.Module):
         self.activation = torch.nn.SELU()
 
     def forward(self, x: Dict[str, torch.Tensor], edge_index: torch.Tensor):
-        # Convert input to match model dtype (for mixed precision training)
         h = x
         for i in range(0, self.n_layers):
             h = self.layers[i](h, edge_index)
@@ -84,9 +83,6 @@ class SAGE(torch.nn.Module):
         self.activation = torch.nn.SELU()
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor):
-        # Convert input to match model dtype (for mixed precision training)
-        target_dtype = next(self.parameters()).dtype
-        x = x.to(dtype=target_dtype)
 
         h = x
         for i in range(0, self.n_layers):
@@ -96,11 +92,6 @@ class SAGE(torch.nn.Module):
 
         h = self.last_layer(h)
         return h
-
-    # def forward(self, x, edge_index):
-    #     x = self.conv1(x, edge_index).relu()
-    #     x = self.conv2(x, edge_index)
-    #     return x
 
 
 # GRAPH_KEYS = [
