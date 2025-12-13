@@ -428,74 +428,62 @@ def validate(
             num_item += batch_size
 
             start_time = time.time()
-            # Process each sample in the batch as a micro-batch.
-            try:
 
-                if "token_type_ids" in batch["input"]:
-                    batch["input"].pop("token_type_ids")
-                micro_input = {
-                    "input_ids": batch["input"]["input_ids"],
-                    "attention_mask": batch["input"]["attention_mask"],
-                    "labels": batch["input"]["labels"],
-                }
+            if "token_type_ids" in batch["input"]:
+                batch["input"].pop("token_type_ids")
 
-                if "graph" in args.baseline_prompt:
-                    graphs = batch["graph"]
-                    graph_masks = batch["graph_mask"]
-                    graph_token_indices = []
-                    for i in range(batch_size):
-                        graph_token_index = torch.where(
-                            micro_input["input_ids"][i] == config.graph_token_id[1]
-                        )[0].tolist()
-                        graph_token_indices.append(graph_token_index)
+            micro_input = {
+                "input_ids": batch["input"]["input_ids"],
+                "attention_mask": batch["input"]["attention_mask"],
+                "labels": batch["input"]["labels"],
+            }
 
-                else:
-                    graphs = None
-                    graph_masks = None
-                    graph_token_indices = None
+            if "graph" in args.baseline_prompt:
+                graphs = batch["graph"]
+                graph_masks = batch["graph_mask"]
+                graph_token_indices = []
+                for i in range(batch_size):
+                    graph_token_index = torch.where(
+                        micro_input["input_ids"][i] == config.graph_token_id[1]
+                    )[0].tolist()
+                    graph_token_indices.append(graph_token_index)
 
-                outputs = model(
-                    **micro_input,
-                    graphs=graphs,
-                    graph_masks=graph_masks,
-                    graph_token_indices=graph_token_indices,
-                )
-                loss = outputs.loss
-                if multi_gpu:
-                    all_losses = accelerator.gather(loss)
-                    all_losses = torch.where(torch.isnan(all_losses), 0.0, all_losses)
-                    all_losses = all_losses.to("cpu").detach().float()
-                    total_loss = torch.sum(all_losses)
-                    batch_loss += total_loss.to("cpu").detach().float().item()
-                else:
-                    batch_loss += loss.to("cpu").detach().float().item()
+            else:
+                graphs = None
+                graph_masks = None
+                graph_token_indices = None
 
-                # logging_gpu_usage(step=step, console=console)
+            outputs = model(
+                **micro_input,
+                graphs=graphs,
+                graph_masks=graph_masks,
+                graph_token_indices=graph_token_indices,
+            )
+            loss = outputs.loss
+            if multi_gpu:
+                all_losses = accelerator.gather(loss)
+                all_losses = torch.where(torch.isnan(all_losses), 0.0, all_losses)
+                all_losses = all_losses.to("cpu").detach().float()
+                total_loss = torch.sum(all_losses)
+                batch_loss += total_loss.to("cpu").detach().float().item()
+            else:
+                batch_loss += loss.to("cpu").detach().float().item()
 
-                for key in micro_input.keys():
-                    micro_input[key] = micro_input[key].to("cpu")
-                if "graph" in args.baseline_prompt:
-                    for graph in graphs:
-                        graph = graph.to("cpu")
-                        # for key in GRAPH_KEYS:
-                        #     if key in graph.keys():
-                        #         graph[key] = graph[key].to("cpu")
-                        #         graph.pop(key, None)
-                    for graph_mask in graph_masks:
-                        for mask in graph_mask:
-                            mask = mask.to("cpu")
-                    del graph_masks, graphs, graph_token_indices
-                loss = loss.to("cpu")
-                del outputs, loss, micro_input, batch
-                gc.collect()
-                torch.cuda.empty_cache()
+            # logging_gpu_usage(step=step, console=console)
 
-            except torch.cuda.OutOfMemoryError as e:
-                tqdm.write(
-                    f"OOM in batch {step}: input_dis {micro_input['input_ids'].size()} - graph_mask {graph_mask.size()}"
-                )
-                torch.cuda.empty_cache()
-                continue
+            for key in micro_input.keys():
+                micro_input[key] = micro_input[key].to("cpu")
+            if "graph" in args.baseline_prompt:
+                for graph in graphs:
+                    graph = graph.to("cpu")
+                for graph_mask in graph_masks:
+                    for mask in graph_mask:
+                        mask = mask.to("cpu")
+                del graph_masks, graphs, graph_token_indices
+            loss = loss.to("cpu")
+            del outputs, loss, micro_input, batch
+            gc.collect()
+            torch.cuda.empty_cache()
 
             if accelerator.is_main_process and progress is not None:
                 progress.update(
