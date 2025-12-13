@@ -347,6 +347,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                     if "x" in graph[node_type]:
                         graph[node_type].x = graph[node_type].x.half()
 
+                print(graph.edge_index_dict)
                 graph_embeds = self.gnn(graph.x_dict, graph.edge_index_dict)
                 graph_embeds = graph_embeds["node"][overall_indices, :]
 
