@@ -671,8 +671,8 @@ class Data(object):
                         branch_masks: List[torch.Tensor] = all_masks[mask_key]
 
                         if graph is not None:
-                            # print(branch_masks)
                             for mask in branch_masks:
+                                print(mask.shape[0], graph.num_nodes)
                                 assert (
                                     mask.shape[0] == graph.num_nodes
                                 ), "Mask size mismatch!"
