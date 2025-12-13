@@ -667,6 +667,7 @@ class Data(object):
                             continue
                         mask_key = int(testcase.split("_")[-1])
                         branch_masks: List[torch.Tensor] = all_masks[mask_key]
+                        print(branch_masks)
                         for mask in branch_masks:
                             assert (
                                 mask.size(0) == graph.num_nodes
