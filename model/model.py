@@ -61,8 +61,8 @@ def get_model(
     else:
         console.log(f"Mode {args.mode} not using model.")
         return None
-    for name, param in model.named_parameters():
-        console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
+    # for name, param in model.named_parameters():
+    #     console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
     return model
 
 
@@ -474,8 +474,8 @@ def get_model_test(
                 p.data = p.data.to(torch.float16)
 
     console.log(f"Model is loaded to device: {model.device} - with type {model.dtype}")
-    for name, param in model.named_parameters():
-        console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
+    # for name, param in model.named_parameters():
+    #     console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
     return model
 
 
@@ -654,10 +654,10 @@ def get_model_testgen(
         console.log(
             f"Model is loaded to device: {model.device} - with type {model.dtype}"
         )
-        for name, param in model.named_parameters():
-            console.log(
-                f"[yellow]Parameter {name}, dtype: {param.dtype}, device: {param.device}[/yellow]"
-            )
+        # for name, param in model.named_parameters():
+        #     console.log(
+        #         f"[yellow]Parameter {name}, dtype: {param.dtype}, device: {param.device}[/yellow]"
+        #     )
     else:
         model = None
     return model
