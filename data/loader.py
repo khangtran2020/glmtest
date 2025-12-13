@@ -92,11 +92,13 @@ class GLMFDataset(Dataset):
                 else:
                     act_node = torch.cat((act_node, active_node), dim=0)
 
+            print(f"Number of nodes before sampling: {graph.num_nodes}")
             graph = sampling_neighbor(
                 graph=graph,
                 active_node=act_node.long(),
                 n_hops=self.n_hops,
             )
+            print(f"Number of nodes after sampling: {graph.num_nodes}")
 
         if self.testing == False:
             full_text = sample["full_text"]
@@ -226,7 +228,7 @@ def pad(
     return padded_tensors
 
 
-def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> dict:
+def collate_fn(batch, tokenizer: PreTrainedTokenizer) -> dict:
 
     # check if batch is tuple
     if not isinstance(batch[0], tuple):

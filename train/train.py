@@ -178,9 +178,7 @@ def train(
     else:
         start_step = -1
 
-    collate_fn_ = partial(
-        collate_fn, tokenizer=dataset.llm_tokenizer, max_seq_length=args.max_seq_length
-    )
+    collate_fn_ = partial(collate_fn, tokenizer=dataset.llm_tokenizer)
     if args.num_gpu == 1:
         train_single_gpu_accelerate(
             args=args,
