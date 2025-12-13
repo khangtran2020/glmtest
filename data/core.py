@@ -806,7 +806,7 @@ class Data(object):
         else:
             processed_data_path = os.path.join(
                 self.data_path,
-                f"raw",
+                f"raw-pyg",
             )
             if "graph" not in self.baseline_prompt:
                 processed_prompt_path = os.path.join(
@@ -1057,7 +1057,7 @@ class Data(object):
         else:
             processed_data_path = os.path.join(
                 self.data_path,
-                f"raw",
+                f"raw-pyg",
             )
             if "graph" not in self.baseline_prompt:
                 processed_prompt_path = os.path.join(
