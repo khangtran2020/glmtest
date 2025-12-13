@@ -667,10 +667,10 @@ class Data(object):
                             continue
                         mask_key = int(testcase.split("_")[-1])
                         branch_masks: List[torch.Tensor] = all_masks[mask_key]
-                        print(branch_masks)
+                        # print(branch_masks)
                         for mask in branch_masks:
                             assert (
-                                mask.size(0) == graph.num_nodes
+                                mask.shape[0] == graph.num_nodes
                             ), "Mask size mismatch!"
                         branch_line = dat["test_cases"][testcase]["branch"]
                         # print(branch_masks)
