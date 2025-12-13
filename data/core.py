@@ -682,6 +682,7 @@ class Data(object):
                             get_index_by_value(a=branch_masks[i], val=1)
                             for i in range(len(branch_masks))
                         ]
+                        print(active_nodes[0])
                         if len(active_nodes) == 0:
                             self.logger.log(
                                 f"Active node empty at uuid: {uuid} testcase: {testcase}"
@@ -1342,9 +1343,9 @@ class Data(object):
         # graph_dict["num_nodes"] = num_nodes
         # graph_dict["feat_size"] = feat.size()
         # return graph_dict
-        print(
-            f"Number of nodes in graph: {graph_data.num_nodes}, num nodes: {num_nodes}"
-        )
+        # print(
+        #     f"Number of nodes in graph: {graph_data.num_nodes}, num nodes: {num_nodes}"
+        # )
         assert graph_data.num_nodes == num_nodes, "Number of nodes mismatch!"
         return graph_data
 
