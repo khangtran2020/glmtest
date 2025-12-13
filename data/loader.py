@@ -96,14 +96,6 @@ class GLMFDataset(Dataset):
 
             graph = self.loop_transform(graph)
 
-            # print(f"Number of nodes before sampling: {graph.num_nodes}")
-            # graph = sampling_neighbor(
-            #     graph=graph,
-            #     active_node=act_node.long(),
-            #     n_hops=self.n_hops,
-            # )
-            # print(f"Number of nodes after sampling: {graph.num_nodes}")
-
         if self.testing == False:
             full_text = sample["full_text"]
             tokenized, pad_size = self.tokenize(full_text, num_gpu=self.num_gpus)

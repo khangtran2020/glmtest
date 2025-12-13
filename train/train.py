@@ -849,356 +849,365 @@ def train_multi_gpu_accelerate(
     best_val_loss = 10000.0
     step_timer = StepTimer(window_size=100)
 
-    # with Progress(
-    #     SpinnerColumn(),
-    #     TextColumn("[progress.description]{task.description}"),
-    #     BarColumn(),
-    #     TaskProgressColumn(),
-    #     MofNCompleteColumn(),
-    #     TimeElapsedColumn(),
-    #     TimeRemainingColumn(),
-    #     TextColumn("| ⏱️  [cyan]{task.fields[step_time]:.2f}s/step"),
-    #     transient=False,
-    # ) as progress:
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        MofNCompleteColumn(),
+        TimeElapsedColumn(),
+        TimeRemainingColumn(),
+        TextColumn("| ⏱️  [cyan]{task.fields[step_time]:.2f}s/step"),
+        transient=False,
+    ) as progress:
 
-    # if accelerator.is_main_process:
-    #     train_task = progress.add_task(
-    #         "Training...", total=args.num_train_epochs, step_time=0.0
-    #     )
-
-    for epoch in range(args.num_train_epochs):
-
-        model.train()
-        # if accelerator.is_main_process:
-        #     train_epoch_task = progress.add_task(
-        #         f"Epoch {epoch + 1}/{args.num_train_epochs}",
-        #         total=len(tr_loader),
-        #         step_time=0.0,
-        #     )
-        epoch_loss = 0.0
-        num_items = 0.0
-
-        # Time tracking variables
-        total_data_time = 0.0
-        total_embedding_time = 0.0
-        total_forward_time = 0.0
-        total_backward_time = 0.0
-        num_batches = 0
-
-        for step, batch in enumerate(tr_loader):
-            # Start step timing
-            step_timer.start()
-
-            if (continue_training == True) and (global_step <= start_step):
-                global_step += args.batch_size
-                # ram_usage = log_ram_usage()
-
-                # if accelerator.is_main_process:
-                #     progress.update(
-                #         train_epoch_task,
-                #         advance=1,
-                #         step_time=0.0,
-                #         description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
-                #     )
-                # step_timer.end()
-                continue
-
-            # Get data loading time from batch (measured in __getitem__)
-            data_load_time = sum(batch.get("data_load_time", [0.0]))
-            total_data_time += data_load_time
-
-            accelerator.wait_for_everyone()
-            batch_size = batch["input"]["input_ids"].size(0)
-            batch_loss = 0.0
-
-            # Micro-batching: Process each sample in batch individually to avoid OOM
-            for micro_idx in range(batch_size):
-                # Extract single sample from batch
-                micro_input = {
-                    "input_ids": batch["input"]["input_ids"][micro_idx : micro_idx + 1],
-                    "attention_mask": batch["input"]["attention_mask"][
-                        micro_idx : micro_idx + 1
-                    ],
-                    "labels": batch["input"]["labels"][micro_idx : micro_idx + 1],
-                }
-
-                if "token_type_ids" in batch["input"]:
-                    micro_input["token_type_ids"] = batch["input"]["token_type_ids"][
-                        micro_idx : micro_idx + 1
-                    ]
-
-                # Extract graph data for this sample
-                if "graph" in args.baseline_prompt:
-                    micro_graphs = (
-                        [batch["graph"][micro_idx]]
-                        if batch["graph"] is not None
-                        else None
-                    )
-                    micro_graph_masks = (
-                        [batch["graph_mask"][micro_idx]]
-                        if batch["graph_mask"] is not None
-                        else None
-                    )
-
-                    if micro_graphs is not None:
-                        graph_token_index = torch.where(
-                            micro_input["input_ids"][0] == config.graph_token_id[1]
-                        )[0].tolist()
-                        micro_graph_token_indices = [graph_token_index]
-                    else:
-                        micro_graph_token_indices = None
-                else:
-                    micro_graphs = None
-                    micro_graph_masks = None
-                    micro_graph_token_indices = None
-
-                # Forward pass with gradient accumulation
-                with accelerator.accumulate(model):
-                    forward_start = time.time()
-                    outputs = model(
-                        **micro_input,
-                        graphs=micro_graphs,
-                        graph_masks=micro_graph_masks,
-                        graph_token_indices=micro_graph_token_indices,
-                        accelerator=accelerator,
-                    )
-                    forward_time = time.time() - forward_start
-                    total_forward_time += forward_time
-
-                    loss = outputs.loss
-                    backward_start = time.time()
-                    accelerator.backward(loss)
-                    backward_time = time.time() - backward_start
-                    total_backward_time += backward_time
-
-                    if accelerator.sync_gradients:
-                        accelerator.wait_for_everyone()
-                        accelerator.clip_grad_norm_(
-                            model.parameters(), args.max_grad_norm
-                        )
-                        optimizer.step()
-                        lr_scheduler.step()
-                        optimizer.zero_grad(set_to_none=True)
-
-                # Accumulate loss
-                with torch.no_grad():
-                    all_losses = accelerator.gather(loss)
-                    all_losses = torch.where(
-                        torch.isnan(all_losses),
-                        torch.zeros_like(all_losses),
-                        all_losses,
-                    )
-                    total_loss = torch.mean(all_losses)
-                    batch_loss += total_loss.detach().float().item()
-
-                # Clean up memory for this micro-batch
-                for key in micro_input.keys():
-                    micro_input[key] = micro_input[key].to("cpu")
-
-                if "graph" in args.baseline_prompt and micro_graphs is not None:
-                    for graph in micro_graphs:
-                        graph = graph.to("cpu")
-                    if micro_graph_masks is not None:
-                        for mask in micro_graph_masks:
-                            for m in mask:
-                                m = m.to("cpu")
-                    del micro_graphs, micro_graph_masks, micro_graph_token_indices
-
-                outputs.logits = outputs.logits.to("cpu")
-                loss = loss.to("cpu")
-                del outputs, loss, micro_input
-                gc.collect()
-                torch.cuda.empty_cache()
-
-            # Update global step and logging
-            global_step += 1
-
-            # Clean up batch
-            del batch
-            gc.collect()
-
-            # End step timing
-            step_timer.end()
-
-            avg_batch_loss = batch_loss / batch_size
-            num_batches += 1
-
-            # Get embedding time from model if available
-            embedding_time = getattr(
-                model.module if hasattr(model, "module") else model,
-                "_last_embedding_time",
-                0.0,
+        if accelerator.is_main_process:
+            train_task = progress.add_task(
+                "Training...", total=args.num_train_epochs, step_time=0.0
             )
-            total_embedding_time += embedding_time
 
+        for epoch in range(args.num_train_epochs):
+
+            model.train()
             if accelerator.is_main_process:
-                ram_usage = log_ram_usage()
-                avg_time = step_timer.avg_time()
-                # progress.update(
-                #     train_epoch_task,
-                #     advance=1,
-                #     step_time=avg_time,
-                #     description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} | Data: {data_load_time:.3f}s | Emb: {embedding_time:.3f}s | Fwd: {forward_time:.3f}s | Bwd: {backward_time:.3f}s | RAM: {ram_usage:.1f}MB",
-                # )
-                accelerator.print(
-                    f"Step {global_step} - Loss: {avg_batch_loss:.4f} | "
-                    f"Data: {data_load_time:.3f}s | Emb: {embedding_time:.3f}s | "
-                    f"Fwd: {forward_time:.3f}s | Bwd: {backward_time:.3f}s"
+                train_epoch_task = progress.add_task(
+                    f"Epoch {epoch + 1}/{args.num_train_epochs}",
+                    total=len(tr_loader),
+                    step_time=0.0,
                 )
-            epoch_loss += avg_batch_loss * batch_size
-            num_items += batch_size
+            epoch_loss = 0.0
+            num_items = 0.0
 
-            if (global_step % args.logging_steps == 0) and accelerator.is_main_process:
-                current_lr = lr_scheduler.get_last_lr()[0]
-                avg_data_time = total_data_time / num_batches if num_batches > 0 else 0
-                avg_embedding_time = (
-                    total_embedding_time / num_batches if num_batches > 0 else 0
-                )
-                avg_forward_time = (
-                    total_forward_time / num_batches if num_batches > 0 else 0
-                )
-                avg_backward_time = (
-                    total_backward_time / num_batches if num_batches > 0 else 0
-                )
-                if accelerator.is_main_process:
-                    accelerator.log(
-                        {
-                            "train/loss": avg_batch_loss,
-                            "train/learning_rate": current_lr,
-                            "train/step": global_step,
-                            "train/avg_data_time": avg_data_time,
-                            "train/avg_embedding_time": avg_embedding_time,
-                            "train/avg_forward_time": avg_forward_time,
-                            "train/avg_backward_time": avg_backward_time,
-                        },
-                        step=global_step,
-                    )
-                    accelerator.print(
-                        f"[cyan]Timing Stats (avg over {num_batches} batches): "
-                        f"Data={avg_data_time:.3f}s | Emb={avg_embedding_time:.3f}s | "
-                        f"Fwd={avg_forward_time:.3f}s | Bwd={avg_backward_time:.3f}s[/cyan]"
-                    )
+            # Time tracking variables
+            total_data_time = 0.0
+            total_embedding_time = 0.0
+            total_forward_time = 0.0
+            total_backward_time = 0.0
+            num_batches = 0
 
-            if global_step % args.save_steps == 0:
-                accelerator.wait_for_everyone()
-                accelerator.print(f"Saving checkpoint at step {global_step}...")
-                if (previous_checkpoint_step != -1) and (accelerator.is_main_process):
+            for step, batch in enumerate(tr_loader):
+                # Start step timing
+                step_timer.start()
 
-                    old_dir = os.path.join(
-                        save_path,
-                        f"current_checkpoint",
-                    )
-                    new_dir = os.path.join(
-                        save_path,
-                        f"checkpoint-{previous_checkpoint_step}",
-                    )
-                    os.rename(old_dir, new_dir)
+                if (continue_training == True) and (global_step <= start_step):
+                    global_step += args.batch_size
+                    ram_usage = log_ram_usage()
 
-                if accelerator.is_main_process:
-                    checkpoint_dir_new = os.path.join(
-                        save_path,
-                        f"current_checkpoint",
-                    )
-                    previous_checkpoint_step = global_step
-
-                    while len(os.listdir(save_path)) >= max_num_checkpoint:
-                        oldest_checkpoint = min(
-                            [
-                                os.path.join(save_path, f)
-                                for f in os.listdir(save_path)
-                                if f.startswith("checkpoint-")
-                            ],
-                            key=os.path.getctime,
+                    if accelerator.is_main_process:
+                        progress.update(
+                            train_epoch_task,
+                            advance=1,
+                            step_time=0.0,
+                            description=f"Batch {step + 1}/{len(tr_loader)}: loss = N/A - RAM usage: {ram_usage:.1f} MB",
                         )
-                        shutil.rmtree(oldest_checkpoint)
+                    step_timer.end()
+                    continue
 
-                    unwrapped_model = accelerator.unwrap_model(model)
-                    save_checkpoint(
-                        model=unwrapped_model,
-                        path=checkpoint_dir_new,
-                        global_step=global_step,
-                        seed=args.seed,
-                        is_lora=args.use_lora,
-                    )
-                    accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
-                    del unwrapped_model
+                # Get data loading time from batch (measured in __getitem__)
+                data_load_time = sum(batch.get("data_load_time", [0.0]))
+                total_data_time += data_load_time
 
-            if global_step % args.validating_steps == 0:
                 accelerator.wait_for_everyone()
-                val_loss = validate(
-                    args=args,
-                    loader=va_loader,
-                    model=model,
-                    config=config,
-                    accelerator=accelerator,
-                    progress=None,
+                batch_size = batch["input"]["input_ids"].size(0)
+                batch_loss = 0.0
+
+                # Micro-batching: Process each sample in batch individually to avoid OOM
+                for micro_idx in range(batch_size):
+                    # Extract single sample from batch
+                    micro_input = {
+                        "input_ids": batch["input"]["input_ids"][
+                            micro_idx : micro_idx + 1
+                        ],
+                        "attention_mask": batch["input"]["attention_mask"][
+                            micro_idx : micro_idx + 1
+                        ],
+                        "labels": batch["input"]["labels"][micro_idx : micro_idx + 1],
+                    }
+
+                    if "token_type_ids" in batch["input"]:
+                        micro_input["token_type_ids"] = batch["input"][
+                            "token_type_ids"
+                        ][micro_idx : micro_idx + 1]
+
+                    # Extract graph data for this sample
+                    if "graph" in args.baseline_prompt:
+                        micro_graphs = (
+                            [batch["graph"][micro_idx]]
+                            if batch["graph"] is not None
+                            else None
+                        )
+                        micro_graph_masks = (
+                            [batch["graph_mask"][micro_idx]]
+                            if batch["graph_mask"] is not None
+                            else None
+                        )
+
+                        if micro_graphs is not None:
+                            graph_token_index = torch.where(
+                                micro_input["input_ids"][0] == config.graph_token_id[1]
+                            )[0].tolist()
+                            micro_graph_token_indices = [graph_token_index]
+                        else:
+                            micro_graph_token_indices = None
+                    else:
+                        micro_graphs = None
+                        micro_graph_masks = None
+                        micro_graph_token_indices = None
+
+                    # Forward pass with gradient accumulation
+                    with accelerator.accumulate(model):
+                        forward_start = time.time()
+                        outputs = model(
+                            **micro_input,
+                            graphs=micro_graphs,
+                            graph_masks=micro_graph_masks,
+                            graph_token_indices=micro_graph_token_indices,
+                            accelerator=accelerator,
+                        )
+                        forward_time = time.time() - forward_start
+                        total_forward_time += forward_time
+
+                        loss = outputs.loss
+                        backward_start = time.time()
+                        accelerator.backward(loss)
+                        backward_time = time.time() - backward_start
+                        total_backward_time += backward_time
+
+                        if accelerator.sync_gradients:
+                            accelerator.wait_for_everyone()
+                            accelerator.clip_grad_norm_(
+                                model.parameters(), args.max_grad_norm
+                            )
+                            optimizer.step()
+                            lr_scheduler.step()
+                            optimizer.zero_grad(set_to_none=True)
+
+                    # Accumulate loss
+                    with torch.no_grad():
+                        all_losses = accelerator.gather(loss)
+                        all_losses = torch.where(
+                            torch.isnan(all_losses),
+                            torch.zeros_like(all_losses),
+                            all_losses,
+                        )
+                        total_loss = torch.mean(all_losses)
+                        batch_loss += total_loss.detach().float().item()
+
+                    # Clean up memory for this micro-batch
+                    for key in micro_input.keys():
+                        micro_input[key] = micro_input[key].to("cpu")
+
+                    if "graph" in args.baseline_prompt and micro_graphs is not None:
+                        for graph in micro_graphs:
+                            graph = graph.to("cpu")
+                        if micro_graph_masks is not None:
+                            for mask in micro_graph_masks:
+                                for m in mask:
+                                    m = m.to("cpu")
+                        del micro_graphs, micro_graph_masks, micro_graph_token_indices
+
+                    outputs.logits = outputs.logits.to("cpu")
+                    loss = loss.to("cpu")
+                    del outputs, loss, micro_input
+                    gc.collect()
+                    torch.cuda.empty_cache()
+
+                # Update global step and logging
+                global_step += 1
+
+                # Clean up batch
+                del batch
+                gc.collect()
+
+                # End step timing
+                step_timer.end()
+
+                avg_batch_loss = batch_loss / batch_size
+                num_batches += 1
+
+                # Get embedding time from model if available
+                embedding_time = getattr(
+                    model.module if hasattr(model, "module") else model,
+                    "_last_embedding_time",
+                    0.0,
                 )
-                accelerator.wait_for_everyone()
+                total_embedding_time += embedding_time
 
                 if accelerator.is_main_process:
-                    wandb.log({"val_loss": val_loss})
-                    accelerator.print(
-                        f"Validation loss: {val_loss:.4f} at step {global_step}"
+                    ram_usage = log_ram_usage()
+                    avg_time = step_timer.avg_time()
+                    progress.update(
+                        train_epoch_task,
+                        advance=1,
+                        step_time=avg_time,
+                        description=f"Batch {step + 1}/{len(tr_loader)}: loss = {avg_batch_loss:.4f} | Data: {data_load_time:.3f}s | Emb: {embedding_time:.3f}s | Fwd: {forward_time:.3f}s | Bwd: {backward_time:.3f}s | RAM: {ram_usage:.1f}MB",
                     )
+                    accelerator.print(
+                        f"Step {global_step} - Loss: {avg_batch_loss:.4f} | "
+                        f"Data: {data_load_time:.3f}s | Emb: {embedding_time:.3f}s | "
+                        f"Fwd: {forward_time:.3f}s | Bwd: {backward_time:.3f}s"
+                    )
+                epoch_loss += avg_batch_loss * batch_size
+                num_items += batch_size
 
-                    if val_loss < best_val_loss:
-                        best_val_loss = val_loss
+                if (
+                    global_step % args.logging_steps == 0
+                ) and accelerator.is_main_process:
+                    current_lr = lr_scheduler.get_last_lr()[0]
+                    avg_data_time = (
+                        total_data_time / num_batches if num_batches > 0 else 0
+                    )
+                    avg_embedding_time = (
+                        total_embedding_time / num_batches if num_batches > 0 else 0
+                    )
+                    avg_forward_time = (
+                        total_forward_time / num_batches if num_batches > 0 else 0
+                    )
+                    avg_backward_time = (
+                        total_backward_time / num_batches if num_batches > 0 else 0
+                    )
+                    if accelerator.is_main_process:
+                        accelerator.log(
+                            {
+                                "train/loss": avg_batch_loss,
+                                "train/learning_rate": current_lr,
+                                "train/step": global_step,
+                                "train/avg_data_time": avg_data_time,
+                                "train/avg_embedding_time": avg_embedding_time,
+                                "train/avg_forward_time": avg_forward_time,
+                                "train/avg_backward_time": avg_backward_time,
+                            },
+                            step=global_step,
+                        )
                         accelerator.print(
-                            f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
-                        )
-                        checkpoint_dir = os.path.join(
-                            save_path,
-                            f"best_model",
+                            f"[cyan]Timing Stats (avg over {num_batches} batches): "
+                            f"Data={avg_data_time:.3f}s | Emb={avg_embedding_time:.3f}s | "
+                            f"Fwd={avg_forward_time:.3f}s | Bwd={avg_backward_time:.3f}s[/cyan]"
                         )
 
-                        if not os.path.exists(checkpoint_dir):
-                            os.makedirs(checkpoint_dir, exist_ok=True)
+                if global_step % args.save_steps == 0:
+                    accelerator.wait_for_everyone()
+                    accelerator.print(f"Saving checkpoint at step {global_step}...")
+                    if (previous_checkpoint_step != -1) and (
+                        accelerator.is_main_process
+                    ):
+
+                        old_dir = os.path.join(
+                            save_path,
+                            f"current_checkpoint",
+                        )
+                        new_dir = os.path.join(
+                            save_path,
+                            f"checkpoint-{previous_checkpoint_step}",
+                        )
+                        os.rename(old_dir, new_dir)
+
+                    if accelerator.is_main_process:
+                        checkpoint_dir_new = os.path.join(
+                            save_path,
+                            f"current_checkpoint",
+                        )
+                        previous_checkpoint_step = global_step
+
+                        while len(os.listdir(save_path)) >= max_num_checkpoint:
+                            oldest_checkpoint = min(
+                                [
+                                    os.path.join(save_path, f)
+                                    for f in os.listdir(save_path)
+                                    if f.startswith("checkpoint-")
+                                ],
+                                key=os.path.getctime,
+                            )
+                            shutil.rmtree(oldest_checkpoint)
 
                         unwrapped_model = accelerator.unwrap_model(model)
-                        # Save state dict to CPU to avoid keeping GPU memory
-                        state_dict_cpu = {
-                            k: v.cpu() for k, v in unwrapped_model.state_dict().items()
-                        }
-                        if args.use_lora:
-                            lora_state_dict = {
-                                k: v
-                                for k, v in state_dict_cpu.items()
-                                if ("lora_" in k) or ("gnn" in k) or ("nvib" in k)
-                            }
-                            torch.save(
-                                lora_state_dict,
-                                os.path.join(checkpoint_dir, f"model_weight.pt"),
-                            )
-                        else:
-                            torch.save(
-                                state_dict_cpu,
-                                os.path.join(
-                                    checkpoint_dir,
-                                    f"model_weight.pt",
-                                ),
-                            )
-
-                        tokenizer.save_pretrained(checkpoint_dir)
-                        console.log(
-                            f"[green]Saved best checkpoint to {checkpoint_dir}[/green]"
+                        save_checkpoint(
+                            model=unwrapped_model,
+                            path=checkpoint_dir_new,
+                            global_step=global_step,
+                            seed=args.seed,
+                            is_lora=args.use_lora,
                         )
-                        del state_dict_cpu, unwrapped_model
-                        del checkpoint_dir
-                        if args.use_lora:
-                            del lora_state_dict
-                        gc.collect()
+                        accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
+                        del unwrapped_model
 
-        # if accelerator.is_main_process:
-        #     if ((continue_training == True) and (global_step > start_step)) or (
-        #         continue_training == False
-        #     ):
-        #         progress.update(train_epoch_task, visible=False)
-        #         progress.remove_task(train_epoch_task)
-        #         progress.update(
-        #             train_task,
-        #             advance=1,
-        #             description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
-        #         )
+                if global_step % args.validating_steps == 0:
+                    accelerator.wait_for_everyone()
+                    val_loss = validate(
+                        args=args,
+                        loader=va_loader,
+                        model=model,
+                        config=config,
+                        accelerator=accelerator,
+                        progress=progress,
+                    )
+                    accelerator.wait_for_everyone()
+
+                    if accelerator.is_main_process:
+                        wandb.log({"val_loss": val_loss})
+                        accelerator.print(
+                            f"Validation loss: {val_loss:.4f} at step {global_step}"
+                        )
+
+                        if val_loss < best_val_loss:
+                            best_val_loss = val_loss
+                            accelerator.print(
+                                f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
+                            )
+                            checkpoint_dir = os.path.join(
+                                save_path,
+                                f"best_model",
+                            )
+
+                            if not os.path.exists(checkpoint_dir):
+                                os.makedirs(checkpoint_dir, exist_ok=True)
+
+                            unwrapped_model = accelerator.unwrap_model(model)
+                            # Save state dict to CPU to avoid keeping GPU memory
+                            state_dict_cpu = {
+                                k: v.cpu()
+                                for k, v in unwrapped_model.state_dict().items()
+                            }
+                            if args.use_lora:
+                                lora_state_dict = {
+                                    k: v
+                                    for k, v in state_dict_cpu.items()
+                                    if ("lora_" in k) or ("gnn" in k) or ("nvib" in k)
+                                }
+                                torch.save(
+                                    lora_state_dict,
+                                    os.path.join(checkpoint_dir, f"model_weight.pt"),
+                                )
+                            else:
+                                torch.save(
+                                    state_dict_cpu,
+                                    os.path.join(
+                                        checkpoint_dir,
+                                        f"model_weight.pt",
+                                    ),
+                                )
+
+                            tokenizer.save_pretrained(checkpoint_dir)
+                            console.log(
+                                f"[green]Saved best checkpoint to {checkpoint_dir}[/green]"
+                            )
+                            del state_dict_cpu, unwrapped_model
+                            del checkpoint_dir
+                            if args.use_lora:
+                                del lora_state_dict
+                            gc.collect()
+
+            if accelerator.is_main_process:
+                if ((continue_training == True) and (global_step > start_step)) or (
+                    continue_training == False
+                ):
+                    progress.update(train_epoch_task, visible=False)
+                    progress.remove_task(train_epoch_task)
+                    progress.update(
+                        train_task,
+                        advance=1,
+                        description=f"Epoch {epoch + 1}/{args.num_train_epochs}, loss = {epoch_loss / num_items:.4f}",
+                    )
 
     # One more validation at the end of training
     val_loss = validate(
