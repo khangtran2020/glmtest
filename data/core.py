@@ -672,7 +672,7 @@ class Data(object):
 
                         if graph is not None:
                             for mask in branch_masks:
-                                print(mask.shape[0], graph.num_nodes)
+                                # print(mask.shape[0], graph.num_nodes)
                                 assert (
                                     mask.shape[0] == graph.num_nodes
                                 ), "Mask size mismatch!"
