@@ -637,19 +637,6 @@ class Data(object):
                 for uuid, dat in tqdm(
                     self.data[data_n].items(), position=0, leave=True
                 ):
-                    data_name = f"{uuid}_testcase_{testcase}.json"
-                    data_path = os.path.join(processed_prompt_path, data_name)
-
-                    if os.path.exists(data_path):
-                        with open(data_path, "r") as file:
-                            data = json.load(file)
-                        num_token = data["num_tokens"]
-                        num_tokens.append(num_token)
-
-                        self.processed_data[data_n][f"{uuid}_testcase_{testcase}"] = {
-                            "num_tokens": num_token,
-                            "path": data_path,
-                        }
 
                     with open(dat["code_path"], "r") as file:
                         src_code = file.read()
@@ -673,6 +660,23 @@ class Data(object):
                             graph = None
 
                     for testcase in dat["test_cases"].keys():
+                        data_name = f"{uuid}_testcase_{testcase}.json"
+                        data_path = os.path.join(processed_prompt_path, data_name)
+
+                        if os.path.exists(data_path):
+                            with open(data_path, "r") as file:
+                                data = json.load(file)
+                            num_token = data["num_tokens"]
+                            num_tokens.append(num_token)
+
+                            self.processed_data[data_n][
+                                f"{uuid}_testcase_{testcase}"
+                            ] = {
+                                "num_tokens": num_token,
+                                "path": data_path,
+                            }
+                            continue
+
                         test_code = dat["test_cases"][testcase]["test_case"]
                         if self.data_fuzz:
                             test_code = self.add_fuzz_tags(test_code)
