@@ -94,12 +94,12 @@ def train(
                     f"DeepSpeed config file not found at {deepspeed_config_path}."
                 )
 
-            if ("gpt" in args.llm_model.lower()) or (mixed_precision == "bf16"):
-                bf16_config = args.deepspeed_config.replace(".json", "_bf16.json")
-                if not os.path.exists(bf16_config):
-                    raise FileNotFoundError(f"BF16 config not found at {bf16_config}.")
-                deepspeed_config_path = bf16_config
-                console.log(f"[green]Using BF16 config: {bf16_config}[/green]")
+            # if ("gpt" in args.llm_model.lower()) or (mixed_precision == "bf16"):
+            #     bf16_config = args.deepspeed_config.replace(".json", "_bf16.json")
+            #     if not os.path.exists(bf16_config):
+            #         raise FileNotFoundError(f"BF16 config not found at {bf16_config}.")
+            #     deepspeed_config_path = bf16_config
+            #     console.log(f"[green]Using BF16 config: {bf16_config}[/green]")
 
             with open(deepspeed_config_path, "r") as f:
                 ds_config = json.load(f)
