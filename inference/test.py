@@ -269,7 +269,8 @@ def generate_and_save_on_one_dataset(
                     do_sample=False,
                 )
 
-                with torch.autocast(device_type="cuda", dtype=torch.float16):
+                dtype = torch.bfloat16 if args.dtype == "bf16" else torch.float16
+                with torch.autocast(device_type="cuda", dtype=dtype):
                     if args.num_gpu > 1:
                         outputs = model.module.generate(
                             inputs_embeds=inputs_embeds,

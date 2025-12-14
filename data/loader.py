@@ -192,7 +192,12 @@ class GLMFDataset(Dataset):
 
             result["attention_mask"] = torch.cat(
                 [attention_tensor, result["attention_mask"]], dim=1
-            ).to(dtype=torch.bfloat16)
+            )
+            result["attention_mask"] = (
+                result["attention_mask"].to(dtype=torch.bfloat16)
+                if self.dtype == "bf16"
+                else result["attention_mask"].to(dtype=torch.float16)
+            )
             pad_size = pad_tensor.shape[1]
 
         # Use clone() to make a copy of the tensor for labels.

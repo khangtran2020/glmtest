@@ -239,6 +239,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             torch_dtype = torch.bfloat16
         else:
             torch_dtype = None
+        self.torch_dtype = torch_dtype
 
         # For ZeRO-3, device_map must be None as DeepSpeed handles device placement
         model_kwargs = {
@@ -345,7 +346,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
                 for node_type in graph.node_types:
                     if "x" in graph[node_type]:
-                        graph[node_type].x = graph[node_type].x.half()
+                        graph[node_type].x = graph[node_type].x.to(self.torch_dtype)
 
                 graph_embeds = self.gnn(graph.x_dict, graph.edge_index_dict)
                 graph_embeds = graph_embeds["node"][overall_indices, :]
