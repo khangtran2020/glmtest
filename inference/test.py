@@ -4,7 +4,6 @@ import json
 import time
 import torch
 from itertools import islice
-from tqdm import tqdm
 from rich import print as pprint
 from data.core import Data
 from data.loader import GLMFDataset, collate_fn
@@ -30,9 +29,7 @@ def test(
     config: GLMFModelConfig = None,
     mixed_precision: str = "bf16",
 ):
-    collate_fn_ = partial(
-        collate_fn, tokenizer=dataset.llm_tokenizer, max_seq_length=args.max_seq_length
-    )
+    collate_fn_ = partial(collate_fn, tokenizer=dataset.llm_tokenizer)
     tokenizer = dataset.llm_tokenizer
     if config is None:
         config = model.config

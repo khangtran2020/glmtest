@@ -1,13 +1,9 @@
 import os
 import json
 import torch
-import tempfile
 import pandas as pd
 import numpy as np
 from copy import deepcopy
-from utils.utils import get_index_by_value
-from graph.core import Graph
-from graph.utils import get_graph
 from data.core import Data
 from data.core import PROMPT_TEMPLATE
 from accelerate import Accelerator
@@ -16,7 +12,6 @@ from inference.verifier import verify_test_case
 from data.loader import GLMFDataset, collate_fn
 from sklearn.preprocessing import LabelEncoder
 from transformers import PreTrainedTokenizer, PreTrainedModel
-from branch.utils import get_all_branch, merge_testcases
 from rich.console import Console
 from functools import partial
 from train.utils import extract_code_block
@@ -47,7 +42,8 @@ def testcase_generate(
         raise ValueError("Either dataset or file_path must be provided, but not both.")
 
     collate_fn_ = partial(
-        collate_fn, tokenizer=dataset.llm_tokenizer, max_seq_length=args.max_seq_length
+        collate_fn,
+        tokenizer=dataset.llm_tokenizer,
     )
 
     # if dataset is None and file_path is not None:
