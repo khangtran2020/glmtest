@@ -130,6 +130,7 @@ def testcase_generate(
             debug=args.debug,
             n_hops=dataset.n_hops,
             testing=True,
+            metadata=model.metadata,
             dtype=args.dtype,
             num_gpus=args.num_gpu,
         )
@@ -141,6 +142,7 @@ def testcase_generate(
             debug=args.debug,
             n_hops=dataset.n_hops,
             testing=True,
+            metadata=model.metadata,
             dtype=args.dtype,
             num_gpus=args.num_gpu,
         )

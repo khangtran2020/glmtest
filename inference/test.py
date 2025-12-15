@@ -48,6 +48,7 @@ def test(
             n_hops=dataset.n_hops,
             testing=True,
             dtype=args.dtype,
+            metadata=model.metadata,
             num_gpus=args.num_gpu,
         )
         generate_and_save_on_one_dataset(
@@ -71,6 +72,7 @@ def test(
             n_hops=dataset.n_hops,
             testing=True,
             dtype=args.dtype,
+            metadata=model.metadata,
             num_gpus=args.num_gpu,
         )
         te_proj_dataset = GLMFDataset(
@@ -81,6 +83,7 @@ def test(
             n_hops=dataset.n_hops,
             testing=True,
             dtype=args.dtype,
+            metadata=model.metadata,
             num_gpus=args.num_gpu,
         )
         generate_and_save_on_one_dataset(
