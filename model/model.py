@@ -315,14 +315,17 @@ def get_model_test(
     metadata: tuple = None,
 ):
     # load model
+
+    if rank == -1:
+        device = torch.device("cpu")
+    else:
+        device = torch.device(f"cuda:{rank}")
+
     assert (
         args.model_weight_path is not None
     ), "Model directory must be specified for testing."
 
-    if "current_checkpoint" in args.model_weight_path:
-        use_lora = True
-    else:
-        use_lora = False
+    use_lora = True
 
     if args.fuzz_model:
 
@@ -450,28 +453,86 @@ def get_model_test(
             tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
         ]
 
+    # # take .pt file from the model_weight_path
+    # console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
+    # for file in os.listdir(args.model_weight_path):
+    #     if file.endswith(".pt"):
+    #         state_dict = torch.load(
+    #             os.path.join(args.model_weight_path, file),
+    #             map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+    #         )
+    #         model.load_state_dict(state_dict)
+    #         if use_lora:
+    #             model.llm_model = model.llm_model.merge_and_unload()
+    #         console.log(f"[red]Model weights loaded from {file}[/red]")
+
     # take .pt file from the model_weight_path
-    console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
-    for file in os.listdir(args.model_weight_path):
-        if file.endswith(".pt"):
-            state_dict = torch.load(
-                os.path.join(args.model_weight_path, file),
-                map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+    if args.model_weight_path.endswith(".pt"):
+        console.log(f"[red]Loading weight from {args.model_weight_path}[/red]")
+        state_dict = torch.load(
+            args.model_weight_path,
+            map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+        )
+        console.log(f"[green]Using LoRA weights for testing: {use_lora}.[/green]")
+        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
+        if missing_keys:
+            console.log(
+                f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
             )
-            model.load_state_dict(state_dict)
-            if use_lora:
-                model.llm_model = model.llm_model.merge_and_unload()
-            console.log(f"[red]Model weights loaded from {file}[/red]")
+        if unexpected_keys:
+            console.log(
+                f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
+            )
+            # Log sample of unexpected keys for debugging
+            sample_unexpected = list(unexpected_keys)[:3]
+            console.log(
+                f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
+            )
+    else:
+        console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
+        for file in os.listdir(args.model_weight_path):
+            if file.endswith(".pt"):
+                state_dict = torch.load(
+                    os.path.join(args.model_weight_path, file),
+                    map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+                )
+                console.log(
+                    f"[green]Using LoRA weights for testing: {use_lora}.[/green]"
+                )
+
+                state_dict = state_dict["model_state_dict"]
+                missing_keys, unexpected_keys = model.load_state_dict(
+                    state_dict, strict=False
+                )
+
+                if missing_keys:
+                    console.log(
+                        f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
+                    )
+                if unexpected_keys:
+                    console.log(
+                        f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
+                    )
+                    # Log sample of unexpected keys for debugging
+                    sample_unexpected = list(unexpected_keys)[:3]
+                    console.log(
+                        f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
+                    )
+                break
+
+    if use_lora:
+        model.llm_model = model.llm_model.merge_and_unload()
+    console.log(f"[red]Model weights loaded from {args.model_weight_path}[/red]")
 
     # model = model.to(dtype=torch.float)
     # unifying dtype to avoid errors
     for n, p in model.named_parameters():
         if args.dtype == "bf16":
-            if p.dtype != torch.bfloat16:
-                p.data = p.data.to(torch.bfloat16)
+            p.data = p.data.to(torch.bfloat16)
+            p.data = p.data.to(device)
         elif args.dtype == "fp16":
-            if p.dtype != torch.float16:
-                p.data = p.data.to(torch.float16)
+            p.data = p.data.to(torch.float16)
+            p.data = p.data.to(device)
 
     console.log(f"Model is loaded to device: {model.device} - with type {model.dtype}")
     # for name, param in model.named_parameters():
@@ -491,11 +552,7 @@ def get_model_testgen(
     assert (
         args.model_weight_path is not None
     ), "Model directory must be specified for testing."
-
-    if "current_checkpoint" in args.model_weight_path:
-        use_lora = True
-    else:
-        use_lora = False
+    use_lora = True
 
     if args.do_generate:
         if args.fuzz_model:
@@ -626,31 +683,74 @@ def get_model_testgen(
                 tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
             ]
         console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
-        for file in os.listdir(args.model_weight_path):
-            if file.endswith(".pt"):
-                state_dict = torch.load(
-                    os.path.join(args.model_weight_path, file),
-                    map_location=f"cuda:{rank}" if args.num_gpu >= 1 else "cpu",
+        if args.model_weight_path.endswith(".pt"):
+            console.log(f"[red]Loading weight from {args.model_weight_path}[/red]")
+            state_dict = torch.load(
+                args.model_weight_path,
+                map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+            )
+            console.log(f"[green]Using LoRA weights for testing: {use_lora}.[/green]")
+            missing_keys, unexpected_keys = model.load_state_dict(
+                state_dict, strict=False
+            )
+            if missing_keys:
+                console.log(
+                    f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
                 )
-                model.load_state_dict(state_dict)
-                if use_lora:
-                    model.llm_model = model.llm_model.merge_and_unload()
-                console.log(f"[red]Model weights loaded from {file}[/red]")
+            if unexpected_keys:
+                console.log(
+                    f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
+                )
+                # Log sample of unexpected keys for debugging
+                sample_unexpected = list(unexpected_keys)[:3]
+                console.log(
+                    f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
+                )
+        else:
+            console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
+            for file in os.listdir(args.model_weight_path):
+                if file.endswith(".pt"):
+                    state_dict = torch.load(
+                        os.path.join(args.model_weight_path, file),
+                        map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
+                    )
+                    console.log(
+                        f"[green]Using LoRA weights for testing: {use_lora}.[/green]"
+                    )
+
+                    state_dict = state_dict["model_state_dict"]
+                    missing_keys, unexpected_keys = model.load_state_dict(
+                        state_dict, strict=False
+                    )
+
+                    if missing_keys:
+                        console.log(
+                            f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
+                        )
+                    if unexpected_keys:
+                        console.log(
+                            f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
+                        )
+                        # Log sample of unexpected keys for debugging
+                        sample_unexpected = list(unexpected_keys)[:3]
+                        console.log(
+                            f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
+                        )
+                    break
+
+        if use_lora:
+            model.llm_model = model.llm_model.merge_and_unload()
+        console.log(f"[red]Model weights loaded from {args.model_weight_path}[/red]")
 
         # model = model.to(dtype=torch.float)
         # unifying dtype to avoid errors
         for n, p in model.named_parameters():
             if args.dtype == "bf16":
-                if p.dtype != torch.bfloat16:
-                    p.data = p.data.to(torch.bfloat16)
-                if p.device != device:
-                    p.data = p.data.to(device)
+                p.data = p.data.to(torch.bfloat16)
+                p.data = p.data.to(device)
             elif args.dtype == "fp16":
-                if p.dtype != torch.float16:
-                    p.data = p.data.to(torch.float16)
-                if p.device != device:
-                    p.data = p.data.to(device)
-
+                p.data = p.data.to(torch.float16)
+                p.data = p.data.to(device)
         console.log(
             f"Model is loaded to device: {model.device} - with type {model.dtype}"
         )
