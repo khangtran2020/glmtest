@@ -329,6 +329,23 @@ def add_training_group(group):
         default="configs/deepspeed_zero2.json",
     )
     group.add_argument(
+        "--use_deepspeed_inference",
+        action="store_true",
+        help="use DeepSpeed for inference with tensor parallelism (reduces memory usage and speeds up inference)",
+    )
+    group.add_argument(
+        "--deepspeed_inference_config",
+        type=str,
+        help="path to DeepSpeed inference config file",
+        default="configs/deepspeed_inference.json",
+    )
+    group.add_argument(
+        "--tensor_parallel_size",
+        type=int,
+        help="number of GPUs for tensor parallelism during inference",
+        default=2,
+    )
+    group.add_argument(
         "--num_gpu",
         type=int,
         help="number of gpus",

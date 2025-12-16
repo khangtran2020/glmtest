@@ -3,6 +3,7 @@ import gc
 import json
 import time
 import torch
+import deepspeed
 from itertools import islice
 from rich import print as pprint
 from data.core import Data
@@ -34,7 +35,23 @@ def test(
     if config is None:
         config = model.config
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model.to(device)
+
+    # Initialize DeepSpeed inference if enabled
+    if args.use_deepspeed_inference:
+        console.log(
+            f"[cyan]Initializing DeepSpeed inference engine with tensor parallelism (tp_size={args.tensor_parallel_size})...[/cyan]"
+        )
+        model = initialize_deepspeed_inference(
+            model=model,
+            args=args,
+            console=console,
+        )
+        console.log(
+            "[green]DeepSpeed inference engine initialized successfully![/green]"
+        )
+    else:
+        model.to(device)
+
     console.log("Testing on device ... :", device)
     if args.test_on_train:
         te_dataset = GLMFDataset(
@@ -512,3 +529,61 @@ def validate(
         val_loss /= num_item
     model.train()
     return val_loss
+
+
+def initialize_deepspeed_inference(
+    model: GLMFModelForCausalLM,
+    args: Namespace,
+    console: Console,
+):
+    """
+    Initialize DeepSpeed inference engine with tensor parallelism.
+
+    Args:
+        model: The model to wrap with DeepSpeed
+        args: Arguments containing DeepSpeed configuration
+        console: Console for logging
+
+    Returns:
+        Model wrapped with DeepSpeed inference engine
+    """
+    # Load DeepSpeed inference config
+    if os.path.exists(args.deepspeed_inference_config):
+        with open(args.deepspeed_inference_config, "r") as f:
+            ds_config = json.load(f)
+    else:
+        console.log(
+            f"[yellow]DeepSpeed config not found at {args.deepspeed_inference_config}, using default config[/yellow]"
+        )
+        ds_config = {
+            "tensor_parallel": {"tp_size": args.tensor_parallel_size},
+            "dtype": args.dtype,
+            "replace_with_kernel_inject": True,
+            "enable_cuda_graph": False,
+        }
+
+    # Update tensor parallel size if specified in args
+    if "tensor_parallel" in ds_config:
+        ds_config["tensor_parallel"]["tp_size"] = args.tensor_parallel_size
+
+    # Set dtype based on args
+    ds_config["dtype"] = args.dtype
+
+    console.log(
+        f"[cyan]DeepSpeed inference config: {json.dumps(ds_config, indent=2)}[/cyan]"
+    )
+
+    # Initialize DeepSpeed inference engine
+    try:
+        ds_engine = deepspeed.init_inference(
+            model=model,
+            config=ds_config,
+        )
+        console.log(
+            "[green]DeepSpeed inference engine initialized successfully[/green]"
+        )
+        return ds_engine.module
+    except Exception as e:
+        console.log(f"[red]Error initializing DeepSpeed inference: {e}[/red]")
+        console.log("[yellow]Falling back to standard inference[/yellow]")
+        return model.to("cuda" if torch.cuda.is_available() else "cpu")
