@@ -213,6 +213,7 @@ def main() -> None:
                 rank = int(os.environ.get("RANK", 0))
                 device = torch.device("cuda", rank)
                 args.num_gpu = n_gpus
+                local_rank = rank
             else:
                 console.log("Using 1 GPU.")
                 device = torch.device("cuda:0")
