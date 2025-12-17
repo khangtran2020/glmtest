@@ -279,25 +279,14 @@ def generate_and_save_on_one_dataset(
 
                 dtype = torch.bfloat16 if args.dtype == "bf16" else torch.float16
                 with torch.autocast(device_type="cuda", dtype=dtype):
-                    if args.num_gpu > 1:
-                        outputs = model.module.generate(
-                            inputs_embeds=inputs_embeds,
-                            attention_mask=micro_input["attention_mask"],
-                            generation_config=generation_config,
-                            pad_token_id=tokenizer.eos_token_id,
-                        )
-
-                        if isinstance(model, GLMFModelFuzzing):
-                            model.module.clear_cache()
-                    else:
-                        outputs = model.generate(
-                            inputs_embeds=inputs_embeds,
-                            attention_mask=micro_input["attention_mask"],
-                            generation_config=generation_config,
-                            pad_token_id=tokenizer.eos_token_id,
-                        )
-                        if isinstance(model, GLMFModelFuzzing):
-                            model.clear_cache()
+                    outputs = model.generate(
+                        inputs_embeds=inputs_embeds,
+                        attention_mask=micro_input["attention_mask"],
+                        generation_config=generation_config,
+                        pad_token_id=tokenizer.eos_token_id,
+                    )
+                    if isinstance(model, GLMFModelFuzzing):
+                        model.clear_cache()
 
                 out_text = tokenizer.batch_decode(
                     outputs,
