@@ -219,23 +219,6 @@ def testcase_generate(
                     refactored_code = verification_result["refactored_code"]
                     project_dict[k.split("_testcase_")[0]].append(refactored_code)
 
-                if args.verifier_model is None:
-                    project_dict[k.split("_testcase_")[0]].append(
-                        extract_code_block(text=v)
-                    )
-                else:
-                    # verify the test case
-                    with console.status(f"Verifying test case {k}..."):
-                        verification_result = verify_test_case(
-                            test_case=extract_code_block(text=v),
-                            model=args.verifier_model,
-                            temperature=0.2,
-                            api_key=args.verifier_api_key,
-                            max_tokens=2048,
-                        )
-                    refactored_code = verification_result["refactored_code"]
-                    project_dict[k.split("_testcase_")[0]].append(refactored_code)
-
             # generated_testsrc_dict = {}
             # for k, v in project_dict.items():
             #     test_src = merge_testcases(codes=v)

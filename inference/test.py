@@ -537,15 +537,16 @@ def initialize_deepspeed_inference(
     console: Console,
 ):
     """
-    Initialize DeepSpeed inference engine with tensor parallelism.
+    Initialize DeepSpeed inference engine with tensor parallelism on LLM only.
+    Keeps GNN on regular CUDA for compatibility.
 
     Args:
-        model: The model to wrap with DeepSpeed
+        model: The GLMFModelForCausalLM model (with GNN + LLM)
         args: Arguments containing DeepSpeed configuration
         console: Console for logging
 
     Returns:
-        Model wrapped with DeepSpeed inference engine
+        Model with DeepSpeed-wrapped LLM component
     """
     # Load DeepSpeed inference config
     if os.path.exists(args.deepspeed_inference_config):
@@ -573,16 +574,33 @@ def initialize_deepspeed_inference(
         f"[cyan]DeepSpeed inference config: {json.dumps(ds_config, indent=2)}[/cyan]"
     )
 
-    # Initialize DeepSpeed inference engine
+    # Initialize DeepSpeed inference engine ONLY on the LLM part
     try:
+        # Keep GNN on regular CUDA
+        if hasattr(model, "gnn") and "graph" in args.baseline_prompt:
+            console.log("[cyan]Moving GNN to CUDA (not wrapped by DeepSpeed)[/cyan]")
+            model.gnn = model.gnn.to("cuda")
+
+        # Apply DeepSpeed only to the LLM model
+        console.log("[cyan]Applying DeepSpeed inference to LLM component only[/cyan]")
         ds_engine = deepspeed.init_inference(
-            model=model,
+            model=model.llm_model,
             config=ds_config,
         )
+
+        # Replace the LLM component with DeepSpeed-wrapped version
+        model.llm_model = ds_engine.module
+
         console.log(
-            "[green]DeepSpeed inference engine initialized successfully[/green]"
+            "[green]DeepSpeed inference engine initialized successfully on LLM[/green]"
         )
-        return ds_engine.module
+        console.log(
+            f"[green]GNN remains on regular CUDA: {next(model.gnn.parameters()).device if hasattr(model, 'gnn') else 'N/A'}[/green]"
+        )
+        console.log(
+            f"[green]LLM on DeepSpeed: {next(model.llm_model.parameters()).device}[/green]"
+        )
+        return model
     except Exception as e:
         console.log(f"[red]Error initializing DeepSpeed inference: {e}[/red]")
         console.log("[yellow]Falling back to standard inference[/yellow]")
