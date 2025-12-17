@@ -261,22 +261,13 @@ def generate_and_save_on_one_dataset(
                     graph_masks = None
                     graph_token_indices = None
 
-                if args.num_gpu > 1:
-                    inputs_embeds = model.module.extract_embedding(
-                        input_ids=micro_input["input_ids"],
-                        graphs=graphs,
-                        inputs_embeds=None,
-                        graph_masks=graph_masks,
-                        graph_token_indices=graph_token_indices,
-                    )
-                else:
-                    inputs_embeds = model.extract_embedding(
-                        input_ids=micro_input["input_ids"],
-                        graphs=graphs,
-                        inputs_embeds=None,
-                        graph_masks=graph_masks,
-                        graph_token_indices=graph_token_indices,
-                    )
+                inputs_embeds = model.extract_embedding(
+                    input_ids=micro_input["input_ids"],
+                    graphs=graphs,
+                    inputs_embeds=None,
+                    graph_masks=graph_masks,
+                    graph_token_indices=graph_token_indices,
+                )
 
                 generation_config = GenerationConfig(
                     temperature=args.temp,
