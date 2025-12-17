@@ -592,6 +592,15 @@ def add_baseline_group(group):
 
 def parse_args():
     parser = argparse.ArgumentParser()
+
+    # Add local_rank for DeepSpeed launcher compatibility
+    parser.add_argument(
+        "--local_rank",
+        type=int,
+        default=-1,
+        help="Local rank for distributed training (set by DeepSpeed launcher)",
+    )
+
     general_group = parser.add_argument_group(title="General configuration")
     data_group = parser.add_argument_group(title="Data-related configuration")
     joern_group = parser.add_argument_group(title="Joern-related configuration")

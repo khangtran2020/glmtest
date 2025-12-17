@@ -193,6 +193,7 @@ def main() -> None:
 
     if torch.cuda.is_available():
         # Check if distributed training is enabled (this is the case when using Accelerate or torchrun with multi-node)
+        # Also check if DeepSpeed launcher passed --local_rank
         if "WORLD_SIZE" in os.environ and int(os.environ["WORLD_SIZE"]) > 1:
             rank = int(os.environ.get("RANK", 0))
             local_rank = int(
@@ -204,6 +205,17 @@ def main() -> None:
                 f"Distributed training: rank {rank+1}/{world_size}, using device {device}."
             )
             args.num_gpu = world_size
+        elif args.local_rank != -1:
+            # DeepSpeed launcher sets --local_rank argument
+            local_rank = args.local_rank
+            rank = local_rank  # For single-node, local_rank == rank
+            device = torch.device("cuda", local_rank)
+            # Infer world size from WORLD_SIZE env or default to number of GPUs
+            world_size = int(os.environ.get("WORLD_SIZE", torch.cuda.device_count()))
+            args.num_gpu = world_size
+            console.log(
+                f"DeepSpeed distributed: local_rank={local_rank}, world_size={world_size}, device={device}"
+            )
         else:
             # Fallback for single-node training, single or multi GPU.
             n_gpus = torch.cuda.device_count()
