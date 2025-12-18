@@ -10,15 +10,9 @@ from data.utils import get_dataset
 from data.core import get_reasoning
 from graph.utils import get_graph
 from train.train import train
-from model.model import get_model, continue_training_from_checkpoint
-from inference.test import test, eval_bleu_score
+from model.model import get_model, extract_metadata_from_graph
+from inference.test import test
 from inference.testcase_generate import testcase_generate
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.optim import AdamW
-from datetime import timedelta
-from torch.distributed import init_process_group
-
-# baseline
 from baselines.prompt_engineer.run import PromptEngineer
 from baselines.codamosa.run import run_codamosa
 
@@ -78,6 +72,7 @@ def main() -> None:
         return
 
     if args.mode == "data":
+        dataset.crawl()
         dataset.process_raw()
         console.log("Data processing completed. Exiting as mode is 'data'.")
         return
@@ -199,6 +194,7 @@ def main() -> None:
 
     if torch.cuda.is_available():
         # Check if distributed training is enabled (this is the case when using Accelerate or torchrun with multi-node)
+        # Also check if DeepSpeed launcher passed --local_rank
         if "WORLD_SIZE" in os.environ and int(os.environ["WORLD_SIZE"]) > 1:
             rank = int(os.environ.get("RANK", 0))
             local_rank = int(
@@ -210,6 +206,17 @@ def main() -> None:
                 f"Distributed training: rank {rank+1}/{world_size}, using device {device}."
             )
             args.num_gpu = world_size
+        elif args.local_rank != -1:
+            # DeepSpeed launcher sets --local_rank argument
+            local_rank = args.local_rank
+            rank = local_rank  # For single-node, local_rank == rank
+            device = torch.device("cuda", local_rank)
+            # Infer world size from WORLD_SIZE env or default to number of GPUs
+            world_size = int(os.environ.get("WORLD_SIZE", torch.cuda.device_count()))
+            args.num_gpu = world_size
+            console.log(
+                f"DeepSpeed distributed: local_rank={local_rank}, world_size={world_size}, device={device}"
+            )
         else:
             # Fallback for single-node training, single or multi GPU.
             n_gpus = torch.cuda.device_count()
@@ -219,6 +226,7 @@ def main() -> None:
                 rank = int(os.environ.get("RANK", 0))
                 device = torch.device("cuda", rank)
                 args.num_gpu = n_gpus
+                local_rank = rank
             else:
                 console.log("Using 1 GPU.")
                 device = torch.device("cuda:0")
@@ -244,52 +252,41 @@ def main() -> None:
             value = [dataset.llm_tokenizer.convert_tokens_to_ids(v) for v in value]
             console.log(f"[cyan]{key}[/cyan]: {value}")
 
-    model = get_model(
-        args=args,
-        console=console,
-        tokenizer=dataset.llm_tokenizer,
-        rank=local_rank,
-        device=device,
+    graph_metadata = (
+        extract_metadata_from_graph(dataset=dataset)
+        if "graph" in args.baseline_prompt
+        else None
     )
 
     if args.mode == "train":
-
-        optimizer = AdamW(
-            filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
-        )
-        lr_scheduler = CosineAnnealingLR(optimizer, T_max=100, eta_min=5e-8)
-
-        if args.continue_training:
-            model, start_step, optimizer, lr_scheduler = (
-                continue_training_from_checkpoint(
-                    args=args,
-                    model=model,
-                    rank=rank,
-                    console=console,
-                    optimizer=optimizer,
-                    lr_scheduler=lr_scheduler,
-                )
-            )
-        else:
-            start_step = -1
-
         train(
             args=args,
             dataset=dataset,
             console=console,
-            model=model,
-            optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
             continue_training=args.continue_training,
-            start_step=start_step,
             max_num_checkpoint=args.max_num_checkpoint,
+            metadata=graph_metadata,
             mixed_precision="bf16" if args.dtype == "bf16" else "fp16",
         )
-
     elif args.mode == "test":
+        model = get_model(
+            args=args,
+            console=console,
+            tokenizer=dataset.llm_tokenizer,
+            rank=local_rank,
+            metadata=graph_metadata,
+            device=device,
+        )
         test(args=args, dataset=dataset, model=model, console=console)
-
     elif args.mode == "testgen":
+        model = get_model(
+            args=args,
+            console=console,
+            tokenizer=dataset.llm_tokenizer,
+            rank=local_rank,
+            metadata=graph_metadata,
+            device=device,
+        )
         testcase_generate(
             args=args,
             dataset=dataset,

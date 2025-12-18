@@ -81,7 +81,7 @@ def add_data_group(group):
         help="LRU cache size for data loading",
     )
     # group.add_argument(
-    #     "--reasoning_save_path", type=str, help="api key for reason model", default=None
+    #     "--redo_graph", action="store_true", help="recreate the graph data"
     # )
 
 
@@ -320,13 +320,30 @@ def add_training_group(group):
     group.add_argument(
         "--use_deepspeed",
         action="store_true",
-        help="use DeepSpeed for training optimization (ZeRO-2 for 20-40%% speedup)",
+        help="use DeepSpeed for training optimization (ZeRO-2 for 20-40%% speedup, ZeRO-3 for maximum memory efficiency)",
     )
     group.add_argument(
         "--deepspeed_config",
         type=str,
-        help="path to DeepSpeed config file",
+        help="path to DeepSpeed config file (supports ZeRO-2 and ZeRO-3)",
         default="configs/deepspeed_zero2.json",
+    )
+    group.add_argument(
+        "--use_deepspeed_inference",
+        action="store_true",
+        help="use DeepSpeed for inference with tensor parallelism (reduces memory usage and speeds up inference)",
+    )
+    group.add_argument(
+        "--deepspeed_inference_config",
+        type=str,
+        help="path to DeepSpeed inference config file",
+        default="configs/deepspeed_inference.json",
+    )
+    group.add_argument(
+        "--tensor_parallel_size",
+        type=int,
+        help="number of GPUs for tensor parallelism during inference",
+        default=2,
     )
     group.add_argument(
         "--num_gpu",
@@ -575,6 +592,15 @@ def add_baseline_group(group):
 
 def parse_args():
     parser = argparse.ArgumentParser()
+
+    # Add local_rank for DeepSpeed launcher compatibility
+    parser.add_argument(
+        "--local_rank",
+        type=int,
+        default=-1,
+        help="Local rank for distributed training (set by DeepSpeed launcher)",
+    )
+
     general_group = parser.add_argument_group(title="General configuration")
     data_group = parser.add_argument_group(title="Data-related configuration")
     joern_group = parser.add_argument_group(title="Joern-related configuration")

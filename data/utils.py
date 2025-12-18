@@ -1,10 +1,11 @@
 import ast
-import dgl
 import torch
 from data.ossfuzz_data import OSSFuzz
 from data.testgeneval_data import TestGenEval
+from data.codamosa_data import Codamosa
 from graph.joerngraph import JoernGraph
 from transformers import AutoTokenizer, AutoModel
+from torch_geometric.utils import k_hop_subgraph
 from utils.constant import (
     GRAPH_START_TOKEN,
     GRAPH_PAD_TOKEN,
@@ -16,6 +17,7 @@ from utils.constant import (
 # typing
 from data.core import Data
 from rich.console import Console
+from torch_geometric.data import HeteroData
 
 
 def get_dataset(
@@ -111,27 +113,59 @@ def get_dataset(
             repo=repo,
             gnn_mode=gnn_mode,
         )
+    elif data_name == "codamosa":
+        logger.log("Using Codamosa dataset")
+        return Codamosa(
+            logger=logger,
+            path=data_path,
+            graph=graph,
+            model=model,
+            model_name=model_name,
+            llm_model_name=llm_model_name,
+            tokenizer=tokenizer,
+            llm_tokenizer=llm_tokenizer,
+            baseline_prompt=baseline_prompt,
+            debug=debug,
+            graph_sampling=graph_sampling,
+            max_tokens=max_tokens,
+            n_hops=kwargs.get("n_hops", 1),
+            raw_overwrite=raw_overwrite,
+            repo=repo,
+            gnn_mode=gnn_mode,
+        )
     else:
         logger.log("Dataset not found")
         return None
 
 
 def sampling_neighbor(
-    graph: dgl.DGLGraph, mask: torch.Tensor, n_hops: int = 2
-) -> dgl.DGLGraph:
+    graph: HeteroData, active_node: torch.Tensor, n_hops: int = 2
+) -> HeteroData:
     """
     Sample the neighbors of the graph starting from a mask over multiple hops.
+    Uses PyTorch Geometric's k-hop subgraph sampling.
     """
 
-    seeds = mask
-    blocks = []
+    # Collect all sampled nodes across edge types
+    all_sampled_nodes = set(active_node.tolist())
 
-    for _ in range(n_hops):
-        block = dgl.sampling.sample_neighbors(graph, seeds.long(), fanout=1)
-        blocks.append(block)
-        seeds = block.nodes()
+    # For each edge type, perform k-hop neighbor sampling
+    for edge_type in graph.edge_types:
+        edge_index = graph[edge_type].edge_index
 
-    final_subgraph = dgl.node_subgraph(
-        graph, torch.unique(torch.cat([b.nodes() for b in blocks]))
-    )
-    return final_subgraph
+        # k_hop_subgraph returns (subset, edge_index, mapping, edge_mask)
+        subset, _, _, _ = k_hop_subgraph(
+            node_idx=active_node,
+            num_hops=n_hops,
+            edge_index=edge_index,
+            relabel_nodes=False,
+            num_nodes=graph["node"].x.size(0),
+        )
+
+        all_sampled_nodes.update(subset.tolist())
+
+    # Create subgraph with sampled nodes
+    sampled_nodes = torch.tensor(sorted(all_sampled_nodes), dtype=torch.long)
+    subgraph = graph.subgraph({"node": sampled_nodes})
+
+    return subgraph

@@ -1,23 +1,20 @@
 import os
-import dgl
 import json
 import torch
-import tempfile
 import pandas as pd
 import numpy as np
 from copy import deepcopy
-from utils.utils import get_index_by_value
-from graph.core import Graph
-from graph.utils import get_graph
 from data.core import Data
 from data.core import PROMPT_TEMPLATE
 from accelerate import Accelerator
-from inference.test import generate_and_save_on_one_dataset
+from inference.test import (
+    generate_and_save_on_one_dataset,
+    initialize_deepspeed_inference,
+)
 from inference.verifier import verify_test_case
 from data.loader import GLMFDataset, collate_fn
 from sklearn.preprocessing import LabelEncoder
 from transformers import PreTrainedTokenizer, PreTrainedModel
-from branch.utils import get_all_branch, merge_testcases
 from rich.console import Console
 from functools import partial
 from train.utils import extract_code_block
@@ -38,20 +35,36 @@ def testcase_generate(
     mixed_precision: str = "bf16",
     do_generate: bool = True,
 ):
-    config = model.config
+    config = model.config if model is not None else None
     accelerator = Accelerator(
         mixed_precision=mixed_precision,
         log_with="wandb",
         project_dir=args.log_dir,
     )
+
+    # Initialize DeepSpeed inference if enabled
+    if args.use_deepspeed_inference and model is not None:
+        console.log(
+            f"[cyan]Initializing DeepSpeed inference engine for testgen with tensor parallelism (tp_size={args.tensor_parallel_size})...[/cyan]"
+        )
+        model = initialize_deepspeed_inference(
+            model=model,
+            args=args,
+            console=console,
+        )
+        console.log(
+            "[green]DeepSpeed inference engine initialized successfully for testgen![/green]"
+        )
+
     if dataset is not None and file_path is not None:
         raise ValueError("Either dataset or file_path must be provided, but not both.")
 
     collate_fn_ = partial(
-        collate_fn, tokenizer=dataset.llm_tokenizer, max_seq_length=args.max_seq_length
+        collate_fn,
+        tokenizer=dataset.llm_tokenizer,
     )
 
-    if dataset is None and file_path is not None:
+    """ if dataset is None and file_path is not None:
         graph_extractor = get_graph(
             args=args,
             graph_type=args.graph_type,
@@ -117,7 +130,7 @@ def testcase_generate(
             # save generated text to jsonl file
             with open(save_dir, "w", encoding="utf-8") as f:
                 # save as json file
-                json.dump(generated_text, f, ensure_ascii=False, indent=4)
+                json.dump(generated_text, f, ensure_ascii=False, indent=4)"""
 
     if dataset is not None:
 
@@ -131,6 +144,7 @@ def testcase_generate(
             debug=args.debug,
             n_hops=dataset.n_hops,
             testing=True,
+            metadata=model.metadata,
             dtype=args.dtype,
             num_gpus=args.num_gpu,
         )
@@ -142,6 +156,7 @@ def testcase_generate(
             debug=args.debug,
             n_hops=dataset.n_hops,
             testing=True,
+            metadata=model.metadata,
             dtype=args.dtype,
             num_gpus=args.num_gpu,
         )
@@ -186,23 +201,6 @@ def testcase_generate(
             for k, v in generated_dict.items():
                 if k.split("_testcase_")[0] not in project_dict.keys():
                     project_dict[k.split("_testcase_")[0]] = []
-
-                if args.verifier_model is None:
-                    project_dict[k.split("_testcase_")[0]].append(
-                        extract_code_block(markdown=v)
-                    )
-                else:
-                    # verify the test case
-                    with console.status(f"Verifying test case {k}..."):
-                        verification_result = verify_test_case(
-                            test_case=extract_code_block(markdown=v),
-                            model=args.verifier_model,
-                            temperature=0.2,
-                            api_key=args.verifier_api_key,
-                            max_tokens=2048,
-                        )
-                    refactored_code = verification_result["refactored_code"]
-                    project_dict[k.split("_testcase_")[0]].append(refactored_code)
 
                 if args.verifier_model is None:
                     project_dict[k.split("_testcase_")[0]].append(
@@ -284,131 +282,6 @@ def testcase_generate(
         with open(save_dir, "w", encoding="utf-8") as f:
             # save as json file
             json.dump(project_dict, f, ensure_ascii=False, indent=4)
-
-
-def prepare_module(
-    args: Namespace,
-    code: str = None,
-    module_path: str = None,
-    save_path: str = None,
-    graph_extractor: Graph = None,
-    llm_tokenizer: PreTrainedTokenizer = None,
-    tokenizer: PreTrainedTokenizer = None,
-    feat_model: PreTrainedModel = None,
-    device: torch.device = torch.device("cpu"),
-    console: Console = None,
-):
-
-    uuid = (
-        module_path.split("/")[-1].split(".")[0] if module_path is not None else "temp"
-    )
-    if save_path is None:
-        save_path = tempfile.mkdtemp()
-        os.makedirs(save_path, exist_ok=True)
-
-    if (code is None) == (module_path is None):
-        raise ValueError("Either code or module_path must be provided, but not both.")
-
-    if code is None:
-        assert module_path is not None, "module_path must be provided if code is None"
-        with open(module_path, "r") as f:
-            code = f.read()
-    else:
-        code_path = os.path.join(save_path, "module.py")
-        with open(code_path, "w") as f:
-            f.write(code)
-
-    graph_path = os.path.join(save_path, "graph.pt")
-    os.makedirs(graph_path, exist_ok=True)
-
-    # extract graph from code
-    graph = graph_extractor.extract_graph(
-        code_path=code_path,
-        save_path=graph_path,
-        overwrite=True,
-    )
-
-    node_feat = get_node_features(
-        graph=graph, tokenizer=tokenizer, device=device, feat_model=feat_model
-    )
-
-    graph_dict = {}
-    num_nodes = len(graph["nodes"])
-    assert num_nodes == node_feat.shape[0]
-    edge_dict = read_edge(graph)
-
-    for etype in edge_dict.keys():
-        u = torch.Tensor(edge_dict[etype][0]).long()
-        v = torch.Tensor(edge_dict[etype][1]).long()
-        graph = dgl.graph((u, v), num_nodes=num_nodes)
-        graph.ndata["feat"] = node_feat
-        graph_dict[etype] = graph
-    graph_dict["num_nodes"] = num_nodes
-    graph_dict["feat_size"] = node_feat.size()
-    torch.save(graph_dict, graph_path)
-
-    branches = get_all_branch(code=code)
-    all_masks = []
-    for branch in enumerate(branches):
-        mask = get_mask_tensor(graph=graph, branch=branch)
-        all_masks.append(mask)
-
-    if console is not None:
-        log_info = f"Module processed. Number of branches: {len(branches)}, Feature shape: {node_feat.shape}, number of masks: {len(all_masks)}"
-        console.log(log_info)
-
-    # build the prompts
-    processed_data = {}
-    for i, branch in enumerate(branches):
-        prompt = get_prompt(
-            src_code=code,
-            mask=all_masks[i],
-            branch=branch,
-            tokenizer=tokenizer,
-            gnn_mode=args.gnn_mode,
-            baseline_prompt=args.baseline_prompt,
-            max_tokens=args.max_seq_length,
-        )
-
-        assert len(all_masks[i].shape) == 2, "Mask shape must be (1, num_nodes)"
-        active_node = get_index_by_value(a=all_masks[i][0], val=1)
-
-        if "graph" in args.baseline_prompt:
-            data = {
-                "uuid": f"{uuid}_{i}",
-                "prompt": prompt,
-                "active_node": active_node.tolist(),
-                "mask": all_masks[i].tolist(),
-                "graph_path": graph_path,
-            }
-        else:
-            data = {
-                "uuid": f"{uuid}_{i}",
-                "prompt": prompt,
-                "active_node": None,
-                "mask": None,
-                "graph_path": None,
-            }
-
-        data_name = f"{uuid}_testcase_{i}.json"
-        data_path = os.path.join(save_path, data_name)
-        with open(data_path, "w") as file:
-            json.dump(data, file, indent=4)
-
-        processed_data[f"{uuid}_testcase_{i}"] = data_path
-
-    # build a GLMFDataset from the graph, node_feat, and all_masks
-    dataset = GLMFDataset(
-        data=processed_data,
-        tokenizer=llm_tokenizer,
-        max_seq_length=args.max_seq_length,
-        debug=args.debug,
-        n_hops=args.n_layers,
-        testing=True,
-        dtype=args.dtype,
-        num_gpus=args.num_gpu,
-    )
-    return dataset
 
 
 def get_node_features(
@@ -651,3 +524,128 @@ def get_node_id_dict(graph: dict) -> dict:
         node = graph["nodes"][i]
         node_dict[node["id"]] = i
     return node_dict
+
+
+"""def prepare_module(
+    args: Namespace,
+    code: str = None,
+    module_path: str = None,
+    save_path: str = None,
+    graph_extractor: Graph = None,
+    llm_tokenizer: PreTrainedTokenizer = None,
+    tokenizer: PreTrainedTokenizer = None,
+    feat_model: PreTrainedModel = None,
+    device: torch.device = torch.device("cpu"),
+    console: Console = None,
+):
+
+    uuid = (
+        module_path.split("/")[-1].split(".")[0] if module_path is not None else "temp"
+    )
+    if save_path is None:
+        save_path = tempfile.mkdtemp()
+        os.makedirs(save_path, exist_ok=True)
+
+    if (code is None) == (module_path is None):
+        raise ValueError("Either code or module_path must be provided, but not both.")
+
+    if code is None:
+        assert module_path is not None, "module_path must be provided if code is None"
+        with open(module_path, "r") as f:
+            code = f.read()
+    else:
+        code_path = os.path.join(save_path, "module.py")
+        with open(code_path, "w") as f:
+            f.write(code)
+
+    graph_path = os.path.join(save_path, "graph.pt")
+    os.makedirs(graph_path, exist_ok=True)
+
+    # extract graph from code
+    graph = graph_extractor.extract_graph(
+        code_path=code_path,
+        save_path=graph_path,
+        overwrite=True,
+    )
+
+    node_feat = get_node_features(
+        graph=graph, tokenizer=tokenizer, device=device, feat_model=feat_model
+    )
+
+    graph_dict = {}
+    num_nodes = len(graph["nodes"])
+    assert num_nodes == node_feat.shape[0]
+    edge_dict = read_edge(graph)
+
+    for etype in edge_dict.keys():
+        u = torch.Tensor(edge_dict[etype][0]).long()
+        v = torch.Tensor(edge_dict[etype][1]).long()
+        graph = dgl.graph((u, v), num_nodes=num_nodes)
+        graph.ndata["feat"] = node_feat
+        graph_dict[etype] = graph
+    graph_dict["num_nodes"] = num_nodes
+    graph_dict["feat_size"] = node_feat.size()
+    torch.save(graph_dict, graph_path)
+
+    branches = get_all_branch(code=code)
+    all_masks = []
+    for branch in enumerate(branches):
+        mask = get_mask_tensor(graph=graph, branch=branch)
+        all_masks.append(mask)
+
+    if console is not None:
+        log_info = f"Module processed. Number of branches: {len(branches)}, Feature shape: {node_feat.shape}, number of masks: {len(all_masks)}"
+        console.log(log_info)
+
+    # build the prompts
+    processed_data = {}
+    for i, branch in enumerate(branches):
+        prompt = get_prompt(
+            src_code=code,
+            mask=all_masks[i],
+            branch=branch,
+            tokenizer=tokenizer,
+            gnn_mode=args.gnn_mode,
+            baseline_prompt=args.baseline_prompt,
+            max_tokens=args.max_seq_length,
+        )
+
+        assert len(all_masks[i].shape) == 2, "Mask shape must be (1, num_nodes)"
+        active_node = get_index_by_value(a=all_masks[i][0], val=1)
+
+        if "graph" in args.baseline_prompt:
+            data = {
+                "uuid": f"{uuid}_{i}",
+                "prompt": prompt,
+                "active_node": active_node.tolist(),
+                "mask": all_masks[i].tolist(),
+                "graph_path": graph_path,
+            }
+        else:
+            data = {
+                "uuid": f"{uuid}_{i}",
+                "prompt": prompt,
+                "active_node": None,
+                "mask": None,
+                "graph_path": None,
+            }
+
+        data_name = f"{uuid}_testcase_{i}.json"
+        data_path = os.path.join(save_path, data_name)
+        with open(data_path, "w") as file:
+            json.dump(data, file, indent=4)
+
+        processed_data[f"{uuid}_testcase_{i}"] = data_path
+
+    # build a GLMFDataset from the graph, node_feat, and all_masks
+    dataset = GLMFDataset(
+        data=processed_data,
+        tokenizer=llm_tokenizer,
+        max_seq_length=args.max_seq_length,
+        debug=args.debug,
+        n_hops=args.n_layers,
+        testing=True,
+        dtype=args.dtype,
+        num_gpus=args.num_gpu,
+    )
+    return dataset"""

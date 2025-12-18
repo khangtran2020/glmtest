@@ -1,9 +1,6 @@
 import os
-import gc
+import time
 import torch
-from torch import nn
-from rich import print as pprint
-
 from transformers import AutoModelForCausalLM, AutoConfig
 from transformers.configuration_utils import PretrainedConfig
 from transformers import AutoModelForCausalLM, PreTrainedTokenizer
@@ -16,17 +13,18 @@ import torch.distributed as dist
 from transformers.models.auto.configuration_auto import CONFIG_MAPPING
 from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING
 from transformers.loss.loss_utils import fixed_cross_entropy
-
-# from utils.prompter import Prompter
-from model.gnn import MultiGAT
+from model.gnn import GAT, SAGE
 from train.utils import extract_local
-from ring_flash_attn import update_ring_flash_attn_params
 from peft import get_peft_model, LoraConfig, TaskType
+from utils.utils import get_index_by_value
 
 
 # typing
 from accelerate import Accelerator
 from typing import Callable, List, Optional, Tuple, Union, Dict, Any
+from torch_geometric.data import HeteroData
+
+# from ring_flash_attn import update_ring_flash_attn_params
 
 
 class GLMFModelConfig(PretrainedConfig):
@@ -44,13 +42,13 @@ class GLMFModelConfig(PretrainedConfig):
         dropout: float = 0.2,
         dtype: str = "float32",
         device_map=None,
-        # LoRA parameters
         use_lora: bool = False,
         lora_r: int = 4,
         lora_alpha: int = 32,
         lora_dropout: float = 0.1,
         lora_target_modules: List[str] = None,
         debug: bool = False,
+        use_flash_attn: bool = False,
         **kwargs,
     ):
         # super().__init__(**kwargs)
@@ -60,13 +58,6 @@ class GLMFModelConfig(PretrainedConfig):
             raise ValueError("`llm_model` must be provided to GLMFModelConfig.")
 
         config = AutoConfig.from_pretrained(llm_model).to_dict()
-
-        # if "_attn_implementation_autoset" in kwargs:
-        #     config.pop("_attn_implementation_autoset", None)
-
-        # for key in kwargs:
-        #     if key in config.keys():
-        #         config.pop(key, None)
 
         for key in list(kwargs):
             config.pop(key, None)
@@ -93,6 +84,7 @@ class GLMFModelConfig(PretrainedConfig):
         self.dtype = dtype
         self.device_map = device_map
         self.debug = debug
+        self.use_flash_attn = use_flash_attn
 
         if lora_target_modules is None:
             # This can be adjusted depending on your underlying model's architecture.
@@ -112,13 +104,7 @@ class GLMFModelConfig(PretrainedConfig):
         self.lora_dropout = lora_dropout
         self.lora_target_modules = lora_target_modules
 
-        # self.dtype = dtype
-        # self.graph_token_id = [92302, 92303, 92304]
-        # super().__init__(**config, **kwargs)
-
     def to_diff_dict(self):
-        # Instead of comparing with a default instance (which fails),
-        # simply return the full dict.
         return self.to_dict()
 
     def _get_non_default_generation_parameters(self) -> Dict[str, Any]:
@@ -209,11 +195,13 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         self,
         config: GLMFModelConfig,
         rank: int = 0,
+        gnn_type: str = "gat",
         tokenizer: PreTrainedTokenizer = None,
         baseline_prompt: str = None,
         multi_gpu: bool = False,
         debug: bool = False,
         is_training: bool = False,
+        use_zero3: bool = False,
     ):
 
         super().__init__(config)
@@ -223,71 +211,79 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         self.debug = debug
         self.rank = rank
         self.is_training = is_training
-
-        pprint(f"[green]Model is loaded to device of rank: {rank}[/green]")
+        self.gnn_mode = config.mode
+        self.use_lora = config.use_lora
 
         if "graph" in self.baseline_prompt:
-            self.gnn = MultiGAT(
-                config.mode,
-                config.in_feats,
-                config.n_hidden,
-                config.hidden_size,
-                config.n_layers,
-                config.num_head,
-                config.dropout,
-            )
+            if gnn_type == "gat":
+                self.gnn: GAT = GAT(
+                    in_feats=config.in_feats,
+                    n_hidden=config.n_hidden,
+                    hidden_size=config.hidden_size,
+                    n_layers=config.n_layers,
+                    num_head=config.num_head,
+                    dropout=config.dropout,
+                )
+            else:  # graphsage
+                self.gnn: SAGE = SAGE(
+                    in_feats=config.in_feats,
+                    n_hidden=config.n_hidden,
+                    hidden_size=config.hidden_size,
+                    n_layers=config.n_layers,
+                    dropout=config.dropout,
+                )
 
         if config.dtype == "fp16":
-            self.llm_model = AutoModelForCausalLM.from_pretrained(
-                config.model_name,
-                torch_dtype=torch.float16,
-                device_map=f"cuda:{rank}",
-                attn_implementation="flash_attention_2",
-            )
+            torch_dtype = torch.float16
         elif config.dtype == "bf16":
-            self.llm_model = AutoModelForCausalLM.from_pretrained(
-                config.model_name,
-                torch_dtype=torch.bfloat16,
-                device_map=f"cuda:{rank}",
-                attn_implementation="flash_attention_2",
-            )
+            torch_dtype = torch.bfloat16
         else:
-            self.llm_model = AutoModelForCausalLM.from_pretrained(
-                config.model_name,
-                device_map=f"cuda:{rank}",
-                attn_implementation="flash_attention_2",
-            )
+            torch_dtype = None
+        self.torch_dtype = torch_dtype
+
+        # For ZeRO-3, device_map must be None as DeepSpeed handles device placement
+        model_kwargs = {
+            "dtype": torch_dtype,
+            "attn_implementation": (
+                "flash_attention_2" if config.use_flash_attn else "sdpa"
+            ),
+        }
+        if not use_zero3:
+            model_kwargs["device_map"] = f"cuda:{rank}"
+
+        self.llm_model = AutoModelForCausalLM.from_pretrained(
+            config.model_name,
+            **model_kwargs,
+        )
 
         if self.is_training:
             self.llm_model.resize_token_embeddings(len(tokenizer))
             self.config.vocab_size = len(tokenizer)
-            if config.use_lora:
-                lora_config = LoraConfig(
-                    r=config.lora_r,
-                    lora_alpha=config.lora_alpha,
-                    target_modules=config.lora_target_modules,
-                    lora_dropout=config.lora_dropout,
-                    bias="none",
-                    task_type=TaskType.CAUSAL_LM,
-                )
-                self.llm_model = get_peft_model(self.llm_model, lora_config)
         else:
             self.llm_model.resize_token_embeddings(len(tokenizer))
 
-        # LoRA init
+        if config.use_lora:
+            lora_config = LoraConfig(
+                r=config.lora_r,
+                lora_alpha=config.lora_alpha,
+                target_modules=config.lora_target_modules,
+                lora_dropout=config.lora_dropout,
+                bias="none",
+                task_type=TaskType.CAUSAL_LM,
+            )
+            self.llm_model = get_peft_model(self.llm_model, lora_config)
 
-        gc.collect()
-        torch.cuda.empty_cache()
         self.model_type = config.model_type
 
     def extract_embedding(
         self,
         input_ids: torch.Tensor,
-        graphs: Optional[List[dict]],
+        graphs: Optional[List[HeteroData]],
         graph_masks: Optional[List[torch.Tensor]],
         graph_token_indices: Optional[List[torch.LongTensor]],
         inputs_embeds: torch.Tensor = None,
     ) -> torch.Tensor:
+        embedding_start = time.time()
 
         # embeds = []
         if inputs_embeds is None:
@@ -303,30 +299,77 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         ):
             assert graph_masks is not None
             assert graph_token_indices is not None
-            batch_size = inputs_embeds.size(0)
 
+            batch_size = inputs_embeds.size(0)
             for i in range(batch_size):
+
+                graph_token_index = graph_token_indices[i]
+                graph_mask = graph_masks[i]
+                graph_mask = [mask for mask in graph_mask if mask.sum() > 0]
+
+                if self.gnn_mode == "node":
+                    ranges = []
+                    start = graph_token_index[0]
+                    prev = graph_token_index[0]
+                    for j in graph_token_index[1:]:
+                        if j == prev + 1:
+                            prev = j
+                        else:
+                            ranges.append((start, prev))
+                            start = j
+                            prev = j
+                    ranges.append((start, prev))
+
+                    assert len(ranges) == len(
+                        graph_mask
+                    ), f"Mismatch between graph masks {len(graph_mask)} and token index ranges {len(ranges)}. Graph token index are ranges: {ranges}."
+
                 graph = graphs[i]
-                for key in graph.keys():
-                    graph[key] = graph[key].to(self.llm_model.device)
-                graph_mask = graph_masks[i].to(self.llm_model.device)
-                graph_embeds = self.gnn(graph, graph_mask)
-                graph_embeds = graph_embeds.to(inputs_embeds.device)
-                assert (
-                    graph_embeds.shape
-                    == inputs_embeds[
-                        i,
-                        graph_token_indices[i][0] : (graph_token_indices[i][-1] + 1),
-                        :,
-                    ].shape
-                ), f"Shape mismatch in assignment: graph embedding shape {graph_embeds.shape}, input embedding shape: {inputs_embeds[i, graph_token_indices[i][0] : graph_token_indices[i][-1] + 1, :].shape}, graph_token_index: {len(graph_token_indices[i])}!"
-                inputs_embeds[
-                    i, graph_token_indices[i][0] : graph_token_indices[i][-1] + 1, :
-                ] = graph_embeds.to(inputs_embeds.dtype)
+                overall_mask = None  # merge graph_mask
+                for j, mask in enumerate(graph_mask):
+                    if j == 0:
+                        overall_mask = mask.to(torch.bool)
+                    else:
+                        overall_mask = overall_mask | mask.to(torch.bool)
+                overall_indices = (overall_mask == 1).nonzero(as_tuple=True)[0]
+                mask_idx = []
+                for j, mask in enumerate(graph_mask):
+                    mask_indices = (mask == 1).nonzero(as_tuple=True)[0]
+                    idx_in_overall = []
+                    for k, idx in enumerate(mask_indices):
+                        if idx in overall_indices:
+                            idx_in_overall.append(k)
+                    mask_idx.append(idx_in_overall)
+
+                overall_mask = overall_mask.long().to(self.llm_model.device)
+                graph = graph.to(self.llm_model.device)
+
+                for node_type in graph.node_types:
+                    if "x" in graph[node_type]:
+                        graph[node_type].x = graph[node_type].x.to(self.torch_dtype)
+
+                graph_embeds = self.gnn(graph.x_dict, graph.edge_index_dict)
+                graph_embeds = graph_embeds["node"][overall_indices, :]
+
+                if self.gnn_mode == "node":
+                    for j, mask in enumerate(graph_mask):
+                        embeds = graph_embeds[mask_idx[j], :]
+                        assert embeds.size(0) == len(mask_idx[j])
+                        embeds = embeds.to(inputs_embeds.device)
+                        inputs_embeds[i, ranges[j][0] : ranges[j][1] + 1, :] = (
+                            embeds.to(inputs_embeds.dtype)
+                        )
+                else:  # branch mode
+                    for j, mask in enumerate(graph_mask):
+                        embeds = graph_embeds[mask_idx[j], :]
+                        assert embeds.size(0) == len(mask_idx[j])
+                        inputs_embeds[
+                            i, graph_token_index[j] : graph_token_index[j] + 1, :
+                        ] = embeds.to(inputs_embeds.dtype).mean(dim=0, keepdim=True)
         else:
             if self.is_training:
                 inputs_embeds = inputs_embeds.requires_grad_(True)
-
+        self._last_embedding_time = time.time() - embedding_start
         return inputs_embeds
 
     def forward(
@@ -345,7 +388,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
-        step: int = 0,
+        # step: int = 0,
+        # ring_attn: bool = False,
         accelerator: Optional[Accelerator] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
@@ -384,16 +428,27 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if accelerator is not None:
             accelerator.wait_for_everyone()
         if self.multi_gpu:
-            return self.forward_llm(
+            # if not ring_attn:
+            return self.llm_model(
                 input_ids=None,
                 inputs_embeds=inputs_embeds,
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 use_cache=use_cache,
+                past_key_values=past_key_values,
                 labels=labels,
-                step=step,
-                accelerator=accelerator,
             )
+            # else:
+            #     return self.forward_llm(
+            #         input_ids=None,
+            #         inputs_embeds=inputs_embeds,
+            #         position_ids=position_ids,
+            #         attention_mask=attention_mask,
+            #         use_cache=use_cache,
+            #         labels=labels,
+            #         step=step,
+            #         accelerator=accelerator,
+            #     )
         else:
             return self.llm_model(
                 input_ids=None,
@@ -475,7 +530,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             **kwargs,
         )
 
-    def forward_llm(
+    """def forward_llm(
         self,
         input_ids: torch.LongTensor = None,
         attention_mask: Optional[torch.Tensor] = None,
@@ -507,6 +562,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         rank = self.rank
 
         num_processes = dist.get_world_size()
+        # pprint(f"[blue]Number of processes: {num_processes}[/blue]")
         inputs_embeds, cu_seqlens_emb = extract_local(
             inputs_embeds, rank, num_processes, inputs_embeds.device
         )
@@ -542,34 +598,33 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
         if accelerator is not None:
             accelerator.wait_for_everyone()
 
-        # return self.llm_model(
-        #     input_ids=None,
-        #     attention_mask=attention_mask,
-        #     position_ids=position_ids,
-        #     past_key_values=past_key_values,
-        #     inputs_embeds=inputs_embeds,
-        #     labels=labels,
-        #     use_cache=use_cache,
-        #     cache_position=cache_position,
-        # )
-
         if self.is_training:
-            # print("Running in training mode.")
-            # print(
-            #     f"Type of self.llm_model.base_model.model.model: {type(self.llm_model.base_model.model.model)}"
-            # )
-            outputs = self.llm_model.base_model.model.model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
-                past_key_values=past_key_values,
-                inputs_embeds=inputs_embeds,
-                use_cache=use_cache,
-                output_attentions=output_attentions,
-                output_hidden_states=output_hidden_states,
-                return_dict=return_dict,
-                cache_position=cache_position,
-            )
+            if self.use_lora:
+                outputs = self.llm_model.base_model.model.model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    position_ids=position_ids,
+                    past_key_values=past_key_values,
+                    inputs_embeds=inputs_embeds,
+                    use_cache=use_cache,
+                    output_attentions=output_attentions,
+                    output_hidden_states=output_hidden_states,
+                    return_dict=return_dict,
+                    cache_position=cache_position,
+                )
+            else:
+                outputs = self.llm_model.model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    position_ids=position_ids,
+                    past_key_values=past_key_values,
+                    inputs_embeds=inputs_embeds,
+                    use_cache=use_cache,
+                    output_attentions=output_attentions,
+                    output_hidden_states=output_hidden_states,
+                    return_dict=return_dict,
+                    cache_position=cache_position,
+                )
         else:
             outputs = self.llm_model.model(
                 input_ids=input_ids,
@@ -585,21 +640,18 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             )
 
         hidden_states = outputs.last_hidden_state
-        # print("Hidden states requires_grad:", hidden_states.requires_grad)
-        # print("Hidden states grad_fn:", hidden_states.grad_fn)
-
-        # # pprint(
-        # #     f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]Last hidden_states value: {hidden_states} [/cyan]\n\n\n"
-        # # )
 
         slice_indices = (
             slice(-logits_to_keep, None)
             if isinstance(logits_to_keep, int)
             else logits_to_keep
         )
-        logits = self.llm_model.base_model.model.lm_head(
-            hidden_states[:, slice_indices, :]
-        )
+        if self.is_training and self.use_lora:
+            logits = self.llm_model.base_model.model.lm_head(
+                hidden_states[:, slice_indices, :]
+            )
+        else:
+            logits = self.llm_model.lm_head(hidden_states[:, slice_indices, :])
 
         loss = None
         if labels is not None:
@@ -614,9 +666,6 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                 ignore_index=ignore_index,
                 **kwargs,
             )
-        #     # pprint(
-        #     #     f"[yellow]Step {step} - rank {rank}[/yellow]: [cyan]loss: {loss}[/cyan], [green]logits shape: {logits}[/green], [blue]labels shape: {labels}[/blue]"
-        #     # )
 
         return CausalLMOutputWithPast(
             loss=loss,
@@ -624,7 +673,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
-        )
+        )"""
 
     def init_for_train(self, tokenizer: PreTrainedTokenizer):
 

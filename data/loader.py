@@ -1,11 +1,19 @@
 import json
+import time
 import torch
-from rich import print as pprint
 from data.utils import sampling_neighbor
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizer
 from typing import List, Dict, Any
 from utils.constant import GRAPH_PAD_TOKEN
+from torch_geometric.transforms import AddSelfLoops
+from torch_geometric.data import HeteroData
+from torch_geometric.data.storage import (
+    BaseStorage,
+    GlobalStorage,
+    NodeStorage,
+    EdgeStorage,
+)
 
 
 class GLMFDataset(Dataset):
@@ -21,6 +29,7 @@ class GLMFDataset(Dataset):
         testing: bool = False,
         num_gpus: int = 1,
         dtype: str = "bf16",
+        metadata: tuple = None,
         logger=None,
     ):
         self.data = data
@@ -34,6 +43,8 @@ class GLMFDataset(Dataset):
         self.num_gpus = num_gpus
         self.logger = logger
         self.dtype = dtype
+        self.metadata = metadata
+        self.loop_transform = AddSelfLoops()
         self.index_to_key_dict = dict(zip(range(len(self.data)), self.data.keys()))
 
         if self.logger is not None:
@@ -46,7 +57,6 @@ class GLMFDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        import time
 
         start_time = time.time()
 
@@ -54,7 +64,24 @@ class GLMFDataset(Dataset):
         with open(data_path, "r") as f:
             sample = json.load(f)
         graph_path = sample["graph_path"]
-        graph = torch.load(graph_path) if graph_path is not None else None
+
+        # Load graph with PyG classes allowlisted
+        if graph_path is not None:
+            with torch.serialization.safe_globals(
+                [HeteroData, BaseStorage, GlobalStorage, NodeStorage, EdgeStorage]
+            ):
+                graph = torch.load(graph_path, weights_only=True)
+        else:
+            graph = None
+
+        _, list_of_edge_type = self.metadata
+        _, edge_type = graph.metadata()
+
+        for etype in list_of_edge_type:
+            if etype not in edge_type:
+                graph[etype].edge_index = torch.empty(
+                    (2, 0), dtype=torch.long
+                )  # Add empty edge_index
 
         if sample["active_node"] is not None:
             active_nodes = []
@@ -78,18 +105,7 @@ class GLMFDataset(Dataset):
                 else:
                     act_node = torch.cat((act_node, active_node), dim=0)
 
-            for key in graph.keys():
-                graph[key] = sampling_neighbor(
-                    graph=graph[key],
-                    mask=act_node,
-                    n_hops=self.n_hops,
-                )
-                # Force features to CPU and materialize to avoid DGL lazy loading issues with DataLoader workers
-                feat = graph[key].ndata["feat"]
-                graph[key].ndata["feat"] = feat.to(
-                    device="cpu",
-                    dtype=torch.bfloat16 if self.dtype == "bf16" else torch.float16,
-                )
+            graph = self.loop_transform(graph)
 
         if self.testing == False:
             full_text = sample["full_text"]
@@ -176,7 +192,12 @@ class GLMFDataset(Dataset):
 
             result["attention_mask"] = torch.cat(
                 [attention_tensor, result["attention_mask"]], dim=1
-            ).to(dtype=torch.bfloat16)
+            )
+            result["attention_mask"] = (
+                result["attention_mask"].to(dtype=torch.bfloat16)
+                if self.dtype == "bf16"
+                else result["attention_mask"].to(dtype=torch.float16)
+            )
             pad_size = pad_tensor.shape[1]
 
         # Use clone() to make a copy of the tensor for labels.
@@ -219,7 +240,7 @@ def pad(
     return padded_tensors
 
 
-def collate_fn(batch, tokenizer: PreTrainedTokenizer, max_seq_length: int) -> dict:
+def collate_fn(batch, tokenizer: PreTrainedTokenizer) -> dict:
 
     # check if batch is tuple
     if not isinstance(batch[0], tuple):

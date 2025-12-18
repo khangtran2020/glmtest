@@ -1,30 +1,25 @@
 import os
 import re
-import sys
 import ast
-import dgl
 import json
 import torch
 import random
 import anthropic
 import numpy as np
 import pandas as pd
-import networkx as nx
 from tqdm import tqdm
-from rich.progress import Progress
+from torch_geometric.data import HeteroData
 from rich.console import Console
 from rich.pretty import pretty_repr
 from graph.core import Graph
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from branch.utils import run_coverage, get_all_branch
 from utils.utils import run_command, get_index_by_value, get_depth
-from utils.code_analyzer import analyze_code, remove_method_from_class
 from sklearn.preprocessing import LabelEncoder
 from copy import deepcopy
-from model.gnn import GRAPH_KEYS
 
 # typing
-from typing import List, Union, Dict, Any, Optional
+from typing import List, Union, Dict, Optional
 
 PROMPT_TEMPLATE = """# INSTRUCTION: You are an AI agent that generates executable Python test cases targeting a specific execution branch of a module.
 
@@ -591,7 +586,7 @@ class Data(object):
         else:
             processed_data_path = os.path.join(
                 self.data_path,
-                f"raw",
+                f"raw-pyg",
             )
             if "graph" not in self.baseline_prompt:
                 processed_prompt_path = os.path.join(
@@ -660,32 +655,34 @@ class Data(object):
 
                         if not os.path.exists(graph_path):
                             graph = self.read_graph(dat)
-
-                            check_graph_exist_dict = {}
-                            graph_dict = {}
-                            for key in GRAPH_KEYS:
-                                check_graph_exist_dict[key] = False
-
-                            for key in graph.keys():
-                                if isinstance(graph[key], dgl.DGLGraph):
-                                    graph_dict[key] = graph[key]
-                                    check_graph_exist_dict[key] = True
-
-                            exist_atleast_one = False
-                            for key in check_graph_exist_dict.keys():
-                                if check_graph_exist_dict[key] == True:
-                                    exist_atleast_one = True
-                                    break
-
-                            if not exist_atleast_one:
-                                self.logger.log(
-                                    f"[red]Graph is not generated for {uuid}[/red]"
-                                )
-                                num_discarded += len(dat["test_cases"])
-                                continue
-                            torch.save(graph_dict, graph_path)
+                            torch.save(graph, graph_path)
+                        else:
+                            graph = None
 
                     for testcase in dat["test_cases"].keys():
+                        data_name = f"{uuid}_testcase_{testcase}.json"
+                        data_path = os.path.join(processed_prompt_path, data_name)
+
+                        if os.path.exists(data_path):
+
+                            try:
+                                with open(data_path, "r") as file:
+                                    data = json.load(file)
+                                num_token = data["num_tokens"]
+                                num_tokens.append(num_token)
+
+                                self.processed_data[data_n][
+                                    f"{uuid}_testcase_{testcase}"
+                                ] = {
+                                    "num_tokens": num_token,
+                                    "path": data_path,
+                                }
+                                continue
+                            except:
+                                self.logger.log(
+                                    f"[red]Error loading existing data at {data_path}, will re-generate[/red]"
+                                )
+
                         test_code = dat["test_cases"][testcase]["test_case"]
                         if self.data_fuzz:
                             test_code = self.add_fuzz_tags(test_code)
@@ -694,12 +691,20 @@ class Data(object):
                             continue
                         mask_key = int(testcase.split("_")[-1])
                         branch_masks: List[torch.Tensor] = all_masks[mask_key]
+
+                        if graph is not None:
+                            for mask in branch_masks:
+                                # print(mask.shape[0], graph.num_nodes)
+                                assert (
+                                    mask.shape[0] == graph.num_nodes
+                                ), "Mask size mismatch!"
                         branch_line = dat["test_cases"][testcase]["branch"]
                         # print(branch_masks)
                         active_nodes = [
                             get_index_by_value(a=branch_masks[i], val=1)
                             for i in range(len(branch_masks))
                         ]
+                        # print(active_nodes[0])
                         if len(active_nodes) == 0:
                             self.logger.log(
                                 f"Active node empty at uuid: {uuid} testcase: {testcase}"
@@ -753,8 +758,6 @@ class Data(object):
                                 "num_tokens": num_token,
                             }
 
-                        data_name = f"{uuid}_testcase_{testcase}.json"
-                        data_path = os.path.join(processed_prompt_path, data_name)
                         with open(data_path, "w") as file:
                             json.dump(data, file, indent=4)
 
@@ -809,7 +812,7 @@ class Data(object):
         else:
             processed_data_path = os.path.join(
                 self.data_path,
-                f"raw",
+                f"raw-pyg",
             )
             if "graph" not in self.baseline_prompt:
                 processed_prompt_path = os.path.join(
@@ -879,30 +882,7 @@ class Data(object):
 
                         if not os.path.exists(graph_path):
                             graph = self.read_graph(dat)
-
-                            check_graph_exist_dict = {}
-                            graph_dict = {}
-                            for key in GRAPH_KEYS:
-                                check_graph_exist_dict[key] = False
-
-                            for key in graph.keys():
-                                if isinstance(graph[key], dgl.DGLGraph):
-                                    graph_dict[key] = graph[key]
-                                    check_graph_exist_dict[key] = True
-
-                            exist_atleast_one = False
-                            for key in check_graph_exist_dict.keys():
-                                if check_graph_exist_dict[key] == True:
-                                    exist_atleast_one = True
-                                    break
-
-                            if not exist_atleast_one:
-                                self.logger.log(
-                                    f"[red]Graph is not generated for {uuid}[/red]"
-                                )
-                                num_discarded += len(dat["test_cases"])
-                                continue
-                            torch.save(graph_dict, graph_path)
+                            torch.save(graph, graph_path)
 
                     for testcase in dat["test_cases"].keys():
 
@@ -1083,7 +1063,7 @@ class Data(object):
         else:
             processed_data_path = os.path.join(
                 self.data_path,
-                f"raw",
+                f"raw-pyg",
             )
             if "graph" not in self.baseline_prompt:
                 processed_prompt_path = os.path.join(
@@ -1141,29 +1121,7 @@ class Data(object):
                                 graph = json.load(file)
                         else:
                             graph = self.read_graph(dat)
-                            check_graph_exist_dict = {}
-                            graph_dict = {}
-                            for key in GRAPH_KEYS:
-                                check_graph_exist_dict[key] = False
-
-                            for key in graph.keys():
-                                if isinstance(graph[key], dgl.DGLGraph):
-                                    graph_dict[key] = graph[key]
-                                    check_graph_exist_dict[key] = True
-
-                            exist_atleast_one = False
-                            for key in check_graph_exist_dict.keys():
-                                if check_graph_exist_dict[key] == True:
-                                    exist_atleast_one = True
-                                    break
-
-                            if not exist_atleast_one:
-                                self.logger.log(
-                                    f"[red]Graph is not generated for {uuid}[/red]"
-                                )
-                                num_discarded += len(dat["test_cases"])
-                                continue
-                            torch.save(graph_dict, graph_path)
+                            torch.save(graph, graph_path)
 
                     for i, branch in enumerate(branches):
 
@@ -1383,22 +1341,33 @@ class Data(object):
         with open(graph_path, "r") as file:
             graph = json.load(file)
 
-        graph_dict = {}
+        # graph_dict = {}
         num_nodes = len(graph["nodes"])
         feat = torch.load(data["graph"]["node_feature_path"], weights_only=True)
+
         assert num_nodes == feat.shape[0]
 
+        graph_data = HeteroData()
+        graph_data["node"].x = feat
         edge_dict = self.read_edge(graph)
 
         for etype in edge_dict.keys():
-            u = torch.Tensor(edge_dict[etype][0]).long()
-            v = torch.Tensor(edge_dict[etype][1]).long()
-            graph = dgl.graph((u, v), num_nodes=num_nodes)
-            graph.ndata["feat"] = feat
-            graph_dict[etype] = graph
-        graph_dict["num_nodes"] = num_nodes
-        graph_dict["feat_size"] = feat.size()
-        return graph_dict
+            u = torch.Tensor(edge_dict[etype][0]).long()  # Size (num_edges,)
+            v = torch.Tensor(edge_dict[etype][1]).long()  # Size (num_edges,)
+            graph_data["node", etype, "node"].edge_index = torch.stack(
+                [u, v], dim=0
+            )  # Size (2, num_edges)
+            # graph = dgl.graph((u, v), num_nodes=num_nodes)
+            # graph.ndata["feat"] = feat
+            # graph_dict[etype] = graph
+        # graph_dict["num_nodes"] = num_nodes
+        # graph_dict["feat_size"] = feat.size()
+        # return graph_dict
+        # print(
+        #     f"Number of nodes in graph: {graph_data.num_nodes}, num nodes: {num_nodes}"
+        # )
+        assert graph_data.num_nodes == num_nodes, "Number of nodes mismatch!"
+        return graph_data
 
     def read_edge(self, graph: dict) -> dict:
         node_dict = self.get_node_id_dict(graph)
@@ -1847,33 +1816,33 @@ class Data(object):
             code_line += line + "\n"
         return code_line
 
-    def get_graph_stats(self, graph_dict: Dict[str, dgl.DGLGraph]) -> dict:
-        """
-        Get the statistics of the graph
-        """
-        stats = {}
-        for key in graph_dict.keys():
-            graph = graph_dict[key]
-            num_nodes = graph.num_nodes()
-            num_edges = graph.num_edges()
-            in_max_degrees = graph.in_degrees().float().max().item()
-            out_max_degrees = graph.out_degrees().float().max().item()
-            in_min_degrees = graph.in_degrees().float().max().item()
-            out_min_degrees = graph.out_degrees().float().max().item()
+    # def get_graph_stats(self, graph_dict: Dict[str, dgl.DGLGraph]) -> dict:
+    #     """
+    #     Get the statistics of the graph
+    #     """
+    #     stats = {}
+    #     for key in graph_dict.keys():
+    #         graph = graph_dict[key]
+    #         num_nodes = graph.num_nodes()
+    #         num_edges = graph.num_edges()
+    #         in_max_degrees = graph.in_degrees().float().max().item()
+    #         out_max_degrees = graph.out_degrees().float().max().item()
+    #         in_min_degrees = graph.in_degrees().float().max().item()
+    #         out_min_degrees = graph.out_degrees().float().max().item()
 
-            nx_graph = graph.to_networkx().to_undirected()
-            num_components = nx.number_connected_components(nx_graph)
+    #         nx_graph = graph.to_networkx().to_undirected()
+    #         num_components = nx.number_connected_components(nx_graph)
 
-            stats[key] = {
-                "num_nodes": num_nodes,
-                "num_edges": num_edges,
-                "in_max_degrees": in_max_degrees,
-                "out_max_degrees": out_max_degrees,
-                "in_min_degrees": in_min_degrees,
-                "out_min_degrees": out_min_degrees,
-                "num_components": num_components,
-            }
-        return stats
+    #         stats[key] = {
+    #             "num_nodes": num_nodes,
+    #             "num_edges": num_edges,
+    #             "in_max_degrees": in_max_degrees,
+    #             "out_max_degrees": out_max_degrees,
+    #             "in_min_degrees": in_min_degrees,
+    #             "out_min_degrees": out_min_degrees,
+    #             "num_components": num_components,
+    #         }
+    #     return stats
 
     def extract_blocks(self, source_code):
         """

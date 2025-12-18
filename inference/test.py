@@ -3,9 +3,8 @@ import gc
 import json
 import time
 import torch
+import deepspeed
 from itertools import islice
-from model.gnn import GRAPH_KEYS
-from tqdm import tqdm
 from rich import print as pprint
 from data.core import Data
 from data.loader import GLMFDataset, collate_fn
@@ -31,14 +30,28 @@ def test(
     config: GLMFModelConfig = None,
     mixed_precision: str = "bf16",
 ):
-    collate_fn_ = partial(
-        collate_fn, tokenizer=dataset.llm_tokenizer, max_seq_length=args.max_seq_length
-    )
+    collate_fn_ = partial(collate_fn, tokenizer=dataset.llm_tokenizer)
     tokenizer = dataset.llm_tokenizer
     if config is None:
         config = model.config
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model.to(device)
+
+    # Initialize DeepSpeed inference if enabled
+    if args.use_deepspeed_inference:
+        console.log(
+            f"[cyan]Initializing DeepSpeed inference engine with tensor parallelism (tp_size={args.tensor_parallel_size})...[/cyan]"
+        )
+        model = initialize_deepspeed_inference(
+            model=model,
+            args=args,
+            console=console,
+        )
+        console.log(
+            "[green]DeepSpeed inference engine initialized successfully![/green]"
+        )
+    else:
+        model.to(device)
+
     console.log("Testing on device ... :", device)
     if args.test_on_train:
         te_dataset = GLMFDataset(
@@ -49,6 +62,7 @@ def test(
             n_hops=dataset.n_hops,
             testing=True,
             dtype=args.dtype,
+            metadata=model.metadata,
             num_gpus=args.num_gpu,
         )
         generate_and_save_on_one_dataset(
@@ -72,6 +86,7 @@ def test(
             n_hops=dataset.n_hops,
             testing=True,
             dtype=args.dtype,
+            metadata=model.metadata,
             num_gpus=args.num_gpu,
         )
         te_proj_dataset = GLMFDataset(
@@ -82,6 +97,7 @@ def test(
             n_hops=dataset.n_hops,
             testing=True,
             dtype=args.dtype,
+            metadata=model.metadata,
             num_gpus=args.num_gpu,
         )
         generate_and_save_on_one_dataset(
@@ -223,12 +239,13 @@ def generate_and_save_on_one_dataset(
 
                     for i in range(batch_size):
                         graph = batch["graph"][i]
-                        for key in GRAPH_KEYS:
-                            if key in graph.keys():
-                                graph[key] = graph[key].to(device)
-                                graph[key].ndata["feat"] = (
-                                    graph[key].ndata["feat"].to(device)
-                                )
+                        graph = graph.to(device)
+                        # for key in GRAPH_KEYS:
+                        #     if key in graph.keys():
+                        #         graph[key] = graph[key].to(device)
+                        #         graph[key].ndata["feat"] = (
+                        #             graph[key].ndata["feat"].to(device)
+                        #         )
 
                         graph_mask = [
                             mask.to(device) for mask in batch["graph_mask"][i]
@@ -244,22 +261,13 @@ def generate_and_save_on_one_dataset(
                     graph_masks = None
                     graph_token_indices = None
 
-                if args.num_gpu > 1:
-                    inputs_embeds = model.module.extract_embedding(
-                        input_ids=micro_input["input_ids"],
-                        graphs=graphs,
-                        inputs_embeds=None,
-                        graph_masks=graph_masks,
-                        graph_token_indices=graph_token_indices,
-                    )
-                else:
-                    inputs_embeds = model.extract_embedding(
-                        input_ids=micro_input["input_ids"],
-                        graphs=graphs,
-                        inputs_embeds=None,
-                        graph_masks=graph_masks,
-                        graph_token_indices=graph_token_indices,
-                    )
+                inputs_embeds = model.extract_embedding(
+                    input_ids=micro_input["input_ids"],
+                    graphs=graphs,
+                    inputs_embeds=None,
+                    graph_masks=graph_masks,
+                    graph_token_indices=graph_token_indices,
+                )
 
                 generation_config = GenerationConfig(
                     temperature=args.temp,
@@ -269,26 +277,16 @@ def generate_and_save_on_one_dataset(
                     do_sample=False,
                 )
 
-                with torch.autocast(device_type="cuda", dtype=torch.float16):
-                    if args.num_gpu > 1:
-                        outputs = model.module.generate(
-                            inputs_embeds=inputs_embeds,
-                            attention_mask=micro_input["attention_mask"],
-                            generation_config=generation_config,
-                            pad_token_id=tokenizer.eos_token_id,
-                        )
-
-                        if isinstance(model, GLMFModelFuzzing):
-                            model.module.clear_cache()
-                    else:
-                        outputs = model.generate(
-                            inputs_embeds=inputs_embeds,
-                            attention_mask=micro_input["attention_mask"],
-                            generation_config=generation_config,
-                            pad_token_id=tokenizer.eos_token_id,
-                        )
-                        if isinstance(model, GLMFModelFuzzing):
-                            model.clear_cache()
+                dtype = torch.bfloat16 if args.dtype == "bf16" else torch.float16
+                with torch.autocast(device_type="cuda", dtype=dtype):
+                    outputs = model.generate(
+                        inputs_embeds=inputs_embeds,
+                        attention_mask=micro_input["attention_mask"],
+                        generation_config=generation_config,
+                        pad_token_id=tokenizer.eos_token_id,
+                    )
+                    if isinstance(model, GLMFModelFuzzing):
+                        model.clear_cache()
 
                 out_text = tokenizer.batch_decode(
                     outputs,
@@ -302,10 +300,11 @@ def generate_and_save_on_one_dataset(
                         micro_input[key] = micro_input[key].to("cpu")
                 if "graph" in args.baseline_prompt:
                     for graph in graphs:
-                        for key in GRAPH_KEYS:
-                            if key in graph.keys():
-                                graph[key] = graph[key].to("cpu")
-                                graph.pop(key, None)
+                        graph = graph.to("cpu")
+                        # for key in GRAPH_KEYS:
+                        #     if key in graph.keys():
+                        #         graph[key] = graph[key].to("cpu")
+                        #         graph.pop(key, None)
                     for graph_mask in graph_masks:
                         for mask in graph_mask:
                             mask = mask.to("cpu")
@@ -416,7 +415,7 @@ def validate(
         val_loss = 0.0
         num_item = 0
 
-        if accelerator.is_main_process:
+        if accelerator.is_main_process and progress is not None:
             val_task = progress.add_task(
                 "Validating...", total=len(loader), step_time=0.0
             )
@@ -427,75 +426,71 @@ def validate(
             num_item += batch_size
 
             start_time = time.time()
-            # Process each sample in the batch as a micro-batch.
+
+            if "token_type_ids" in batch["input"]:
+                batch["input"].pop("token_type_ids")
+
+            micro_input = {
+                "input_ids": batch["input"]["input_ids"],
+                "attention_mask": batch["input"]["attention_mask"],
+                "labels": batch["input"]["labels"],
+            }
+
+            if "graph" in args.baseline_prompt:
+                graphs = batch["graph"]
+                graph_masks = batch["graph_mask"]
+                graph_token_indices = []
+                for i in range(batch_size):
+                    graph_token_index = torch.where(
+                        micro_input["input_ids"][i] == config.graph_token_id[1]
+                    )[0].tolist()
+                    graph_token_indices.append(graph_token_index)
+
+            else:
+                graphs = None
+                graph_masks = None
+                graph_token_indices = None
+
             try:
-
-                if "token_type_ids" in batch["input"]:
-                    batch["input"].pop("token_type_ids")
-                micro_input = {
-                    "input_ids": batch["input"]["input_ids"],
-                    "attention_mask": batch["input"]["attention_mask"],
-                    "labels": batch["input"]["labels"],
-                }
-
-                if "graph" in args.baseline_prompt:
-                    graphs = batch["graph"]
-                    graph_masks = batch["graph_mask"]
-                    graph_token_indices = []
-                    for i in range(batch_size):
-                        graph_token_index = torch.where(
-                            micro_input["input_ids"][i] == config.graph_token_id[1]
-                        )[0].tolist()
-                        graph_token_indices.append(graph_token_index)
-
-                else:
-                    graphs = None
-                    graph_masks = None
-                    graph_token_indices = None
-
                 outputs = model(
                     **micro_input,
                     graphs=graphs,
                     graph_masks=graph_masks,
                     graph_token_indices=graph_token_indices,
                 )
-                loss = outputs.loss
-                if multi_gpu:
-                    all_losses = accelerator.gather(loss)
-                    all_losses = torch.where(torch.isnan(all_losses), 0.0, all_losses)
-                    all_losses = all_losses.to("cpu").detach().float()
-                    total_loss = torch.sum(all_losses)
-                    batch_loss += total_loss.to("cpu").detach().float().item()
-                else:
-                    batch_loss += loss.to("cpu").detach().float().item()
+            except Exception as e:
+                print(f"RuntimeError during validation at step {step}: {e}")
+                for graph in graphs:
+                    print(graph.edge_index_dict)
+                raise e
 
-                # logging_gpu_usage(step=step, console=console)
+            loss = outputs.loss
+            if multi_gpu:
+                all_losses = accelerator.gather(loss)
+                all_losses = torch.where(torch.isnan(all_losses), 0.0, all_losses)
+                all_losses = all_losses.to("cpu").detach().float()
+                total_loss = torch.sum(all_losses)
+                batch_loss += total_loss.to("cpu").detach().float().item()
+            else:
+                batch_loss += loss.to("cpu").detach().float().item()
 
-                for key in micro_input.keys():
-                    micro_input[key] = micro_input[key].to("cpu")
-                if "graph" in args.baseline_prompt:
-                    for graph in graphs:
-                        for key in GRAPH_KEYS:
-                            if key in graph.keys():
-                                graph[key] = graph[key].to("cpu")
-                                graph.pop(key, None)
-                    for graph_mask in graph_masks:
-                        for mask in graph_mask:
-                            mask = mask.to("cpu")
-                    del graph_masks, graphs, graph_token_indices
-                loss = loss.to("cpu")
-                del outputs, loss, micro_input, batch
-                gc.collect()
-                torch.cuda.empty_cache()
+            # logging_gpu_usage(step=step, console=console)
 
-            except torch.cuda.OutOfMemoryError as e:
-                tqdm.write(
-                    f"OOM in batch {step}: input_dis {micro_input['input_ids'].size()} - graph_mask {graph_mask.size()}"
-                )
-                torch.cuda.empty_cache()
-                continue
+            for key in micro_input.keys():
+                micro_input[key] = micro_input[key].to("cpu")
+            if "graph" in args.baseline_prompt:
+                for graph in graphs:
+                    graph = graph.to("cpu")
+                for graph_mask in graph_masks:
+                    for mask in graph_mask:
+                        mask = mask.to("cpu")
+                del graph_masks, graphs, graph_token_indices
+            loss = loss.to("cpu")
+            del outputs, loss, micro_input, batch
+            gc.collect()
+            torch.cuda.empty_cache()
 
-            if accelerator.is_main_process:
+            if accelerator.is_main_process and progress is not None:
                 progress.update(
                     val_task,
                     advance=1,
@@ -509,8 +504,84 @@ def validate(
             if step % 10 == 0:
                 torch.cuda.empty_cache()
 
-        if accelerator.is_main_process:
+        if accelerator.is_main_process and progress is not None:
             progress.update(val_task, visible=False)
         val_loss /= num_item
     model.train()
     return val_loss
+
+
+def initialize_deepspeed_inference(
+    model: GLMFModelForCausalLM,
+    args: Namespace,
+    console: Console,
+):
+    """
+    Initialize DeepSpeed inference engine with tensor parallelism on LLM only.
+    Keeps GNN on regular CUDA for compatibility.
+
+    Args:
+        model: The GLMFModelForCausalLM model (with GNN + LLM)
+        args: Arguments containing DeepSpeed configuration
+        console: Console for logging
+
+    Returns:
+        Model with DeepSpeed-wrapped LLM component
+    """
+    # Load DeepSpeed inference config
+    if os.path.exists(args.deepspeed_inference_config):
+        with open(args.deepspeed_inference_config, "r") as f:
+            ds_config = json.load(f)
+    else:
+        console.log(
+            f"[yellow]DeepSpeed config not found at {args.deepspeed_inference_config}, using default config[/yellow]"
+        )
+        ds_config = {
+            "tensor_parallel": {"tp_size": args.tensor_parallel_size},
+            "dtype": args.dtype,
+            "replace_with_kernel_inject": True,
+            "enable_cuda_graph": False,
+        }
+
+    # Update tensor parallel size if specified in args
+    if "tensor_parallel" in ds_config:
+        ds_config["tensor_parallel"]["tp_size"] = args.tensor_parallel_size
+
+    # Set dtype based on args
+    ds_config["dtype"] = args.dtype
+
+    console.log(
+        f"[cyan]DeepSpeed inference config: {json.dumps(ds_config, indent=2)}[/cyan]"
+    )
+
+    # Initialize DeepSpeed inference engine ONLY on the LLM part
+    try:
+        # Keep GNN on regular CUDA
+        if hasattr(model, "gnn") and "graph" in args.baseline_prompt:
+            console.log("[cyan]Moving GNN to CUDA (not wrapped by DeepSpeed)[/cyan]")
+            model.gnn = model.gnn.to("cuda")
+
+        # Apply DeepSpeed only to the LLM model
+        console.log("[cyan]Applying DeepSpeed inference to LLM component only[/cyan]")
+        ds_engine = deepspeed.init_inference(
+            model=model.llm_model,
+            config=ds_config,
+        )
+
+        # Replace the LLM component with DeepSpeed-wrapped version
+        model.llm_model = ds_engine.module
+
+        console.log(
+            "[green]DeepSpeed inference engine initialized successfully on LLM[/green]"
+        )
+        console.log(
+            f"[green]GNN remains on regular CUDA: {next(model.gnn.parameters()).device if hasattr(model, 'gnn') else 'N/A'}[/green]"
+        )
+        console.log(
+            f"[green]LLM on DeepSpeed: {next(model.llm_model.parameters()).device}[/green]"
+        )
+        return model
+    except Exception as e:
+        console.log(f"[red]Error initializing DeepSpeed inference: {e}[/red]")
+        console.log("[yellow]Falling back to standard inference[/yellow]")
+        return model.to("cuda" if torch.cuda.is_available() else "cpu")
