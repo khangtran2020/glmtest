@@ -72,6 +72,7 @@ def main() -> None:
         return
 
     if args.mode == "data":
+        dataset.crawl()
         dataset.process_raw()
         console.log("Data processing completed. Exiting as mode is 'data'.")
         return

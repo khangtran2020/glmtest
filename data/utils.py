@@ -2,6 +2,7 @@ import ast
 import torch
 from data.ossfuzz_data import OSSFuzz
 from data.testgeneval_data import TestGenEval
+from data.codamosa_data import Codamosa
 from graph.joerngraph import JoernGraph
 from transformers import AutoTokenizer, AutoModel
 from torch_geometric.utils import k_hop_subgraph
@@ -95,6 +96,26 @@ def get_dataset(
     elif data_name == "testgeneval":
         logger.log("Using TestGeneval dataset")
         return TestGenEval(
+            logger=logger,
+            path=data_path,
+            graph=graph,
+            model=model,
+            model_name=model_name,
+            llm_model_name=llm_model_name,
+            tokenizer=tokenizer,
+            llm_tokenizer=llm_tokenizer,
+            baseline_prompt=baseline_prompt,
+            debug=debug,
+            graph_sampling=graph_sampling,
+            max_tokens=max_tokens,
+            n_hops=kwargs.get("n_hops", 1),
+            raw_overwrite=raw_overwrite,
+            repo=repo,
+            gnn_mode=gnn_mode,
+        )
+    elif data_name == "codamosa":
+        logger.log("Using Codamosa dataset")
+        return Codamosa(
             logger=logger,
             path=data_path,
             graph=graph,
