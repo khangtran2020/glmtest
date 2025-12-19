@@ -1,7 +1,10 @@
 import os
+import ast
 import sys
 import git
 import json
+import torch
+import shutil
 from typing import List
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from rich.console import Console
@@ -858,7 +861,103 @@ class Codamosa(Data):
                     f.write(json.dumps(instance) + "\n")
 
     def process_raw(self) -> None:
-        self.logger.log("Processing raw data...")
+
+        process = False
+        # check if the data has been processeds
+        if os.path.exists(os.path.join(self.data_path, "data_processed.json")):
+            self.logger.log(
+                "Found data_processed.json file, do not need to process raw data"
+            )
+            # load data
+            with open(os.path.join(self.data_path, "data_processed.json"), "r") as file:
+                self.data = json.load(file)
+        else:
+            process = True
+
+        if not process:
+            return
+
+        if not os.path.exists(os.path.join(self.data_path, "raw_data.jsonl")):
+            raise FileNotFoundError("raw_data.jsonl not found, please crawl the data")
+
+        code_path = os.path.join(self.data_path, "codes")
+        graph_path = os.path.join(self.data_path, "graphs")
+
+        # make projects dir
+        if self.raw_overwrite:
+
+            if os.path.exists(code_path):
+                shutil.rmtree(code_path)
+            if os.path.exists(graph_path):
+                shutil.rmtree(graph_path)
+
+        os.makedirs(code_path, exist_ok=True)
+        os.makedirs(graph_path, exist_ok=True)
+
+        data_dict = {}
+        repos = []
+        num_module = 0
+        data_n = "test_module"
+
+        with open(os.path.join(self.data_path, f"raw_data.jsonl"), "r") as file:
+            raw_data = [json.loads(l) for l in file.readlines()]
+
+        data = []
+
+        for instance in raw_data:
+
+            key = instance["module_name"].replace(
+                ".", "_"
+            )  # Use module_name as unique key
+
+            dat = {}
+            dat["test_cases"] = {}
+            dat["graph"] = {}
+            dat["uuid"] = key
+            dat["code_path"] = os.path.join(code_path, f"{key}.py")
+            dat["graph"]["src_graph_path"] = os.path.join(graph_path, f"{key}.json")
+            dat["graph"]["node_feature_path"] = os.path.join(graph_path, f"{key}.pt")
+            dat["graph"]["mask_path"] = os.path.join(graph_path, f"{key}_mask.pt")
+            # dat["repo"] = raw_data[key]["repo"]
+            dat["module_path"] = instance["module_path"]
+            project = instance["repo_name"]
+            repos.append(project)
+
+            if (not os.path.exists(dat["code_path"])) or (
+                os.path.exists(dat["code_path"]) and self.raw_overwrite
+            ):
+                with open(dat["code_path"], "w") as file:
+                    file.write(instance["source_code"])
+
+            if os.path.exists(dat["graph"]["node_feature_path"]):
+                node_feat = torch.load(dat["graph"]["node_feature_path"])
+                if node_feat.size(0) == 0:
+                    self.logger.log(f"[red]Node features are empty for {key}[/red]")
+                data.append(dat)
+                num_module += 1
+                continue
+
+            graph = self.graph.extract_graph(
+                code_path=dat["code_path"],
+                save_path=dat["graph"]["src_graph_path"],
+                overwrite=self.raw_overwrite,
+            )
+
+            num_nodes = len(graph["nodes"])
+            if not os.path.exists(dat["graph"]["node_feature_path"]):
+                node_feat = self.get_node_features(graph=graph)
+                assert node_feat.size(0) == num_nodes
+
+        data_dict[data_n] = {dat["uuid"]: dat for dat in data}
+
+        self.data = data_dict
+        with open(os.path.join(self.data_path, "data_processed.json"), "w") as f:
+            json.dump(self.data, f)
+
+        num_project = len(set(repos))
+        self.logger.log("Processed raw data")
+        self.logger.log(f"Number of projects: {num_project}")
+        self.logger.log(f"Number of modules: {num_module}")
         return
 
     def create_package_txt(self, data: dict) -> None:
