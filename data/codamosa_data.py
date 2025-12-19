@@ -905,6 +905,9 @@ class Codamosa(Data):
         with open(os.path.join(self.data_path, f"raw_data.jsonl"), "r") as file:
             raw_data = [json.loads(l) for l in file.readlines()]
 
+        self.logger.log(
+            f"[cyan]Processing {len(raw_data)} modules from raw data[/cyan]"
+        )
         data = []
 
         for instance in raw_data:
