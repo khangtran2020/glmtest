@@ -950,12 +950,12 @@ class Codamosa(Data):
                     file.write(instance["source_code"])
 
             data.append(dat)
+            num_module += 1
             if not os.path.exists(dat["graph"]["src_graph_path"]):
                 if os.path.exists(dat["graph"]["node_feature_path"]):
                     node_feat = torch.load(dat["graph"]["node_feature_path"])
                     if node_feat.size(0) == 0:
                         self.logger.log(f"[red]Node features are empty for {key}[/red]")
-                    num_module += 1
 
                 graph = self.graph.extract_graph(
                     code_path=dat["code_path"],
