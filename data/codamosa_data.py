@@ -921,7 +921,7 @@ class Codamosa(Data):
             dat["graph"]["src_graph_path"] = os.path.join(graph_path, f"{key}.json")
             dat["graph"]["node_feature_path"] = os.path.join(graph_path, f"{key}.pt")
             dat["graph"]["mask_path"] = os.path.join(graph_path, f"{key}_mask.pt")
-            dat["repo"] = raw_data["repo_name"]
+            # dat["repo"] = raw_data["repo_name"]
             dat["module_path"] = instance["module_path"]
 
             # extract local imports
