@@ -925,7 +925,7 @@ class Codamosa(Data):
             dat["module_path"] = instance["module_path"]
 
             # extract local imports
-            classes = [instance["classes"]["name"] for cls in instance["classes"]]
+            classes = [cls["name"] for cls in instance["classes"]]
             functions = instance["functions"]
 
             local_imports = (
