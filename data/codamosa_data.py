@@ -966,6 +966,7 @@ class Codamosa(Data):
                 num_nodes = len(graph["nodes"])
                 if not os.path.exists(dat["graph"]["node_feature_path"]):
                     node_feat = self.get_node_features(graph=graph)
+                    torch.save(node_feat, dat["graph"]["node_feature_path"])
                     assert node_feat.size(0) == num_nodes
 
         data_dict[data_n] = {dat["uuid"]: dat for dat in data}
