@@ -160,8 +160,11 @@ def train(
 
     console.log(f"Metadata used for model initialization: {metadata}")
 
-    # for name, param in model.named_parameters():
-    #     console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
+    if accelerator.is_main_process:
+        for name, param in model.named_parameters():
+            console.log(
+                f"[yellow]Parameter {name}, dtype: {param.dtype}, shape: {param.shape}[/yellow]"
+            )
 
     optimizer = AdamW(
         filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
