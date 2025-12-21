@@ -18,7 +18,7 @@ from model.model import (
     get_model,
     continue_training_from_checkpoint,
 )
-from deepspeed.utils.zero_to_fp32 import load_state_dict_from_zero_checkpoint
+from deepspeed.utils.zero_to_fp32 import get_fp32_state_dict_from_zero_checkpoint
 from accelerate import Accelerator
 from accelerate import DeepSpeedPlugin
 from transformers.trainer_utils import seed_worker
@@ -1136,12 +1136,14 @@ def train_multi_gpu_accelerate(
                             )
                             shutil.rmtree(oldest_checkpoint)
 
-                    unwrapped_model = accelerator.unwrap_model(model)
-                    accelerator.save_model(model, save_directory=save_path)
-                    state_dict = accelerator.get_state_dict(unwrapped_model)
+                    # unwrapped_model = accelerator.unwrap_model(model)
+                    accelerator.save_model(model, save_directory=checkpoint_dir_new)
                     if accelerator.is_main_process:
+                        state_dict = get_fp32_state_dict_from_zero_checkpoint(
+                            checkpoint_dir_new
+                        )
                         save_checkpoint(
-                            model=unwrapped_model,
+                            model=None,
                             path=checkpoint_dir_new,
                             global_step=global_step,
                             state_dict=state_dict if use_zero3 else None,
@@ -1149,8 +1151,11 @@ def train_multi_gpu_accelerate(
                             is_lora=args.use_lora,
                             accelerator=accelerator,
                         )
+                        for file in os.listdir(checkpoint_dir_new):
+                            if not file.endswith(".pt"):
+                                os.remove(os.path.join(checkpoint_dir_new, file))
+
                     accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
-                    del unwrapped_model
 
                 if global_step % args.validating_steps == 0:
                     accelerator.wait_for_everyone()
