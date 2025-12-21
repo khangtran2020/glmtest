@@ -857,6 +857,9 @@ def train_multi_gpu_accelerate(
     model, optimizer, lr_scheduler, tr_loader, va_loader = accelerator.prepare(
         model, optimizer, lr_scheduler, tr_loader, va_loader
     )
+    if isinstance(model, deepspeed.runtime.engine.DeepSpeedEngine):
+        console.log(f"[yellow]DeepSpeed model detected after prepare[/yellow]")
+
     global_step = 0
     previous_checkpoint_step = -1
     best_val_loss = 10000.0
