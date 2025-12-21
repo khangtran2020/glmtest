@@ -1136,6 +1136,7 @@ def train_multi_gpu_accelerate(
                             shutil.rmtree(oldest_checkpoint)
 
                     unwrapped_model = accelerator.unwrap_model(model)
+                    accelerator.save_model(model, save_directory=save_path)
                     state_dict = accelerator.get_state_dict(unwrapped_model)
                     if accelerator.is_main_process:
                         save_checkpoint(
