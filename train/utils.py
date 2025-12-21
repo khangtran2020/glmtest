@@ -118,7 +118,11 @@ def save_checkpoint(
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
 
-    save_name = os.path.join(path, f"checkpoint-{global_step}.pt")
+    if "best_model" not in path:
+        save_name = os.path.join(path, f"checkpoint-{global_step}.pt")
+    else:
+        save_name = os.path.join(path, f"model_weight.pt")
+
     if state_dict is not None:
         full_state_dict = state_dict
     else:
