@@ -18,8 +18,7 @@ from model.model import (
     get_model,
     continue_training_from_checkpoint,
 )
-
-# from deepspeed.utils.zero_to_fp32 import get_fp32_state_dict_from_zero_checkpoint
+from deepspeed.utils.zero_to_fp32 import load_state_dict_from_zero_checkpoint
 from accelerate import Accelerator
 from accelerate import DeepSpeedPlugin
 from transformers.trainer_utils import seed_worker
@@ -858,7 +857,8 @@ def train_multi_gpu_accelerate(
     model, optimizer, lr_scheduler, tr_loader, va_loader = accelerator.prepare(
         model, optimizer, lr_scheduler, tr_loader, va_loader
     )
-
+    if isinstance(model, deepspeed.runtime.engine.DeepSpeedEngine):
+        console.log(f"[yellow]DeepSpeed model detected after prepare[/yellow]")
     global_step = 0
     previous_checkpoint_step = -1
     best_val_loss = 10000.0
@@ -1135,19 +1135,14 @@ def train_multi_gpu_accelerate(
                             )
                             shutil.rmtree(oldest_checkpoint)
 
-                    if use_zero3:
-                        model.save_checkpoint(checkpoint_dir_new)
-                        # state_dict = get_fp32_state_dict_from_zero_checkpoint(
-                        #     checkpoint_dir
-                        # )
-
                     unwrapped_model = accelerator.unwrap_model(model)
+                    state_dict = accelerator.get_state_dict(unwrapped_model)
                     if accelerator.is_main_process:
                         save_checkpoint(
                             model=unwrapped_model,
                             path=checkpoint_dir_new,
                             global_step=global_step,
-                            state_dict=None,
+                            state_dict=state_dict if use_zero3 else None,
                             seed=args.seed,
                             is_lora=args.use_lora,
                             accelerator=accelerator,
