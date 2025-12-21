@@ -18,6 +18,7 @@ from model.model import (
     get_model,
     continue_training_from_checkpoint,
 )
+from deepspeed.utils.zero_to_fp32 import load_state_dict_from_zero_checkpoint
 from accelerate import Accelerator
 from accelerate import DeepSpeedPlugin
 from transformers.trainer_utils import seed_worker
@@ -37,6 +38,7 @@ from utils.utils import log_ram_usage
 from collections import deque
 
 # typing
+import deepspeed
 from argparse import Namespace
 from rich.console import Console
 from transformers import PreTrainedTokenizer
@@ -159,6 +161,8 @@ def train(
     )
 
     console.log(f"Metadata used for model initialization: {metadata}")
+    if isinstance(model, deepspeed.runtime.engine.DeepSpeedEngine):
+        console.log(f"[yellow]DeepSpeed model detected[/yellow]")
 
     if accelerator.is_main_process:
         for name, param in model.named_parameters():
