@@ -1120,7 +1120,7 @@ def train_multi_gpu_accelerate(
 
                     checkpoint_dir_new = os.path.join(
                         save_path,
-                        f"current_checkpoint",
+                        f"latest",
                     )
                     previous_checkpoint_step = global_step
 
@@ -1139,21 +1139,20 @@ def train_multi_gpu_accelerate(
                     # unwrapped_model = accelerator.unwrap_model(model)
                     accelerator.save_model(model, save_directory=checkpoint_dir_new)
                     if accelerator.is_main_process:
-                        state_dict = get_fp32_state_dict_from_zero_checkpoint(
-                            checkpoint_dir_new
-                        )
+                        state_dict = get_fp32_state_dict_from_zero_checkpoint(save_path)
                         save_checkpoint(
                             model=None,
-                            path=checkpoint_dir_new,
+                            path=os.path.join(
+                                save_path,
+                                f"current_checkpoint",
+                            ),
                             global_step=global_step,
                             state_dict=state_dict if use_zero3 else None,
                             seed=args.seed,
                             is_lora=args.use_lora,
                             accelerator=accelerator,
                         )
-                        for file in os.listdir(checkpoint_dir_new):
-                            if not file.endswith(".pt"):
-                                os.remove(os.path.join(checkpoint_dir_new, file))
+                        shutil.rmtree(checkpoint_dir_new)
 
                     accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
 
