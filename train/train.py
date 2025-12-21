@@ -740,6 +740,8 @@ def train_multi_gpu_accelerate(
     mixed_precision: str = "bf16",
     use_zero3: bool = False,
 ):
+
+    save_path = os.path.join(args.output_dir, args.name)
     if accelerator.is_main_process:
         # init wandb
         accelerator.init_trackers(
@@ -760,7 +762,6 @@ def train_multi_gpu_accelerate(
         )
 
         # Create save directory
-        save_path = os.path.join(args.output_dir, args.name)
         if os.path.exists(save_path):
             if continue_training == False:
                 shutil.rmtree(save_path)
