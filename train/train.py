@@ -213,6 +213,7 @@ def train(
             model=model,
             max_num_checkpoint=max_num_checkpoint,
             collate_fn=collate_fn_,
+            use_zero3=use_zero3,
         )
 
 
@@ -733,6 +734,7 @@ def train_multi_gpu_accelerate(
     max_num_checkpoint: int = 5,
     collate_fn: callable = collate_fn,
     mixed_precision: str = "bf16",
+    use_zero3: bool = False,
 ):
     if accelerator.is_main_process:
         # init wandb
@@ -1109,13 +1111,13 @@ def train_multi_gpu_accelerate(
                         )
                         os.rename(old_dir, new_dir)
 
-                    if accelerator.is_main_process:
-                        checkpoint_dir_new = os.path.join(
-                            save_path,
-                            f"current_checkpoint",
-                        )
-                        previous_checkpoint_step = global_step
+                    checkpoint_dir_new = os.path.join(
+                        save_path,
+                        f"current_checkpoint",
+                    )
+                    previous_checkpoint_step = global_step
 
+                    if accelerator.is_main_process:
                         while len(os.listdir(save_path)) >= max_num_checkpoint:
                             oldest_checkpoint = min(
                                 [
@@ -1127,16 +1129,20 @@ def train_multi_gpu_accelerate(
                             )
                             shutil.rmtree(oldest_checkpoint)
 
-                        unwrapped_model = accelerator.unwrap_model(model)
+                    unwrapped_model = accelerator.unwrap_model(model)
+                    state_dict = accelerator.get_state_dict(unwrapped_model)
+                    if accelerator.is_main_process:
                         save_checkpoint(
                             model=unwrapped_model,
                             path=checkpoint_dir_new,
                             global_step=global_step,
+                            state_dict=state_dict if use_zero3 else None,
                             seed=args.seed,
                             is_lora=args.use_lora,
+                            accelerator=accelerator,
                         )
-                        accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
-                        del unwrapped_model
+                    accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
+                    del unwrapped_model
 
                 if global_step % args.validating_steps == 0:
                     accelerator.wait_for_everyone()

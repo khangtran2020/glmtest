@@ -3,17 +3,18 @@ import re
 import torch
 import subprocess
 import transformers
+from accelerate import Accelerator
 from utils.utils import seed_everything
 from transformers.models.qwen2.modeling_qwen2 import Qwen2RotaryEmbedding
 from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding
 from typing import Optional
 from rich.console import Console
 
-# from ring_flash_attn.zigzag_ring_flash_attn import zigzag_ring_flash_attn_func
-# from ring_flash_attn import substitute_hf_flash_attn
-# from transformers.modeling_flash_attention_utils import _flash_attention_forward
+"""from ring_flash_attn.zigzag_ring_flash_attn import zigzag_ring_flash_attn_func
+from ring_flash_attn import substitute_hf_flash_attn
+from transformers.modeling_flash_attention_utils import _flash_attention_forward
 
-# old_flash_attn = _flash_attention_forward
+old_flash_attn = _flash_attention_forward"""
 
 
 def extract_local(value, rank, world_size, device, dim=1):
@@ -39,28 +40,6 @@ def extract_local(value, rank, world_size, device, dim=1):
     return local_value.to(device), cu_seqlens
 
 
-# def ring_flash_attention_forward(
-#     self,
-#     query_states,
-#     key_states,
-#     value_states,
-#     attention_mask,
-#     query_length,
-#     dropout=0.0,
-#     softmax_scale=None,
-#     seqlens_in_batch=None,
-# ):
-#     attn_output = zigzag_ring_flash_attn_func(
-#         query_states,
-#         key_states,
-#         value_states,
-#         dropout,
-#         softmax_scale=softmax_scale,
-#         causal=self.is_causal,
-#     )
-#     return attn_output
-
-
 def judge_dir(resume_dir):
     is_checkpoint_dir = False
     if os.path.exists(resume_dir) == False:
@@ -71,45 +50,6 @@ def judge_dir(resume_dir):
         if "pth" in _dir:
             is_checkpoint_dir = True
     return is_checkpoint_dir
-
-
-# def patch_model(model_type: str):
-#     transformers.modeling_flash_attention_utils._flash_attention_forward = (
-#         ring_flash_attention_forward
-#     )
-
-#     if model_type == "llama":
-#         forward_llama_embed_ori = copy.deepcopy(LlamaRotaryEmbedding.forward)
-
-#         def forward_llama_embed(self, x, seq_len=None):
-#             seq_len = seq_len * dist.get_world_size()
-#             return forward_llama_embed_ori(self, x, seq_len)
-
-#         Qwen2RotaryEmbedding.forward = forward_llama_embed
-
-#     elif model_type == "qwen2":
-
-#         forward_qwen2_embed_ori = copy.deepcopy(Qwen2RotaryEmbedding.forward)
-
-#         def forward_qwen2_embed(self, x, seq_len=None):
-#             seq_len = seq_len * dist.get_world_size()
-#             return forward_qwen2_embed_ori(self, x, seq_len)
-
-#         Qwen2RotaryEmbedding.forward = forward_qwen2_embed
-
-#     else:
-#         raise NotImplementedError(f"Model type {model_type} is not supported.")
-
-
-# def patch_model(process_group=None):
-
-#     original_methods = {}
-#     # Store and patch attention
-#     original_methods["attention_forward"] = (
-#         transformers.modeling_flash_attention_utils._flash_attention_forward
-#     )
-#     substitute_hf_flash_attn(process_group=process_group, heads_k_stride=1)
-#     return original_methods
 
 
 def revert_model_patch(original_methods):
@@ -126,62 +66,6 @@ def revert_model_patch(original_methods):
 
 def get_index_by_value(a, val):
     return (a == val).nonzero(as_tuple=True)[0]
-
-
-# def longlora_flash_attention_forward(
-#     self,
-#     query_states,
-#     key_states,
-#     value_states,
-#     attention_mask,
-#     query_length,
-#     dropout=0.0,
-#     softmax_scale=None,
-#     seqlens_in_batch=None,
-# ):
-
-#     bsz, q_len, _ = query_states.size()
-
-#     if getattr(self.config, "group_size_ratio", None) and self.training:  # shift
-#         groupsz = int(q_len * getattr(self.config, "group_size_ratio"))
-#         assert (
-#             q_len % groupsz == 0
-#         ), f"q_len {q_len} should be divisible by group size {groupsz}."
-#         num_groups = q_len // groupsz
-
-#         def shift(state: "torch.Tensor") -> "torch.Tensor":
-#             state = torch.cat(
-#                 (
-#                     state[:, :, : self.num_heads // 2],
-#                     state[:, :, self.num_heads // 2 :].roll(-groupsz // 2, dims=1),
-#                 ),
-#                 dim=2,
-#             )
-#             return state.reshape(
-#                 bsz * num_groups, groupsz, self.num_heads, self.head_dim
-#             )
-
-#         query_states, key_states, value_states = (
-#             shift(query_states),
-#             shift(key_states),
-#             shift(value_states),
-#         )
-#         if attention_mask is not None:
-#             attention_mask = attention_mask[:, :groupsz].repeat(num_groups, 1)
-
-#     attn_output: torch.Tensor = old_flash_attn(
-#         query_states,
-#         key_states,
-#         value_states,
-#         attention_mask,
-#         query_states.size(1),
-#         dropout=dropout,
-#         sliding_window=getattr(self, "sliding_window", None),
-#         use_top_left_mask=self._flash_attn_uses_top_left_mask,
-#         is_causal=self.is_causal,
-#     )
-
-#     return attn_output
 
 
 def run_nvidia_smi(console: Console):
@@ -227,14 +111,18 @@ def save_checkpoint(
     path: str,
     global_step: int,
     seed: int,
+    state_dict: dict = None,
     is_lora: Optional[bool] = True,
+    accelerator: Accelerator = None,
 ):
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
 
     save_name = os.path.join(path, f"checkpoint-{global_step}.pt")
-
-    full_state_dict = model.state_dict()
+    if state_dict is not None:
+        full_state_dict = state_dict
+    else:
+        full_state_dict = accelerator.get_state_dict(model)
     if is_lora == False:
         filtered_state_dict = full_state_dict
     else:
@@ -244,10 +132,6 @@ def save_checkpoint(
             if ("lora_" in k) or ("gnn" in k) or ("nvib" in k)
         }
         filtered_state_dict = lora_state_dict
-        # # Print out the keys being saved
-        # print("Saving the following LoRA parameters:")
-        # for key in lora_state_dict.keys():
-        #     print(f" - {key}")
 
     checkpoint = {
         "seed": seed,
@@ -256,7 +140,7 @@ def save_checkpoint(
     }
 
     # save checkpoint
-    torch.save(checkpoint, save_name)
+    accelerator.save(checkpoint, save_name)
 
 
 def load_checkpoint(
@@ -288,3 +172,118 @@ def extract_code_block(text):
         return extracted[-1]
     else:
         return ""
+
+
+"""def ring_flash_attention_forward(
+    self,
+    query_states,
+    key_states,
+    value_states,
+    attention_mask,
+    query_length,
+    dropout=0.0,
+    softmax_scale=None,
+    seqlens_in_batch=None,
+):
+    attn_output = zigzag_ring_flash_attn_func(
+        query_states,
+        key_states,
+        value_states,
+        dropout,
+        softmax_scale=softmax_scale,
+        causal=self.is_causal,
+    )
+    return attn_output
+
+def patch_model(model_type: str):
+    transformers.modeling_flash_attention_utils._flash_attention_forward = (
+        ring_flash_attention_forward
+    )
+
+    if model_type == "llama":
+        forward_llama_embed_ori = copy.deepcopy(LlamaRotaryEmbedding.forward)
+
+        def forward_llama_embed(self, x, seq_len=None):
+            seq_len = seq_len * dist.get_world_size()
+            return forward_llama_embed_ori(self, x, seq_len)
+
+        Qwen2RotaryEmbedding.forward = forward_llama_embed
+
+    elif model_type == "qwen2":
+
+        forward_qwen2_embed_ori = copy.deepcopy(Qwen2RotaryEmbedding.forward)
+
+        def forward_qwen2_embed(self, x, seq_len=None):
+            seq_len = seq_len * dist.get_world_size()
+            return forward_qwen2_embed_ori(self, x, seq_len)
+
+        Qwen2RotaryEmbedding.forward = forward_qwen2_embed
+
+    else:
+        raise NotImplementedError(f"Model type {model_type} is not supported.")
+
+
+def patch_model(process_group=None):
+
+    original_methods = {}
+    # Store and patch attention
+    original_methods["attention_forward"] = (
+        transformers.modeling_flash_attention_utils._flash_attention_forward
+    )
+    substitute_hf_flash_attn(process_group=process_group, heads_k_stride=1)
+    return original_methods
+
+def longlora_flash_attention_forward(
+    self,
+    query_states,
+    key_states,
+    value_states,
+    attention_mask,
+    query_length,
+    dropout=0.0,
+    softmax_scale=None,
+    seqlens_in_batch=None,
+):
+
+    bsz, q_len, _ = query_states.size()
+
+    if getattr(self.config, "group_size_ratio", None) and self.training:  # shift
+        groupsz = int(q_len * getattr(self.config, "group_size_ratio"))
+        assert (
+            q_len % groupsz == 0
+        ), f"q_len {q_len} should be divisible by group size {groupsz}."
+        num_groups = q_len // groupsz
+
+        def shift(state: "torch.Tensor") -> "torch.Tensor":
+            state = torch.cat(
+                (
+                    state[:, :, : self.num_heads // 2],
+                    state[:, :, self.num_heads // 2 :].roll(-groupsz // 2, dims=1),
+                ),
+                dim=2,
+            )
+            return state.reshape(
+                bsz * num_groups, groupsz, self.num_heads, self.head_dim
+            )
+
+        query_states, key_states, value_states = (
+            shift(query_states),
+            shift(key_states),
+            shift(value_states),
+        )
+        if attention_mask is not None:
+            attention_mask = attention_mask[:, :groupsz].repeat(num_groups, 1)
+
+    attn_output: torch.Tensor = old_flash_attn(
+        query_states,
+        key_states,
+        value_states,
+        attention_mask,
+        query_states.size(1),
+        dropout=dropout,
+        sliding_window=getattr(self, "sliding_window", None),
+        use_top_left_mask=self._flash_attn_uses_top_left_mask,
+        is_causal=self.is_causal,
+    )
+
+    return attn_output"""
