@@ -153,9 +153,20 @@ def load_checkpoint(
 ):
     if os.path.exists(path) == False:
         raise ValueError(f"Checkpoint path {path} does not exist.")
-    checkpoint = torch.load(
-        path, map_location=f"cuda:{rank}" if torch.cuda.is_available() else "cpu"
-    )
+
+    if path.endswith(".pt"):
+        checkpoint = torch.load(
+            path,
+            map_location=f"cuda:{rank}" if torch.cuda.is_available() else "cpu",
+        )
+    else:
+        for file in os.listdir(path):
+            if file.endswith(".pt"):
+                checkpoint = torch.load(
+                    path,
+                    map_location=f"cuda:{rank}" if torch.cuda.is_available() else "cpu",
+                )
+                break
     seed = checkpoint["seed"]
     seed_everything(seed)
     return checkpoint

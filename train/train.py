@@ -176,13 +176,11 @@ def train(
     lr_scheduler = CosineAnnealingLR(optimizer, T_max=100, eta_min=5e-8)
 
     if args.continue_training:
-        model, start_step, optimizer, lr_scheduler = continue_training_from_checkpoint(
+        model, start_step = continue_training_from_checkpoint(
             args=args,
             model=model,
             rank=accelerator.process_index,
             console=console,
-            optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
         )
     else:
         start_step = -1

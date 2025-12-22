@@ -453,20 +453,6 @@ def get_model_test(
             tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
         ]
 
-    # # take .pt file from the model_weight_path
-    # console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
-    # for file in os.listdir(args.model_weight_path):
-    #     if file.endswith(".pt"):
-    #         state_dict = torch.load(
-    #             os.path.join(args.model_weight_path, file),
-    #             map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-    #         )
-    #         model.load_state_dict(state_dict)
-    #         if use_lora:
-    #             model.llm_model = model.llm_model.merge_and_unload()
-    #         console.log(f"[red]Model weights loaded from {file}[/red]")
-
-    # take .pt file from the model_weight_path
     if args.model_weight_path.endswith(".pt"):
         console.log(f"[red]Loading weight from {args.model_weight_path}[/red]")
         state_dict = torch.load(
@@ -523,9 +509,6 @@ def get_model_test(
     if use_lora:
         model.llm_model = model.llm_model.merge_and_unload()
     console.log(f"[red]Model weights loaded from {args.model_weight_path}[/red]")
-
-    # model = model.to(dtype=torch.float)
-    # unifying dtype to avoid errors
     for n, p in model.named_parameters():
         if args.dtype == "bf16":
             p.data = p.data.to(torch.bfloat16)
@@ -535,8 +518,6 @@ def get_model_test(
             p.data = p.data.to(device)
 
     console.log(f"Model is loaded to device: {model.device} - with type {model.dtype}")
-    # for name, param in model.named_parameters():
-    #     console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
     return model
 
 
@@ -766,23 +747,46 @@ def get_model_testgen(
 def continue_training_from_checkpoint(
     args: Namespace,
     model: GLMFModelForCausalLM,
-    optimizer: torch.optim.Optimizer,
-    lr_scheduler: torch.optim.lr_scheduler._LRScheduler,
     local_rank: int,
+    console: Console,
 ):
     if args.continue_training:
 
-        assert args.checkpoint_path is not None, "Checkpoint path must be specified."
-        check_point = load_checkpoint(path=args.checkpoint_path, rank=local_rank)
+        # assert args.checkpoint_path is not None, "Checkpoint path must be specified."
+        if args.checkpoint_path is None:
+            ckpt_path = os.path.join(args.output_dir, args.name, "current_checkpoint")
+        else:
+            ckpt_path = args.checkpoint_path
 
-        model.load_state_dict(check_point["model_state_dict"])
-        optimizer.load_state_dict(check_point["optimizer_state_dict"])
-        lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
+        # check if exists current checkpoint path and it's not empty
+        if not os.path.exists(ckpt_path) or len(os.listdir(ckpt_path)) == 0:
+            console.log(
+                f"[cyan]Checkpoint path {ckpt_path} does not exist or is empty. Cannot continue training.[/cyan]"
+            )
+            console.log(f"[cyan]Starting training from scratch.[/cyan]")
+            return model, -1
+
+        check_point = load_checkpoint(path=ckpt_path, rank=local_rank)
+        state_dict = check_point["model_state_dict"]
+        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
+
+        if missing_keys:
+            console.log(
+                f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
+            )
+        if unexpected_keys:
+            console.log(
+                f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
+            )
+            sample_unexpected = list(unexpected_keys)[:3]
+            console.log(
+                f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
+            )
         start_step = check_point["global_step"]
     else:
         start_step = -1
 
-    return model, optimizer, lr_scheduler, start_step
+    return model, start_step
 
 
 def extract_metadata_from_graph(dataset: Data):
