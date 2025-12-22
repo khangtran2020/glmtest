@@ -18,7 +18,6 @@ from model.model import (
     get_model,
     continue_training_from_checkpoint,
 )
-from deepspeed.utils.zero_to_fp32 import get_fp32_state_dict_from_zero_checkpoint
 from accelerate import Accelerator
 from accelerate import DeepSpeedPlugin
 from transformers.trainer_utils import seed_worker
@@ -179,7 +178,7 @@ def train(
         model, start_step = continue_training_from_checkpoint(
             args=args,
             model=model,
-            rank=accelerator.process_index,
+            local_rank=accelerator.process_index,
             console=console,
         )
     else:
