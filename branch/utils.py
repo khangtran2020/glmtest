@@ -353,8 +353,8 @@ def get_all_branch(
         set_of_end = [
             e
             for e in set_of_endline
-            if e > line_dict["functions"][func_name][0]
-            and e <= line_dict["functions"][func_name][1]
+            if e > line_dict["async_functions"][func_name][0]
+            and e <= line_dict["async_functions"][func_name][1]
         ]
         if len(set_of_end) == 0:
             continue
