@@ -52,6 +52,9 @@ def analyze_code(code: str) -> Dict:
     for node in ast.walk(tree):
 
         if isinstance(node, ast.FunctionDef):
+            # check if function is not a private function
+            if node.name.startswith("_"):
+                continue
             start_line = node.lineno
             end_line = getattr(node, "end_lineno", None)
             analysis_results["functions"][node.name] = (start_line, end_line)
@@ -59,18 +62,13 @@ def analyze_code(code: str) -> Dict:
             key_end_line.append(end_line)
 
         elif isinstance(node, ast.AsyncFunctionDef):
+            if node.name.startswith("_"):
+                continue
             start_line = node.lineno
             end_line = getattr(node, "end_lineno", None)
             analysis_results["async_functions"][node.name] = (start_line, end_line)
             key_start_line.append(start_line)
             key_end_line.append(end_line)
-
-        # elif isinstance(node, ast.ClassDef):
-        #     start_line = node.lineno
-        #     end_line = getattr(node, "end_lineno", None)
-        #     analysis_results["classes"][node.name] = (start_line, end_line)
-        #     key_start_line.append(start_line)
-        #     key_end_line.append(end_line)
 
         elif isinstance(node, ast.For):
             for_line.append(node.lineno)
