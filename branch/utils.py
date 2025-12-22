@@ -264,10 +264,6 @@ def get_all_branch(
     branch_limit: int = 1000,
 ) -> Dict:
 
-    # pprint("[green]Extracting branches...[/green]")
-    # pprint("-------------------------")
-    # pprint(f"[blue]Processing code:[/blue]\n {code}")
-
     if code is None and filepath is None:
         raise ValueError("Either code or filepath must be provided.")
 
@@ -276,23 +272,12 @@ def get_all_branch(
 
     line_dict = analyze_code(code=code)
 
-    # Debugging
-    # pprint(f"[green]Analyzed line dict:[/green] {pretty_repr(line_dict)}")
-
     new_code = []
     for i, line in enumerate(code.split("\n")):
         new_code.append(f"{i+1}: {line}")
     new_code = "\n".join(new_code)
 
-    # pprint(f"[green]Source code:[/green]\n{new_code}")
-
     G, set_of_endline, arcs = parse_code(code=code)
-
-    # Debugging
-    # pprint(f"[green]Parsed arcs:[/green] {pretty_repr(arcs)}")
-    # pprint(f"[green]Set of end lines:[/green] {pretty_repr(set_of_endline)}")
-    # pprint(f"[green]Parsed graph nodes:[/green] {pretty_repr(G.nodes())}")
-    # pprint(f"[green]Parsed graph edges:[/green] {pretty_repr(G.edges())}")
 
     init_lines = get_init_lines(source_code=code)
 
@@ -312,7 +297,6 @@ def get_all_branch(
 
     branches = []
     num_branch = 0
-    # process func
     if console is not None:
         console.log("Processing Function")
 
