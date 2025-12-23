@@ -163,7 +163,7 @@ def load_checkpoint(
         for file in os.listdir(path):
             if file.endswith(".pt"):
                 checkpoint = torch.load(
-                    path,
+                    os.path.join(path, file),
                     map_location=f"cuda:{rank}" if torch.cuda.is_available() else "cpu",
                 )
                 break
