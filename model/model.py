@@ -189,100 +189,69 @@ def get_model_train(
                     param.requires_grad = True
                     console.log(f"Parameter {name} is set to be trainable.")
     else:
+        config = GLMFModelConfig(
+            llm_model=args.llm_model,
+            use_lora=args.use_lora,
+            dtype=args.dtype,
+            mode=args.gnn_mode,
+            in_feats=args.in_feats,
+            n_hidden=args.n_hidden,
+            n_layers=args.n_layers,
+            num_head=args.num_head,
+            dropout=args.dropout,
+            lora_r=args.lora_r,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            lora_target_modules=args.lora_target_modules,
+            device_map=(
+                None if use_zero3 else ("cuda" if torch.cuda.is_available() else "cpu")
+            ),
+        )
+        model = GLMFModelForCausalLM(
+            config=config,
+            tokenizer=tokenizer,
+            baseline_prompt=args.baseline_prompt,
+            multi_gpu=True if args.num_gpu > 1 else False,
+            debug=args.debug,
+            rank=rank,
+            is_training=True,
+            use_zero3=use_zero3,
+        )
+        model.metadata = metadata
+        if metadata is not None:
+            model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
+            console.log(
+                f"[blue]Converted GNN to heterogeneous with metadata: {metadata}[/blue]"
+            )
         if args.model_weight_path is not None:
-
-            config = GLMFModelConfig(
-                llm_model=args.llm_model,
-                use_lora=False,
-                dtype=args.dtype,
-                mode=args.gnn_mode,
-                in_feats=args.in_feats,
-                n_hidden=args.n_hidden,
-                n_layers=args.n_layers,
-                num_head=args.num_head,
-                dropout=args.dropout,
-                lora_r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                lora_target_modules=args.lora_target_modules,
-                device_map="cuda" if torch.cuda.is_available() else "cpu",
+            if args.model_weight_path.endswith(".pt"):
+                weights_path = args.model_weight_path
+            else:
+                console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
+                for file in os.listdir(args.model_weight_path):
+                    if file.endswith(".pt"):
+                        weights_path = os.path.join(args.model_weight_path, file)
+                        break
+            console.log(f"[red]Loading weight from {weights_path}[/red]")
+            state_dict = torch.load(
+                weights_path,
+                map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
             )
-
-            model = GLMFModelForCausalLM(
-                config=config,
-                tokenizer=tokenizer,
-                baseline_prompt=args.baseline_prompt,
-                multi_gpu=True if args.num_gpu > 1 else False,
-                debug=args.debug,
-                rank=rank,
-                is_training=False,
+            missing_keys, unexpected_keys = model.load_state_dict(
+                state_dict, strict=False
             )
-
-            model.metadata = metadata
-            if metadata is not None:
-                model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
+            if missing_keys:
                 console.log(
-                    f"[blue]Converted GNN to heterogeneous with metadata: {metadata}[/blue]"
+                    f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
                 )
-
-            for file in os.listdir(args.model_weight_path):
-                if file.endswith(".pt"):
-                    state_dict = torch.load(
-                        os.path.join(args.model_weight_path, file),
-                        map_location="cpu",
-                        weights_only=True,
-                    )
-                    model.load_state_dict(state_dict)
-                    console.log(
-                        f"[red]Model weights loaded from {os.path.join(args.model_weight_path, file)}[/red]"
-                    )
-
-            model.init_for_train(tokenizer=tokenizer, rank=rank)
-            # make the model to bf16/fp16
-            for n, p in model.named_parameters():
-                if args.dtype == "bf16":
-                    if p.dtype != torch.bfloat16:
-                        p.data = p.data.to(torch.bfloat16)
-                elif args.dtype == "fp16":
-                    if p.dtype != torch.float16:
-                        p.data = p.data.to(torch.float16)
-
-        else:
-            config = GLMFModelConfig(
-                llm_model=args.llm_model,
-                use_lora=args.use_lora,
-                dtype=args.dtype,
-                mode=args.gnn_mode,
-                in_feats=args.in_feats,
-                n_hidden=args.n_hidden,
-                n_layers=args.n_layers,
-                num_head=args.num_head,
-                dropout=args.dropout,
-                lora_r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                lora_target_modules=args.lora_target_modules,
-                device_map=(
-                    None
-                    if use_zero3
-                    else ("cuda" if torch.cuda.is_available() else "cpu")
-                ),
-            )
-            model = GLMFModelForCausalLM(
-                config=config,
-                tokenizer=tokenizer,
-                baseline_prompt=args.baseline_prompt,
-                multi_gpu=True if args.num_gpu > 1 else False,
-                debug=args.debug,
-                rank=rank,
-                is_training=True,
-                use_zero3=use_zero3,
-            )
-            model.metadata = metadata
-            if metadata is not None:
-                model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
+            if unexpected_keys:
                 console.log(
-                    f"[blue]Converted GNN to heterogeneous with metadata: {metadata}[/blue]"
+                    f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
+                )
+                # Log sample of unexpected keys for debugging
+                sample_unexpected = list(unexpected_keys)[:3]
+                console.log(
+                    f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
                 )
 
         model.llm_model.gradient_checkpointing_enable()
