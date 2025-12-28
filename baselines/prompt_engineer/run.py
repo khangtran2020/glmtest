@@ -362,9 +362,9 @@ class PromptEngineer:
             )
 
             # If responses file exists, read processed keys to skip
-            if os.path.exists(output_file):
+            if os.path.exists(test_case_file):
                 try:
-                    with open(output_file, "r") as f:
+                    with open(test_case_file, "r") as f:
                         for line in f:
                             line = line.strip()
                             if not line:
@@ -373,7 +373,14 @@ class PromptEngineer:
                                 rec = json.loads(line)
                                 iid = rec.get("instance_id")
                                 bkey = rec.get("branch_key")
-                                if iid is not None and bkey is not None:
+                                response_success = rec.get("response").get(
+                                    "success", False
+                                )
+                                if (
+                                    (iid is not None)
+                                    and (bkey is not None)
+                                    and response_success
+                                ):
                                     processed_keys.add(KEY_TEMPLATE.format(iid, bkey))
                             except Exception:
                                 # ignore malformed lines
