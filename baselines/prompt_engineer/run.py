@@ -392,6 +392,9 @@ class PromptEngineer:
         skipped = 0
         generated = 0
 
+        print(f"Total prompts to process: {len(prompt_list)}")
+        print(f"Already processed keys: {len(processed_keys)}")
+
         for prompt_item in tqdm(prompt_list):
             iid = prompt_item["instance_id"]
             bkey = prompt_item["branch_key"]
