@@ -233,10 +233,8 @@ def get_model_train(
                         weights_path = os.path.join(args.model_weight_path, file)
                         break
             console.log(f"[red]Loading weight from {weights_path}[/red]")
-            state_dict = torch.load(
-                weights_path,
-                map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-            )
+            check_point = load_checkpoint(path=weights_path, rank=rank)
+            state_dict = check_point["model_state_dict"]
             missing_keys, unexpected_keys = model.load_state_dict(
                 state_dict, strict=False
             )
@@ -422,13 +420,18 @@ def get_model_test(
             tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
         ]
 
-    if args.model_weight_path.endswith(".pt"):
-        console.log(f"[red]Loading weight from {args.model_weight_path}[/red]")
-        state_dict = torch.load(
-            args.model_weight_path,
-            map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-        )
-        console.log(f"[green]Using LoRA weights for testing: {use_lora}.[/green]")
+    if args.model_weight_path is not None:
+        if args.model_weight_path.endswith(".pt"):
+            weights_path = args.model_weight_path
+        else:
+            console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
+            for file in os.listdir(args.model_weight_path):
+                if file.endswith(".pt"):
+                    weights_path = os.path.join(args.model_weight_path, file)
+                    break
+        console.log(f"[red]Loading weight from {weights_path}[/red]")
+        check_point = load_checkpoint(path=weights_path, rank=rank)
+        state_dict = check_point["model_state_dict"]
         missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
         if missing_keys:
             console.log(
@@ -443,37 +446,6 @@ def get_model_test(
             console.log(
                 f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
             )
-    else:
-        console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
-        for file in os.listdir(args.model_weight_path):
-            if file.endswith(".pt"):
-                state_dict = torch.load(
-                    os.path.join(args.model_weight_path, file),
-                    map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-                )
-                console.log(
-                    f"[green]Using LoRA weights for testing: {use_lora}.[/green]"
-                )
-
-                state_dict = state_dict["model_state_dict"]
-                missing_keys, unexpected_keys = model.load_state_dict(
-                    state_dict, strict=False
-                )
-
-                if missing_keys:
-                    console.log(
-                        f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
-                    )
-                if unexpected_keys:
-                    console.log(
-                        f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
-                    )
-                    # Log sample of unexpected keys for debugging
-                    sample_unexpected = list(unexpected_keys)[:3]
-                    console.log(
-                        f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
-                    )
-                break
 
     if use_lora:
         model.llm_model = model.llm_model.merge_and_unload()
@@ -504,6 +476,7 @@ def get_model_testgen(
     ), "Model directory must be specified for testing."
     use_lora = True
 
+    model = None
     if args.do_generate:
         if args.fuzz_model:
 
@@ -633,13 +606,19 @@ def get_model_testgen(
                 tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
             ]
         console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
-        if args.model_weight_path.endswith(".pt"):
-            console.log(f"[red]Loading weight from {args.model_weight_path}[/red]")
-            state_dict = torch.load(
-                args.model_weight_path,
-                map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-            )
-            console.log(f"[green]Using LoRA weights for testing: {use_lora}.[/green]")
+
+        if args.model_weight_path is not None:
+            if args.model_weight_path.endswith(".pt"):
+                weights_path = args.model_weight_path
+            else:
+                console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
+                for file in os.listdir(args.model_weight_path):
+                    if file.endswith(".pt"):
+                        weights_path = os.path.join(args.model_weight_path, file)
+                        break
+            console.log(f"[red]Loading weight from {weights_path}[/red]")
+            check_point = load_checkpoint(path=weights_path, rank=rank)
+            state_dict = check_point["model_state_dict"]
             missing_keys, unexpected_keys = model.load_state_dict(
                 state_dict, strict=False
             )
@@ -656,38 +635,6 @@ def get_model_testgen(
                 console.log(
                     f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
                 )
-        else:
-            console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
-            for file in os.listdir(args.model_weight_path):
-                if file.endswith(".pt"):
-                    state_dict = torch.load(
-                        os.path.join(args.model_weight_path, file),
-                        map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-                    )
-                    console.log(
-                        f"[green]Using LoRA weights for testing: {use_lora}.[/green]"
-                    )
-
-                    state_dict = state_dict["model_state_dict"]
-                    missing_keys, unexpected_keys = model.load_state_dict(
-                        state_dict, strict=False
-                    )
-
-                    if missing_keys:
-                        console.log(
-                            f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
-                        )
-                    if unexpected_keys:
-                        console.log(
-                            f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
-                        )
-                        # Log sample of unexpected keys for debugging
-                        sample_unexpected = list(unexpected_keys)[:3]
-                        console.log(
-                            f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
-                        )
-                    break
-
         if use_lora:
             model.llm_model = model.llm_model.merge_and_unload()
         console.log(f"[red]Model weights loaded from {args.model_weight_path}[/red]")
@@ -708,8 +655,6 @@ def get_model_testgen(
         #     console.log(
         #         f"[yellow]Parameter {name}, dtype: {param.dtype}, device: {param.device}[/yellow]"
         #     )
-    else:
-        model = None
     return model
 
 
