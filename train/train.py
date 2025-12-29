@@ -988,8 +988,11 @@ def train_multi_gpu_accelerate(
 
                         if accelerator.sync_gradients:
                             accelerator.wait_for_everyone()
-                            accelerator.clip_grad_norm_(
+                            grad_norm = accelerator.clip_grad_norm_(
                                 model.parameters(), args.max_grad_norm
+                            )
+                            accelerator.print(
+                                f"[blue]Grad norm at step {global_step}: {grad_norm}[/blue]"
                             )
                             optimizer.step()
                             lr_scheduler.step()

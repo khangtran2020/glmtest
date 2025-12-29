@@ -368,9 +368,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                         inputs_embeds[
                             i, graph_token_index[j] : graph_token_index[j] + 1, :
                         ] = embeds.to(inputs_embeds.dtype).mean(dim=0, keepdim=True)
-        else:
-            if self.is_training:
-                inputs_embeds = inputs_embeds.requires_grad_(True)
+
+        if self.is_training:
+            inputs_embeds = inputs_embeds.requires_grad_(True)
         self._last_embedding_time = time.time() - embedding_start
         return inputs_embeds
 
