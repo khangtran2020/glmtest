@@ -265,13 +265,13 @@ def get_model_train(
             f"Attention implementation of the model is: {model.llm_model.config._attn_implementation}"
         )
 
-    for n, p in model.named_parameters():
-        if args.dtype == "bf16":
-            if p.dtype != torch.bfloat16:
-                p.data = p.data.to(torch.bfloat16)
-        elif args.dtype == "fp16":
-            if p.dtype != torch.float16:
-                p.data = p.data.to(torch.float16)
+    # for n, p in model.named_parameters():
+    #     if args.dtype == "bf16":
+    #         if p.dtype != torch.bfloat16:
+    #             p.data = p.data.to(torch.bfloat16)
+    #     elif args.dtype == "fp16":
+    #         if p.dtype != torch.float16:
+    #             p.data = p.data.to(torch.float16)
 
     return model
 
