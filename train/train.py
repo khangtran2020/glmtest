@@ -8,7 +8,7 @@ import shutil
 from rich import print as pprint
 from functools import partial
 from torch.utils.data import DataLoader, WeightedRandomSampler
-from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, CosineAnnealingWarmRestarts
 from torch.optim import AdamW
 from datetime import timedelta
 from data.core import Data
@@ -172,7 +172,7 @@ def train(
     optimizer = AdamW(
         filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
     )
-    lr_scheduler = CosineAnnealingLR(optimizer, T_max=100, eta_min=5e-8)
+    lr_scheduler = CosineAnnealingWarmRestarts(optimizer=optimizer, T_0=10, T_mult=1)
 
     if args.continue_training:
         model, start_step = continue_training_from_checkpoint(
