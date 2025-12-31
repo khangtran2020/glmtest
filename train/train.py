@@ -172,7 +172,7 @@ def train(
     optimizer = AdamW(
         filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
     )
-    lr_scheduler = CosineAnnealingWarmRestarts(optimizer=optimizer, T_0=10, T_mult=1)
+    lr_scheduler = CosineAnnealingWarmRestarts(optimizer=optimizer, T_0=20, T_mult=1)
 
     if args.continue_training:
         model, start_step = continue_training_from_checkpoint(
