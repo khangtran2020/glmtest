@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import torch
 from model.glmf import GLMFModelConfig, GLMFModelForCausalLM
@@ -677,8 +678,9 @@ def continue_training_from_checkpoint(
             console.log(
                 f"[cyan]Checkpoint path {ckpt_path} does not exist or is empty. Cannot continue training.[/cyan]"
             )
-            console.log(f"[cyan]Starting training from scratch.[/cyan]")
-            return model, -1
+            raise FileNotFoundError(
+                f"Checkpoint path {ckpt_path} does not exist or is empty."
+            )
 
         check_point = load_checkpoint(path=ckpt_path, rank=local_rank)
         state_dict = check_point["model_state_dict"]
