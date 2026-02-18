@@ -588,6 +588,18 @@ def add_baseline_group(group):
         action="store_true",
         help="skip data preparation for baseline",
     )
+    group.add_argument(
+        "--baseline_branch_data",
+        type=str,
+        help="Dir for branches of generated test cases for baseline",
+        default=None,
+    )
+    group.add_argument(
+        "--baseline_response_data",
+        type=str,
+        help="Dir for generated test case responses for baseline",
+        default=None,
+    )
 
 
 def parse_args():

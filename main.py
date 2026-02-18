@@ -165,6 +165,8 @@ def main() -> None:
                 output_path=args.baseline_output_path,
                 output_name=args.baseline_output_name,
                 max_tokens=args.baseline_max_tokens,
+                branch_data=args.baseline_branch_data,
+                response_data=args.baseline_response_data,
             )
             console.log(
                 "Baseline Prompt Engineer completed. Exiting as mode is 'baseline'."
