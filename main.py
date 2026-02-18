@@ -151,7 +151,8 @@ def main() -> None:
         return  # exit after getting reasoning
 
     if args.mode == "baseline":
-        if args.baseline_prompt_type == "prompt_engineer":
+        console.log(f"[green]Running baseline method: {args.baseline_type}[/green]")
+        if args.baseline_type == "prompt_engineer":
             pe = PromptEngineer(
                 args=args,
                 model=args.baseline_llm_model,
@@ -172,7 +173,7 @@ def main() -> None:
                 "Baseline Prompt Engineer completed. Exiting as mode is 'baseline'."
             )
             return
-        elif args.baseline_prompt_type == "codamosa":
+        elif args.baseline_type == "codamosa":
             if not os.path.exists(os.path.join(dataset.data_path, "test_module.jsonl")):
                 raise FileNotFoundError(
                     "test_module.jsonl not found, please crawl the data"

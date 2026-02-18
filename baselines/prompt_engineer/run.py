@@ -292,6 +292,53 @@ class PromptEngineer:
         prompt_list = []
         if on_processed_data:
             data = dataset.processed_data[split]
+            if response_data is not None:
+                # read the jsonl file from response_data
+                response_mapping = {}
+                try:
+                    with open(response_data, "r") as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                rec = json.loads(line)
+                                # rec is a dict with key is the uuid and value is the test case content
+                                for k, v in rec.items():
+                                    response_mapping[k] = v
+                            except Exception as e:
+                                raise ValueError(
+                                    f"Failed to parse line in response data file: {e}"
+                                )
+                except Exception as e:
+                    raise ValueError(f"Failed to read response data file: {e}")
+            else:
+                response_mapping = None
+
+            if branch_data is not None:
+                # read the jsonl file from branch_data
+                branch_mapping = {}
+                try:
+                    with open(branch_data, "r") as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                rec = json.loads(line)
+                                uuid = rec.get("id")
+                                branches = rec.get("branches")  # is a dict
+                                for k, v in branches.items():
+                                    branch_mapping[f"{uuid}_{k}"] = v
+                            except Exception as e:
+                                raise ValueError(
+                                    f"Failed to parse line in branch data file: {e}"
+                                )
+                except Exception as e:
+                    raise ValueError(f"Failed to read branch data file: {e}")
+            else:
+                branch_mapping = None
+
             # Add tqdm progress bar
             for key in tqdm(data.keys()):
 
