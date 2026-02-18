@@ -14,6 +14,7 @@ from model.model import get_model, extract_metadata_from_graph
 from inference.test import test
 from inference.testcase_generate import testcase_generate
 from baselines.prompt_engineer.run import PromptEngineer
+from baselines.rag.run import RAGTestGenerator
 from baselines.codamosa.run import run_codamosa
 
 warnings.filterwarnings("ignore")
@@ -173,6 +174,15 @@ def main() -> None:
                 "Baseline Prompt Engineer completed. Exiting as mode is 'baseline'."
             )
             return
+        elif args.baseline_type == "rag":
+            rag = RAGTestGenerator(api_key=args.baseline_api_key, console=console)
+            rag.generate_test_cases(
+                dataset=dataset,
+                output_path=args.baseline_output_path,
+                db_path=args.baseline_output_path,
+                output_name=args.baseline_output_name,
+                top_k=2,
+            )
         elif args.baseline_type == "codamosa":
             if not os.path.exists(os.path.join(dataset.data_path, "test_module.jsonl")):
                 raise FileNotFoundError(
