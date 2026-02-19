@@ -143,7 +143,7 @@ class RAGTestGenerator:
         """Build knowledge base from dataset test cases."""
         self.console.log("[yellow]Building knowledge base...[/yellow]")
 
-        data = dataset.processed_data[split]
+        data = dataset.data[split]
         for key in tqdm(data.keys()):
             uuid = data[key]["uuid"]
             module_path = data[key]["module_path"]
