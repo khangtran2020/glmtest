@@ -175,6 +175,7 @@ def main() -> None:
             )
             return
         elif args.baseline_type == "rag":
+            console.log("Running RAG baseline.")
             rag = RAGTestGenerator(api_key=args.baseline_api_key, console=console)
             rag.generate_test_cases(
                 dataset=dataset,
@@ -183,6 +184,7 @@ def main() -> None:
                 output_name=args.baseline_output_name,
                 top_k=2,
             )
+            return
         elif args.baseline_type == "codamosa":
             if not os.path.exists(os.path.join(dataset.data_path, "test_module.jsonl")):
                 raise FileNotFoundError(
@@ -191,6 +193,11 @@ def main() -> None:
             with open(os.path.join(dataset.data_path, "test_module.jsonl"), "r") as f:
                 task_instances = [json.loads(line) for line in f.readlines()]
             run_codamosa(args=args, task_instances=task_instances, console=console)
+            return
+        else:
+            console.log(
+                f"[red]Baseline type {args.baseline_type} not recognized.[/red]"
+            )
             return
 
     if args.mode != "testgen":
