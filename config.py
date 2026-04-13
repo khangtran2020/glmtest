@@ -548,6 +548,12 @@ def add_baseline_group(group):
         default=None,
     )
     group.add_argument(
+        "--baseline_ragemb_api_key",
+        type=str,
+        help="api key for the embedding of rag module",
+        default=None,
+    )
+    group.add_argument(
         "--baseline_output_path",
         type=str,
         help="path to save baseline outputs",

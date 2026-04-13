@@ -176,7 +176,12 @@ def main() -> None:
             return
         elif args.baseline_type == "rag":
             console.log("Running RAG baseline.")
-            rag = RAGTestGenerator(api_key=args.baseline_api_key, console=console)
+            rag = RAGTestGenerator(
+                api_key=args.baseline_api_key,
+                model=args.baseline_llm_model,
+                embedding_model_api=args.baseline_ragemb_api_key,
+                console=console,
+            )
             rag.generate_test_cases(
                 dataset=dataset,
                 output_path=args.baseline_output_path,

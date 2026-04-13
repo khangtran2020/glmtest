@@ -4,6 +4,7 @@ import ast
 import json
 import torch
 import openai
+import anthropic
 import argparse
 import numpy as np
 from tqdm import tqdm
@@ -79,32 +80,56 @@ def get_embedding(
         return []
 
 
-def query_openai(
+def query_model(
     prompt: str,
-    client: openai.OpenAI,
+    client: Union[openai.OpenAI, anthropic.Client],
     model: str,
     max_tokens: int,
     temperature: float,
 ) -> Dict[str, Any]:
     """Query OpenAI API."""
     try:
-        messages = [{"role": "user", "content": prompt}]
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
+        if isinstance(client, openai.OpenAI):
+            messages = [{"role": "user", "content": prompt}]
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
 
-        content = response.choices[0].message.content
-        usage = response.usage.model_dump() if response.usage else {}
+            content = response.choices[0].message.content
+            usage = response.usage.model_dump() if response.usage else {}
 
-        return {
-            "success": True,
-            "content": content,
-            "usage": usage,
-            "extract_content": extract_test_case(content),
-        }
+            return {
+                "success": True,
+                "content": content,
+                "usage": usage,
+                "extract_content": extract_test_case(content),
+            }
+        elif isinstance(client, anthropic.Client):
+            # Anthropic's messages.create API
+            messages = [{"role": "user", "content": prompt}]
+            kwargs = {
+                "model": model,
+                "max_tokens": max_tokens,  # Anthropic uses max_tokens, not max_output_tokens
+                "temperature": temperature,
+                "messages": messages,
+            }
+            response = client.messages.create(**kwargs)
+
+            # Anthropic's messages.create returns a Message object
+            return {
+                "success": True,
+                "content": response.content[0].text,
+                "model": response.model,
+                "usage": {
+                    "input_tokens": response.usage.input_tokens,
+                    "output_tokens": response.usage.output_tokens,
+                },
+                "stop_reason": response.stop_reason,
+                "extract_content": extract_test_case(response.content[0].text),
+            }
     except Exception as e:
         return {
             "success": False,
@@ -117,9 +142,20 @@ def query_openai(
 class RAGTestGenerator:
     """RAG-based test case generator using OpenAI."""
 
-    def __init__(self, api_key: str, console: Console, model: str = "gpt-4o-mini"):
-        self.client = openai.OpenAI(api_key=api_key)
-        self.model = model
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        embedding_model_api: str,
+        console: Console,
+    ):
+        self.embedding_client = openai.OpenAI(api_key=embedding_model_api)
+        if "gpt" in model:
+            self.client = openai.OpenAI(api_key=api_key)
+            self.model = model
+        else:
+            self.client = anthropic.Client(api_key=api_key)
+            self.model = model
         self.console = console
         self.kb_docs = []
         self.kb_embeddings = []
@@ -163,7 +199,7 @@ class RAGTestGenerator:
                     )
 
                 doc_text = f"### Module: {module_path}\n### Code:\n{module_code[:300]}\n### Branch: {branch_line} -> \n### Test: {test_case}"
-                embedding = get_embedding(doc_text, self.client)
+                embedding = get_embedding(doc_text, self.embedding_client)
 
                 if embedding:
                     self.kb_docs.append(
@@ -289,7 +325,7 @@ class RAGTestGenerator:
                 )
 
                 # Query
-                response = query_openai(
+                response = query_model(
                     prompt, self.client, self.model, max_tokens, temperature
                 )
 
