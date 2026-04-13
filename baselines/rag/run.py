@@ -168,7 +168,13 @@ class RAGTestGenerator:
             self.console.log(
                 f"[yellow]Loading existing knowledge base embeddings from {embedding_path}...[/yellow]"
             )
-            embs_and_docs = torch.load(embedding_path, allow_pickle=True)
+            try:
+                embs_and_docs = torch.load(
+                    embedding_path, map_location="cpu", weights_only=False
+                )
+            except TypeError:
+                # Backward compatibility with older PyTorch versions.
+                embs_and_docs = torch.load(embedding_path, map_location="cpu")
             self.kb_embeddings = embs_and_docs["embeddings"]
             self.kb_docs = embs_and_docs["docs"]
             self.console.log(
