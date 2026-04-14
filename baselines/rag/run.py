@@ -231,7 +231,7 @@ class RAGTestGenerator:
         if len(self.kb_docs) == 0:
             return []
 
-        query_emb = get_embedding(query, self.client)
+        query_emb = get_embedding(query, self.embedding_client)
         if not query_emb:
             return []
 
