@@ -1,3 +1,6 @@
 [submodule "model/nvib"]
 	path = model/nvib
 	url = https://github.com/khangtran2020/nvib.git
+[submodule "testgeneval"]
+	path = testgeneval
+	url = https://github.com/khangtran2020/testgeneval.git
