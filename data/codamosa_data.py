@@ -1,13 +1,19 @@
 import os
+import ast
 import sys
 import git
 import json
+import torch
+import shutil
+import numpy as np
 from typing import List
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from rich.console import Console
 from data.core import Data
 from graph.core import Graph
 from git import Repo
+from branch.utils import get_all_branch
+from utils.utils import get_index_by_value
 import importlib.util
 import inspect as insp
 
@@ -258,39 +264,39 @@ REPO_MODULE_DICT = {
         "cookiecutter.replay",
         "cookiecutter.find",
     ],
-    "thef": [
-        "thef.rules.brew_install",
-        "thef.shells.generic",
-        "thef.rules.git_rm_recursive",
-        "thef.rules.pacman_invalid_option",
-        "thef.rules.cp_create_destination",
-        "thef.rules.choco_install",
-        "thef.rules.vagrant_up",
-        "thef.entrypoints.fix_command",
-        "thef.rules.aws_cli",
-        "thef.rules.no_such_file",
-        "thef.logs",
-        "thef.conf",
-        "thef.entrypoints.not_configured",
-        "thef.argument_parser",
-        "thef.rules.git_push_pull",
-        "thef.rules.tsuru_not_command",
-        "thef.entrypoints.shell_logger",
-        "thef.rules.django_south_merge",
-        "thef.entrypoints.alias",
-        "thef.rules.lein_not_task",
-        "thef.rules.git_diff_no_index",
-        "thef.rules.rm_root",
-        "thef.entrypoints.main",
-        "thef.rules.scm_correction",
-        "thef.rules.sudo_command_from_user_path",
-        "thef.system.unix",
-        "thef.corrector",
-        "thef.rules.dirty_unzip",
-        "thef.rules.git_add_force",
-        "thef.rules.cat_dir",
-        "thef.types",
-        "thef.rules.git_commit_reset",
+    "thefuck": [
+        "thefuck.rules.brew_install",
+        "thefuck.shells.generic",
+        "thefuck.rules.git_rm_recursive",
+        "thefuck.rules.pacman_invalid_option",
+        "thefuck.rules.cp_create_destination",
+        "thefuck.rules.choco_install",
+        "thefuck.rules.vagrant_up",
+        "thefuck.entrypoints.fix_command",
+        "thefuck.rules.aws_cli",
+        "thefuck.rules.no_such_file",
+        "thefuck.logs",
+        "thefuck.conf",
+        "thefuck.entrypoints.not_configured",
+        "thefuck.argument_parser",
+        "thefuck.rules.git_push_pull",
+        "thefuck.rules.tsuru_not_command",
+        "thefuck.entrypoints.shell_logger",
+        "thefuck.rules.django_south_merge",
+        "thefuck.entrypoints.alias",
+        "thefuck.rules.lein_not_task",
+        "thefuck.rules.git_diff_no_index",
+        "thefuck.rules.rm_root",
+        "thefuck.entrypoints.main",
+        "thefuck.rules.scm_correction",
+        "thefuck.rules.sudo_command_from_user_path",
+        "thefuck.system.unix",
+        "thefuck.corrector",
+        "thefuck.rules.dirty_unzip",
+        "thefuck.rules.git_add_force",
+        "thefuck.rules.cat_dir",
+        "thefuck.types",
+        "thefuck.rules.git_commit_reset",
     ],
     "youtube_dl": [
         "youtube_dl.extractor.archiveorg",
@@ -560,7 +566,7 @@ REPO_URL_DICT = {
     "pandas": "https://github.com/pandas-dev/pandas.git",
     "scrapy": "https://github.com/scrapy/scrapy.git",
     "spacy": "https://github.com/explosion/spaCy.git",
-    "thef": "https://github.com/nvbn/thefuck.git",
+    "thefuck": "https://github.com/nvbn/thefuck.git",
     "tornado": "https://github.com/tornadoweb/tornado.git",
     "tqdm": "https://github.com/tqdm/tqdm.git",
     "youtube_dl": "https://github.com/ytdl-org/youtube-dl.git",
@@ -595,7 +601,7 @@ REPO_COMMIT_ID_DICT = {
     "pandas": "945c9ed",
     "scrapy": "61130c8",
     "spacy": "800737b",
-    "thef": "0949d2e",
+    "thefuck": "0949d2e",
     "tornado": "2047e7a",
     "tqdm": "18d7aa4",
     "youtube_dl": "b224cf3",
@@ -858,7 +864,121 @@ class Codamosa(Data):
                     f.write(json.dumps(instance) + "\n")
 
     def process_raw(self) -> None:
-        self.logger.log("Processing raw data...")
+
+        process = False
+        # check if the data has been processeds
+        if os.path.exists(os.path.join(self.data_path, "data_processed.json")):
+            self.logger.log(
+                "Found data_processed.json file, do not need to process raw data"
+            )
+            # load data
+            with open(os.path.join(self.data_path, "data_processed.json"), "r") as file:
+                self.data = json.load(file)
+        else:
+            process = True
+
+        if not process:
+            return
+
+        if not os.path.exists(os.path.join(self.data_path, "raw_data.jsonl")):
+            raise FileNotFoundError("raw_data.jsonl not found, please crawl the data")
+
+        code_path = os.path.join(self.data_path, "codes")
+        graph_path = os.path.join(self.data_path, "graphs")
+
+        # make projects dir
+        if self.raw_overwrite:
+
+            if os.path.exists(code_path):
+                shutil.rmtree(code_path)
+            if os.path.exists(graph_path):
+                shutil.rmtree(graph_path)
+
+        os.makedirs(code_path, exist_ok=True)
+        os.makedirs(graph_path, exist_ok=True)
+
+        data_dict = {}
+        repos = []
+        num_module = 0
+        data_n = "test_module"
+
+        with open(os.path.join(self.data_path, f"raw_data.jsonl"), "r") as file:
+            raw_data = [json.loads(l) for l in file.readlines()]
+
+        self.logger.log(
+            f"[cyan]Processing {len(raw_data)} modules from raw data[/cyan]"
+        )
+        data = []
+
+        for instance in raw_data:
+
+            key = instance["module_name"].replace(
+                ".", "_"
+            )  # Use module_name as unique key
+
+            dat = {}
+            dat["test_cases"] = {}
+            dat["graph"] = {}
+            dat["uuid"] = key
+            dat["code_path"] = os.path.join(code_path, f"{key}.py")
+            dat["graph"]["src_graph_path"] = os.path.join(graph_path, f"{key}.json")
+            dat["graph"]["node_feature_path"] = os.path.join(graph_path, f"{key}.pt")
+            dat["graph"]["mask_path"] = os.path.join(graph_path, f"{key}_mask.pt")
+            # dat["repo"] = raw_data["repo_name"]
+            dat["module_path"] = instance["module_path"]
+
+            # extract local imports
+            classes = [cls["name"] for cls in instance["classes"]]
+            functions = instance["functions"]
+
+            local_imports = (
+                "from "
+                + instance["module_name"]
+                + " import "
+                + ", ".join([*classes, *functions])
+                + "\n"
+            )
+            dat["local_imports"] = local_imports
+
+            project = instance["repo_name"]
+            repos.append(project)
+
+            if (not os.path.exists(dat["code_path"])) or (
+                os.path.exists(dat["code_path"]) and self.raw_overwrite
+            ):
+                with open(dat["code_path"], "w") as file:
+                    file.write(instance["source_code"])
+
+            data.append(dat)
+            num_module += 1
+            if not os.path.exists(dat["graph"]["src_graph_path"]):
+                if os.path.exists(dat["graph"]["node_feature_path"]):
+                    node_feat = torch.load(dat["graph"]["node_feature_path"])
+                    if node_feat.size(0) == 0:
+                        self.logger.log(f"[red]Node features are empty for {key}[/red]")
+
+                graph = self.graph.extract_graph(
+                    code_path=dat["code_path"],
+                    save_path=dat["graph"]["src_graph_path"],
+                    overwrite=self.raw_overwrite,
+                )
+
+                num_nodes = len(graph["nodes"])
+                if not os.path.exists(dat["graph"]["node_feature_path"]):
+                    node_feat = self.get_node_features(graph=graph)
+                    torch.save(node_feat, dat["graph"]["node_feature_path"])
+                    assert node_feat.size(0) == num_nodes
+
+        data_dict[data_n] = {dat["uuid"]: dat for dat in data}
+
+        self.data = data_dict
+        with open(os.path.join(self.data_path, "data_processed.json"), "w") as f:
+            json.dump(self.data, f)
+
+        num_project = len(set(repos))
+        self.logger.log("Processed raw data")
+        self.logger.log(f"Number of projects: {num_project}")
+        self.logger.log(f"Number of modules: {num_module}")
         return
 
     def create_package_txt(self, data: dict) -> None:
@@ -909,3 +1029,190 @@ class Codamosa(Data):
                 module_info["module_name_coverage"] = module.replace(".", "/")
                 module_infos.append(module_info)
         return module_infos
+
+    def prepare_data_for_test_gen(self, branch_limit: int = 100) -> None:
+
+        assert self.data is not None
+
+        processed_data = None
+
+        if "graph" not in self.baseline_prompt:
+            processed_data_file_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.llm_model_name}",
+                "testgen",
+                "processed_data_for_test_gen.json",
+            )
+        else:
+            processed_data_file_path = os.path.join(
+                self.data_path,
+                f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                "testgen",
+                "processed_data_for_test_gen.json",
+            )
+
+        if os.path.exists(processed_data_file_path):
+            with open(
+                processed_data_file_path,
+                "r",
+            ) as file:
+                self.processed_data = json.load(file)
+            processed_data = True
+        else:
+            processed_data_path = os.path.join(
+                self.data_path,
+                f"raw-pyg",
+            )
+            if "graph" not in self.baseline_prompt:
+                processed_prompt_path = os.path.join(
+                    self.data_path,
+                    f"{self.baseline_prompt}_{self.llm_model_name}",
+                    "testgen",
+                )
+            else:
+                processed_prompt_path = os.path.join(
+                    self.data_path,
+                    f"{self.baseline_prompt}_{self.llm_model_name}_{self.gnn_mode}",
+                    "testgen",
+                )
+
+            os.makedirs(processed_data_path, exist_ok=True)
+            os.makedirs(processed_prompt_path, exist_ok=True)
+
+        if processed_data:
+            self.logger.log("[green]Data is already processed![/green]")
+            self.logger.log(f"Size of data data: {len(self.processed_data)}")
+            return
+
+        with self.logger.status("[green]Preparing data for test gen...[/green]"):
+
+            self.processed_data = {}
+            num_tokens = []
+            num_discarded = 0
+            num_branch_total = 0
+            num_testcase_total = 0
+
+            for data_n in self.data.keys():
+
+                if "test" not in data_n:
+                    continue
+
+                self.processed_data[data_n] = {}
+
+                for uuid, dat in self.data[data_n].items():
+
+                    with open(dat["code_path"], "r") as file:
+                        src_code = file.read()
+
+                    local_imports = dat.get("local_imports", "")
+
+                    module_path = dat.get("module_path", "N/A")
+                    branches = get_all_branch(code=src_code, branch_limit=branch_limit)
+                    num_branch_total += len(branches)
+
+                    if "graph" in self.baseline_prompt:
+                        graph_name = f"{uuid}_graph.pt"
+                        graph_path = os.path.join(processed_data_path, graph_name)
+
+                        if os.path.exists(graph_path):
+                            with open(dat["graph"]["src_graph_path"], "r") as file:
+                                graph = json.load(file)
+                        else:
+                            graph = self.read_graph(dat)
+                            torch.save(graph, graph_path)
+
+                    for i, branch in enumerate(branches):
+
+                        all_masks = self.get_mask_tensor(graph=graph, branch=branch)
+                        assert len(branch) == len(
+                            all_masks
+                        ), "Mask and branch length mismatch: {} vs {}".format(
+                            len(all_masks), len(branch)
+                        )
+
+                        if all_masks is None:
+                            self.logger.log(
+                                f"Only import branch at uuid: {uuid}, testcase: {i}"
+                            )
+
+                        active_nodes = [
+                            get_index_by_value(a=all_masks[j], val=1)
+                            for j in range(len(all_masks))
+                        ]
+
+                        result = self.get_prompt(
+                            src_code=src_code,
+                            testcase_out=None,
+                            active_nodes=active_nodes,
+                            tokenizer=self.llm_tokenizer,
+                            module_path=module_path,
+                            branch=branch,
+                            gnn_mode=self.gnn_mode,
+                            testing=True,
+                            local_imports=local_imports,
+                        )
+
+                        if result is None:
+                            num_discarded += 1
+                            continue
+
+                        prompt = result
+                        num_token = len(self.llm_tokenizer.tokenize(prompt))
+                        num_tokens.append(num_token)
+
+                        if "graph" in self.baseline_prompt:
+
+                            data = {
+                                "uuid": f"{uuid}_testcase_{i}",
+                                "prompt": prompt,
+                                "active_node": [
+                                    active_node.tolist() for active_node in active_nodes
+                                ],
+                                "mask": [
+                                    all_masks[i].tolist() for i in range(len(all_masks))
+                                ],
+                                "graph_path": graph_path,
+                                "num_tokens": num_token,
+                                "branch": branch,
+                                "module_path": module_path,
+                                "code_path": dat["code_path"],
+                            }
+
+                        else:
+                            data = {
+                                "uuid": f"{uuid}_testcase_{i}",
+                                "prompt": prompt,
+                                "active_node": None,
+                                "mask": None,
+                                "graph_path": None,
+                                "num_tokens": num_token,
+                                "branch": None,
+                                "module_path": module_path,
+                            }
+
+                        data_name = f"{uuid}_testcase_{i}.json"
+                        data_path = os.path.join(processed_prompt_path, data_name)
+                        with open(data_path, "w") as file:
+                            json.dump(data, file, indent=4)
+                            print(f"Saved data to {data_path}")
+
+                        self.processed_data[data_n][f"{uuid}_testcase_{i}"] = {
+                            "num_tokens": num_token,
+                            "path": data_path,
+                        }
+                        num_testcase_total += 1
+
+        with open(processed_data_file_path, "w") as file:
+            json.dump(self.processed_data, file, indent=4)
+
+        self.logger.log("[green]Data is ready![/green]")
+        self.logger.log(
+            f"Size of processed data: {len(self.processed_data)}, num_discarded: {num_discarded}"
+        )
+
+        quartiles = np.quantile(num_tokens, [0, 0.25, 0.5, 0.75, 1])
+        max_num_tokens = max(num_tokens)
+        min_num_tokens = min(num_tokens)
+        self.logger.log(
+            f"Statistics of # tokens: {quartiles}, max: {max_num_tokens}, min: {min_num_tokens}, num_data: {len(num_tokens)}"
+        )

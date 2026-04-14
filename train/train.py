@@ -8,7 +8,7 @@ import shutil
 from rich import print as pprint
 from functools import partial
 from torch.utils.data import DataLoader, WeightedRandomSampler
-from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, CosineAnnealingWarmRestarts
 from torch.optim import AdamW
 from datetime import timedelta
 from data.core import Data
@@ -37,6 +37,7 @@ from utils.utils import log_ram_usage
 from collections import deque
 
 # typing
+import deepspeed
 from argparse import Namespace
 from rich.console import Console
 from transformers import PreTrainedTokenizer
@@ -159,23 +160,26 @@ def train(
     )
 
     console.log(f"Metadata used for model initialization: {metadata}")
+    if isinstance(model, deepspeed.runtime.engine.DeepSpeedEngine):
+        console.log(f"[yellow]DeepSpeed model detected[/yellow]")
 
-    # for name, param in model.named_parameters():
-    #     console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
+    # if accelerator.is_main_process:
+    #     for name, param in model.named_parameters():
+    #         console.log(
+    #             f"[yellow]Parameter {name}, dtype: {param.dtype}, shape: {param.shape}[/yellow]"
+    #         )
 
     optimizer = AdamW(
         filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate
     )
-    lr_scheduler = CosineAnnealingLR(optimizer, T_max=100, eta_min=5e-8)
+    lr_scheduler = CosineAnnealingWarmRestarts(optimizer=optimizer, T_0=20, T_mult=1)
 
     if args.continue_training:
-        model, start_step, optimizer, lr_scheduler = continue_training_from_checkpoint(
+        model, start_step = continue_training_from_checkpoint(
             args=args,
             model=model,
-            rank=accelerator.process_index,
+            local_rank=accelerator.process_index,
             console=console,
-            optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
         )
     else:
         start_step = -1
@@ -210,6 +214,7 @@ def train(
             model=model,
             max_num_checkpoint=max_num_checkpoint,
             collate_fn=collate_fn_,
+            use_zero3=use_zero3,
         )
 
 
@@ -730,7 +735,10 @@ def train_multi_gpu_accelerate(
     max_num_checkpoint: int = 5,
     collate_fn: callable = collate_fn,
     mixed_precision: str = "bf16",
+    use_zero3: bool = False,
 ):
+
+    save_path = os.path.join(args.output_dir, args.name)
     if accelerator.is_main_process:
         # init wandb
         accelerator.init_trackers(
@@ -751,7 +759,6 @@ def train_multi_gpu_accelerate(
         )
 
         # Create save directory
-        save_path = os.path.join(args.output_dir, args.name)
         if os.path.exists(save_path):
             if continue_training == False:
                 shutil.rmtree(save_path)
@@ -848,6 +855,8 @@ def train_multi_gpu_accelerate(
     model, optimizer, lr_scheduler, tr_loader, va_loader = accelerator.prepare(
         model, optimizer, lr_scheduler, tr_loader, va_loader
     )
+    if isinstance(model, deepspeed.runtime.engine.DeepSpeedEngine):
+        console.log(f"[yellow]DeepSpeed model detected after prepare[/yellow]")
     global_step = 0
     previous_checkpoint_step = -1
     best_val_loss = 10000.0
@@ -979,8 +988,11 @@ def train_multi_gpu_accelerate(
 
                         if accelerator.sync_gradients:
                             accelerator.wait_for_everyone()
-                            accelerator.clip_grad_norm_(
+                            grad_norm = accelerator.clip_grad_norm_(
                                 model.parameters(), args.max_grad_norm
+                            )
+                            accelerator.print(
+                                f"[blue]Grad norm at step {global_step}: {grad_norm}[/blue]"
                             )
                             optimizer.step()
                             lr_scheduler.step()
@@ -1106,13 +1118,13 @@ def train_multi_gpu_accelerate(
                         )
                         os.rename(old_dir, new_dir)
 
-                    if accelerator.is_main_process:
-                        checkpoint_dir_new = os.path.join(
-                            save_path,
-                            f"current_checkpoint",
-                        )
-                        previous_checkpoint_step = global_step
+                    checkpoint_dir_new = os.path.join(
+                        save_path,
+                        f"current_checkpoint",
+                    )
+                    previous_checkpoint_step = global_step
 
+                    if accelerator.is_main_process:
                         while len(os.listdir(save_path)) >= max_num_checkpoint:
                             oldest_checkpoint = min(
                                 [
@@ -1124,16 +1136,26 @@ def train_multi_gpu_accelerate(
                             )
                             shutil.rmtree(oldest_checkpoint)
 
-                        unwrapped_model = accelerator.unwrap_model(model)
+                    #
+                    state_dict = accelerator.get_state_dict(model)
+                    if accelerator.is_main_process:
+                        unwrapped_model = (
+                            accelerator.unwrap_model(model) if not use_zero3 else None
+                        )
                         save_checkpoint(
                             model=unwrapped_model,
                             path=checkpoint_dir_new,
                             global_step=global_step,
+                            state_dict=state_dict if use_zero3 else None,
                             seed=args.seed,
                             is_lora=args.use_lora,
+                            accelerator=accelerator,
                         )
-                        accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
                         del unwrapped_model
+                    del state_dict
+                    gc.collect()
+
+                    accelerator.print(f"Saving checkpoint to {checkpoint_dir_new}")
 
                 if global_step % args.validating_steps == 0:
                     accelerator.wait_for_everyone()
@@ -1153,53 +1175,44 @@ def train_multi_gpu_accelerate(
                             f"Validation loss: {val_loss:.4f} at step {global_step}"
                         )
 
-                        if val_loss < best_val_loss:
-                            best_val_loss = val_loss
-                            accelerator.print(
-                                f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
-                            )
-                            checkpoint_dir = os.path.join(
-                                save_path,
-                                f"best_model",
-                            )
+                    if val_loss < best_val_loss:
+                        # Save best model
+                        checkpoint_dir = os.path.join(
+                            save_path,
+                            f"best_model",
+                        )
 
-                            if not os.path.exists(checkpoint_dir):
-                                os.makedirs(checkpoint_dir, exist_ok=True)
+                        if (
+                            not os.path.exists(checkpoint_dir)
+                            and accelerator.is_main_process
+                        ):
+                            os.makedirs(checkpoint_dir, exist_ok=True)
 
-                            unwrapped_model = accelerator.unwrap_model(model)
-                            # Save state dict to CPU to avoid keeping GPU memory
-                            state_dict_cpu = {
-                                k: v.cpu()
-                                for k, v in unwrapped_model.state_dict().items()
-                            }
-                            if args.use_lora:
-                                lora_state_dict = {
-                                    k: v
-                                    for k, v in state_dict_cpu.items()
-                                    if ("lora_" in k) or ("gnn" in k) or ("nvib" in k)
-                                }
-                                torch.save(
-                                    lora_state_dict,
-                                    os.path.join(checkpoint_dir, f"model_weight.pt"),
-                                )
-                            else:
-                                torch.save(
-                                    state_dict_cpu,
-                                    os.path.join(
-                                        checkpoint_dir,
-                                        f"model_weight.pt",
-                                    ),
-                                )
+                        accelerator.wait_for_everyone()
 
-                            tokenizer.save_pretrained(checkpoint_dir)
-                            console.log(
-                                f"[green]Saved best checkpoint to {checkpoint_dir}[/green]"
+                        state_dict = accelerator.get_state_dict(model)
+                        if accelerator.is_main_process:
+                            unwrapped_model = (
+                                accelerator.unwrap_model(model)
+                                if not use_zero3
+                                else None
                             )
-                            del state_dict_cpu, unwrapped_model
-                            del checkpoint_dir
-                            if args.use_lora:
-                                del lora_state_dict
-                            gc.collect()
+                            save_checkpoint(
+                                model=unwrapped_model,
+                                path=checkpoint_dir,
+                                global_step=global_step,
+                                state_dict=state_dict if use_zero3 else None,
+                                seed=args.seed,
+                                is_lora=args.use_lora,
+                                accelerator=accelerator,
+                            )
+                            del unwrapped_model
+                        del state_dict
+                        gc.collect()
+                        tokenizer.save_pretrained(checkpoint_dir)
+                        console.log(
+                            f"[green]Saved best checkpoint to {checkpoint_dir}[/green]"
+                        )
 
             if accelerator.is_main_process:
                 if ((continue_training == True) and (global_step > start_step)) or (
@@ -1230,50 +1243,35 @@ def train_multi_gpu_accelerate(
             f"Final validation loss: {val_loss:.4f} at step {global_step}"
         )
 
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            accelerator.print(
-                f"New best validation loss: {best_val_loss:.4f} at step {global_step}. Saving best model..."
+    if val_loss < best_val_loss:
+        # Save best model
+        checkpoint_dir = os.path.join(
+            save_path,
+            f"best_model",
+        )
+
+        if not os.path.exists(checkpoint_dir) and accelerator.is_main_process:
+            os.makedirs(checkpoint_dir, exist_ok=True)
+
+        accelerator.wait_for_everyone()
+
+        state_dict = accelerator.get_state_dict(model)
+        if accelerator.is_main_process:
+            unwrapped_model = accelerator.unwrap_model(model) if not use_zero3 else None
+            save_checkpoint(
+                model=unwrapped_model,
+                path=checkpoint_dir,
+                global_step=global_step,
+                state_dict=state_dict if use_zero3 else None,
+                seed=args.seed,
+                is_lora=args.use_lora,
+                accelerator=accelerator,
             )
-            checkpoint_dir = os.path.join(
-                save_path,
-                f"best_model",
-            )
-
-            if not os.path.exists(checkpoint_dir):
-                os.makedirs(checkpoint_dir, exist_ok=True)
-
-            unwrapped_model = accelerator.unwrap_model(model)
-            # Save state dict to CPU to avoid keeping GPU memory
-            state_dict_cpu = {
-                k: v.cpu() for k, v in unwrapped_model.state_dict().items()
-            }
-            if args.use_lora:
-                lora_state_dict = {
-                    k: v
-                    for k, v in state_dict_cpu.items()
-                    if ("lora_" in k) or ("gnn" in k) or ("nvib" in k)
-                }
-                torch.save(
-                    lora_state_dict,
-                    os.path.join(checkpoint_dir, f"model_weight.pt"),
-                )
-            else:
-                torch.save(
-                    state_dict_cpu,
-                    os.path.join(
-                        checkpoint_dir,
-                        f"model_weight.pt",
-                    ),
-                )
-
-            tokenizer.save_pretrained(checkpoint_dir)
-            console.log(f"[green]Saved best checkpoint to {checkpoint_dir}[/green]")
-            del state_dict_cpu, unwrapped_model
-            del checkpoint_dir
-            if args.use_lora:
-                del lora_state_dict
-            gc.collect()
+            del unwrapped_model
+        del state_dict
+        gc.collect()
+        tokenizer.save_pretrained(checkpoint_dir)
+        console.log(f"[green]Saved best checkpoint to {checkpoint_dir}[/green]")
 
     accelerator.end_training()
 

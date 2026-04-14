@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import torch
 from model.glmf import GLMFModelConfig, GLMFModelForCausalLM
@@ -189,100 +190,67 @@ def get_model_train(
                     param.requires_grad = True
                     console.log(f"Parameter {name} is set to be trainable.")
     else:
+        config = GLMFModelConfig(
+            llm_model=args.llm_model,
+            use_lora=args.use_lora,
+            dtype=args.dtype,
+            mode=args.gnn_mode,
+            in_feats=args.in_feats,
+            n_hidden=args.n_hidden,
+            n_layers=args.n_layers,
+            num_head=args.num_head,
+            dropout=args.dropout,
+            lora_r=args.lora_r,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            lora_target_modules=args.lora_target_modules,
+            device_map=(
+                None if use_zero3 else ("cuda" if torch.cuda.is_available() else "cpu")
+            ),
+        )
+        model = GLMFModelForCausalLM(
+            config=config,
+            tokenizer=tokenizer,
+            baseline_prompt=args.baseline_prompt,
+            multi_gpu=True if args.num_gpu > 1 else False,
+            debug=args.debug,
+            rank=rank,
+            is_training=True,
+            use_zero3=use_zero3,
+        )
+        model.metadata = metadata
+        if metadata is not None:
+            model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
+            console.log(
+                f"[blue]Converted GNN to heterogeneous with metadata: {metadata}[/blue]"
+            )
         if args.model_weight_path is not None:
-
-            config = GLMFModelConfig(
-                llm_model=args.llm_model,
-                use_lora=False,
-                dtype=args.dtype,
-                mode=args.gnn_mode,
-                in_feats=args.in_feats,
-                n_hidden=args.n_hidden,
-                n_layers=args.n_layers,
-                num_head=args.num_head,
-                dropout=args.dropout,
-                lora_r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                lora_target_modules=args.lora_target_modules,
-                device_map="cuda" if torch.cuda.is_available() else "cpu",
+            if args.model_weight_path.endswith(".pt"):
+                weights_path = args.model_weight_path
+            else:
+                console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
+                for file in os.listdir(args.model_weight_path):
+                    if file.endswith(".pt"):
+                        weights_path = os.path.join(args.model_weight_path, file)
+                        break
+            console.log(f"[red]Loading weight from {weights_path}[/red]")
+            check_point = load_checkpoint(path=weights_path, rank=rank)
+            state_dict = check_point["model_state_dict"]
+            missing_keys, unexpected_keys = model.load_state_dict(
+                state_dict, strict=False
             )
-
-            model = GLMFModelForCausalLM(
-                config=config,
-                tokenizer=tokenizer,
-                baseline_prompt=args.baseline_prompt,
-                multi_gpu=True if args.num_gpu > 1 else False,
-                debug=args.debug,
-                rank=rank,
-                is_training=False,
-            )
-
-            model.metadata = metadata
-            if metadata is not None:
-                model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
+            if missing_keys:
                 console.log(
-                    f"[blue]Converted GNN to heterogeneous with metadata: {metadata}[/blue]"
+                    f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
                 )
-
-            for file in os.listdir(args.model_weight_path):
-                if file.endswith(".pt"):
-                    state_dict = torch.load(
-                        os.path.join(args.model_weight_path, file),
-                        map_location="cpu",
-                        weights_only=True,
-                    )
-                    model.load_state_dict(state_dict)
-                    console.log(
-                        f"[red]Model weights loaded from {os.path.join(args.model_weight_path, file)}[/red]"
-                    )
-
-            model.init_for_train(tokenizer=tokenizer, rank=rank)
-            # make the model to bf16/fp16
-            for n, p in model.named_parameters():
-                if args.dtype == "bf16":
-                    if p.dtype != torch.bfloat16:
-                        p.data = p.data.to(torch.bfloat16)
-                elif args.dtype == "fp16":
-                    if p.dtype != torch.float16:
-                        p.data = p.data.to(torch.float16)
-
-        else:
-            config = GLMFModelConfig(
-                llm_model=args.llm_model,
-                use_lora=args.use_lora,
-                dtype=args.dtype,
-                mode=args.gnn_mode,
-                in_feats=args.in_feats,
-                n_hidden=args.n_hidden,
-                n_layers=args.n_layers,
-                num_head=args.num_head,
-                dropout=args.dropout,
-                lora_r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                lora_target_modules=args.lora_target_modules,
-                device_map=(
-                    None
-                    if use_zero3
-                    else ("cuda" if torch.cuda.is_available() else "cpu")
-                ),
-            )
-            model = GLMFModelForCausalLM(
-                config=config,
-                tokenizer=tokenizer,
-                baseline_prompt=args.baseline_prompt,
-                multi_gpu=True if args.num_gpu > 1 else False,
-                debug=args.debug,
-                rank=rank,
-                is_training=True,
-                use_zero3=use_zero3,
-            )
-            model.metadata = metadata
-            if metadata is not None:
-                model.gnn = to_hetero(model.gnn, metadata=metadata, aggr="sum")
+            if unexpected_keys:
                 console.log(
-                    f"[blue]Converted GNN to heterogeneous with metadata: {metadata}[/blue]"
+                    f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
+                )
+                # Log sample of unexpected keys for debugging
+                sample_unexpected = list(unexpected_keys)[:3]
+                console.log(
+                    f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
                 )
 
         model.llm_model.gradient_checkpointing_enable()
@@ -296,13 +264,13 @@ def get_model_train(
             f"Attention implementation of the model is: {model.llm_model.config._attn_implementation}"
         )
 
-    for n, p in model.named_parameters():
-        if args.dtype == "bf16":
-            if p.dtype != torch.bfloat16:
-                p.data = p.data.to(torch.bfloat16)
-        elif args.dtype == "fp16":
-            if p.dtype != torch.float16:
-                p.data = p.data.to(torch.float16)
+    # for n, p in model.named_parameters():
+    #     if args.dtype == "bf16":
+    #         if p.dtype != torch.bfloat16:
+    #             p.data = p.data.to(torch.bfloat16)
+    #     elif args.dtype == "fp16":
+    #         if p.dtype != torch.float16:
+    #             p.data = p.data.to(torch.float16)
 
     return model
 
@@ -453,27 +421,18 @@ def get_model_test(
             tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
         ]
 
-    # # take .pt file from the model_weight_path
-    # console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
-    # for file in os.listdir(args.model_weight_path):
-    #     if file.endswith(".pt"):
-    #         state_dict = torch.load(
-    #             os.path.join(args.model_weight_path, file),
-    #             map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-    #         )
-    #         model.load_state_dict(state_dict)
-    #         if use_lora:
-    #             model.llm_model = model.llm_model.merge_and_unload()
-    #         console.log(f"[red]Model weights loaded from {file}[/red]")
-
-    # take .pt file from the model_weight_path
-    if args.model_weight_path.endswith(".pt"):
-        console.log(f"[red]Loading weight from {args.model_weight_path}[/red]")
-        state_dict = torch.load(
-            args.model_weight_path,
-            map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-        )
-        console.log(f"[green]Using LoRA weights for testing: {use_lora}.[/green]")
+    if args.model_weight_path is not None:
+        if args.model_weight_path.endswith(".pt"):
+            weights_path = args.model_weight_path
+        else:
+            console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
+            for file in os.listdir(args.model_weight_path):
+                if file.endswith(".pt"):
+                    weights_path = os.path.join(args.model_weight_path, file)
+                    break
+        console.log(f"[red]Loading weight from {weights_path}[/red]")
+        check_point = load_checkpoint(path=weights_path, rank=rank)
+        state_dict = check_point["model_state_dict"]
         missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
         if missing_keys:
             console.log(
@@ -488,44 +447,10 @@ def get_model_test(
             console.log(
                 f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
             )
-    else:
-        console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
-        for file in os.listdir(args.model_weight_path):
-            if file.endswith(".pt"):
-                state_dict = torch.load(
-                    os.path.join(args.model_weight_path, file),
-                    map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-                )
-                console.log(
-                    f"[green]Using LoRA weights for testing: {use_lora}.[/green]"
-                )
-
-                state_dict = state_dict["model_state_dict"]
-                missing_keys, unexpected_keys = model.load_state_dict(
-                    state_dict, strict=False
-                )
-
-                if missing_keys:
-                    console.log(
-                        f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
-                    )
-                if unexpected_keys:
-                    console.log(
-                        f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
-                    )
-                    # Log sample of unexpected keys for debugging
-                    sample_unexpected = list(unexpected_keys)[:3]
-                    console.log(
-                        f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
-                    )
-                break
 
     if use_lora:
         model.llm_model = model.llm_model.merge_and_unload()
     console.log(f"[red]Model weights loaded from {args.model_weight_path}[/red]")
-
-    # model = model.to(dtype=torch.float)
-    # unifying dtype to avoid errors
     for n, p in model.named_parameters():
         if args.dtype == "bf16":
             p.data = p.data.to(torch.bfloat16)
@@ -535,8 +460,6 @@ def get_model_test(
             p.data = p.data.to(device)
 
     console.log(f"Model is loaded to device: {model.device} - with type {model.dtype}")
-    # for name, param in model.named_parameters():
-    #     console.log(f"[yellow]Parameter {name}, dtype: {param.dtype}[/yellow]")
     return model
 
 
@@ -554,6 +477,7 @@ def get_model_testgen(
     ), "Model directory must be specified for testing."
     use_lora = True
 
+    model = None
     if args.do_generate:
         if args.fuzz_model:
 
@@ -683,13 +607,19 @@ def get_model_testgen(
                 tokenizer.convert_tokens_to_ids(GRAPH_END_TOKEN),
             ]
         console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
-        if args.model_weight_path.endswith(".pt"):
-            console.log(f"[red]Loading weight from {args.model_weight_path}[/red]")
-            state_dict = torch.load(
-                args.model_weight_path,
-                map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-            )
-            console.log(f"[green]Using LoRA weights for testing: {use_lora}.[/green]")
+
+        if args.model_weight_path is not None:
+            if args.model_weight_path.endswith(".pt"):
+                weights_path = args.model_weight_path
+            else:
+                console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
+                for file in os.listdir(args.model_weight_path):
+                    if file.endswith(".pt"):
+                        weights_path = os.path.join(args.model_weight_path, file)
+                        break
+            console.log(f"[red]Loading weight from {weights_path}[/red]")
+            check_point = load_checkpoint(path=weights_path, rank=rank)
+            state_dict = check_point["model_state_dict"]
             missing_keys, unexpected_keys = model.load_state_dict(
                 state_dict, strict=False
             )
@@ -706,38 +636,6 @@ def get_model_testgen(
                 console.log(
                     f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
                 )
-        else:
-            console.log(f"[red]Finding weights from {args.model_weight_path}[/red]")
-            for file in os.listdir(args.model_weight_path):
-                if file.endswith(".pt"):
-                    state_dict = torch.load(
-                        os.path.join(args.model_weight_path, file),
-                        map_location=f"cuda:{rank}" if args.num_gpu > 1 else "cpu",
-                    )
-                    console.log(
-                        f"[green]Using LoRA weights for testing: {use_lora}.[/green]"
-                    )
-
-                    state_dict = state_dict["model_state_dict"]
-                    missing_keys, unexpected_keys = model.load_state_dict(
-                        state_dict, strict=False
-                    )
-
-                    if missing_keys:
-                        console.log(
-                            f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
-                        )
-                    if unexpected_keys:
-                        console.log(
-                            f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
-                        )
-                        # Log sample of unexpected keys for debugging
-                        sample_unexpected = list(unexpected_keys)[:3]
-                        console.log(
-                            f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
-                        )
-                    break
-
         if use_lora:
             model.llm_model = model.llm_model.merge_and_unload()
         console.log(f"[red]Model weights loaded from {args.model_weight_path}[/red]")
@@ -758,38 +656,65 @@ def get_model_testgen(
         #     console.log(
         #         f"[yellow]Parameter {name}, dtype: {param.dtype}, device: {param.device}[/yellow]"
         #     )
-    else:
-        model = None
     return model
 
 
 def continue_training_from_checkpoint(
     args: Namespace,
     model: GLMFModelForCausalLM,
-    optimizer: torch.optim.Optimizer,
-    lr_scheduler: torch.optim.lr_scheduler._LRScheduler,
     local_rank: int,
+    console: Console,
 ):
     if args.continue_training:
 
-        assert args.checkpoint_path is not None, "Checkpoint path must be specified."
-        check_point = load_checkpoint(path=args.checkpoint_path, rank=local_rank)
+        # assert args.checkpoint_path is not None, "Checkpoint path must be specified."
+        if args.checkpoint_path is None:
+            ckpt_path = os.path.join(args.output_dir, args.name, "current_checkpoint")
+        else:
+            ckpt_path = args.checkpoint_path
 
-        model.load_state_dict(check_point["model_state_dict"])
-        optimizer.load_state_dict(check_point["optimizer_state_dict"])
-        lr_scheduler.load_state_dict(check_point["scheduler_state_dict"])
+        # check if exists current checkpoint path and it's not empty
+        if not os.path.exists(ckpt_path) or len(os.listdir(ckpt_path)) == 0:
+            console.log(
+                f"[cyan]Checkpoint path {ckpt_path} does not exist or is empty. Cannot continue training.[/cyan]"
+            )
+            raise FileNotFoundError(
+                f"Checkpoint path {ckpt_path} does not exist or is empty."
+            )
+
+        check_point = load_checkpoint(path=ckpt_path, rank=local_rank)
+        state_dict = check_point["model_state_dict"]
+        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
+
+        if missing_keys:
+            console.log(
+                f"[yellow]Missing keys in checkpoint: {len(missing_keys)} keys[/yellow]"
+            )
+        if unexpected_keys:
+            console.log(
+                f"[yellow]Unexpected keys in checkpoint (ignored): {len(unexpected_keys)} keys[/yellow]"
+            )
+            sample_unexpected = list(unexpected_keys)[:3]
+            console.log(
+                f"[yellow]Sample unexpected keys: {sample_unexpected}...[/yellow]"
+            )
         start_step = check_point["global_step"]
     else:
         start_step = -1
 
-    return model, optimizer, lr_scheduler, start_step
+    return model, start_step
 
 
 def extract_metadata_from_graph(dataset: Data):
     # Get 1 graph from the dataset to make the GNN model become heterogeneous
-    data_path = dataset.processed_data["train"][
-        list(dataset.processed_data["train"].keys())[0]
-    ]["path"]
+    if "train" in dataset.processed_data:
+        data_path = dataset.processed_data["train"][
+            list(dataset.processed_data["train"].keys())[0]
+        ]["path"]
+    else:
+        data_path = dataset.processed_data["test_module"][
+            list(dataset.processed_data["test_module"].keys())[0]
+        ]["path"]
     with open(data_path, "r") as f:
         sample = json.load(f)
     graph_path = sample["graph_path"]

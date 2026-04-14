@@ -292,6 +292,8 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
             inputs_embeds = self.llm_model.get_input_embeddings()(input_ids)
             input_ids = input_ids.to("cpu")
 
+        dtype = inputs_embeds.dtype
+
         if (
             (graphs is not None)
             and ("graph" in self.baseline_prompt)
@@ -346,7 +348,7 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
 
                 for node_type in graph.node_types:
                     if "x" in graph[node_type]:
-                        graph[node_type].x = graph[node_type].x.to(self.torch_dtype)
+                        graph[node_type].x = graph[node_type].x.to(dtype)
 
                 graph_embeds = self.gnn(graph.x_dict, graph.edge_index_dict)
                 graph_embeds = graph_embeds["node"][overall_indices, :]
@@ -366,9 +368,9 @@ class GLMFModelForCausalLM(GLMFModel, GenerationMixin):
                         inputs_embeds[
                             i, graph_token_index[j] : graph_token_index[j] + 1, :
                         ] = embeds.to(inputs_embeds.dtype).mean(dim=0, keepdim=True)
-        else:
-            if self.is_training:
-                inputs_embeds = inputs_embeds.requires_grad_(True)
+
+        if self.is_training:
+            inputs_embeds = inputs_embeds.requires_grad_(True)
         self._last_embedding_time = time.time() - embedding_start
         return inputs_embeds
 

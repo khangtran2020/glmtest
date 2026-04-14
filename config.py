@@ -548,6 +548,12 @@ def add_baseline_group(group):
         default=None,
     )
     group.add_argument(
+        "--baseline_ragemb_api_key",
+        type=str,
+        help="api key for the embedding of rag module",
+        default=None,
+    )
+    group.add_argument(
         "--baseline_output_path",
         type=str,
         help="path to save baseline outputs",
@@ -587,6 +593,18 @@ def add_baseline_group(group):
         "--baseline_skip_prepare_data",
         action="store_true",
         help="skip data preparation for baseline",
+    )
+    group.add_argument(
+        "--baseline_branch_data",
+        type=str,
+        help="Dir for branches of generated test cases for baseline",
+        default=None,
+    )
+    group.add_argument(
+        "--baseline_response_data",
+        type=str,
+        help="Dir for generated test case responses for baseline",
+        default=None,
     )
 
 

@@ -14,6 +14,7 @@ from model.model import get_model, extract_metadata_from_graph
 from inference.test import test
 from inference.testcase_generate import testcase_generate
 from baselines.prompt_engineer.run import PromptEngineer
+from baselines.rag.run import RAGTestGenerator
 from baselines.codamosa.run import run_codamosa
 
 warnings.filterwarnings("ignore")
@@ -85,7 +86,7 @@ def main() -> None:
                     console.log(
                         f"[blue]Number of test cases for {data_n}: {len(dataset.processed_data[data_n])}[/blue]"
                     )
-        if (args.mode == "prepare_reasoning") or (
+        elif (args.mode == "prepare_reasoning") or (
             (args.mode == "train") and args.train_reasoning
         ):
             dataset.prepare_reasoning_data()
@@ -151,7 +152,8 @@ def main() -> None:
         return  # exit after getting reasoning
 
     if args.mode == "baseline":
-        if args.baseline_prompt_type == "prompt_engineer":
+        console.log(f"[green]Running baseline method: {args.baseline_type}[/green]")
+        if args.baseline_type == "prompt_engineer":
             pe = PromptEngineer(
                 args=args,
                 model=args.baseline_llm_model,
@@ -165,12 +167,30 @@ def main() -> None:
                 output_path=args.baseline_output_path,
                 output_name=args.baseline_output_name,
                 max_tokens=args.baseline_max_tokens,
+                branch_data=args.baseline_branch_data,
+                response_data=args.baseline_response_data,
             )
             console.log(
                 "Baseline Prompt Engineer completed. Exiting as mode is 'baseline'."
             )
             return
-        elif args.baseline_prompt_type == "codamosa":
+        elif args.baseline_type == "rag":
+            console.log("Running RAG baseline.")
+            rag = RAGTestGenerator(
+                api_key=args.baseline_api_key,
+                model=args.baseline_llm_model,
+                embedding_model_api=args.baseline_ragemb_api_key,
+                console=console,
+            )
+            rag.generate_test_cases(
+                dataset=dataset,
+                output_path=args.baseline_output_path,
+                db_path=args.baseline_output_path,
+                output_name=args.baseline_output_name,
+                top_k=2,
+            )
+            return
+        elif args.baseline_type == "codamosa":
             if not os.path.exists(os.path.join(dataset.data_path, "test_module.jsonl")):
                 raise FileNotFoundError(
                     "test_module.jsonl not found, please crawl the data"
@@ -178,6 +198,11 @@ def main() -> None:
             with open(os.path.join(dataset.data_path, "test_module.jsonl"), "r") as f:
                 task_instances = [json.loads(line) for line in f.readlines()]
             run_codamosa(args=args, task_instances=task_instances, console=console)
+            return
+        else:
+            console.log(
+                f"[red]Baseline type {args.baseline_type} not recognized.[/red]"
+            )
             return
 
     if args.mode != "testgen":

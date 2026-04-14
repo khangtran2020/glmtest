@@ -34,6 +34,47 @@ Just output your answer WITHOUT REASONING and ensure your response is in the fol
 ```
 """
 
+PROMPT_FB = """Generate a test case for the following module such that:
+- The test case use the pytest framework and executable.
+- The test case will be put in the `tests/` directory which is place in the root of the project.
+- The test case will need to execute the provided branch of execution in the provided module.
+
+Here is the module:
+```python
+{}
+```
+
+The module is from this path:
+{}
+
+Here is the execution branch. The execution branch is a sequence of executable line number in the module:
+{}
+
+Just output your answer WITHOUT REASONING and ensure your response is in the following format:
+
+```json
+{{
+  "test_case": <YOUR ANSWER FOR THE TEST CASE - JUST ONLY THE EXECUTABLE PYTHON CODE>
+}}
+```
+
+Here is your generated test case and the branch it executes. Please adjust the test case to execute the provided branch of execution in the provided module.
+
+Your generated test case:
+{}
+
+Branch it executes:
+{}
+
+Just output your answer WITHOUT REASONING and ensure your response is in the following format:
+
+```json
+{{
+  "test_case": <YOUR ANSWER FOR THE TEST CASE - JUST ONLY THE EXECUTABLE PYTHON CODE>
+}}
+```
+"""
+
 PROMPT_COT = """Generate a test case for the following module such that:
 - The test case use the pytest framework and executable.
 - The test case will be put in the `tests/` directory which is place in the root of the project.
@@ -244,11 +285,60 @@ class PromptEngineer:
         split: str = "test_module",
         prompt_type: str = "zero_shot",
         on_processed_data: bool = False,
+        branch_data: Optional[Dict[str, Any]] = None,
+        response_data: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, str]]:
 
         prompt_list = []
         if on_processed_data:
             data = dataset.processed_data[split]
+            if response_data is not None:
+                # read the jsonl file from response_data
+                response_mapping = {}
+                try:
+                    with open(response_data, "r") as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                rec = json.loads(line)
+                                # rec is a dict with key is the uuid and value is the test case content
+                                for k, v in rec.items():
+                                    response_mapping[k] = v
+                            except Exception as e:
+                                raise ValueError(
+                                    f"Failed to parse line in response data file: {e}"
+                                )
+                except Exception as e:
+                    raise ValueError(f"Failed to read response data file: {e}")
+            else:
+                response_mapping = None
+
+            if branch_data is not None:
+                # read the jsonl file from branch_data
+                branch_mapping = {}
+                try:
+                    with open(branch_data, "r") as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                rec = json.loads(line)
+                                uuid = rec.get("id")
+                                branches = rec.get("branches")  # is a dict
+                                for k, v in branches.items():
+                                    branch_mapping[f"{uuid}_{k}"] = v
+                            except Exception as e:
+                                raise ValueError(
+                                    f"Failed to parse line in branch data file: {e}"
+                                )
+                except Exception as e:
+                    raise ValueError(f"Failed to read branch data file: {e}")
+            else:
+                branch_mapping = None
+
             # Add tqdm progress bar
             for key in tqdm(data.keys()):
 
@@ -299,6 +389,53 @@ class PromptEngineer:
             )
         else:
             data = dataset.data[split]
+            if response_data is not None:
+                # read the jsonl file from response_data
+                response_mapping = {}
+                try:
+                    with open(response_data, "r") as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                rec = json.loads(line)
+                                # rec is a dict with key is the uuid and value is the test case content
+                                for k, v in rec.items():
+                                    response_mapping[k] = v
+                            except Exception as e:
+                                raise ValueError(
+                                    f"Failed to parse line in response data file: {e}"
+                                )
+                except Exception as e:
+                    raise ValueError(f"Failed to read response data file: {e}")
+            else:
+                response_mapping = None
+
+            if branch_data is not None:
+                # read the jsonl file from branch_data
+                branch_mapping = {}
+                try:
+                    with open(branch_data, "r") as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                rec = json.loads(line)
+                                uuid = rec.get("id")
+                                branches = rec.get("branches")  # is a dict
+                                for k, v in branches.items():
+                                    branch_mapping[f"{uuid}_{k}"] = v
+                            except Exception as e:
+                                raise ValueError(
+                                    f"Failed to parse line in branch data file: {e}"
+                                )
+                except Exception as e:
+                    raise ValueError(f"Failed to read branch data file: {e}")
+            else:
+                branch_mapping = None
+
             # Add tqdm progress bar
             for key in tqdm(data.keys()):
                 uuid = data[key]["uuid"]
@@ -319,6 +456,29 @@ class PromptEngineer:
                     if prompt_type == "cot":
                         prompt_text = PROMPT_COT.format(
                             module_code, module_path, branch_line
+                        )
+                    elif prompt_type == "fb":
+                        assert (
+                            response_mapping is not None
+                        ), "response_data file is required for feedback prompt type"
+                        assert (
+                            branch_mapping is not None
+                        ), "branch_data file is required for feedback prompt type"
+                        response = response_mapping.get(f"{uuid}_{tc_key}", "")
+                        branch_info = branch_mapping.get(f"{uuid}_{tc_key}", "")
+                        branch_line_res = ""
+                        for i, branch_item in enumerate(branch_info):
+                            branch_line_res += (
+                                f"Branch #{i+1}"
+                                + "->".join([str(item) for item in branch_item])
+                                + "\n"
+                            )
+                        prompt_text = PROMPT_FB.format(
+                            module_code,
+                            module_path,
+                            branch_line,
+                            response,
+                            branch_line_res,
                         )
                     else:
                         prompt_text = PROMPT_ZERO_SHOT.format(
@@ -459,12 +619,16 @@ class PromptEngineer:
         output_name: str,
         max_tokens: int,
         on_processed_data: bool = False,
+        branch_data: Optional[Dict[str, Any]] = None,
+        response_data: Optional[Dict[str, Any]] = None,
     ):
         prompt_list = self.build_prompt(
             dataset=dataset,
             split="test_module",
             prompt_type=prompt_type,
             on_processed_data=on_processed_data,
+            branch_data=branch_data,
+            response_data=response_data,
         )
         self.console.log(
             f"[green]Built {len(prompt_list)} prompts for prompt engineering.[/green]"

@@ -1125,22 +1125,23 @@ class Data(object):
 
                     for i, branch in enumerate(branches):
 
-                        all_masks = self.get_mask_tensor(graph=graph, branch=branch)
-                        assert len(branch) == len(
-                            all_masks
-                        ), "Mask and branch length mismatch: {} vs {}".format(
-                            len(all_masks), len(branch)
-                        )
-
-                        if all_masks is None:
-                            self.logger.log(
-                                f"Only import branch at uuid: {uuid}, testcase: {i}"
+                        if "graph" in self.baseline_prompt:
+                            all_masks = self.get_mask_tensor(graph=graph, branch=branch)
+                            assert len(branch) == len(
+                                all_masks
+                            ), "Mask and branch length mismatch: {} vs {}".format(
+                                len(all_masks), len(branch)
                             )
+                        else:
+                            all_masks = None
 
-                        active_nodes = [
-                            get_index_by_value(a=all_masks[j], val=1)
-                            for j in range(len(all_masks))
-                        ]
+                        if "graph" in self.baseline_prompt:
+                            active_nodes = [
+                                get_index_by_value(a=all_masks[j], val=1)
+                                for j in range(len(all_masks))
+                            ]
+                        else:
+                            active_nodes = []
 
                         result = self.get_prompt(
                             src_code=src_code,

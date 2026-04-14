@@ -74,14 +74,15 @@ class GLMFDataset(Dataset):
         else:
             graph = None
 
-        _, list_of_edge_type = self.metadata
-        _, edge_type = graph.metadata()
+        if graph is not None:
+            _, list_of_edge_type = self.metadata
+            _, edge_type = graph.metadata()
 
-        for etype in list_of_edge_type:
-            if etype not in edge_type:
-                graph[etype].edge_index = torch.empty(
-                    (2, 0), dtype=torch.long
-                )  # Add empty edge_index
+            for etype in list_of_edge_type:
+                if etype not in edge_type:
+                    graph[etype].edge_index = torch.empty(
+                        (2, 0), dtype=torch.long
+                    )  # Add empty edge_index
 
         if sample["active_node"] is not None:
             active_nodes = []
